@@ -2,6 +2,8 @@
 
 ## 测试分层与定位
 
+`tools/source_lab/access` 的 capacity/profile 路径固定使用 `open62541_client_runner`，不提供 backend selector。
+
 ### Unit Tests（单元测试）
 
 验证单个函数、类或模块的逻辑正确性。不依赖外部服务（数据库、网络、OPC UA 服务器），所有外部依赖使用 mock 或 fake。
@@ -16,7 +18,7 @@
 验证多个组件之间的交互是否正确。依赖真实的数据库连接、真实的 OPC UA 服务器启动/停止、真实的网络通信。不做 mock。
 
 - **目标**：验证组件间接口和交互正确
-- **依赖**：PostgreSQL、OPC UA 服务端、asyncua Client
+- **依赖**：PostgreSQL、OPC UA 服务端、open62541 runner
 - **标记**：`@pytest.mark.integration`
 - **目录**：[tests/integration/](tests/integration/)
 

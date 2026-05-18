@@ -5,6 +5,7 @@ from __future__ import annotations
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 from tools.source_lab.access.scheduling import (
+    RunnerEndpointPlan,
     build_source_specs,
     iter_float_ramp,
     iter_int_ramp,
@@ -38,13 +39,20 @@ def test_partition_specs_round_robin() -> None:
     assert len(buckets) == 2
     assert len(buckets[0]) == 3
     assert len(buckets[1]) == 2
+    assert all(isinstance(item, RunnerEndpointPlan) for bucket in buckets for item in bucket)
 
 
-def test_build_source_specs_offset_range() -> None:
+def test_build_source_specs_offset_distribution() -> None:
     target_hz = 10.0
-    interval_seconds = 1.0 / target_hz
+    period_ns = round((1.0 / target_hz) * 1_000_000_000)
     specs = build_source_specs(tuple(_runtime_spec(i) for i in range(4)), target_hz=target_hz)
 
     assert len(specs) == 4
+    assert tuple(spec.global_index for spec in specs) == (0, 1, 2, 3)
+    assert tuple(spec.offset_ns for spec in specs) == (0, 25_000_000, 50_000_000, 75_000_000)
     for spec in specs:
-        assert 0.0 <= spec.offset_seconds < interval_seconds
+        assert 0 <= spec.offset_ns < period_ns
+
+
+def test_build_source_specs_returns_empty_for_empty_sources() -> None:
+    assert build_source_specs((), target_hz=10.0) == ()

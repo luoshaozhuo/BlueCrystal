@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,25 +120,3 @@ class SimulatedSource:
 
     connection: SourceConnection
     points: tuple[SimulatedPoint, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class SourceReadPoint:
-    """One point value plus timestamps returned by a simulation source."""
-
-    path: str
-    value: Any
-    status: str | None = None
-    source_timestamp: datetime | None = None
-    server_timestamp: datetime | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class SourceNodeInfo:
-    """One readable source variable node plus parsed logical path parts."""
-
-    node_path: str
-    data_type: str
-    ld_name: str
-    ln_name: str
-    do_name: str

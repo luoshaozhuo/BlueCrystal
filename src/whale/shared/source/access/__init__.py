@@ -17,7 +17,6 @@ def build_source_access_adapter(
     points: tuple[SourcePointSpec, ...],
     *,
     read_timeout_s: float,
-    opcua_client_backend: str = "open62541",
 ) -> SourceAccessAdapter:
     """Build the reusable adapter for the requested protocol.
 
@@ -26,8 +25,6 @@ def build_source_access_adapter(
         endpoint: Endpoint definition.
         points: Point definitions to be read by the adapter.
         read_timeout_s: Read timeout in seconds.
-        opcua_client_backend: OPC UA client backend label.
-
     Returns:
         One reusable source access adapter.
 
@@ -41,7 +38,6 @@ def build_source_access_adapter(
             endpoint,
             points,
             read_timeout_s=read_timeout_s,
-            client_backend=opcua_client_backend,
         )
     raise ValueError(f"Unsupported protocol adapter: {protocol}")
 

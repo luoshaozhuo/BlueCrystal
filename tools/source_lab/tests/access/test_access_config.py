@@ -1,10 +1,10 @@
-"""Tests for capacity config env parsing."""
+"""Tests for capacity and probe config env parsing."""
 
 from __future__ import annotations
 
 import pytest
 
-from tools.source_lab.access.config import from_env_for_simulator
+from tools.source_lab.access.config import from_env_for_probe, from_env_for_simulator
 
 
 def test_from_env_supports_start_step_max(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -42,14 +42,11 @@ def test_from_env_supports_alias_server_count_and_target_hz(monkeypatch: pytest.
 
 
 def test_from_env_fixed_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep fixed defaults expected by capacity scanner."""
+    """Keep fixed defaults expected by the capacity scanner."""
 
     monkeypatch.delenv("SOURCE_SIM_LOAD_LEVEL_DURATION_S", raising=False)
     monkeypatch.delenv("SOURCE_SIM_LOAD_WARMUP_S", raising=False)
-    monkeypatch.delenv("SOURCE_SIM_LOAD_PREFLIGHT_ENABLED", raising=False)
-    monkeypatch.delenv("SOURCE_SIM_LOAD_PREFLIGHT_TCP_TIMEOUT_S", raising=False)
     monkeypatch.delenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", raising=False)
-    monkeypatch.delenv("SOURCE_SIM_LOAD_MAX_CONCURRENT_READS", raising=False)
     monkeypatch.delenv("SOURCE_SIM_LOAD_PERIOD_MAX_TOLERANCE_RATIO", raising=False)
     monkeypatch.delenv("SOURCE_SIM_LOAD_PERIOD_TOLERANCE_RATIO", raising=False)
     monkeypatch.delenv("SOURCE_SIM_LOAD_PERIOD_MEAN_ERROR_RATIO", raising=False)
@@ -65,10 +62,7 @@ def test_from_env_fixed_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert config.level_duration_s == 30.0
     assert config.warmup_s == 10.0
-    assert config.preflight_enabled is True
-    assert config.preflight_tcp_timeout_s == 3.0
     assert config.source_update_enabled is False
-    assert config.max_concurrent_reads == 16
     assert config.period_max_tolerance_ratio == 0.2
     assert config.period_mean_error_ratio == 0.05
     assert config.fail_confirm_runs == 2
@@ -80,16 +74,18 @@ def test_from_env_fixed_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.fleet_startup_timeout_s == 180.0
 
 
-def test_from_env_supports_preflight_flags(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Parse preflight enable switch and preflight timeout from environment."""
+def test_capacity_config_does_not_expose_preflight_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Capacity config should not retain preflight-era fields."""
 
     monkeypatch.setenv("SOURCE_SIM_LOAD_PREFLIGHT_ENABLED", "false")
     monkeypatch.setenv("SOURCE_SIM_LOAD_PREFLIGHT_TCP_TIMEOUT_S", "2.5")
+    monkeypatch.setenv("SOURCE_SIM_LOAD_PREFLIGHT_CONCURRENCY", "7")
 
     config = from_env_for_simulator()
 
-    assert config.preflight_enabled is False
-    assert config.preflight_tcp_timeout_s == 2.5
+    assert not hasattr(config, "preflight_enabled")
+    assert not hasattr(config, "preflight_tcp_timeout_s")
+    assert not hasattr(config, "preflight_concurrency")
 
 
 def test_from_env_supports_progress_flags(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -102,3 +98,45 @@ def test_from_env_supports_progress_flags(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert config.progress_enabled is False
     assert config.progress_interval_s == 2.0
+
+
+def test_from_env_ignores_removed_legacy_coroutine_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy_name = "SOURCE_SIM_LOAD_" + "COROUTINES_PER_PROCESS"
+    monkeypatch.setenv(legacy_name, "99")
+
+    config = from_env_for_simulator()
+
+    assert not hasattr(config, "coroutines_" + "per_process")
+
+
+def test_from_env_does_not_expose_backend_fields() -> None:
+    config = from_env_for_simulator()
+
+    assert not hasattr(config, "opcua_" + "client" + "_" + "backend")
+    assert not hasattr(config, "opcua_" + "simulator" + "_" + "backend")
+
+
+def test_from_env_supports_runner_trace_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOURCE_SIM_LOAD_RUNNER_TRACE_ENABLED", "true")
+    monkeypatch.setenv("SOURCE_SIM_LOAD_RUNNER_TRACE_TOP_N", "9")
+
+    config = from_env_for_simulator()
+
+    assert config.runner_trace_enabled is True
+    assert config.runner_trace_top_n == 9
+
+
+def test_probe_env_loader_parses_probe_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SOURCE_LAB_PROBE_PROTOCOL", "opc-ua")
+    monkeypatch.setenv("SOURCE_LAB_PROBE_TIMEOUT_S", "6")
+    monkeypatch.setenv("SOURCE_LAB_PROBE_SAMPLES", "12")
+    monkeypatch.setenv("SOURCE_LAB_PROBE_CONCURRENCY", "4")
+    monkeypatch.setenv("SOURCE_LAB_PROBE_TCP_TIMEOUT_S", "2")
+
+    config = from_env_for_probe()
+
+    assert config.protocol == "opc-ua"
+    assert config.timeout_s == 6.0
+    assert config.samples == 12
+    assert config.concurrency == 4
+    assert config.tcp_timeout_s == 2.0

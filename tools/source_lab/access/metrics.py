@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from whale.shared.source.access.model import TickResult
 from tools.source_lab.access.model import (
     CapacityLevelMetrics,
     CapacityScanConfig,
@@ -13,6 +12,7 @@ from tools.source_lab.access.model import (
     ConfirmedLevelResult,
     PeriodGap,
     ResponsePeriodStats,
+    TickResult,
 )
 
 
@@ -29,6 +29,38 @@ class ReaderStats:
 
 
 @dataclass(frozen=True, slots=True)
+class RunnerTrace:
+    """One runner trace row retained for diagnostics."""
+
+    worker_index: int
+    local_index: int
+    global_index: int
+    tick_index: int
+    lag_ms: float
+    read_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class RunnerSummary:
+    """One parsed runner summary retained for diagnostics."""
+
+    worker_index: int
+    endpoint_count: int
+    total_reads: int
+    ok_reads: int
+    bad_reads: int
+    read_errors: int
+    missing_response_timestamps: int
+    missed_ticks: int
+    max_lag_ms: float
+    max_read_ms: float
+    warmup_reads: int
+    warmup_errors: int
+    warmup_max_lag_ms: float
+    warmup_max_read_ms: float
+
+
+@dataclass(frozen=True, slots=True)
 class WorkerRawStats:
     """Raw metrics from one worker process."""
 
@@ -39,6 +71,9 @@ class WorkerRawStats:
     missing_response_timestamps: int
     response_timestamps_by_reader: tuple[tuple[float, ...], ...]
     max_observed_concurrent_reads: int
+    runner_summary: RunnerSummary | None = None
+    top_lag_traces: tuple[RunnerTrace, ...] = ()
+    top_read_traces: tuple[RunnerTrace, ...] = ()
 
 
 def record_tick(stats: ReaderStats, result: TickResult) -> None:
@@ -121,9 +156,13 @@ def build_level_metrics(
     response_timestamps_by_reader = tuple(
         timestamps for worker in worker_stats for timestamps in worker.response_timestamps_by_reader
     )
+    summaries = [item.runner_summary for item in worker_stats if item.runner_summary is not None]
     worker_conc_by_worker = tuple(item.max_observed_concurrent_reads for item in worker_stats)
     worker_conc_sum = sum(worker_conc_by_worker)
     worker_conc_max = max(worker_conc_by_worker, default=0)
+    missed_ticks = sum(item.missed_ticks for item in summaries)
+    runner_max_lag_ms = max((item.max_lag_ms for item in summaries), default=0.0)
+    runner_max_read_ms = max((item.max_read_ms for item in summaries), default=0.0)
 
     target_period_ms = 1000.0 / target_hz
     period_stats = evaluate_response_periods(
@@ -166,6 +205,9 @@ def build_level_metrics(
         period_mean_ms=round(period_stats.mean_ms, 2),
         period_max_ms=round(period_stats.max_ms, 2),
         period_mean_abs_error_ms=round(period_stats.mean_abs_error_ms, 2),
+        missed_ticks=missed_ticks,
+        runner_max_lag_ms=round(runner_max_lag_ms, 3),
+        runner_max_read_ms=round(runner_max_read_ms, 3),
         worker_conc_sum=worker_conc_sum,
         worker_conc_max=worker_conc_max,
         worker_conc_by_worker=worker_conc_by_worker,
@@ -202,6 +244,9 @@ def build_skip_result(
         period_mean_ms=0.0,
         period_max_ms=0.0,
         period_mean_abs_error_ms=0.0,
+        missed_ticks=0,
+        runner_max_lag_ms=0.0,
+        runner_max_read_ms=0.0,
         worker_conc_sum=0,
         worker_conc_max=0,
         worker_conc_by_worker=(),

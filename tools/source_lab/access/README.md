@@ -1,128 +1,42 @@
 # source_lab access
 
-`tools/source_lab/access` 是 `source_lab` 下的 **source 接入能力扫描工具**，用于实验、诊断和容量探测，不是生产接入框架。
+## Current architecture
 
-新的边界如下：
+- `capacity.py` is the protocol-agnostic capacity orchestration layer.
+- Runner-specific logic is outside capacity core.
+- The current implemented capacity runner is OPC UA `open62541`.
+- `open62541_serial_polling.py` is a runner adapter, not the capacity core.
+- `field_probe.py` is a standalone field connectivity and latency probe tool.
+- `field_capacity.py` is a standalone file-driven field capacity scan tool.
 
-```text
-src/whale/shared/source/access
-    通用 source 接入抽象，可被 src/whale 复用。
+## Field input model
 
-tools/source_lab/access
-    接入能力扫描工具，负责 preflight、capacity scan、报告输出和本地/现场 provider 编排。
-```
+- Field input is loaded from `field_servers.tsv` and `signal_profile_items.tsv`.
+- `profile_id` is the binding key from server rows to profile item rows.
+- Different servers may share one `profile_id`.
+- Different servers may use different `profile_id` values.
+- File loading validates required fields and enabled filtering before execution.
+- `FieldFileSourceProvider` is the main field provider for the `profile_id`-bound现场 path.
+- `FieldSourceProvider` is only a simple static `endpoints + points` provider for basic scenarios and compatibility tests.
 
-## 1. 分层定位
+## Protocol boundary
 
-`src/whale/shared/source/access` 负责可复用基础层：
+- Multi-protocol file models are supported at the loader/provider boundary.
+- Current execution support is only for OPC UA `open62541`.
+- Non-OPC UA protocols are reported as `SKIP unsupported_protocol` in phase 1.
+- Protocol-filtered rows are reported explicitly by `field_probe` and `field_capacity`; unsupported requested protocols are skipped without fake execution.
+- Capacity core does not perform protocol probing or TCP checks.
+- Probe is independent from capacity and is never called by `capacity.py`.
 
-```text
-1. SourceEndpointSpec / SourcePointSpec
-2. TickResult
-3. SourceAccessAdapter 协议
-4. OPC UA adapter 包装
-5. prepare_read -> read_prepared_raw 读取链路
-```
+## Output behavior
 
-`tools/source_lab/access` 负责工具层：
+- `field_capacity.py` writes CSV and JSONL reports with a timestamped filename by default.
+- `field_capacity.py --run-id <value>` can be used to keep a caller-provided run identifier in report filenames.
 
-```text
-1. preflight
-2. capacity scan
-3. PASS / FLAKY / FAIL / SKIP
-4. server_count / hz ramp
-5. fail confirm runs
-6. reporter
-7. simulator / field provider 编排
-```
+## Explicitly unsupported
 
-这意味着：
-
-```text
-access 不是生产接入框架
-tools/source_lab/access 是工具层
-src/whale/shared/source/access 才是可复用接入基础层
-```
-
-## 2. 当前目录职责
-
-```text
-tools/source_lab/access/
-├── __init__.py
-├── capacity.py
-├── config.py
-├── metrics.py
-├── model.py
-├── preflight.py
-├── reporter.py
-├── scheduling.py
-├── utils.py
-├── worker.py
-└── providers/
-    ├── __init__.py
-    ├── base.py
-    ├── field.py
-    └── simulator.py
-```
-
-其中：
-
-```text
-model.py
-    只保留扫描工具专用模型，例如 CapacityScanConfig / CapacityScanResult /
-    PreflightResult / CapacityLevelMetrics / ConfirmedLevelResult。
-
-preflight.py
-    负责 TCP reachability、adapter connect、prepare_read、read_tick 和结果归一化。
-
-capacity.py
-    负责 server_count ramp、hz ramp、失败确认、停止策略和总结果汇总。
-
-worker.py
-    负责一个 level 的扫描执行，依赖 shared/source/access 中的通用 adapter。
-
-providers/
-    负责 simulator / field 两类 source 来源与生命周期。
-```
-
-## 3. 行为边界
-
-本次分层不改变以下行为：
-
-```text
-1. preflight 语义
-2. capacity scan 语义
-3. PASS / FLAKY / FAIL / SKIP 判定
-4. stop_hz_ramp_on_first_fail 行为
-5. accept_flaky_as_pass 行为
-6. OPC UA open62541 client backend 默认路径
-7. SourcePollingScheduler 使用路径
-8. profile 测试路径
-```
-
-额外说明：
-
-```text
-capacity/profile 边界不变
-open62541_runner_poll 仍只属于 profile 测试，不进入 capacity scan
-```
-
-## 4. 依赖方向
-
-允许：
-
-```text
-tools/source_lab/access
-    -> src/whale/shared/source/access
-```
-
-禁止：
-
-```text
-src/whale/shared/source/access
-    -> tools/source_lab
-src/whale/shared/source/access
-    -> tools/source_lab/tests
-tools/source_lab/access
-    -> source_lab test-only helpers
-```
+- `asyncua`
+- Python high-frequency scheduler
+- backend selector envs
+- legacy C runner `PREPARE/READ` protocol
+- Python async source reader path

@@ -1,0 +1,132 @@
+"""CLI entrypoint for standalone field connectivity and latency probes."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from tools.source_lab.access.io import build_field_runtime_sources
+from tools.source_lab.access.model import ProbeConfig
+from tools.source_lab.access.probe import run_probe
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the ``field_probe`` CLI parser."""
+
+    parser = argparse.ArgumentParser(
+        description="Probe field servers from field_servers.tsv and signal_profile_items.tsv.",
+    )
+    parser.add_argument("--servers", type=Path, required=True, help="Path to field_servers TSV/CSV.")
+    parser.add_argument(
+        "--profile-items",
+        type=Path,
+        required=True,
+        help="Path to signal_profile_items TSV/CSV.",
+    )
+    parser.add_argument(
+        "--protocol",
+        default="opcua",
+        help="Protocol filter to execute. Unsupported protocols are reported as SKIP.",
+    )
+    parser.add_argument("--samples", type=int, default=10, help="Latency sample count per endpoint.")
+    parser.add_argument("--timeout", type=float, default=5.0, help="Protocol read timeout in seconds.")
+    parser.add_argument(
+        "--tcp-timeout",
+        type=float,
+        default=3.0,
+        help="TCP connect timeout in seconds.",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=16,
+        help="Maximum concurrent field probes.",
+    )
+    return parser
+
+
+def _format_metric(value: float | None) -> str:
+    """Format numeric output for TSV printing."""
+
+    if value is None:
+        return ""
+    return f"{value:.3f}"
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the ``field_probe`` CLI.
+
+    Args:
+        argv: Optional argument vector override.
+
+    Returns:
+        Process exit code.
+    """
+
+    args = _build_parser().parse_args(argv)
+    sources = build_field_runtime_sources(args.servers, args.profile_items)
+    result = run_probe(
+        ProbeConfig(
+            protocol=args.protocol,
+            timeout_s=args.timeout,
+            samples=args.samples,
+            concurrency=args.concurrency,
+            tcp_timeout_s=args.tcp_timeout,
+        ),
+        sources,
+    )
+    print(
+        "\t".join(
+            [
+                "endpoint_id",
+                "profile_id",
+                "protocol",
+                "host",
+                "port",
+                "point_count",
+                "tcp_status",
+                "protocol_status",
+                "readable_count",
+                "expected_count",
+                "latency_min_ms",
+                "latency_mean_ms",
+                "latency_p95_ms",
+                "latency_p99_ms",
+                "latency_max_ms",
+                "missing_ts",
+                "status",
+                "reason",
+            ]
+        )
+    )
+    for row in result.rows:
+        latency = row.latency
+        print(
+            "\t".join(
+                [
+                    row.endpoint_id,
+                    row.profile_id,
+                    row.protocol,
+                    row.host,
+                    str(row.port),
+                    str(row.point_count),
+                    row.tcp_status,
+                    row.protocol_status,
+                    str(row.readable_count),
+                    str(row.expected_count),
+                    _format_metric(latency.min_ms if latency is not None else None),
+                    _format_metric(latency.mean_ms if latency is not None else None),
+                    _format_metric(latency.p95_ms if latency is not None else None),
+                    _format_metric(latency.p99_ms if latency is not None else None),
+                    _format_metric(latency.max_ms if latency is not None else None),
+                    "true" if row.missing_ts else "false",
+                    row.status.value,
+                    row.reason,
+                ]
+            )
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,8 +1,8 @@
+# mypy: disable-error-code=import-untyped
 """Simulator-mode source provider for capacity scanning."""
 
 from __future__ import annotations
 
-import os
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -48,7 +48,6 @@ class SimulatorSourceProvider(SourceProvider):
             raise ValueError(f"unsupported simulator protocol: {config.protocol}")
 
         self._active_config = config
-        os.environ.setdefault("SOURCE_SIM_OPCUA_BACKEND", config.opcua_simulator_backend)
 
         base_source = build_opcua_source_from_repository(
             min_expected_point_count=config.min_expected_point_count,

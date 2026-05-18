@@ -1,4 +1,5 @@
-"""Tool-side models for source access scanning."""
+# mypy: disable-error-code=import-untyped
+"""Data models for protocol-agnostic capacity scans and standalone field probes."""
 
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ class CapacityMode(str, Enum):
 
 
 class CapacityStatus(str, Enum):
-    """Result status for one capacity level."""
+    """Result status for one capacity or probe row."""
 
     PASS = "PASS"
     FLAKY = "FLAKY"
@@ -48,36 +49,19 @@ class ResponsePeriodStats:
 
 
 @dataclass(frozen=True, slots=True)
-class ServerPreflightResult:
-    """Preflight result for one server endpoint."""
+class TickResult:
+    """Normalized one-shot read result used by metrics and field probes."""
 
-    server_name: str
-    endpoint: str
-    tcp_reachable: bool | None
-    protocol_connect_ok: bool
-    readable_point_count: int
-    expected_point_count: int
-    missing_response_timestamp: bool
-    status: CapacityStatus
-    failure_reason: str = ""
-
-
-@dataclass(frozen=True, slots=True)
-class PreflightResult:
-    """Preflight aggregate result for one scan run."""
-
-    by_server: tuple[ServerPreflightResult, ...]
-
-    @property
-    def passed(self) -> bool:
-        """Return whether all server preflight checks passed."""
-
-        return all(item.status == CapacityStatus.PASS for item in self.by_server)
+    ok: bool
+    value_count: int
+    elapsed_ms: float
+    response_timestamp_s: float | None
+    error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class CapacityLevelMetrics:
-    """Measured metrics for one (server_count, hz) level."""
+    """Measured metrics for one ``(server_count, hz)`` level."""
 
     server_count: int
     target_hz: float
@@ -91,6 +75,9 @@ class CapacityLevelMetrics:
     period_mean_ms: float
     period_max_ms: float
     period_mean_abs_error_ms: float
+    missed_ticks: int
+    runner_max_lag_ms: float
+    runner_max_read_ms: float
     worker_conc_sum: int
     worker_conc_max: int
     worker_conc_by_worker: tuple[int, ...]
@@ -128,15 +115,11 @@ class CapacityScanConfig:
     hz_step: float
     hz_max: float
     process_count: int
-    coroutines_per_process: int
     level_duration_s: float = 30.0
     warmup_s: float = 10.0
     read_timeout_s: float = 5.0
-    preflight_enabled: bool = True
-    preflight_tcp_timeout_s: float = 3.0
     source_update_enabled: bool = False
     source_update_hz: float = 10.0
-    max_concurrent_reads: int = 16
     period_max_tolerance_ratio: float = 0.2
     period_mean_error_ratio: float = 0.05
     fail_confirm_runs: int = 2
@@ -145,18 +128,19 @@ class CapacityScanConfig:
     top_gap_count: int = 10
     fleet_startup_timeout_s: float = 180.0
     fleet_stop_grace_s: float = 0.2
-    opcua_client_backend: str = "open62541"
-    opcua_simulator_backend: str = "open62541"
     progress_enabled: bool = True
     progress_interval_s: float = 5.0
+    runner_trace_enabled: bool = False
+    runner_trace_top_n: int = 20
     port_start: int = 45000
     port_end: int = 65000
     min_expected_point_count: int = 300
     max_expected_point_count: int = 500
     verbose_errors: bool = False
-    ignored_profile_scheduler_mode: str | None = None
 
     def __post_init__(self) -> None:
+        """Validate numeric scan settings."""
+
         if self.server_count_start <= 0 or self.server_count_step <= 0:
             raise ValueError("server_count_start and server_count_step must be greater than 0")
         if self.server_count_max < self.server_count_start:
@@ -167,14 +151,12 @@ class CapacityScanConfig:
             raise ValueError("hz_max must be greater than or equal to hz_start")
         if self.process_count <= 0:
             raise ValueError("process_count must be greater than 0")
-        if self.max_concurrent_reads <= 0:
-            raise ValueError("max_concurrent_reads must be greater than 0")
         if self.level_duration_s <= 0 or self.warmup_s < 0 or self.read_timeout_s <= 0:
             raise ValueError("invalid timing config")
-        if self.preflight_tcp_timeout_s <= 0:
-            raise ValueError("preflight_tcp_timeout_s must be greater than 0")
         if self.progress_interval_s <= 0:
             raise ValueError("progress_interval_s must be greater than 0")
+        if self.runner_trace_top_n <= 0:
+            raise ValueError("runner_trace_top_n must be greater than 0")
 
     @classmethod
     def from_env_for_simulator(cls) -> CapacityScanConfig:
@@ -190,7 +172,6 @@ class CapacityScanResult:
     """Final capacity scan result across all tested levels."""
 
     config: CapacityScanConfig
-    preflight: PreflightResult | None
     levels: tuple[ConfirmedLevelResult, ...]
 
     @property
@@ -201,3 +182,65 @@ class CapacityScanResult:
         if self.config.accept_flaky_as_pass:
             accepted_statuses.add(CapacityStatus.FLAKY)
         return any(level.final_status in accepted_statuses for level in self.levels)
+
+
+@dataclass(frozen=True, slots=True)
+class ProbeConfig:
+    """Configuration for standalone field endpoint probing."""
+
+    protocol: str
+    timeout_s: float = 5.0
+    samples: int = 1
+    concurrency: int = 16
+    tcp_timeout_s: float = 3.0
+
+    def __post_init__(self) -> None:
+        """Validate probe settings."""
+
+        if self.timeout_s <= 0:
+            raise ValueError("timeout_s must be greater than 0")
+        if self.samples <= 0:
+            raise ValueError("samples must be greater than 0")
+        if self.concurrency <= 0:
+            raise ValueError("concurrency must be greater than 0")
+        if self.tcp_timeout_s <= 0:
+            raise ValueError("tcp_timeout_s must be greater than 0")
+
+
+@dataclass(frozen=True, slots=True)
+class ProbeLatencyStats:
+    """Latency aggregates in milliseconds for one probe target."""
+
+    min_ms: float
+    mean_ms: float
+    p95_ms: float
+    p99_ms: float
+    max_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class ServerProbeResult:
+    """Probe result for one field server endpoint."""
+
+    endpoint_id: str
+    profile_id: str
+    protocol: str
+    host: str
+    port: int
+    point_count: int
+    tcp_status: str
+    protocol_status: str
+    readable_count: int
+    expected_count: int
+    latency: ProbeLatencyStats | None
+    missing_ts: bool
+    status: CapacityStatus
+    reason: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ProbeResult:
+    """Aggregate standalone probe result."""
+
+    config: ProbeConfig
+    rows: tuple[ServerProbeResult, ...]

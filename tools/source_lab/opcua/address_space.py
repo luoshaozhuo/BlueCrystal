@@ -3,7 +3,7 @@
 本模块负责把协议无关的 SimulatedSource 转换为统一 OPC UA 地址空间描述，
 再分别渲染为：
 
-1. NodeSet XML：供 asyncua 后端 import_xml 使用；
+1. NodeSet XML：供 simulator address-space generation 使用；
 2. TSV：供 open62541 C runner 使用。
 
 本模块不负责：

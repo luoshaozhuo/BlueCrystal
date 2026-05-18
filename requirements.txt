@@ -6,7 +6,6 @@ _openmp_mutex=4.5=20_gnu
 aiofiles=25.1.0=pypi_0
 aiosqlite=0.22.1=pypi_0
 apscheduler=3.11.2=pypi_0
-asyncua=1.1.8=pypi_0
 black=26.3.1=pypi_0
 bzip2=1.0.8=hda65f42_9
 c104=2.2.1=pypi_0

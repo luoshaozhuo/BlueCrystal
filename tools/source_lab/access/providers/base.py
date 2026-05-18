@@ -1,3 +1,4 @@
+# mypy: disable-error-code=import-untyped
 """Source providers used by protocol-agnostic capacity scanner."""
 
 from __future__ import annotations

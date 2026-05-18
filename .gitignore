@@ -46,6 +46,8 @@ logs/
 .tox/
 .pytest_cache/
 /tests/tmp/
+tools/source_lab/native/build/
+third_party/
 
 # Environment variables
 .env

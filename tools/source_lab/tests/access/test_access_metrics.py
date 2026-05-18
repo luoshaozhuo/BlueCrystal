@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from tools.source_lab.access.metrics import (
+    RunnerSummary,
+    RunnerTrace,
     WorkerRawStats,
     build_level_metrics,
     build_skip_result,
@@ -26,7 +28,6 @@ def _config() -> CapacityScanConfig:
         hz_step=10.0,
         hz_max=10.0,
         process_count=1,
-        coroutines_per_process=0,
         period_max_tolerance_ratio=0.2,
         period_mean_error_ratio=0.05,
     )
@@ -79,3 +80,67 @@ def test_build_level_metrics_contains_pmax_reason() -> None:
 
     assert metrics.period_max_ok is False
     assert "pmax=" in metrics.failure_reason
+
+
+def test_worker_raw_stats_diagnostics_do_not_change_metrics_semantics() -> None:
+    config = _config()
+    worker_stats = (
+        WorkerRawStats(
+            worker_index=0,
+            reader_count=1,
+            batch_mismatches=0,
+            read_errors=0,
+            missing_response_timestamps=0,
+            response_timestamps_by_reader=((1.0, 1.25),),
+            max_observed_concurrent_reads=1,
+            runner_summary=RunnerSummary(
+                worker_index=0,
+                endpoint_count=1,
+                total_reads=2,
+                ok_reads=2,
+                bad_reads=0,
+                read_errors=0,
+                missing_response_timestamps=0,
+                missed_ticks=3,
+                max_lag_ms=2.5,
+                max_read_ms=1.5,
+                warmup_reads=1,
+                warmup_errors=0,
+                warmup_max_lag_ms=0.5,
+                warmup_max_read_ms=0.6,
+            ),
+            top_lag_traces=(
+                RunnerTrace(
+                    worker_index=0,
+                    local_index=0,
+                    global_index=9,
+                    tick_index=2,
+                    lag_ms=2.5,
+                    read_ms=1.2,
+                ),
+            ),
+            top_read_traces=(
+                RunnerTrace(
+                    worker_index=0,
+                    local_index=0,
+                    global_index=9,
+                    tick_index=3,
+                    lag_ms=1.0,
+                    read_ms=1.5,
+                ),
+            ),
+        ),
+    )
+
+    metrics = build_level_metrics(
+        worker_stats,
+        server_count=1,
+        target_hz=10.0,
+        config=config,
+    )
+
+    assert metrics.period_max_ok is False
+    assert "pmax=" in metrics.failure_reason
+    assert metrics.missed_ticks == 3
+    assert metrics.runner_max_lag_ms == pytest.approx(2.5)
+    assert metrics.runner_max_read_ms == pytest.approx(1.5)

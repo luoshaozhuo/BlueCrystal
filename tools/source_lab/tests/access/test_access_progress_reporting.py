@@ -8,14 +8,7 @@ import pytest
 
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 from tools.source_lab.access.capacity import scan_source_capacity
-from tools.source_lab.access.model import (
-    CapacityLevelMetrics,
-    CapacityMode,
-    CapacityScanConfig,
-    CapacityStatus,
-    PreflightResult,
-    ServerPreflightResult,
-)
+from tools.source_lab.access.model import CapacityLevelMetrics, CapacityMode, CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 
 
@@ -39,6 +32,10 @@ class _Provider:
         return nullcontext()
 
 
+class _Runner:
+    name = "fake_runner"
+
+
 def _config(*, progress_enabled: bool = True) -> CapacityScanConfig:
     return CapacityScanConfig(
         mode=CapacityMode.SIMULATOR,
@@ -52,7 +49,6 @@ def _config(*, progress_enabled: bool = True) -> CapacityScanConfig:
         hz_step=10.0,
         hz_max=10.0,
         process_count=1,
-        coroutines_per_process=0,
         warmup_s=0.1,
         level_duration_s=0.1,
         progress_enabled=progress_enabled,
@@ -74,6 +70,9 @@ def _passing_metrics() -> CapacityLevelMetrics:
         period_mean_ms=100.5,
         period_max_ms=104.2,
         period_mean_abs_error_ms=1.1,
+        missed_ticks=0,
+        runner_max_lag_ms=0.0,
+        runner_max_read_ms=0.0,
         worker_conc_sum=1,
         worker_conc_max=1,
         worker_conc_by_worker=(1,),
@@ -95,36 +94,20 @@ def test_scan_progress_output_contains_main_stages(
 
     config = _config()
     provider = _Provider()
+    runner = _Runner()
 
-    monkeypatch.setattr(
-        "tools.source_lab.access.capacity.run_preflight",
-        lambda config, sources: PreflightResult(
-            by_server=(
-                ServerPreflightResult(
-                    server_name="source-1",
-                    endpoint="127.0.0.1:48001",
-                    tcp_reachable=True,
-                    protocol_connect_ok=True,
-                    readable_point_count=1,
-                    expected_point_count=1,
-                    missing_response_timestamp=False,
-                    status=CapacityStatus.PASS,
-                ),
-            )
-        ),
-    )
     monkeypatch.setattr(
         "tools.source_lab.access.capacity.run_level_once",
-        lambda sources, *, target_hz, config: _passing_metrics(),
+        lambda sources, *, target_hz, config, runner: _passing_metrics(),
     )
 
-    result = scan_source_capacity(config, provider=provider)
+    result = scan_source_capacity(config, provider=provider, runner=runner)
 
     output = capsys.readouterr().out
     assert result.levels
     assert "[source-lab] capacity scan started:" in output
-    assert "[source-lab] preflight start: srv=1 endpoints=1" in output
-    assert "[source-lab] preflight ok: srv=1" in output
+    assert "runner=fake_runner" in output
+    assert "preflight" not in output
     assert "[source-lab] level start: srv=1 hz=10.0 attempt=1/2 period=100.0ms" in output
     assert "[source-lab] measurement start: srv=1 hz=10.0 warmup=0.1s duration=0.1s" in output
     assert "[source-lab] level done: srv=1 hz=10.0 attempt=1 status=PASS" in output
@@ -141,14 +124,10 @@ def test_scan_progress_output_can_be_disabled(
     provider = _Provider()
 
     monkeypatch.setattr(
-        "tools.source_lab.access.capacity.run_preflight",
-        lambda config, sources: PreflightResult(by_server=()),
-    )
-    monkeypatch.setattr(
         "tools.source_lab.access.capacity.run_level_once",
-        lambda sources, *, target_hz, config: _passing_metrics(),
+        lambda sources, *, target_hz, config, runner: _passing_metrics(),
     )
 
-    scan_source_capacity(config, provider=provider)
+    scan_source_capacity(config, provider=provider, runner=_Runner())
 
     assert capsys.readouterr().out == ""

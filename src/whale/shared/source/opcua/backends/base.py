@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
-from asyncua import Node, ua  # type: ignore[import-untyped]
-
 
 class PreparedReadPlan(Protocol):
     """Marker protocol for backend-specific prepared read plans.
@@ -22,20 +20,6 @@ class PreparedReadPlan(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class AsyncuaPreparedReadPlan:
-    """asyncua-specific prepared read plan.
-
-    This first-step backend abstraction keeps the asyncua plan shaped around
-    asyncua `Node` objects and `ua.ReadParameters`. When the open62541 client
-    backend gains a full implementation, plan types may diverge further.
-    """
-
-    node_paths: tuple[str, ...]
-    nodes: tuple[Node, ...]
-    read_params: ua.ReadParameters
-
-
-@dataclass(frozen=True, slots=True)
 class Open62541PreparedReadPlan:
     """open62541-specific prepared read plan for raw polling."""
 
@@ -47,11 +31,11 @@ class Open62541PreparedReadPlan:
 
 @dataclass(frozen=True, slots=True)
 class RawDataValue:
-    """Backend-neutral raw data value used by non-asyncua backends.
+    """Backend-neutral raw data value used by raw-polling backends.
 
     The current open62541 raw polling backend only guarantees the presence of
     ``value`` placeholders sized to the number of values returned by the
-    runner. Full asyncua-style metadata is not available yet.
+    runner.
     """
 
     value: object

@@ -1,21 +1,31 @@
-"""Reporting helpers for capacity scan results."""
+"""Reporting helpers for capacity scan results and runner diagnostics."""
 
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Sequence
 
+from .metrics import WorkerRawStats
 from .model import CapacityLevelMetrics, CapacityScanConfig, CapacityScanResult, CapacityStatus, ConfirmedLevelResult
 
 
 def _emit_progress_line(message: str) -> None:
+    """Print one standardized source-lab progress line."""
+
     print(f"[source-lab] {message}", flush=True)
 
 
-def print_scan_started(config: CapacityScanConfig) -> float:
-    """Print scan start progress lines and return start timestamp."""
+def print_scan_started(config: CapacityScanConfig, *, runner_name: str) -> float:
+    """Print scan start progress lines and return start timestamp.
+
+    Args:
+        config: Capacity scan configuration.
+        runner_name: Injected runner label for progress reporting.
+
+    Returns:
+        ``time.perf_counter()`` start timestamp.
+    """
 
     started_at = time.perf_counter()
     if not config.progress_enabled:
@@ -23,9 +33,7 @@ def print_scan_started(config: CapacityScanConfig) -> float:
 
     _emit_progress_line(
         "capacity scan started: "
-        f"mode={config.mode.value} protocol={config.protocol} "
-        f"client_backend={config.opcua_client_backend} "
-        f"simulator_backend={config.opcua_simulator_backend}"
+        f"mode={config.mode.value} protocol={config.protocol} runner={runner_name}"
     )
     _emit_progress_line(
         "scan range: "
@@ -33,10 +41,7 @@ def print_scan_started(config: CapacityScanConfig) -> float:
         f"hz={config.hz_start:.1f}..{config.hz_max:.1f} step={config.hz_step:.1f}, "
         f"warmup={config.warmup_s:.1f}s, duration={config.level_duration_s:.1f}s, "
         f"process_count={config.process_count}, "
-        f"coroutines_per_process={config.coroutines_per_process}"
-    )
-    _emit_progress_line(
-        f"preflight: enabled={config.preflight_enabled} timeout={config.preflight_tcp_timeout_s:.1f}s"
+        f"runner_trace_enabled={config.runner_trace_enabled}"
     )
     return started_at
 
@@ -58,32 +63,6 @@ def print_level_started(
         f"srv={server_count} hz={target_hz:.1f} attempt={attempt_index}/{attempt_total} "
         f"period={1000.0 / target_hz:.1f}ms"
     )
-
-
-def print_preflight_started(config: CapacityScanConfig, *, server_count: int, endpoint_count: int) -> None:
-    """Print preflight start progress."""
-
-    if not config.progress_enabled:
-        return
-    _emit_progress_line(f"preflight start: srv={server_count} endpoints={endpoint_count}")
-
-
-def print_preflight_finished(
-    config: CapacityScanConfig,
-    *,
-    server_count: int,
-    elapsed_s: float,
-    passed: bool,
-    reason: str = "",
-) -> None:
-    """Print preflight result progress."""
-
-    if not config.progress_enabled:
-        return
-    if passed:
-        _emit_progress_line(f"preflight ok: srv={server_count} elapsed={elapsed_s:.2f}s")
-        return
-    _emit_progress_line(f"preflight failed: srv={server_count} reason={reason}")
 
 
 def print_measurement_started(
@@ -123,6 +102,78 @@ def print_measurement_progress(
         f"srv={server_count} hz={target_hz:.1f}{worker_suffix} "
         f"elapsed={elapsed_s:.1f}/{config.level_duration_s:.1f}s ticks={ticks} bad={bad}"
     )
+
+
+def print_runner_started(
+    config: CapacityScanConfig,
+    *,
+    runner_name: str,
+    worker_index: int,
+    endpoint_count: int,
+    target_hz: float,
+) -> None:
+    """Print one worker-runner start line."""
+
+    if not config.progress_enabled:
+        return
+    _emit_progress_line(
+        "runner start: "
+        f"runner={runner_name} worker={worker_index} endpoints={endpoint_count} hz={target_hz:.1f}"
+    )
+
+
+def print_worker_diagnostics(
+    config: CapacityScanConfig,
+    worker_stats: Sequence[WorkerRawStats],
+) -> None:
+    """Print parent-process worker summaries and top runner traces."""
+
+    if not config.progress_enabled or not config.runner_trace_enabled:
+        return
+
+    summaries = [item.runner_summary for item in worker_stats if item.runner_summary is not None]
+    if summaries:
+        _emit_progress_line("runner summaries:")
+        for summary in sorted(summaries, key=lambda item: item.worker_index):
+            _emit_progress_line(
+                "  "
+                f"worker={summary.worker_index} endpoints={summary.endpoint_count} "
+                f"total={summary.total_reads} ok={summary.ok_reads} bad={summary.bad_reads} "
+                f"err={summary.read_errors} missing_ts={summary.missing_response_timestamps} "
+                f"missed={summary.missed_ticks} max_lag={summary.max_lag_ms:.3f}ms "
+                f"max_read={summary.max_read_ms:.3f}ms warmup_reads={summary.warmup_reads} "
+                f"warmup_errors={summary.warmup_errors} "
+                f"warmup_max_lag={summary.warmup_max_lag_ms:.3f}ms "
+                f"warmup_max_read={summary.warmup_max_read_ms:.3f}ms"
+            )
+
+    lag_traces = sorted(
+        (trace for item in worker_stats for trace in item.top_lag_traces),
+        key=lambda item: item.lag_ms,
+        reverse=True,
+    )[: config.runner_trace_top_n]
+    if lag_traces:
+        _emit_progress_line("top runner lag:")
+        for trace in lag_traces:
+            _emit_progress_line(
+                "  "
+                f"worker={trace.worker_index} local={trace.local_index} global={trace.global_index} "
+                f"tick={trace.tick_index} lag_ms={trace.lag_ms:.3f} read_ms={trace.read_ms:.3f}"
+            )
+
+    read_traces = sorted(
+        (trace for item in worker_stats for trace in item.top_read_traces),
+        key=lambda item: item.read_ms,
+        reverse=True,
+    )[: config.runner_trace_top_n]
+    if read_traces:
+        _emit_progress_line("top runner read:")
+        for trace in read_traces:
+            _emit_progress_line(
+                "  "
+                f"worker={trace.worker_index} local={trace.local_index} global={trace.global_index} "
+                f"tick={trace.tick_index} lag_ms={trace.lag_ms:.3f} read_ms={trace.read_ms:.3f}"
+            )
 
 
 def print_level_done(
@@ -174,7 +225,7 @@ def print_scan_finished(config: CapacityScanConfig, *, started_at: float) -> Non
 
 @dataclass(frozen=True, slots=True)
 class ServerCountSummary:
-    """Summary values for one server_count ramp."""
+    """Summary values for one server-count ramp."""
 
     server_count: int
     stable_pass_hz: float | None
@@ -192,7 +243,7 @@ def summarize_server_count_levels(
     *,
     accept_flaky_as_pass: bool,
 ) -> tuple[ServerCountSummary, ...]:
-    """Build per-server_count summary for capacity levels."""
+    """Build per-server-count summary for capacity levels."""
 
     groups: dict[int, list[ConfirmedLevelResult]] = {}
     for level in levels:
@@ -249,24 +300,19 @@ def print_capacity_report(result: CapacityScanResult) -> None:
     print(f"mode={result.config.mode.value}", flush=True)
     print(f"protocol={result.config.protocol}", flush=True)
     print(
-        f"server_count={result.config.server_count_start}:"
-        f"{result.config.server_count_step}:{result.config.server_count_max}"
-    , flush=True)
+        f"server_count={result.config.server_count_start}:{result.config.server_count_step}:"
+        f"{result.config.server_count_max}",
+        flush=True,
+    )
     print(f"hz={result.config.hz_start}:{result.config.hz_step}:{result.config.hz_max}", flush=True)
-    print(f"preflight_enabled={result.config.preflight_enabled}", flush=True)
     print(f"process_count={result.config.process_count}", flush=True)
-    print(f"coroutines_per_process={result.config.coroutines_per_process}", flush=True)
-    print(f"max_concurrent_reads={result.config.max_concurrent_reads}", flush=True)
-    if result.config.ignored_profile_scheduler_mode:
-        print(
-            "ignored_env=SOURCE_SIM_PROFILE_SCHEDULER_MODE="
-            f"{result.config.ignored_profile_scheduler_mode}"
-        , flush=True)
+    print(f"runner_trace_enabled={result.config.runner_trace_enabled}", flush=True)
     print("-" * 132, flush=True)
     print(
         f"{'srv':>4} {'hz':>6} {'period':>8} {'bad':>5} {'p_n':>7} {'p_mean':>8} "
-        f"{'p_max':>7} {'mean_err':>9} {'conc_sum':>9} {'status':>7} reason"
-    , flush=True)
+        f"{'p_max':>7} {'mean_err':>9} {'conc_sum':>9} {'status':>7} reason",
+        flush=True,
+    )
     print("-" * 132, flush=True)
 
     for level in result.levels:
@@ -276,8 +322,9 @@ def print_capacity_report(result: CapacityScanResult) -> None:
             f"{metrics.batch_mismatches:>5} {metrics.period_samples:>7} {metrics.period_mean_ms:>8.2f} "
             f"{metrics.period_max_ms:>7.2f} {metrics.period_mean_abs_error_ms:>9.2f} "
             f"{metrics.worker_conc_sum:>9} {level.final_status.value:>7} "
-            f"{level.final_reason or metrics.failure_reason}"
-        , flush=True)
+            f"{level.final_reason or metrics.failure_reason}",
+            flush=True,
+        )
         if level.final_status in {CapacityStatus.FAIL, CapacityStatus.FLAKY} and metrics.top_gaps:
             print("  top response period gaps:", flush=True)
             print("    reader  gap    period_ms    prev_ts             cur_ts", flush=True)
@@ -285,8 +332,9 @@ def print_capacity_report(result: CapacityScanResult) -> None:
                 print(
                     f"    {gap.reader_index:>6} {gap.gap_index:>4} "
                     f"{gap.period_ms:>12.2f} {gap.previous_timestamp_s:>17.3f} "
-                    f"{gap.current_timestamp_s:>17.3f}"
-                , flush=True)
+                    f"{gap.current_timestamp_s:>17.3f}",
+                    flush=True,
+                )
 
     print("-" * 132, flush=True)
     print("summary by server_count:", flush=True)
@@ -304,6 +352,7 @@ def print_capacity_report(result: CapacityScanResult) -> None:
             f"p_max={item.best_accepted_p_max_ms if item.best_accepted_p_max_ms is not None else 'N/A'}, "
             f"mean_err={item.best_accepted_mean_err_ms if item.best_accepted_mean_err_ms is not None else 'N/A'}, "
             f"conc_sum={item.best_accepted_conc_sum if item.best_accepted_conc_sum is not None else 'N/A'}, "
-            f"failure_reason={item.best_accepted_failure_reason or '-'}"
-        , flush=True)
+            f"failure_reason={item.best_accepted_failure_reason or '-'}",
+            flush=True,
+        )
     print("=" * 132, flush=True)

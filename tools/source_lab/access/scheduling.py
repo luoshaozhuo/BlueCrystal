@@ -7,17 +7,16 @@ import multiprocessing as mp
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
-from whale.shared.source.scheduling import build_even_stagger_offsets
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 
 
 @dataclass(frozen=True, slots=True)
-class SourceReadSpec:
-    """One source plus globally assigned stagger offset."""
+class RunnerEndpointPlan:
+    """One endpoint assigned to the runner with a fixed C-side offset."""
 
     global_index: int
     source: SourceRuntimeSpec
-    offset_seconds: float
+    offset_ns: int
 
 
 def iter_int_ramp(start: int, step: int, maximum: int) -> Iterator[int]:
@@ -42,24 +41,32 @@ def build_source_specs(
     sources: Sequence[SourceRuntimeSpec],
     *,
     target_hz: float,
-) -> tuple[SourceReadSpec, ...]:
-    """Build globally staggered read specs for one level."""
+) -> tuple[RunnerEndpointPlan, ...]:
+    """Build globally staggered endpoint plans for one level."""
 
-    offsets = build_even_stagger_offsets(count=len(sources), interval_seconds=1.0 / target_hz)
+    count = len(sources)
+    if count == 0:
+        return ()
+
+    period_ns = max(1, round(1_000_000_000 / target_hz))
     return tuple(
-        SourceReadSpec(global_index=index, source=source, offset_seconds=offsets[index])
+        RunnerEndpointPlan(
+            global_index=index,
+            source=source,
+            offset_ns=min(period_ns - 1, max(0, round(period_ns * index / count))),
+        )
         for index, source in enumerate(sources)
     )
 
 
 def partition_specs_round_robin(
-    specs: Sequence[SourceReadSpec],
+    specs: Sequence[RunnerEndpointPlan],
     *,
     process_count: int,
-) -> tuple[tuple[SourceReadSpec, ...], ...]:
+) -> tuple[tuple[RunnerEndpointPlan, ...], ...]:
     """Partition source specs with round-robin distribution across workers."""
 
-    buckets: list[list[SourceReadSpec]] = [[] for _ in range(process_count)]
+    buckets: list[list[RunnerEndpointPlan]] = [[] for _ in range(process_count)]
     for index, spec in enumerate(specs):
         buckets[index % process_count].append(spec)
     return tuple(tuple(bucket) for bucket in buckets)

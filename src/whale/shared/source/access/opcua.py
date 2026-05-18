@@ -63,7 +63,6 @@ class OpcUaSourceAccessAdapter:
         points: tuple[SourcePointSpec, ...],
         *,
         read_timeout_s: float,
-        client_backend: str = "open62541",
     ) -> None:
         """Initialize the reusable OPC UA access adapter.
 
@@ -71,13 +70,11 @@ class OpcUaSourceAccessAdapter:
             endpoint: Endpoint definition for the reader connection.
             points: Point definitions to normalize into prepared reads.
             read_timeout_s: Reader timeout in seconds.
-            client_backend: OPC UA client backend label. Defaults to ``open62541``.
         """
 
         self._endpoint = endpoint
         self._points = points
         self._read_timeout_s = read_timeout_s
-        self._client_backend = client_backend
         self._reader: OpcUaSourceReader | None = None
         self._plan: object | None = None
         self._addresses = tuple(normalize_opcua_node_id(point.address) for point in points)
@@ -85,15 +82,12 @@ class OpcUaSourceAccessAdapter:
     async def connect(self) -> None:
         """Connect the underlying ``OpcUaSourceReader``."""
 
-        params = dict(self._endpoint.params)
-        params.setdefault("backend", self._client_backend)
-
         self._reader = OpcUaSourceReader(
             SourceConnectionProfile(
                 endpoint=build_opcua_endpoint_url(self._endpoint),
                 namespace_uri=self._endpoint.namespace_uri,
                 timeout_seconds=self._read_timeout_s,
-                params=params,
+                params=dict(self._endpoint.params),
             )
         )
         await self._reader.__aenter__()
