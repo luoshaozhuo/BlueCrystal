@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager, nullcontext
 
-from tools.source_lab.access.model import CapacityScanConfig
+from tools.source_lab.access.polling.model import CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceProvider, SourceRuntimeSpec
+from tools.source_lab.access.subscribe.model import SubscribeScanConfig
 
 
 class FieldSourceProvider(SourceProvider):
@@ -13,12 +14,14 @@ class FieldSourceProvider(SourceProvider):
 
     def build_sources(
         self,
-        config: CapacityScanConfig,
+        config: CapacityScanConfig | SubscribeScanConfig,
         *,
         server_count: int,
     ) -> tuple[SourceRuntimeSpec, ...]:
         """Build field runtime specs for one server_count level."""
 
+        if not isinstance(config, CapacityScanConfig):
+            raise ValueError("field source provider only supports capacity configs")
         if not config.endpoints:
             raise ValueError("field mode requires endpoints")
         if not config.points:

@@ -38,7 +38,7 @@ def _build_source(protocol: str = "opcua") -> SimulatedSource:
 
 def test_build_simulator_uses_open62541_backend_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """OPC UA simulator construction is fixed to open62541."""
-    monkeypatch.delenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", raising=False)
+    monkeypatch.delenv("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", raising=False)
 
     simulator = build_simulator(_build_source())
 
@@ -53,6 +53,6 @@ def test_build_simulator_returns_open62541_for_opcua_sources() -> None:
 
 def test_build_simulator_rejects_unknown_protocol(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unknown protocol should fail fast."""
-    monkeypatch.delenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", raising=False)
+    monkeypatch.delenv("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", raising=False)
     with pytest.raises(ValueError, match="Unsupported source simulator type"):
         build_simulator(_build_source(protocol="modbus"))

@@ -6,8 +6,8 @@ from dataclasses import replace
 
 import pytest
 
-from tools.source_lab.access.metrics import RunnerSummary, RunnerTrace, WorkerRawStats
-from tools.source_lab.access.model import (
+from tools.source_lab.access.polling.metrics import RunnerSummary, RunnerTrace, WorkerRawStats
+from tools.source_lab.access.polling.model import (
     CapacityMode,
     CapacityScanConfig,
     CapacityLevelMetrics,
@@ -15,7 +15,7 @@ from tools.source_lab.access.model import (
     CapacityStatus,
     ConfirmedLevelResult,
 )
-from tools.source_lab.access.reporter import (
+from tools.source_lab.access.polling.reporter import (
     print_capacity_report,
     print_level_done,
     print_measurement_progress,
@@ -55,6 +55,7 @@ def _level(server_count: int, hz: float, status: CapacityStatus) -> ConfirmedLev
         missing_response_timestamps=0,
         period_samples=10,
         period_mean_ms=1000.0 / hz,
+        period_p95_ms=1000.0 / hz,
         period_max_ms=1000.0 / hz,
         period_mean_abs_error_ms=0.1,
         missed_ticks=0,
@@ -132,7 +133,7 @@ def test_progress_output_contains_key_fields(capsys: pytest.CaptureFixture[str])
         reason="",
     )
 
-    output = capsys.readouterr().out
+    output = capsys.readouterr().err
     assert "[source-lab] capacity scan started:" in output
     assert "runner=fake_runner" in output
     assert "preflight" not in output
@@ -156,7 +157,7 @@ def test_progress_output_can_be_disabled(capsys: pytest.CaptureFixture[str]) -> 
         reason="",
     )
 
-    assert capsys.readouterr().out == ""
+    assert capsys.readouterr().err == ""
 
 
 def test_worker_diagnostics_prints_summaries_and_top_traces(
@@ -201,7 +202,7 @@ def test_worker_diagnostics_prints_summaries_and_top_traces(
 
     print_worker_diagnostics(config, worker_stats)
 
-    output = capsys.readouterr().out
+    output = capsys.readouterr().err
     assert "runner summaries:" in output
     assert "worker=0 endpoints=1 total=10" in output
     assert "missed=2 max_lag=3.500ms max_read=4.500ms" in output

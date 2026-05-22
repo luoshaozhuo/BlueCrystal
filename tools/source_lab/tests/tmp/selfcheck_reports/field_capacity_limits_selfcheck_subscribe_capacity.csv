@@ -1,0 +1,2 @@
+process_count,server_count,queue_size,max_pass_sample_hz,first_fail_sample_hz,reason
+1,1,1,,5.0,create_subscription_failed; notification_timeout

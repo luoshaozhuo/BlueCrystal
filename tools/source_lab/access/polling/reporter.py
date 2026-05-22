@@ -1,7 +1,13 @@
-"""Reporting helpers for capacity scan results and runner diagnostics."""
+"""Legacy polling progress/detail helpers for profile and debug paths.
+
+Capacity matrix output does not use this module for user-facing progress.
+Capacity uses ``CapacityProgressBar`` for runtime progress and
+``print_capacity_table()`` for the final summary table.
+"""
 
 from __future__ import annotations
 
+import sys
 import time
 from dataclasses import dataclass
 from typing import Iterable, Sequence
@@ -11,9 +17,9 @@ from .model import CapacityLevelMetrics, CapacityScanConfig, CapacityScanResult,
 
 
 def _emit_progress_line(message: str) -> None:
-    """Print one standardized source-lab progress line."""
+    """Print one standardized source-lab progress line to stderr."""
 
-    print(f"[source-lab] {message}", flush=True)
+    print(f"[source-lab] {message}", file=sys.stderr, flush=True)
 
 
 def print_scan_started(config: CapacityScanConfig, *, runner_name: str) -> float:
@@ -247,22 +253,22 @@ def summarize_server_count_levels(
 
     groups: dict[int, list[ConfirmedLevelResult]] = {}
     for level in levels:
-        groups.setdefault(level.primary.server_count, []).append(level)
+        groups.setdefault(level.final_metrics.server_count, []).append(level)
 
     summaries: list[ServerCountSummary] = []
     for server_count in sorted(groups):
-        bucket = sorted(groups[server_count], key=lambda item: item.primary.target_hz)
+        bucket = sorted(groups[server_count], key=lambda item: item.final_metrics.target_hz)
 
         stable_pass_hz = next(
-            (item.primary.target_hz for item in reversed(bucket) if item.final_status == CapacityStatus.PASS),
+            (item.final_metrics.target_hz for item in reversed(bucket) if item.final_status == CapacityStatus.PASS),
             None,
         )
         first_flaky_hz = next(
-            (item.primary.target_hz for item in bucket if item.final_status == CapacityStatus.FLAKY),
+            (item.final_metrics.target_hz for item in bucket if item.final_status == CapacityStatus.FLAKY),
             None,
         )
         first_fail_hz = next(
-            (item.primary.target_hz for item in bucket if item.final_status == CapacityStatus.FAIL),
+            (item.final_metrics.target_hz for item in bucket if item.final_status == CapacityStatus.FAIL),
             None,
         )
 
@@ -271,7 +277,7 @@ def summarize_server_count_levels(
             accepted_statuses.add(CapacityStatus.FLAKY)
 
         accepted = [item for item in bucket if item.final_status in accepted_statuses]
-        best = accepted[-1].primary if accepted else None
+        best = accepted[-1].final_metrics if accepted else None
 
         summaries.append(
             ServerCountSummary(
@@ -310,19 +316,20 @@ def print_capacity_report(result: CapacityScanResult) -> None:
     print("-" * 132, flush=True)
     print(
         f"{'srv':>4} {'hz':>6} {'period':>8} {'bad':>5} {'p_n':>7} {'p_mean':>8} "
-        f"{'p_max':>7} {'mean_err':>9} {'conc_sum':>9} {'status':>7} reason",
+        f"{'p_max':>7} {'mean_err':>9} {'conc_sum':>9} {'status':>7} reason / warnings",
         flush=True,
     )
     print("-" * 132, flush=True)
 
     for level in result.levels:
-        metrics = level.primary
+        metrics = level.final_metrics
         print(
             f"{metrics.server_count:>4} {metrics.target_hz:>6.1f} {metrics.target_period_ms:>8.1f} "
             f"{metrics.batch_mismatches:>5} {metrics.period_samples:>7} {metrics.period_mean_ms:>8.2f} "
             f"{metrics.period_max_ms:>7.2f} {metrics.period_mean_abs_error_ms:>9.2f} "
             f"{metrics.worker_conc_sum:>9} {level.final_status.value:>7} "
-            f"{level.final_reason or metrics.failure_reason}",
+            f"{level.final_reason or metrics.failure_reason or '-'}"
+            f"{'' if not metrics.warnings else ' warnings=' + ','.join(metrics.warnings)}",
             flush=True,
         )
         if level.final_status in {CapacityStatus.FAIL, CapacityStatus.FLAKY} and metrics.top_gaps:
@@ -343,16 +350,34 @@ def print_capacity_report(result: CapacityScanResult) -> None:
         accept_flaky_as_pass=result.config.accept_flaky_as_pass,
     )
     for item in summaries:
+        print(f"  srv={item.server_count}:", flush=True)
         print(
-            f"  srv={item.server_count}: "
-            f"stable_pass_hz={item.stable_pass_hz if item.stable_pass_hz is not None else 'N/A'}, "
-            f"first_flaky_hz={item.first_flaky_hz if item.first_flaky_hz is not None else 'N/A'}, "
-            f"first_fail_hz={item.first_fail_hz if item.first_fail_hz is not None else 'N/A'}, "
-            f"best_accepted_hz={item.best_accepted_hz if item.best_accepted_hz is not None else 'N/A'}, "
-            f"p_max={item.best_accepted_p_max_ms if item.best_accepted_p_max_ms is not None else 'N/A'}, "
-            f"mean_err={item.best_accepted_mean_err_ms if item.best_accepted_mean_err_ms is not None else 'N/A'}, "
-            f"conc_sum={item.best_accepted_conc_sum if item.best_accepted_conc_sum is not None else 'N/A'}, "
-            f"failure_reason={item.best_accepted_failure_reason or '-'}",
+            f"    stable_pass_hz={item.stable_pass_hz if item.stable_pass_hz is not None else 'N/A'}",
             flush=True,
         )
+        print(
+            f"    first_flaky_hz={item.first_flaky_hz if item.first_flaky_hz is not None else 'N/A'}",
+            flush=True,
+        )
+        print(
+            f"    first_fail_hz={item.first_fail_hz if item.first_fail_hz is not None else 'N/A'}",
+            flush=True,
+        )
+        print(
+            f"    best_accepted_hz={item.best_accepted_hz if item.best_accepted_hz is not None else 'N/A'}",
+            flush=True,
+        )
+        print(
+            f"    p_max={item.best_accepted_p_max_ms if item.best_accepted_p_max_ms is not None else 'N/A'}",
+            flush=True,
+        )
+        print(
+            f"    mean_err={item.best_accepted_mean_err_ms if item.best_accepted_mean_err_ms is not None else 'N/A'}",
+            flush=True,
+        )
+        print(
+            f"    conc_sum={item.best_accepted_conc_sum if item.best_accepted_conc_sum is not None else 'N/A'}",
+            flush=True,
+        )
+        print(f"    failure_reason={item.best_accepted_failure_reason or '-'}", flush=True)
     print("=" * 132, flush=True)

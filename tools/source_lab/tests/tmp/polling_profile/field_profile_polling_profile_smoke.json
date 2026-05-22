@@ -1,0 +1,18 @@
+{
+  "access_mode": "polling",
+  "protocol": "opcua",
+  "process_count": 1,
+  "server_count": 50,
+  "hz": 20.0,
+  "sample_hz": null,
+  "publishing_interval_ms": null,
+  "sampling_interval_ms": null,
+  "queue_size": 1,
+  "source_update_enabled": true,
+  "source_update_hz": 20.0,
+  "status": "PASS",
+  "reason": "",
+  "warnings": [],
+  "report_path": "/home/luosh/Whale/tools/source_lab/tests/tmp/polling_profile/field_profile_polling_profile_smoke.txt",
+  "pyinstrument_path": null
+}

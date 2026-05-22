@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
+from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec  # type: ignore[import-untyped]
 
 
 class CapacityMode(str, Enum):
@@ -42,10 +42,11 @@ class ResponsePeriodStats:
 
     samples: int
     mean_ms: float
+    p95_ms: float
     max_ms: float
     mean_abs_error_ms: float
-    worst_gap: PeriodGap | None
-    top_gaps: tuple[PeriodGap, ...]
+    worst_gap: PeriodGap | None = None
+    top_gaps: tuple[PeriodGap, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +74,7 @@ class CapacityLevelMetrics:
     missing_response_timestamps: int
     period_samples: int
     period_mean_ms: float
+    period_p95_ms: float
     period_max_ms: float
     period_mean_abs_error_ms: float
     missed_ticks: int
@@ -86,8 +88,19 @@ class CapacityLevelMetrics:
     period_mean_ok: bool
     passed: bool
     failure_reason: str
-    worst_gap: PeriodGap | None
-    top_gaps: tuple[PeriodGap, ...]
+    points_per_server: int = 0
+    point_total: int = 0
+    expected_value_count: int = 0
+    value_count: int = 0
+    value_delivery_ratio: float = 0.0
+    value_missing_count: int = 0
+    read_count: int = 0
+    batch_count: int = 0
+    worst_gap: PeriodGap | None = None
+    top_gaps: tuple[PeriodGap, ...] = ()
+    warnings: tuple[str, ...] = ()
+    runner_protocol_noise_count: int = 0
+    runner_protocol_noise_samples: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +111,12 @@ class ConfirmedLevelResult:
     attempts: tuple[CapacityLevelMetrics, ...]
     final_status: CapacityStatus
     final_reason: str
+
+    @property
+    def final_metrics(self) -> CapacityLevelMetrics:
+        """Return the metrics object used for final status and table output."""
+
+        return self.attempts[-1] if self.attempts else self.primary
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,7 +137,7 @@ class CapacityScanConfig:
     level_duration_s: float = 30.0
     warmup_s: float = 10.0
     read_timeout_s: float = 5.0
-    source_update_enabled: bool = False
+    source_update_enabled: bool = True
     source_update_hz: float = 10.0
     period_max_tolerance_ratio: float = 0.2
     period_mean_error_ratio: float = 0.05
@@ -153,6 +172,10 @@ class CapacityScanConfig:
             raise ValueError("process_count must be greater than 0")
         if self.level_duration_s <= 0 or self.warmup_s < 0 or self.read_timeout_s <= 0:
             raise ValueError("invalid timing config")
+        if self.period_max_tolerance_ratio < 0:
+            raise ValueError("period_max_tolerance_ratio must be non-negative")
+        if self.period_mean_error_ratio < 0:
+            raise ValueError("period_mean_error_ratio must be non-negative")
         if self.progress_interval_s <= 0:
             raise ValueError("progress_interval_s must be greater than 0")
         if self.runner_trace_top_n <= 0:
@@ -162,7 +185,7 @@ class CapacityScanConfig:
     def from_env_for_simulator(cls) -> CapacityScanConfig:
         """Build simulator-mode config from environment variables."""
 
-        from .config import from_env_for_simulator
+        from ..config import from_env_for_simulator
 
         return from_env_for_simulator()
 

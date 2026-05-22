@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tools.source_lab.access.metrics import (
+from tools.source_lab.access.polling.metrics import (
     RunnerSummary,
     RunnerTrace,
     WorkerRawStats,
@@ -12,7 +12,7 @@ from tools.source_lab.access.metrics import (
     build_skip_result,
     evaluate_response_periods,
 )
-from tools.source_lab.access.model import CapacityMode, CapacityScanConfig, CapacityStatus
+from tools.source_lab.access.polling.model import CapacityMode, CapacityScanConfig, CapacityStatus
 
 
 def _config() -> CapacityScanConfig:
@@ -57,7 +57,7 @@ def test_build_skip_result_status() -> None:
     assert result.final_reason == "skip_reason"
 
 
-def test_build_level_metrics_contains_pmax_reason() -> None:
+def test_build_level_metrics_contains_data_period_max_reason() -> None:
     config = _config()
     worker_stats = (
         WorkerRawStats(
@@ -74,12 +74,13 @@ def test_build_level_metrics_contains_pmax_reason() -> None:
     metrics = build_level_metrics(
         worker_stats,
         server_count=1,
+        point_total=1,
         target_hz=10.0,
         config=config,
     )
 
     assert metrics.period_max_ok is False
-    assert "pmax=" in metrics.failure_reason
+    assert "data_period_max_ms=" in metrics.failure_reason
 
 
 def test_worker_raw_stats_diagnostics_do_not_change_metrics_semantics() -> None:
@@ -135,12 +136,13 @@ def test_worker_raw_stats_diagnostics_do_not_change_metrics_semantics() -> None:
     metrics = build_level_metrics(
         worker_stats,
         server_count=1,
+        point_total=1,
         target_hz=10.0,
         config=config,
     )
 
     assert metrics.period_max_ok is False
-    assert "pmax=" in metrics.failure_reason
+    assert "data_period_max_ms=" in metrics.failure_reason
     assert metrics.missed_ticks == 3
     assert metrics.runner_max_lag_ms == pytest.approx(2.5)
     assert metrics.runner_max_read_ms == pytest.approx(1.5)

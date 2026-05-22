@@ -6,13 +6,13 @@ import inspect
 
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 
-from tools.source_lab.access import worker
-from tools.source_lab.access.metrics import WorkerRawStats
-from tools.source_lab.access.model import CapacityMode, CapacityScanConfig
+from tools.source_lab.access.polling import worker
+from tools.source_lab.access.polling.metrics import WorkerRawStats
+from tools.source_lab.access.polling.model import CapacityMode, CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 from tools.source_lab.access.runners.base import CapacityRunner
-from tools.source_lab.access.scheduling import RunnerEndpointPlan
-from tools.source_lab.access.worker import run_level_once, run_worker_level
+from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
+from tools.source_lab.access.polling.worker import run_level_once, run_worker_level
 
 
 class _FakeRunner:
@@ -86,7 +86,7 @@ def test_run_level_once_process_count_one_uses_injected_runner(
     diagnostics_calls: list[int] = []
 
     monkeypatch.setattr(
-        "tools.source_lab.access.worker.print_worker_diagnostics",
+        "tools.source_lab.access.polling.worker.print_worker_diagnostics",
         lambda config, worker_stats: diagnostics_calls.append(len(worker_stats)),
     )
 
@@ -150,7 +150,7 @@ def test_run_level_once_partitions_sources_across_workers(monkeypatch) -> None:
             submitted.append((index, len(bucket)))
             return _Future(func(index, bucket, target_hz, config, runner_arg))
 
-    monkeypatch.setattr("tools.source_lab.access.worker.ProcessPoolExecutor", _Executor)
+    monkeypatch.setattr("tools.source_lab.access.polling.worker.ProcessPoolExecutor", _Executor)
 
     metrics = run_level_once(
         (_source(0), _source(1), _source(2)),

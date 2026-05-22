@@ -1,5 +1,5 @@
 # mypy: disable-error-code=import-untyped
-"""Simulator-mode source provider for capacity scanning."""
+"""Simulator-mode source provider for polling and subscribe scans."""
 
 from __future__ import annotations
 
@@ -8,13 +8,14 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
 
-from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
-from tools.source_lab.access.model import CapacityScanConfig
+from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec  # type: ignore[import-untyped]
+from tools.source_lab.access.polling.model import CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceProvider, SourceRuntimeSpec
+from tools.source_lab.access.subscribe.model import SubscribeScanConfig
 from tools.source_lab.fleet import SourceSimulatorFleet
 from tools.source_lab.model import SimulatedSource, UpdateConfig
 from tools.source_lab.opcua.address_space import logical_path
-from tools.source_lab.access.utils import normalize_protocol
+from tools.source_lab.access.common.utils import normalize_protocol
 from tools.source_lab.sources import (
     PortAllocator,
     build_multi_sources,
@@ -27,7 +28,7 @@ class SimulatorSourceProvider(SourceProvider):
 
     def __init__(self, *, port_allocator: PortAllocator | None = None) -> None:
         self._port_allocator = port_allocator or PortAllocator.from_env()
-        self._active_config: CapacityScanConfig | None = None
+        self._active_config: CapacityScanConfig | SubscribeScanConfig | None = None
 
     @classmethod
     def from_env(cls) -> SimulatorSourceProvider:
@@ -37,7 +38,7 @@ class SimulatorSourceProvider(SourceProvider):
 
     def build_sources(
         self,
-        config: CapacityScanConfig,
+        config: CapacityScanConfig | SubscribeScanConfig,
         *,
         server_count: int,
     ) -> tuple[SourceRuntimeSpec, ...]:
@@ -49,10 +50,27 @@ class SimulatorSourceProvider(SourceProvider):
 
         self._active_config = config
 
-        base_source = build_opcua_source_from_repository(
-            min_expected_point_count=config.min_expected_point_count,
-            max_expected_point_count=config.max_expected_point_count,
-        )
+        min_expected_point_count = config.min_expected_point_count
+        max_expected_point_count = config.max_expected_point_count
+        if isinstance(config, SubscribeScanConfig):
+            base_source = build_opcua_source_from_repository(
+                min_expected_point_count=1,
+                max_expected_point_count=max(10_000, max_expected_point_count),
+            )
+            if len(base_source.points) < min_expected_point_count:
+                raise ValueError(
+                    "subscribe simulator point count is lower than requested minimum: "
+                    f"available={len(base_source.points)} minimum={min_expected_point_count}"
+                )
+            base_source = replace(
+                base_source,
+                points=base_source.points[:max_expected_point_count],
+            )
+        else:
+            base_source = build_opcua_source_from_repository(
+                min_expected_point_count=min_expected_point_count,
+                max_expected_point_count=max_expected_point_count,
+            )
         ports = self._port_allocator.allocate_many(server_count, host=base_source.connection.host)
         sources = build_multi_sources(base_source, server_count=server_count, ports=ports)
         sources = tuple(
@@ -90,6 +108,23 @@ class SimulatorSourceProvider(SourceProvider):
         update_interval_s = 1.0
         if vars_per_server > 0 and self._active_config.source_update_hz > 0:
             update_interval_s = 1.0 / self._active_config.source_update_hz
+        update_interval_ms = max(1, round(update_interval_s * 1000.0))
+        simulated_sources = tuple(
+            replace(
+                source,
+                connection=replace(
+                    source.connection,
+                    params={
+                        **source.connection.params,
+                        "source_update_enabled": self._active_config.source_update_enabled,
+                        "source_update_hz": self._active_config.source_update_hz,
+                        "open62541_internal_update_enabled": self._active_config.source_update_enabled,
+                        "open62541_internal_update_interval_ms": update_interval_ms,
+                    },
+                ),
+            )
+            for source in simulated_sources
+        )
 
         fleet = SourceSimulatorFleet.create(
             sources=simulated_sources,

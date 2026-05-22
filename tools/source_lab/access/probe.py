@@ -7,8 +7,8 @@ from dataclasses import dataclass
 import math
 import socket
 
-from tools.source_lab.access.io import FieldEndpointMetadata
-from tools.source_lab.access.model import (
+from tools.source_lab.access.common.io import FieldEndpointMetadata
+from tools.source_lab.access.polling.model import (
     CapacityMode,
     CapacityScanConfig,
     CapacityStatus,
@@ -19,7 +19,7 @@ from tools.source_lab.access.model import (
 )
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 from tools.source_lab.access.runners.open62541_serial_polling import run_serial_polling_probe
-from tools.source_lab.access.utils import normalize_protocol
+from tools.source_lab.access.common.utils import normalize_protocol
 
 
 @dataclass(frozen=True, slots=True)

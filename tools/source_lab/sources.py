@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import errno
 import os
 import socket
 from dataclasses import dataclass
@@ -11,7 +10,7 @@ from dataclasses import replace
 from tools.source_lab.model import SimulatedPoint, SimulatedSource, SourceConnection
 from whale.ingest.adapters.config.source_runtime_config_repository import SourceRuntimeConfigRepository  # type: ignore[import-untyped]
 
-_DEFAULT_PORT_START = 45000
+_DEFAULT_PORT_START = 50000
 _DEFAULT_PORT_END = 65000
 
 
@@ -37,47 +36,42 @@ def _resolve_port_scan_range() -> tuple[int, int]:
     return start, end
 
 
+def _resolve_bind_host(host: str) -> str:
+    """Resolve runtime host into one concrete bind host for probing."""
+
+    normalized = host.strip() if host.strip() else "127.0.0.1"
+    if normalized.lower() == "localhost":
+        return "127.0.0.1"
+    return normalized
+
+
 def _is_tcp_port_available(host: str, port: int) -> bool:
-    """Return whether a TCP port is bindable across addresses used by runners."""
+    """Return whether a TCP port is bindable on the given host."""
 
-    candidates = ["127.0.0.1", "0.0.0.0", socket.gethostname(), socket.getfqdn(), host]
-    seen: set[str] = set()
-    for candidate in candidates:
-        if not candidate or candidate in seen:
-            continue
-        seen.add(candidate)
+    bind_host = _resolve_bind_host(host)
+    try:
+        infos = socket.getaddrinfo(
+            bind_host,
+            port,
+            family=socket.AF_INET,
+            type=socket.SOCK_STREAM,
+        )
+    except OSError:
+        return False
 
+    if not infos:
+        return False
+
+    for info in infos:
+        family, sock_type, proto, _canonname, sockaddr = info
         try:
-            infos = socket.getaddrinfo(
-                candidate,
-                port,
-                family=socket.AF_INET,
-                type=socket.SOCK_STREAM,
-            )
+            with socket.socket(family, sock_type, proto) as sock:
+                sock.bind(sockaddr)
+                return True
         except OSError:
             continue
 
-        ipv4_host = infos[0][4][0] if infos else candidate
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                sock.bind((ipv4_host, port))
-            except OSError:
-                return False
-
-    if hasattr(socket, "AF_INET6"):
-        try:
-            with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as sock6:
-                sock6.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                try:
-                    sock6.bind(("::", port))
-                except OSError as exc:
-                    if exc.errno not in {errno.EAFNOSUPPORT, errno.EADDRNOTAVAIL}:
-                        return False
-        except OSError:
-            pass
-
-    return True
+    return False
 
 
 @dataclass(slots=True)
@@ -94,23 +88,53 @@ class PortAllocator:
         start, end = _resolve_port_scan_range()
         return cls(start=start, end=end, next_port=start, used_ports=set())
 
+    @classmethod
+    def from_range(cls, *, start: int, end: int) -> "PortAllocator":
+        """Build allocator from explicit range with safe fallback bounds."""
+
+        resolved_start = start if start > 0 else _DEFAULT_PORT_START
+        resolved_end = end if end > 0 else _DEFAULT_PORT_END
+        if resolved_start > resolved_end:
+            resolved_start, resolved_end = _DEFAULT_PORT_START, _DEFAULT_PORT_END
+        return cls(start=resolved_start, end=resolved_end, next_port=resolved_start, used_ports=set())
+
     def allocate_many(self, count: int, host: str = "127.0.0.1") -> tuple[int, ...]:
         """Allocate a batch of unique currently-bindable TCP ports."""
 
+        if count <= 0:
+            return ()
+
+        bind_host = _resolve_bind_host(host)
         allocated: list[int] = []
+        attempted = 0
+        unavailable: list[int] = []
+
+        if self.next_port < self.start or self.next_port > self.end:
+            self.next_port = self.start
+
+        capacity = self.end - self.start + 1
         candidate = self.next_port
-        while candidate <= self.end and len(allocated) < count:
-            if candidate not in self.used_ports and _is_tcp_port_available(host, candidate):
+        scanned = 0
+        while scanned < capacity and len(allocated) < count:
+            attempted += 1
+            if candidate not in self.used_ports and _is_tcp_port_available(bind_host, candidate):
                 self.used_ports.add(candidate)
                 allocated.append(candidate)
+            elif len(unavailable) < 12:
+                unavailable.append(candidate)
+
+            scanned += 1
             candidate += 1
+            if candidate > self.end:
+                candidate = self.start
 
         self.next_port = candidate
         if len(allocated) != count:
             raise RuntimeError(
                 "Failed to allocate simulator ports: "
-                f"start={self.start}, end={self.end}, needed={count}, "
-                f"allocated={len(allocated)}"
+                f"requested_host={bind_host}, start={self.start}, end={self.end}, "
+                f"needed={count}, attempted={attempted}, allocated={len(allocated)}, "
+                f"next_port={self.next_port}, unavailable_sample={tuple(unavailable)}"
             )
 
         return tuple(allocated)

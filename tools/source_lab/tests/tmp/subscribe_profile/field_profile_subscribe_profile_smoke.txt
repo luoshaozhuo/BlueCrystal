@@ -1,0 +1,36 @@
+
+====================================================================================================================================
+source_lab subscribe scan
+====================================================================================================================================
+mode=field
+protocol=opcua
+server_count=50:1:50
+publishing_interval_ms=20.0 sampling_interval_ms=20.0 source_update_hz=50.0 queue_size=1
+------------------------------------------------------------------------------------------------------------------------------------
+ srv   notify    value   bad   data_p95   data_max    src_p95    src_max   recv_p95    lag_p95   dispatch keepalive  timeout   resub  resub_ok  resub_fail  unrecov recovery_ms  status reason / warnings
+------------------------------------------------------------------------------------------------------------------------------------
+  50    50000   150000     0     20.316     22.781     20.057    120.069     20.315      0.021      3.072         0        0       0         0           0        0       0.000    PASS -
+top response gaps:
+  global=32 local=32 prev_ns=213728732138000 curr_ns=213728754919000 period_ms=22.781
+  global=3 local=3 prev_ns=213729078213000 curr_ns=213729100640000 period_ms=22.427
+  global=0 local=0 prev_ns=213732878238000 curr_ns=213732900632000 period_ms=22.394
+  global=10 local=10 prev_ns=213734886211000 curr_ns=213734908600000 period_ms=22.389
+  global=1 local=1 prev_ns=213727304103000 curr_ns=213727326488000 period_ms=22.385
+top data notify gaps:
+  global=32 local=32 prev_ns=213728732138000 curr_ns=213728754919000 period_ms=22.781
+  global=3 local=3 prev_ns=213729078213000 curr_ns=213729100640000 period_ms=22.427
+  global=0 local=0 prev_ns=213732878238000 curr_ns=213732900632000 period_ms=22.394
+  global=10 local=10 prev_ns=213734886211000 curr_ns=213734908600000 period_ms=22.389
+  global=1 local=1 prev_ns=213727304103000 curr_ns=213727326488000 period_ms=22.385
+top callback_to_flush lag:
+  global=44 local=44 notify_ns=213732876153000 flush_ns=213732876613000 lag_ms=0.460
+  global=25 local=25 notify_ns=213731208131000 flush_ns=213731208374000 lag_ms=0.243
+  global=5 local=5 notify_ns=213728754244000 flush_ns=213728754449000 lag_ms=0.205
+  global=10 local=10 notify_ns=213731126260000 flush_ns=213731126442000 lag_ms=0.182
+  global=35 local=35 notify_ns=213728754570000 flush_ns=213728754741000 lag_ms=0.171
+top endpoint dispatch gaps:
+  global=22 local=22 notify=1000 iterate=10001 dispatch_gap_ms=3.072 iterate_max_ms=0.095 revised_pub_ms=20.000 revised_sample_ms=20.000
+  global=13 local=13 notify=1000 iterate=10001 dispatch_gap_ms=3.006 iterate_max_ms=0.079 revised_pub_ms=20.000 revised_sample_ms=20.000
+  global=36 local=36 notify=1000 iterate=10001 dispatch_gap_ms=2.992 iterate_max_ms=0.139 revised_pub_ms=20.000 revised_sample_ms=20.000
+  global=21 local=21 notify=1000 iterate=10001 dispatch_gap_ms=2.935 iterate_max_ms=0.121 revised_pub_ms=20.000 revised_sample_ms=20.000
+  global=41 local=41 notify=1000 iterate=10001 dispatch_gap_ms=2.904 iterate_max_ms=0.245 revised_pub_ms=20.000 revised_sample_ms=20.000

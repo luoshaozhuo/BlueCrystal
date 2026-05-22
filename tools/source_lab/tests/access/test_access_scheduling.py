@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
-from tools.source_lab.access.scheduling import (
+from tools.source_lab.access.common.scheduling import (
     RunnerEndpointPlan,
     build_source_specs,
     iter_float_ramp,
     iter_int_ramp,
+    parse_float_list_or_ramp,
+    parse_int_list_or_ramp,
     partition_specs_round_robin,
 )
 
@@ -56,3 +58,74 @@ def test_build_source_specs_offset_distribution() -> None:
 
 def test_build_source_specs_returns_empty_for_empty_sources() -> None:
     assert build_source_specs((), target_hz=10.0) == ()
+
+
+def test_parse_int_list_or_ramp_prefers_list() -> None:
+    values = parse_int_list_or_ramp(
+        "1,3,5",
+        start=2,
+        step=2,
+        maximum=8,
+        default=(9,),
+        value_name="server_count",
+    )
+
+    assert values == (1, 3, 5)
+
+
+def test_parse_int_list_or_ramp_uses_ramp_when_list_missing() -> None:
+    values = parse_int_list_or_ramp(
+        None,
+        start=1,
+        step=2,
+        maximum=5,
+        default=(9,),
+        value_name="server_count",
+    )
+
+    assert values == (1, 3, 5)
+
+
+def test_parse_float_list_or_ramp_defaults_when_no_inputs() -> None:
+    values = parse_float_list_or_ramp(
+        None,
+        start=None,
+        step=None,
+        maximum=None,
+        default=(10.0,),
+        value_name="hz",
+    )
+
+    assert values == (10.0,)
+
+
+def test_parse_float_list_or_ramp_rejects_invalid_step() -> None:
+    try:
+        parse_float_list_or_ramp(
+            None,
+            start=5.0,
+            step=0.0,
+            maximum=10.0,
+            default=(10.0,),
+            value_name="hz",
+        )
+    except ValueError as exc:
+        assert "step must be greater than 0" in str(exc)
+    else:  # pragma: no cover - assertion guard
+        raise AssertionError("expected ValueError")
+
+
+def test_parse_int_list_or_ramp_rejects_partial_ramp() -> None:
+    try:
+        parse_int_list_or_ramp(
+            None,
+            start=1,
+            step=None,
+            maximum=3,
+            default=(1,),
+            value_name="process_count",
+        )
+    except ValueError as exc:
+        assert "requires start, step, and max" in str(exc)
+    else:  # pragma: no cover - assertion guard
+        raise AssertionError("expected ValueError")

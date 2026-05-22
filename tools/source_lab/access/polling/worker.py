@@ -6,12 +6,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 
-from tools.source_lab.access.metrics import WorkerRawStats, build_level_metrics
-from tools.source_lab.access.model import CapacityLevelMetrics, CapacityScanConfig
+from tools.source_lab.access.polling.metrics import WorkerRawStats, build_level_metrics
+from tools.source_lab.access.polling.model import CapacityLevelMetrics, CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
-from tools.source_lab.access.reporter import print_runner_started, print_worker_diagnostics
+from tools.source_lab.access.polling.reporter import print_runner_started, print_worker_diagnostics
 from tools.source_lab.access.runners.base import CapacityRunner
-from tools.source_lab.access.scheduling import (
+from tools.source_lab.access.common.scheduling import (
     RunnerEndpointPlan,
     build_source_specs,
     partition_specs_round_robin,
@@ -105,6 +105,7 @@ def run_level_once(
     return build_level_metrics(
         worker_stats,
         server_count=len(sources),
+        point_total=sum(len(source.points) for source in sources),
         target_hz=target_hz,
         config=config,
     )

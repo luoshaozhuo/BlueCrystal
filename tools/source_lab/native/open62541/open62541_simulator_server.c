@@ -12,7 +12,6 @@
  */
 #define _POSIX_C_SOURCE 200809L
 
-#include <open62541/plugin/log_stdout.h>
 #include <open62541/server.h>
 #include <open62541/server_config_default.h>
 
@@ -54,6 +53,17 @@ typedef struct StringSetItem {
 } StringSetItem;
 
 static volatile UA_Boolean running = true;
+static UA_Logger g_null_logger = {0};
+
+static void disable_server_logging(UA_ServerConfig *config) {
+    if (config == NULL) {
+        return;
+    }
+    config->logging = &g_null_logger;
+    if (config->eventLoop != NULL) {
+        config->eventLoop->logger = &g_null_logger;
+    }
+}
 
 /* 收到终止信号后退出主循环，走正常 shutdown 路径释放资源。 */
 static void stop_handler(int sig) {
@@ -872,12 +882,22 @@ static void process_stdin_commands(UA_Server *server, UA_UInt16 ns_idx) {
     }
 }
 
-/* 单调毫秒时钟用于内部更新节拍控制。 */
-static unsigned long monotonic_ms(void) {
+/* 单调纳秒时钟用于内部更新节拍控制。 */
+static int64_t monotonic_ns(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
 
-    return ((unsigned long)ts.tv_sec * 1000UL) + ((unsigned long)ts.tv_nsec / 1000000UL);
+    return ((int64_t)ts.tv_sec * 1000000000LL) + (int64_t)ts.tv_nsec;
+}
+
+static void sleep_ns(int64_t delay_ns) {
+    if (delay_ns <= 0) {
+        return;
+    }
+    struct timespec ts;
+    ts.tv_sec = (time_t)(delay_ns / 1000000000LL);
+    ts.tv_nsec = (long)(delay_ns % 1000000000LL);
+    nanosleep(&ts, NULL);
 }
 
 /* 根据节点数据类型生成下一次内部更新值。 */
@@ -916,18 +936,24 @@ static void maybe_run_internal_update(
     UA_Server *server,
     UA_UInt16 ns_idx,
     AppConfig *config,
-    unsigned long *last_update_ms
+    int64_t *next_update_due_ns
 ) {
     if (!config->update_enabled) {
         return;
     }
 
-    unsigned long now = monotonic_ms();
-    if (*last_update_ms != 0 && now - *last_update_ms < config->update_interval_ms) {
-        return;
+    int64_t interval_ns = (int64_t)config->update_interval_ms * 1000000LL;
+    if (interval_ns <= 0) {
+        interval_ns = 1000000LL;
     }
 
-    *last_update_ms = now;
+    int64_t now_ns = monotonic_ns();
+    if (*next_update_due_ns <= 0) {
+        *next_update_due_ns = now_ns;
+    }
+    if (now_ns < *next_update_due_ns) {
+        return;
+    }
 
     int updated_count = 0;
     char value_buffer[256];
@@ -942,12 +968,34 @@ static void maybe_run_internal_update(
             break;
         }
     }
+
+    *next_update_due_ns += interval_ns;
+    while (*next_update_due_ns <= now_ns) {
+        *next_update_due_ns += interval_ns;
+    }
 }
 
 /* 进程入口：加载配置、启动服务端、循环处理外部命令和内部更新。 */
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <config.tsv>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    int protocol_stdout_fd = dup(STDOUT_FILENO);
+    if (protocol_stdout_fd < 0) {
+        perror("Failed to duplicate stdout");
+        return EXIT_FAILURE;
+    }
+    FILE *protocol_stdout = fdopen(protocol_stdout_fd, "w");
+    if (protocol_stdout == NULL) {
+        perror("Failed to open protocol stdout");
+        close(protocol_stdout_fd);
+        return EXIT_FAILURE;
+    }
+    if (dup2(STDERR_FILENO, STDOUT_FILENO) < 0) {
+        perror("Failed to redirect stdout to stderr");
+        fclose(protocol_stdout);
         return EXIT_FAILURE;
     }
 
@@ -965,6 +1013,7 @@ int main(int argc, char **argv) {
 
     UA_Server *server = UA_Server_new();
     UA_ServerConfig *server_config = UA_Server_getConfig(server);
+    disable_server_logging(server_config);
 
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port, NULL);
     if (status != UA_STATUSCODE_GOOD) {
@@ -973,6 +1022,15 @@ int main(int argc, char **argv) {
         free_config(&app_config);
         return EXIT_FAILURE;
     }
+#ifdef UA_ENABLE_SUBSCRIPTIONS
+    /*
+     * Subscribe capacity scans sweep 10Hz/20Hz/... sample rates. The simulator
+     * must not clamp those requests back to a larger default minimum.
+     */
+    server_config->publishingIntervalLimits.min = 5.0;
+    server_config->samplingIntervalLimits.min = 5.0;
+#endif
+    disable_server_logging(server_config);
 
     UA_UInt16 ns_idx = UA_Server_addNamespace(server, app_config.namespace_uri);
 
@@ -994,22 +1052,31 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    printf("READY\n");
-    fflush(stdout);
+    fprintf(protocol_stdout, "READY\n");
+    fflush(protocol_stdout);
 
-    unsigned long last_update_ms = 0;
+    int64_t next_update_due_ns = 0;
 
     while (running) {
         UA_Server_run_iterate(server, false);
         process_stdin_commands(server, ns_idx);
-        maybe_run_internal_update(server, ns_idx, &app_config, &last_update_ms);
-        usleep(1000);
+        maybe_run_internal_update(server, ns_idx, &app_config, &next_update_due_ns);
+
+        int64_t sleep_budget_ns = 500000LL;
+        if (app_config.update_enabled && next_update_due_ns > 0) {
+            int64_t until_update_ns = next_update_due_ns - monotonic_ns();
+            if (until_update_ns < sleep_budget_ns) {
+                sleep_budget_ns = until_update_ns;
+            }
+        }
+        sleep_ns(sleep_budget_ns);
     }
 
     status = UA_Server_run_shutdown(server);
 
     UA_Server_delete(server);
     free_config(&app_config);
+    fclose(protocol_stdout);
 
     return status == UA_STATUSCODE_GOOD ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -19,6 +19,11 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 
+from tools.source_lab.access.runners.protocol import (
+    ProtocolDiagnostics,
+    read_protocol_line,
+    start_stderr_drain_thread,
+)
 from tools.source_lab.opcua.address_space import (
     build_address_space,
     opcua_data_type,
@@ -30,6 +35,9 @@ from tools.source_lab.model import SimulatedPoint, SimulatedSource
 _STARTUP_TIMEOUT_SECONDS = 10.0
 _READY_POLL_SECONDS = 0.05
 _STOP_TIMEOUT_SECONDS = 5.0
+_READY_PREFIX = "READY"
+_ERROR_PREFIX = "ERROR"
+_OUTPUT_TAIL_LINES = 40
 
 
 class Open62541SourceSimulatorError(RuntimeError):
@@ -62,6 +70,20 @@ class Open62541SourceSimulator:
         self._config_path: Path | None = None
         self._process: subprocess.Popen[str] | None = None
         self._write_targets_by_key: dict[str, tuple[str, SimulatedPoint]] = {}
+        self._protocol_noise_count = 0
+        self._protocol_noise_samples: tuple[str, ...] = ()
+
+    @property
+    def protocol_noise_count(self) -> int:
+        """Return unexpected stdout noise observed during startup."""
+
+        return self._protocol_noise_count
+
+    @property
+    def protocol_noise_samples(self) -> tuple[str, ...]:
+        """Return retained unexpected stdout samples observed during startup."""
+
+        return self._protocol_noise_samples
 
     @property
     def endpoint(self) -> str:
@@ -109,14 +131,27 @@ class Open62541SourceSimulator:
             self._wait_until_ready()
         except Exception:
             stdout, stderr = self._terminate_and_collect_output()
+            returncode = self._process.returncode if self._process is not None else None
+            config_exists = config_path.exists()
+            config_size = config_path.stat().st_size if config_exists else 0
+            stdout_tail = _tail_output(stdout)
+            stderr_tail = _tail_output(stderr)
             self._cleanup_temp_dir()
             self._process = None
             raise Open62541SourceSimulatorError(
                 "Failed to start open62541 simulator runner.\n"
+                f"runner_path={runner_path}\n"
+                f"source={self._source.connection.name}\n"
                 f"endpoint={self.endpoint}\n"
+                f"endpoint_host={self._source.connection.host}\n"
+                f"endpoint_port={self._source.connection.port}\n"
+                f"startup_timeout_seconds={self._startup_timeout_seconds}\n"
                 f"config_path={config_path}\n"
-                f"stdout:\n{stdout}\n"
-                f"stderr:\n{stderr}"
+                f"config_exists={config_exists}\n"
+                f"config_size_bytes={config_size}\n"
+                f"returncode={returncode}\n"
+                f"stdout_tail_lines={_OUTPUT_TAIL_LINES}:\n{stdout_tail}\n"
+                f"stderr_tail_lines={_OUTPUT_TAIL_LINES}:\n{stderr_tail}"
             ) from None
 
         self._write_targets_by_key = {}
@@ -170,10 +205,8 @@ class Open62541SourceSimulator:
         if self._process is None or self._process.poll() is not None:
             raise RuntimeError("Simulator runtime must be started before writes()")
 
-        # If SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED is true, the runner handles all updates
-        # internally. Don't send writes through stdin to avoid double-update overhead.
-        load_update_enabled = os.environ.get("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", "false")
-        if load_update_enabled.strip().lower() in {"1", "true", "yes", "on"}:
+        # When internal runner updates are enabled, stdin writes would double-update values.
+        if self._internal_update_enabled():
             return
 
         if self._process.stdin is None:
@@ -226,9 +259,8 @@ class Open62541SourceSimulator:
 
     def _runner_config_records(self) -> dict[str, str]:
         """Build extra runner configuration records for the TSV file."""
-        load_update_enabled = os.environ.get("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", "false")
-        update_enabled = load_update_enabled.strip().lower() in {"1", "true", "yes", "on"}
-        update_interval_ms = _resolve_internal_update_interval_ms()
+        update_enabled = self._internal_update_enabled()
+        update_interval_ms = self._internal_update_interval_ms()
         return OrderedDict(
             (
                 ("update_enabled", "true" if update_enabled else "false"),
@@ -245,20 +277,46 @@ class Open62541SourceSimulator:
         host = self._source.connection.host
         port = int(self._source.connection.port)
         deadline = time.monotonic() + self._startup_timeout_seconds
-
-        while time.monotonic() < deadline:
-            if self._process.poll() is not None:
+        assert self._process.stdout is not None
+        diagnostics = ProtocolDiagnostics()
+        stderr_thread = start_stderr_drain_thread(self._process.stderr, diagnostics)
+        try:
+            ready_line = read_protocol_line(
+                self._process.stdout,
+                allowed_prefixes=(_READY_PREFIX,),
+                error_prefix=_ERROR_PREFIX,
+                diagnostics=diagnostics,
+                label="open62541 simulator runner",
+            )
+            if ready_line != _READY_PREFIX:
                 raise Open62541SourceSimulatorError(
-                    f"Runner exited before ready: exitcode={self._process.returncode}"
+                    "READY not received from simulator runner; unexpected response: "
+                    f"{ready_line!r}{diagnostics.render_context()}"
+                )
+            self._protocol_noise_count = diagnostics.stdout_noise_count
+            self._protocol_noise_samples = tuple(diagnostics.stdout_noise_samples)
+            if diagnostics.stdout_noise_count > 0:
+                raise Open62541SourceSimulatorError(
+                    "Simulator runner emitted unexpected stdout noise during startup"
+                    f"{diagnostics.render_context()}"
                 )
 
-            if _can_connect(host, port):
-                return
-
-            time.sleep(_READY_POLL_SECONDS)
+            while time.monotonic() < deadline:
+                if self._process.poll() is not None:
+                    raise Open62541SourceSimulatorError(
+                        "Process exited before READY endpoint became connectable: "
+                        f"exitcode={self._process.returncode}{diagnostics.render_context()}"
+                    )
+                if _can_connect(host, port):
+                    return
+                time.sleep(_READY_POLL_SECONDS)
+        finally:
+            stderr_thread.join(timeout=1.0)
 
         raise Open62541SourceSimulatorError(
-            f"Timed out waiting for open62541 endpoint: {host}:{port}"
+            "READY received but endpoint did not become connectable before timeout: "
+            f"{host}:{port}, timeout_seconds={self._startup_timeout_seconds}"
+            f"{diagnostics.render_context()}"
         )
 
     def _terminate_and_collect_output(self) -> tuple[str, str]:
@@ -319,6 +377,32 @@ class Open62541SourceSimulator:
             )
         return value
 
+    def _internal_update_enabled(self) -> bool:
+        """Resolve whether the native runner should drive internal updates."""
+
+        params_value = self._source.connection.params.get("open62541_internal_update_enabled")
+        if isinstance(params_value, bool):
+            return params_value
+        if isinstance(params_value, str) and params_value.strip() != "":
+            return params_value.strip().lower() in {"1", "true", "yes", "on"}
+        load_update_enabled = os.environ.get("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", "false")
+        return load_update_enabled.strip().lower() in {"1", "true", "yes", "on"}
+
+    def _internal_update_interval_ms(self) -> int:
+        """Resolve native runner internal update interval with runtime override support."""
+
+        params_value = self._source.connection.params.get("open62541_internal_update_interval_ms")
+        if isinstance(params_value, (int, float)) and float(params_value) > 0:
+            return max(1, round(float(params_value)))
+        if isinstance(params_value, str) and params_value.strip() != "":
+            try:
+                resolved = float(params_value)
+            except ValueError:
+                resolved = 0.0
+            if resolved > 0:
+                return max(1, round(resolved))
+        return _resolve_internal_update_interval_ms()
+
 
 def resolve_runner_path() -> Path:
     """Resolve open62541 source simulator executable path.
@@ -348,8 +432,8 @@ def _can_connect(host: str, port: int) -> bool:
 
 
 def _resolve_internal_update_interval_ms() -> int:
-    """Resolve internal update interval from SOURCE_SIM_LOAD_SOURCE_UPDATE_HZ."""
-    raw_hz = os.environ.get("SOURCE_SIM_LOAD_SOURCE_UPDATE_HZ", "10")
+    """Resolve internal update interval from SOURCE_SIM_POLL_SOURCE_UPDATE_HZ."""
+    raw_hz = os.environ.get("SOURCE_SIM_POLL_SOURCE_UPDATE_HZ", "10")
 
     try:
         hz = float(raw_hz)
@@ -360,3 +444,14 @@ def _resolve_internal_update_interval_ms() -> int:
         return 1000
 
     return max(1, round(1000.0 / hz))
+
+
+def _tail_output(text: str) -> str:
+    """Return bounded output tail for startup diagnostics."""
+
+    if not text:
+        return ""
+    lines = text.splitlines()
+    if len(lines) <= _OUTPUT_TAIL_LINES:
+        return "\n".join(lines)
+    return "\n".join(lines[-_OUTPUT_TAIL_LINES:])

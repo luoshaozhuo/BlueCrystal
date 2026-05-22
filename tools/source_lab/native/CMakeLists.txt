@@ -25,3 +25,12 @@ target_link_libraries(open62541_client_runner
     PRIVATE
         open62541::open62541
 )
+
+add_executable(open62541_subscription_runner
+    open62541/open62541_subscription_runner.c
+)
+
+target_link_libraries(open62541_subscription_runner
+    PRIVATE
+        open62541::open62541
+)

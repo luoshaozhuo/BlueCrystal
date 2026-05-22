@@ -1,5 +1,4 @@
-# mypy: disable-error-code=import-untyped
-"""Source providers used by protocol-agnostic capacity scanner."""
+"""Source providers used by protocol-agnostic polling and subscribe scans."""
 
 from __future__ import annotations
 
@@ -7,8 +6,9 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Protocol
 
-from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
-from tools.source_lab.access.model import CapacityScanConfig
+from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec  # type: ignore[import-untyped]
+from tools.source_lab.access.polling.model import CapacityScanConfig
+from tools.source_lab.access.subscribe.model import SubscribeScanConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class SourceProvider(Protocol):
 
     def build_sources(
         self,
-        config: CapacityScanConfig,
+        config: CapacityScanConfig | SubscribeScanConfig,
         *,
         server_count: int,
     ) -> tuple[SourceRuntimeSpec, ...]:

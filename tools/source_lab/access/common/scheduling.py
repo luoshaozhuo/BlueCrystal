@@ -19,6 +19,66 @@ class RunnerEndpointPlan:
     offset_ns: int
 
 
+def parse_int_list_or_ramp(
+    list_value: str | None,
+    *,
+    start: int | None,
+    step: int | None,
+    maximum: int | None,
+    default: tuple[int, ...],
+    value_name: str,
+) -> tuple[int, ...]:
+    """Parse an integer list first, otherwise a validated inclusive ramp."""
+
+    if list_value is not None and list_value.strip() != "":
+        values = tuple(int(item.strip()) for item in list_value.split(",") if item.strip())
+        if not values:
+            raise ValueError(f"{value_name} list cannot be empty")
+        return values
+
+    if start is None and step is None and maximum is None:
+        return default
+    if start is None or step is None or maximum is None:
+        raise ValueError(
+            f"{value_name} ramp requires start, step, and max when list is not provided"
+        )
+    if step <= 0:
+        raise ValueError(f"{value_name} step must be greater than 0")
+    if maximum < start:
+        raise ValueError(f"{value_name} max must be greater than or equal to start")
+    return tuple(iter_int_ramp(start, step, maximum))
+
+
+def parse_float_list_or_ramp(
+    list_value: str | None,
+    *,
+    start: float | None,
+    step: float | None,
+    maximum: float | None,
+    default: tuple[float, ...],
+    value_name: str,
+) -> tuple[float, ...]:
+    """Parse a float list first, otherwise a validated inclusive ramp."""
+
+    if list_value is not None and list_value.strip() != "":
+        values = tuple(float(item.strip()) for item in list_value.split(",") if item.strip())
+        if not values:
+            raise ValueError(f"{value_name} list cannot be empty")
+        return values
+
+    if start is None and step is None and maximum is None:
+        return default
+    if start is None or step is None or maximum is None:
+        raise ValueError(
+            f"{value_name} ramp requires start, step, and max when list is not provided"
+        )
+    if step <= 0:
+        raise ValueError(f"{value_name} step must be greater than 0")
+    if maximum < start:
+        raise ValueError(f"{value_name} max must be greater than or equal to start")
+    return tuple(iter_float_ramp(start, step, maximum))
+
+
 def iter_int_ramp(start: int, step: int, maximum: int) -> Iterator[int]:
     """Yield integer ramp values from start to maximum, inclusive."""
 

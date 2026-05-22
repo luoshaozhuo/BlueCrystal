@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager, nullcontext
 
-from tools.source_lab.access.model import CapacityScanConfig
+from tools.source_lab.access.polling.model import CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceProvider, SourceRuntimeSpec
-from tools.source_lab.access.utils import normalize_protocol
+from tools.source_lab.access.subscribe.model import SubscribeScanConfig
+from tools.source_lab.access.common.utils import normalize_protocol
 
 
 class FieldFileSourceProvider(SourceProvider):
@@ -35,7 +36,7 @@ class FieldFileSourceProvider(SourceProvider):
 
     def build_sources(
         self,
-        config: CapacityScanConfig,
+        config: CapacityScanConfig | SubscribeScanConfig,
         *,
         server_count: int,
     ) -> tuple[SourceRuntimeSpec, ...]:
@@ -69,3 +70,27 @@ class FieldFileSourceProvider(SourceProvider):
         """Return no-op lifecycle context for field mode."""
 
         return nullcontext()
+
+
+def build_field_source_provider(
+    sources: tuple[SourceRuntimeSpec, ...],
+    *,
+    protocol: str | None = None,
+    default_port_start: int = 45000,
+) -> SourceProvider:
+    """Build the appropriate field provider for real or simulator-backed fixtures."""
+
+    requested = normalize_protocol(protocol) if protocol is not None else None
+    filtered_sources = tuple(
+        source
+        for source in sources
+        if requested is None or normalize_protocol(source.endpoint.protocol) == requested
+    )
+    if filtered_sources and all(source.endpoint.params.get("source_lab_runtime") == "simulator" for source in filtered_sources):
+        from tools.source_lab.access.providers.expanded_field import ExpandedFieldSourceProvider
+
+        port_start = min(source.endpoint.port for source in filtered_sources)
+        if port_start <= 0:
+            port_start = default_port_start
+        return ExpandedFieldSourceProvider(filtered_sources, port_start=port_start)
+    return FieldFileSourceProvider(sources, protocol=protocol)

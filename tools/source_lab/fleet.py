@@ -19,6 +19,8 @@ from tools.source_lab.model import SimulatedPoint, SimulatedSource, UpdateConfig
 
 _STARTUP_TIMEOUT_SECONDS = 10.0
 _READY_POLL_SECONDS = 0.05
+_START_CONCURRENCY_DEFAULT = 8
+_START_STAGGER_MS_DEFAULT = 0
 
 
 def _resolve_startup_timeout_seconds() -> float:
@@ -37,6 +39,36 @@ def _resolve_startup_timeout_seconds() -> float:
         return _STARTUP_TIMEOUT_SECONDS
 
     return resolved
+
+
+def _resolve_start_concurrency() -> int:
+    """Resolve startup concurrency cap from environment with safe fallback."""
+
+    raw_value = os.environ.get("SOURCE_SIM_FLEET_START_CONCURRENCY")
+    if raw_value is None or raw_value.strip() == "":
+        return _START_CONCURRENCY_DEFAULT
+
+    try:
+        resolved = int(raw_value)
+    except ValueError:
+        return _START_CONCURRENCY_DEFAULT
+
+    return resolved if resolved > 0 else _START_CONCURRENCY_DEFAULT
+
+
+def _resolve_start_stagger_ms() -> int:
+    """Resolve startup stagger milliseconds from environment with safe fallback."""
+
+    raw_value = os.environ.get("SOURCE_SIM_FLEET_START_STAGGER_MS")
+    if raw_value is None or raw_value.strip() == "":
+        return _START_STAGGER_MS_DEFAULT
+
+    try:
+        resolved = int(raw_value)
+    except ValueError:
+        return _START_STAGGER_MS_DEFAULT
+
+    return resolved if resolved >= 0 else _START_STAGGER_MS_DEFAULT
 
 
 def _normalize_point_data_type(raw_data_type: str) -> str:
@@ -161,6 +193,8 @@ class SourceSimulatorFleet:
     update_config: UpdateConfig
     startup_timeout_seconds: float = 10.0
     join_timeout_seconds: float = 5.0
+    start_concurrency: int = _START_CONCURRENCY_DEFAULT
+    start_stagger_ms: int = _START_STAGGER_MS_DEFAULT
     _processes: list[multiprocessing.Process] = field(init=False, repr=False, default_factory=list)
     _stop_events: list[synchronize.Event] = field(init=False, repr=False, default_factory=list)
     _ready_events: list[synchronize.Event] = field(init=False, repr=False, default_factory=list)
@@ -173,10 +207,18 @@ class SourceSimulatorFleet:
         *,
         update_config: UpdateConfig | None = None,
         startup_timeout_seconds: float | None = None,
+        start_concurrency: int | None = None,
+        start_stagger_ms: int | None = None,
     ) -> "SourceSimulatorFleet":
         """Build one fleet from externally prepared simulated sources."""
         resolved_config = update_config or UpdateConfig()
         resolved_timeout = startup_timeout_seconds if startup_timeout_seconds is not None else _STARTUP_TIMEOUT_SECONDS
+        resolved_start_concurrency = (
+            start_concurrency if start_concurrency is not None else _resolve_start_concurrency()
+        )
+        resolved_start_stagger_ms = (
+            start_stagger_ms if start_stagger_ms is not None else _resolve_start_stagger_ms()
+        )
         source_list = tuple(sources)
 
         if not source_list:
@@ -193,6 +235,8 @@ class SourceSimulatorFleet:
             sources=source_list,
             update_config=resolved_config,
             startup_timeout_seconds=resolved_timeout,
+            start_concurrency=resolved_start_concurrency,
+            start_stagger_ms=resolved_start_stagger_ms,
         )
 
     def start(self) -> "SourceSimulatorFleet":
@@ -201,7 +245,6 @@ class SourceSimulatorFleet:
 
         try:
             self._start_processes()
-            self._wait_until_ready()
         except Exception:
             self.stop()
             raise
@@ -219,27 +262,39 @@ class SourceSimulatorFleet:
 
         # 2. 给子进程一次正常退出机会。
         for process in self._processes:
+            if process.pid is None:
+                continue
             process.join(timeout=self.join_timeout_seconds)
 
         # 3. 仍未退出则 terminate。
         for process in self._processes:
+            if process.pid is None:
+                continue
             if process.is_alive():
                 process.terminate()
 
         for process in self._processes:
+            if process.pid is None:
+                continue
             process.join(timeout=self.join_timeout_seconds)
 
         # 4. 仍未退出则 kill。
         for process in self._processes:
+            if process.pid is None:
+                continue
             if process.is_alive():
                 process.kill()
 
         for process in self._processes:
+            if process.pid is None:
+                continue
             process.join(timeout=self.join_timeout_seconds)
 
         alive_processes = []
         # 5. 释放 process handle。
         for process in self._processes:
+            if process.pid is None:
+                continue
             if process.is_alive():
                 alive_processes.append(process.name)
                 continue
@@ -265,6 +320,8 @@ class SourceSimulatorFleet:
     def _start_processes(self) -> None:
         context = multiprocessing.get_context()
         self._error_queue = context.Queue()
+        startup_deadline = time.monotonic() + self.startup_timeout_seconds
+        startup_window: set[int] = set()
 
         for index, source in enumerate(self.sources):
             # ready_event 用来表示子进程已完成 server.start()；
@@ -288,51 +345,84 @@ class SourceSimulatorFleet:
             self._stop_events.append(stop_event)
             self._ready_events.append(ready_event)
 
-    def _wait_until_ready(self) -> None:
-        timeout_seconds = self.startup_timeout_seconds
-        deadline = time.monotonic() + timeout_seconds
-        pending_indices = set(range(len(self._ready_events)))
+            startup_window.add(index)
+            if self.start_stagger_ms > 0:
+                time.sleep(self.start_stagger_ms / 1000.0)
 
-        while pending_indices:
+            if self.start_concurrency > 0 and len(startup_window) >= self.start_concurrency:
+                self._wait_until_ready(
+                    pending_indices=startup_window,
+                    deadline=startup_deadline,
+                )
+                startup_window.clear()
+
+        if startup_window:
+            self._wait_until_ready(
+                pending_indices=startup_window,
+                deadline=startup_deadline,
+            )
+
+        self._wait_until_ready(deadline=startup_deadline)
+
+    def _wait_until_ready(
+        self,
+        *,
+        pending_indices: set[int] | None = None,
+        deadline: float | None = None,
+    ) -> None:
+        timeout_seconds = self.startup_timeout_seconds
+        resolved_deadline = deadline if deadline is not None else (time.monotonic() + timeout_seconds)
+        pending = set(pending_indices) if pending_indices is not None else set(range(len(self._ready_events)))
+
+        while pending:
             startup_errors = self._drain_startup_errors()
             if startup_errors:
                 raise RuntimeError("Failed to start simulator fleet:\n" + "\n".join(startup_errors))
 
-            for index in tuple(pending_indices):
+            for index in tuple(pending):
                 if self._ready_events[index].is_set():
-                    pending_indices.remove(index)
+                    pending.remove(index)
                     continue
 
                 process = self._processes[index]
                 if not process.is_alive():
+                    source = self.sources[index]
                     raise RuntimeError(
                         "Simulator process exited before ready: "
-                        f"name={process.name} exitcode={process.exitcode}"
+                        f"name={process.name} exitcode={process.exitcode} "
+                        f"source={source.connection.name} "
+                        f"endpoint={source.connection.host}:{source.connection.port}"
                     )
 
-            if not pending_indices:
+            if not pending:
                 break
 
-            remaining_seconds = deadline - time.monotonic()
+            remaining_seconds = resolved_deadline - time.monotonic()
             if remaining_seconds <= 0:
-                pending_list = sorted(pending_indices)
+                pending_list = sorted(pending)
                 alive_process_count = sum(
                     1 for process in self._processes if process.is_alive()
                 )
+                pending_sources = [
+                    f"{self.sources[index].connection.name}@"
+                    f"{self.sources[index].connection.host}:{self.sources[index].connection.port}"
+                    for index in pending_list[:20]
+                ]
                 raise RuntimeError(
                     "Timed out waiting for simulator fleet readiness: "
                     f"timeout_seconds={timeout_seconds}, "
                     f"total_sources={len(self.sources)}, "
-                    f"pending_count={len(pending_indices)}, "
+                    f"pending_count={len(pending)}, "
                     f"pending_indices={pending_list[:20]}, "
+                    f"pending_sources={pending_sources}, "
                     f"alive_process_count={alive_process_count}"
                 )
 
-            for index in tuple(pending_indices):
+            for index in tuple(pending):
                 if self._ready_events[index].wait(
                     timeout=min(_READY_POLL_SECONDS, remaining_seconds)
                 ):
-                    pending_indices.remove(index)
+                    pending.remove(index)
 
     def _drain_startup_errors(self) -> list[str]:
         if self._error_queue is None:

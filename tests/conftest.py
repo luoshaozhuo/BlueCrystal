@@ -22,6 +22,29 @@ if str(SRC_ROOT) not in sys.path:
 _VALID_STATE_CACHE_BACKENDS = frozenset({"relational", "redis"})
 _VALID_MESSAGE_BACKENDS = frozenset({"relational_outbox", "redis_streams", "kafka"})
 _VALID_DATABASE_BACKENDS = frozenset({"sqlite", "postgresql"})
+_ROOT_OUTPUT_ARTIFACTS = (
+    "all_test_output.txt",
+    "compile_output.txt",
+    "fail_fast_output.txt",
+    "mypy_output.txt",
+    "profile_test_output.txt",
+    "pytest_out.txt",
+    "test_output.txt",
+    "output.log",
+    "pytest_output.log",
+    "pytest_output_v2.log",
+    "test_out.log",
+    "test_output.log",
+)
+
+
+def _cleanup_root_output_artifacts() -> None:
+    """Remove known root-level test/output artifacts to keep repo clean."""
+
+    for name in _ROOT_OUTPUT_ARTIFACTS:
+        path = PROJECT_ROOT / name
+        if path.is_file():
+            path.unlink()
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -37,6 +60,18 @@ def pytest_configure(config: pytest.Config) -> None:
         os.environ["WHALE_INGEST_STATE_CACHE_BACKEND"] = "relational"
     if os.environ.get("WHALE_INGEST_MESSAGE_BACKEND", "") not in _VALID_MESSAGE_BACKENDS:
         os.environ["WHALE_INGEST_MESSAGE_BACKEND"] = "relational_outbox"
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Clean root-level output artifacts before tests start."""
+
+    _cleanup_root_output_artifacts()
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Clean root-level output artifacts when tests finish."""
+
+    _cleanup_root_output_artifacts()
 
 
 @pytest.fixture()

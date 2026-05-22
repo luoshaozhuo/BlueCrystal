@@ -7,8 +7,8 @@ from contextlib import nullcontext
 import pytest
 
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
-from tools.source_lab.access.capacity import scan_source_capacity
-from tools.source_lab.access.model import CapacityLevelMetrics, CapacityMode, CapacityScanConfig
+from tools.source_lab.access.polling.capacity import scan_source_capacity
+from tools.source_lab.access.polling.model import CapacityLevelMetrics, CapacityMode, CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 
 
@@ -68,6 +68,7 @@ def _passing_metrics() -> CapacityLevelMetrics:
         missing_response_timestamps=0,
         period_samples=10,
         period_mean_ms=100.5,
+        period_p95_ms=103.0,
         period_max_ms=104.2,
         period_mean_abs_error_ms=1.1,
         missed_ticks=0,
@@ -97,13 +98,13 @@ def test_scan_progress_output_contains_main_stages(
     runner = _Runner()
 
     monkeypatch.setattr(
-        "tools.source_lab.access.capacity.run_level_once",
+        "tools.source_lab.access.polling.capacity.run_level_once",
         lambda sources, *, target_hz, config, runner: _passing_metrics(),
     )
 
     result = scan_source_capacity(config, provider=provider, runner=runner)
 
-    output = capsys.readouterr().out
+    output = capsys.readouterr().err
     assert result.levels
     assert "[source-lab] capacity scan started:" in output
     assert "runner=fake_runner" in output
@@ -124,7 +125,7 @@ def test_scan_progress_output_can_be_disabled(
     provider = _Provider()
 
     monkeypatch.setattr(
-        "tools.source_lab.access.capacity.run_level_once",
+        "tools.source_lab.access.polling.capacity.run_level_once",
         lambda sources, *, target_hz, config, runner: _passing_metrics(),
     )
 

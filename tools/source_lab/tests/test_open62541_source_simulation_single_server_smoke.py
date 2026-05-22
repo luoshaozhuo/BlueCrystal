@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 import random
 import socket
 import sys
@@ -137,7 +138,7 @@ def test_open62541_source_simulation_single_server_smoke(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _require_runner()
-    monkeypatch.setenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", "false")
+    monkeypatch.setenv("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", "false")
 
     source = _build_source()
     fleet = SourceSimulatorFleet.create(
@@ -156,10 +157,12 @@ def test_open62541_source_simulator_writes_smoke(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _require_runner()
-    monkeypatch.setenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", "false")
+    monkeypatch.setenv("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", "false")
     source = _build_source()
 
     with Open62541SourceSimulator(source) as simulator:
+        assert simulator.protocol_noise_count == 0
+        assert simulator.protocol_noise_samples == ()
         _assert_tick_ok(asyncio.run(_read_tick(source)), expected_count=len(source.points))
         simulator.writes(
             {
@@ -178,7 +181,7 @@ def test_open62541_source_simulator_rejects_invalid_write_string(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _require_runner()
-    monkeypatch.setenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", "false")
+    monkeypatch.setenv("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", "false")
     source = _build_source()
 
     with Open62541SourceSimulator(source) as simulator:
@@ -186,16 +189,36 @@ def test_open62541_source_simulator_rejects_invalid_write_string(
             simulator.writes({"WPPD1.StrVal": "bad\tvalue"})
 
 
+def test_open62541_source_simulator_prefers_runtime_update_params() -> None:
+    source = _build_source()
+    source = replace(
+        source,
+        connection=replace(
+            source.connection,
+            params={
+                **source.connection.params,
+                "open62541_internal_update_enabled": True,
+                "open62541_internal_update_interval_ms": 50,
+            },
+        ),
+    )
+    simulator = Open62541SourceSimulator(source)
+
+    assert simulator._runner_config_records()["update_enabled"] == "true"
+    assert simulator._runner_config_records()["update_interval_ms"] == "50"
+
+
 @pytest.mark.load
 def test_open62541_source_simulator_internal_updates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _require_runner()
-    monkeypatch.setenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", "true")
-    monkeypatch.setenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_HZ", "10")
+    monkeypatch.setenv("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", "true")
+    monkeypatch.setenv("SOURCE_SIM_POLL_SOURCE_UPDATE_HZ", "10")
     source = _build_source()
 
     with Open62541SourceSimulator(source):
+        # stdout is a control/protocol channel; startup should be noise-free.
         initial_tick = asyncio.run(_read_tick(source))
         asyncio.run(asyncio.sleep(0.3))
         updated_tick = asyncio.run(_read_tick(source))
@@ -209,8 +232,8 @@ def test_open62541_fleet_internal_updates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _require_runner()
-    monkeypatch.setenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_ENABLED", "true")
-    monkeypatch.setenv("SOURCE_SIM_LOAD_SOURCE_UPDATE_HZ", "10")
+    monkeypatch.setenv("SOURCE_SIM_POLL_SOURCE_UPDATE_ENABLED", "true")
+    monkeypatch.setenv("SOURCE_SIM_POLL_SOURCE_UPDATE_HZ", "10")
 
     source = _build_source()
     fleet = SourceSimulatorFleet.create(

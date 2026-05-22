@@ -8,8 +8,8 @@ import subprocess
 
 import pytest
 
-from tools.source_lab.access.metrics import RunnerSummary
-from tools.source_lab.access.model import CapacityMode, CapacityScanConfig
+from tools.source_lab.access.polling.metrics import RunnerSummary
+from tools.source_lab.access.polling.model import CapacityMode, CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 from tools.source_lab.access.runners.open62541_serial_polling import (
     OpcUaOpen62541CapacityRunner,
@@ -19,7 +19,8 @@ from tools.source_lab.access.runners.open62541_serial_polling import (
     run_serial_polling_probe,
     run_serial_polling_worker,
 )
-from tools.source_lab.access.scheduling import RunnerEndpointPlan
+from tools.source_lab.access.runners.protocol import RUNNER_PROTOCOL_NOISE_LIMIT
+from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 
 
@@ -224,6 +225,120 @@ def test_run_serial_polling_worker_raises_on_non_zero_exit(
     )
 
     with pytest.raises(RuntimeError, match="non-zero status 7"):
+        run_serial_polling_worker(0, (_plan(),), 10.0, _config())
+
+
+def test_run_serial_polling_worker_raises_on_error_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    protocol = "\n".join(["READY", "ERROR\tserial\tbad_input", "POLL_DONE\t0"])
+
+    class _FakeProcess:
+        def __init__(self) -> None:
+            self.stdin = io.StringIO()
+            self.stdout = io.StringIO(protocol)
+            self.stderr = io.StringIO("stderr line\n")
+            self.returncode = 0
+
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling._resolve_runner_path",
+        lambda: Path("/tmp/open62541_client_runner"),
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling.subprocess.Popen",
+        lambda *args, **kwargs: _FakeProcess(),
+    )
+
+    with pytest.raises(RuntimeError, match="protocol error.*stderr_tail"):
+        run_serial_polling_worker(0, (_plan(),), 10.0, _config())
+
+
+def test_run_serial_polling_worker_records_small_protocol_noise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    protocol = "\n".join(
+        [
+            "READY",
+            "open62541: stdout noise",
+            "RESULT\t0\t0\t9\t0\t100\t101\t102\tOK\t1.25\t2.50\t1\t1712345678.250000",
+            "RUNNER_SUMMARY\t0\t1\t1\t1\t0\t0\t0\t0\t1.250\t2.500\t0\t0\t0.000\t0.000",
+            "POLL_DONE\t0",
+        ]
+    )
+
+    class _FakeProcess:
+        def __init__(self) -> None:
+            self.stdin = io.StringIO()
+            self.stdout = io.StringIO(protocol)
+            self.stderr = io.StringIO()
+            self.returncode = 0
+
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling._resolve_runner_path",
+        lambda: Path("/tmp/open62541_client_runner"),
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling.subprocess.Popen",
+        lambda *args, **kwargs: _FakeProcess(),
+    )
+
+    stats = run_serial_polling_worker(0, (_plan(),), 10.0, _config())
+
+    assert stats.runner_protocol_noise_count == 1
+    assert stats.runner_protocol_noise_samples == ("open62541: stdout noise",)
+
+
+def test_run_serial_polling_worker_fails_on_protocol_noise_overflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    noise = [f"noise-{index}" for index in range(RUNNER_PROTOCOL_NOISE_LIMIT + 1)]
+    protocol = "\n".join(["READY", *noise])
+
+    class _FakeProcess:
+        def __init__(self) -> None:
+            self.stdin = io.StringIO()
+            self.stdout = io.StringIO(protocol)
+            self.stderr = io.StringIO("stderr tail\n")
+            self.returncode = 0
+
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling._resolve_runner_path",
+        lambda: Path("/tmp/open62541_client_runner"),
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling.subprocess.Popen",
+        lambda *args, **kwargs: _FakeProcess(),
+    )
+
+    with pytest.raises(RuntimeError, match="non-protocol stdout noise.*stderr tail"):
         run_serial_polling_worker(0, (_plan(),), 10.0, _config())
 
 

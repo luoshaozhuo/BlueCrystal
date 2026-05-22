@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 
-from tools.source_lab.access.io import FieldEndpointMetadata
-from tools.source_lab.access.model import CapacityStatus, ProbeConfig, TickResult
+from tools.source_lab.access.common.io import FieldEndpointMetadata
+from tools.source_lab.access.polling.model import CapacityStatus, ProbeConfig, TickResult
 from tools.source_lab.access.probe import run_probe
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 

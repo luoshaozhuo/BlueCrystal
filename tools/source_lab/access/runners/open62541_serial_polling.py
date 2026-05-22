@@ -8,21 +8,26 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 import tempfile
-from typing import IO
+from threading import Thread
 
-from whale.shared.source.access.opcua import build_opcua_endpoint_url
+from whale.shared.source.access.opcua import build_opcua_endpoint_url  # type: ignore[import-untyped]
 
-from tools.source_lab.access.metrics import (
+from tools.source_lab.access.polling.metrics import (
     ReaderStats,
     RunnerSummary,
     RunnerTrace,
     WorkerRawStats,
     record_tick,
 )
-from tools.source_lab.access.model import CapacityScanConfig, TickResult
+from tools.source_lab.access.polling.model import CapacityScanConfig, TickResult
 from tools.source_lab.access.runners.base import CapacityRunner
+from tools.source_lab.access.runners.protocol import (
+    ProtocolDiagnostics,
+    read_protocol_line,
+    start_stderr_drain_thread,
+)
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
-from tools.source_lab.access.scheduling import RunnerEndpointPlan
+from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
 
 _READY_PREFIX = "READY"
 _RESULT_PREFIX = "RESULT"
@@ -58,6 +63,8 @@ class _RunnerSessionResult:
     results: tuple[ParsedRunnerResult, ...]
     summary: RunnerSummary | None
     summary_line: str | None
+    runner_protocol_noise_count: int
+    runner_protocol_noise_samples: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,18 +105,6 @@ def _resolve_runner_path() -> Path:
     return (
         Path(__file__).resolve().parents[2] / "native" / "build" / f"open62541_client_runner{suffix}"
     )
-
-
-def _read_line(stream: IO[str], *, allowed_prefixes: tuple[str, ...]) -> str:
-    """Read one protocol line that matches the allowed prefixes."""
-
-    while True:
-        line = stream.readline()
-        if line == "":
-            raise RuntimeError(f"open62541 runner exited while waiting for {allowed_prefixes!r}")
-        text = line.strip()
-        if any(text.startswith(prefix) for prefix in allowed_prefixes):
-            return text
 
 
 def _write_endpoint_file(temp_dir: str, spec: SourceRuntimeSpec, index: int) -> Path:
@@ -275,71 +270,102 @@ def _run_serial_polling_session(
 
     with tempfile.TemporaryDirectory(prefix="source_lab_access_runner_") as temp_dir:
         endpoint_files = [_write_endpoint_file(temp_dir, spec.source, spec.global_index) for spec in specs]
+        diagnostics = ProtocolDiagnostics()
         process = subprocess.Popen(
             [str(runner_path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             bufsize=1,
         )
+        stderr_thread: Thread = start_stderr_drain_thread(getattr(process, "stderr", None), diagnostics)
+        protocol_error: RuntimeError | None = None
         try:
             assert process.stdin is not None
             assert process.stdout is not None
-            ready_line = _read_line(process.stdout, allowed_prefixes=(_READY_PREFIX,))
-            if ready_line != _READY_PREFIX:
-                raise RuntimeError(f"unexpected runner ready response: {ready_line!r}")
-
-            process.stdin.write(
-                "START_SERIAL_POLL\t"
-                f"{worker_index}\t{target_hz:.9f}\t{period_ns}\t{warmup_s:.9f}\t"
-                f"{duration_s:.9f}\t{read_timeout_s:.9f}\t{len(specs)}\n"
-            )
-            for spec, node_file in zip(specs, endpoint_files):
-                source = spec.source
-                process.stdin.write(
-                    "ENDPOINT\t"
-                    f"{spec.global_index}\t{build_opcua_endpoint_url(source.endpoint)}\t"
-                    f"{source.endpoint.namespace_uri or '-'}\t{source.endpoint.ied_name or '-'}\t"
-                    f"{source.endpoint.ld_name or '-'}\t{node_file}\t{spec.offset_ns}\n"
-                )
-            process.stdin.write("END_SERIAL_POLL\n")
-            process.stdin.flush()
-
-            results: list[ParsedRunnerResult] = []
-            summary_line: str | None = None
-            summary: RunnerSummary | None = None
-            while True:
-                line = _read_line(
+            try:
+                ready_line = read_protocol_line(
                     process.stdout,
-                    allowed_prefixes=(
-                        _RESULT_PREFIX,
-                        _POLL_DONE_PREFIX,
-                        _RUNNER_SUMMARY_PREFIX,
-                        _ERROR_PREFIX,
-                    ),
+                    allowed_prefixes=(_READY_PREFIX,),
+                    error_prefix=_ERROR_PREFIX,
+                    diagnostics=diagnostics,
+                    label="open62541 runner",
                 )
-                if line.startswith(_ERROR_PREFIX):
-                    raise RuntimeError(f"open62541 runner protocol error: {line}")
-                if line.startswith(_RESULT_PREFIX):
-                    results.append(parse_result_line(line))
-                    continue
-                if line.startswith(_RUNNER_SUMMARY_PREFIX):
-                    summary_line = line
-                    summary = parse_summary_line(line)
-                    continue
-                if line.startswith(_POLL_DONE_PREFIX):
-                    break
+                if ready_line != _READY_PREFIX:
+                    raise RuntimeError(
+                        f"unexpected runner ready response: {ready_line!r}{diagnostics.render_context()}"
+                    )
+
+                process.stdin.write(
+                    "START_SERIAL_POLL\t"
+                    f"{worker_index}\t{target_hz:.9f}\t{period_ns}\t{warmup_s:.9f}\t"
+                    f"{duration_s:.9f}\t{read_timeout_s:.9f}\t{len(specs)}\n"
+                )
+                for spec, node_file in zip(specs, endpoint_files):
+                    source = spec.source
+                    process.stdin.write(
+                        "ENDPOINT\t"
+                        f"{spec.global_index}\t{build_opcua_endpoint_url(source.endpoint)}\t"
+                        f"{source.endpoint.namespace_uri or '-'}\t{source.endpoint.ied_name or '-'}\t"
+                        f"{source.endpoint.ld_name or '-'}\t{node_file}\t{spec.offset_ns}\n"
+                    )
+                process.stdin.write("END_SERIAL_POLL\n")
+                process.stdin.flush()
+
+                results: list[ParsedRunnerResult] = []
+                summary_line: str | None = None
+                summary: RunnerSummary | None = None
+                while True:
+                    line = read_protocol_line(
+                        process.stdout,
+                        allowed_prefixes=(
+                            _RESULT_PREFIX,
+                            _POLL_DONE_PREFIX,
+                            _RUNNER_SUMMARY_PREFIX,
+                        ),
+                        error_prefix=_ERROR_PREFIX,
+                        diagnostics=diagnostics,
+                        label="open62541 runner",
+                    )
+                    if line.startswith(_RESULT_PREFIX):
+                        results.append(parse_result_line(line))
+                        continue
+                    if line.startswith(_RUNNER_SUMMARY_PREFIX):
+                        summary_line = line
+                        summary = parse_summary_line(line)
+                        continue
+                    if line.startswith(_POLL_DONE_PREFIX):
+                        break
+            except RuntimeError as exc:
+                protocol_error = exc
+                results = []
+                summary_line = None
+                summary = None
         finally:
             _stop_process(process)
+            stderr_thread.join(timeout=1.0)
 
+        if protocol_error is not None:
+            message = str(protocol_error)
+            context = diagnostics.render_context()
+            if context and context not in message:
+                message = f"{message}{context}"
+            raise RuntimeError(message) from protocol_error
         if process.returncode not in {0, None}:
             raise RuntimeError(
-                f"open62541 runner exited with non-zero status {process.returncode} for worker {worker_index}"
+                "open62541 runner exited with non-zero status "
+                f"{process.returncode} for worker {worker_index}{diagnostics.render_context()}"
             )
 
-    return _RunnerSessionResult(results=tuple(results), summary=summary, summary_line=summary_line)
+    return _RunnerSessionResult(
+        results=tuple(results),
+        summary=summary,
+        summary_line=summary_line,
+        runner_protocol_noise_count=diagnostics.stdout_noise_count,
+        runner_protocol_noise_samples=tuple(diagnostics.stdout_noise_samples),
+    )
 
 
 def _empty_worker_stats(worker_index: int) -> WorkerRawStats:
@@ -353,6 +379,11 @@ def _empty_worker_stats(worker_index: int) -> WorkerRawStats:
         missing_response_timestamps=0,
         response_timestamps_by_reader=(),
         max_observed_concurrent_reads=0,
+        total_reads=0,
+        ok_reads=0,
+        value_count=0,
+        runner_protocol_noise_count=0,
+        runner_protocol_noise_samples=(),
     )
 
 
@@ -456,7 +487,12 @@ def run_serial_polling_worker(
         missing_response_timestamps=sum(item.missing_response_timestamps for item in stats_by_reader),
         response_timestamps_by_reader=tuple(tuple(item.response_timestamps) for item in stats_by_reader),
         max_observed_concurrent_reads=1 if stats_by_reader else 0,
+        total_reads=sum(item.total_reads for item in stats_by_reader),
+        ok_reads=sum(item.ok_reads for item in stats_by_reader),
+        value_count=sum(item.value_count for item in stats_by_reader),
         runner_summary=session.summary,
         top_lag_traces=tuple(top_lag_traces),
         top_read_traces=tuple(top_read_traces),
+        runner_protocol_noise_count=getattr(session, "runner_protocol_noise_count", 0),
+        runner_protocol_noise_samples=getattr(session, "runner_protocol_noise_samples", ()),
     )

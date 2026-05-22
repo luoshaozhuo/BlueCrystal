@@ -41,6 +41,19 @@ Thumbs.db
 *.log
 logs/
 
+# Root-level local check outputs (must stay in tmp/)
+/all_test_output.txt
+/compile_output.txt
+/fail_fast_output.txt
+/mypy_output.txt
+/profile_test_output.txt
+/pytest_out.txt
+/test_output.txt
+/pytest_output.txt
+/pytest_output_v2.txt
+/test_out.txt
+/output.txt
+
 # Testing
 .coverage
 .tox/

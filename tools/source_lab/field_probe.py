@@ -1,17 +1,37 @@
-"""CLI entrypoint for standalone field connectivity and latency probes."""
+"""source_lab 正式现场探针 CLI。
+
+本工具读取 ``field_servers.tsv`` 与 ``signal_profile_items.tsv``，执行现场连通性、
+单次读取可达性与延迟采样探测。输出为以 endpoint 为单位的 TSV 报表，便于快速判断
+哪些服务器可连、可读以及响应延迟区间。
+
+完整执行示例：
+
+    python -m tools.source_lab.field_probe \
+      --servers tools/source_lab/tests/fixtures/simulator/field_servers.tsv \
+      --profile-items tools/source_lab/tests/fixtures/simulator/signal_profile_items.tsv \
+      --protocol opcua \
+      --samples 5 \
+      --timeout 5 \
+      --tcp-timeout 3 \
+      --concurrency 16
+"""
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from tools.source_lab.access.io import build_field_runtime_sources
-from tools.source_lab.access.model import ProbeConfig
+from tools.source_lab.access.common.io import build_field_runtime_sources
+from tools.source_lab.access.polling.model import ProbeConfig
 from tools.source_lab.access.probe import run_probe
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Build the ``field_probe`` CLI parser."""
+    """Build the ``field_probe`` CLI parser.
+
+    Returns:
+        Configured argument parser for the probe CLI.
+    """
 
     parser = argparse.ArgumentParser(
         description="Probe field servers from field_servers.tsv and signal_profile_items.tsv.",
@@ -46,7 +66,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _format_metric(value: float | None) -> str:
-    """Format numeric output for TSV printing."""
+    """Format numeric output for TSV printing.
+
+    Args:
+        value: Numeric metric to render.
+
+    Returns:
+        Empty string for ``None`` or a fixed three-decimal string.
+    """
 
     if value is None:
         return ""

@@ -39,6 +39,18 @@ typedef struct SerialEndpointPlan {
     int64_t missed_ticks;
 } SerialEndpointPlan;
 
+static UA_Logger g_null_logger = {0};
+
+static void disable_client_logging(UA_ClientConfig *config) {
+    if(config == NULL) {
+        return;
+    }
+    config->logging = &g_null_logger;
+    if(config->eventLoop != NULL) {
+        config->eventLoop->logger = &g_null_logger;
+    }
+}
+
 static char *xstrdup(const char *value) {
     size_t len = strlen(value);
     char *copy = (char *)malloc(len + 1);
@@ -267,6 +279,7 @@ static bool serial_connect_endpoint(
 
     UA_ClientConfig *config = UA_Client_getConfig(endpoint->client);
     UA_ClientConfig_setDefault(config);
+    disable_client_logging(config);
     config->timeout = (UA_UInt32)(read_timeout_s * 1000.0);
     config->requestedSessionTimeout = (UA_UInt32)(read_timeout_s * 2000.0);
 
