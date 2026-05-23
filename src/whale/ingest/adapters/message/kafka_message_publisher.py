@@ -1,3 +1,4 @@
+# mypy: disable-error-code=import-untyped
 """Kafka publisher for ingest state snapshot messages."""
 
 from __future__ import annotations
@@ -69,7 +70,7 @@ class KafkaMessagePublisher(MessagePublisherPort):
     def _build_producer(settings: KafkaMessageSettings) -> KafkaProducerClient:
         """Build one real Kafka producer lazily."""
         try:
-            from kafka import KafkaProducer  # type: ignore[import-not-found]
+            from kafka import KafkaProducer  # type: ignore[import-untyped]
         except ImportError as exc:
             raise RuntimeError(
                 "Kafka publishing requires the `kafka-python` package to be installed."

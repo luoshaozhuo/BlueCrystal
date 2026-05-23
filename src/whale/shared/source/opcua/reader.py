@@ -6,7 +6,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from whale.shared.source.models import Batch, SourceConnectionProfile
-from whale.shared.source.opcua.backends import PreparedReadPlan, build_client_backend
+from whale.shared.source.opcua.backends import (
+    PreparedReadPlan,
+    RawOpcUaReadResult,
+    build_client_backend,
+)
 
 
 @dataclass(slots=True)
@@ -40,7 +44,7 @@ class OpcUaSourceReader:
 
         return self._backend.prepare_read(addresses)
 
-    async def read_prepared_raw(self, plan: PreparedReadPlan):
+    async def read_prepared_raw(self, plan: PreparedReadPlan) -> RawOpcUaReadResult:
         """Execute one prepared raw read."""
 
         return await self._backend.read_prepared_raw(plan)

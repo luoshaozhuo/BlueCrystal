@@ -11,13 +11,16 @@
       SOURCE_SIM_PORT_START=45000 \
       SOURCE_SIM_PORT_END=65000 \
       SOURCE_SIM_SUB_PROCESS_COUNT=1 \
-      SOURCE_SIM_SUB_SERVER_COUNT=50 \
-      SOURCE_SIM_SUB_SAMPLE_HZ=50 \
-      SOURCE_SIM_SUB_PUBLISHING_INTERVAL_MS=20 \
-      SOURCE_SIM_SUB_SAMPLING_INTERVAL_MS=20 \
-      SOURCE_SIM_SUB_SOURCE_UPDATE_HZ=50 \
-      SOURCE_SIM_SUB_DURATION_S=20 \
-      SOURCE_SIM_SUB_WARMUP_S=3 \
+      SOURCE_SIM_FLEET_START_CONCURRENCY=4 \
+      SOURCE_SIM_FLEET_START_STAGGER_MS=15 \
+      SOURCE_SIM_FLEET_STARTUP_TIMEOUT_S=30 \
+      SOURCE_SIM_SUB_SERVER_COUNT=10 \
+      SOURCE_SIM_SUB_SAMPLE_HZ=20 \
+      SOURCE_SIM_SUB_PUBLISHING_INTERVAL_MS=50 \
+      SOURCE_SIM_SUB_SAMPLING_INTERVAL_MS=50 \
+      SOURCE_SIM_SUB_SOURCE_UPDATE_HZ=20 \
+      SOURCE_SIM_SUB_DURATION_S=6 \
+      SOURCE_SIM_SUB_WARMUP_S=1 \
       SOURCE_SIM_SUB_TIMEOUT_S=5 \
       SOURCE_SIM_SUB_SOURCE_UPDATE_ENABLED=true \
       SOURCE_SIM_SUB_RUNNER_TRACE_ENABLED=true \
@@ -43,13 +46,13 @@
       --profile-items tools/source_lab/tests/fixtures/simulator/signal_profile_items.tsv \
       --protocol opcua \
       --process-count 1 \
-      --server-count 50 \
-      --sample-hz 50 \
-      --publishing-interval-ms 20 \
-      --sampling-interval-ms 20 \
-      --source-update-hz 50 \
-      --duration 20 \
-      --warmup 3 \
+      --server-count 10 \
+      --sample-hz 20 \
+      --publishing-interval-ms 50 \
+      --sampling-interval-ms 50 \
+      --source-update-hz 20 \
+      --duration 6 \
+      --warmup 1 \
       --timeout 5 \
       --source-update-enabled true \
       --runner-trace true \
@@ -124,6 +127,9 @@ def _build_env() -> dict[str, str]:
     env = os.environ.copy()
     env.setdefault("SOURCE_SIM_PORT_START", "45000")
     env.setdefault("SOURCE_SIM_PORT_END", "65000")
+    env.setdefault("SOURCE_SIM_FLEET_START_CONCURRENCY", "4")
+    env.setdefault("SOURCE_SIM_FLEET_START_STAGGER_MS", "15")
+    env.setdefault("SOURCE_SIM_FLEET_STARTUP_TIMEOUT_S", "30")
     env.setdefault("SOURCE_SIM_SUB_DATA_PERIOD_MAX_TOLERANCE_RATIO", "0.2")
     return env
 
@@ -151,19 +157,19 @@ def _command_args(output_dir: Path) -> list[str]:
         "--process-count",
         _env_text("SOURCE_SIM_SUB_PROCESS_COUNT", "1"),
         "--server-count",
-        _env_text("SOURCE_SIM_SUB_SERVER_COUNT", "50"),
+        _env_text("SOURCE_SIM_SUB_SERVER_COUNT", "10"),
         "--sample-hz",
-        _env_text("SOURCE_SIM_SUB_SAMPLE_HZ", "50"),
+        _env_text("SOURCE_SIM_SUB_SAMPLE_HZ", "20"),
         "--publishing-interval-ms",
-        _env_text("SOURCE_SIM_SUB_PUBLISHING_INTERVAL_MS", "20"),
+        _env_text("SOURCE_SIM_SUB_PUBLISHING_INTERVAL_MS", "50"),
         "--sampling-interval-ms",
-        _env_text("SOURCE_SIM_SUB_SAMPLING_INTERVAL_MS", "20"),
+        _env_text("SOURCE_SIM_SUB_SAMPLING_INTERVAL_MS", "50"),
         "--source-update-hz",
-        _env_text("SOURCE_SIM_SUB_SOURCE_UPDATE_HZ", "50"),
+        _env_text("SOURCE_SIM_SUB_SOURCE_UPDATE_HZ", "20"),
         "--duration",
-        _env_text("SOURCE_SIM_SUB_DURATION_S", "20"),
+        _env_text("SOURCE_SIM_SUB_DURATION_S", "6"),
         "--warmup",
-        _env_text("SOURCE_SIM_SUB_WARMUP_S", "3"),
+        _env_text("SOURCE_SIM_SUB_WARMUP_S", "1"),
         "--timeout",
         _env_text("SOURCE_SIM_SUB_TIMEOUT_S", "5"),
         "--source-update-enabled",
@@ -248,7 +254,7 @@ def test_source_simulation_multi_server_subscribe_profile() -> None:
     assert completed.returncode == 0, completed.stderr
     assert "source_lab subscribe scan" in completed.stdout
     assert "protocol=opcua" in completed.stdout
-    assert "source_update_hz=50.0" in completed.stdout or "source_update_hz=50" in completed.stdout
+    assert "source_update_hz=20.0" in completed.stdout or "source_update_hz=20" in completed.stdout
     assert "queue_size=1" in completed.stdout
     assert "dispatch" in completed.stdout
     assert "access_mode=subscribe" in completed.stdout

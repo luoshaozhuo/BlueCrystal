@@ -11,14 +11,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_SQLITE_DB_PATH = PROJECT_ROOT / ".data" / "ingest" / "whale.ingest.db"
 
 DatabaseBackend = Literal["sqlite", "postgresql"]
-# `relational` means the cache lives in ingest-managed relational tables,
-# currently backed by the same SQLite persistence used by the ingest runtime.
-StateCacheBackend = Literal["relational", "redis"]
+StateCacheBackend = Literal["redis"]
 # `relational_outbox` means published messages are persisted into an outbox
 # table inside the ingest relational database, not written to a file.
 MessageBackend = Literal["relational_outbox", "redis_streams", "kafka"]
 SUPPORTED_DATABASE_BACKENDS = frozenset({"sqlite", "postgresql"})
-SUPPORTED_STATE_CACHE_BACKENDS = frozenset({"relational", "redis"})
+SUPPORTED_STATE_CACHE_BACKENDS = frozenset({"redis"})
 SUPPORTED_MESSAGE_BACKENDS = frozenset({"relational_outbox", "redis_streams", "kafka"})
 
 
@@ -57,13 +55,6 @@ class DatabaseEngineConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class RelationalStateCacheConfig:
-    """Configuration for the local relational state-cache backend."""
-
-    backend: Literal["relational"] = "relational"
-
-
-@dataclass(frozen=True, slots=True)
 class RedisStateCacheConfig:
     """Configuration for the Redis latest-state cache backend."""
 
@@ -77,8 +68,7 @@ class RedisStateCacheConfig:
     decode_responses: bool
     backend: Literal["redis"] = "redis"
 
-
-StateCacheConfig: TypeAlias = RelationalStateCacheConfig | RedisStateCacheConfig
+StateCacheConfig: TypeAlias = RedisStateCacheConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,9 +134,9 @@ def _resolve_database_backend(value: str | None) -> DatabaseBackend:
 def _resolve_state_cache_backend(value: str | None) -> StateCacheBackend:
     """Resolve the state-cache backend from WHALE_INGEST_STATE_CACHE_BACKEND.
 
-    Defaults to ``relational`` when unset.
+    Defaults to ``redis`` when unset.
     """
-    backend = (value or "relational").strip().lower()
+    backend = (value or "redis").strip().lower()
     if backend not in SUPPORTED_STATE_CACHE_BACKENDS:
         raise RuntimeError(
             f"Unsupported WHALE_INGEST_STATE_CACHE_BACKEND value: {value!r}. "
@@ -180,14 +170,8 @@ def _require_env_vars(names: tuple[str, ...], *, scope: str) -> None:
 def _build_config() -> EnvironmentConfig:
     """Build the ingest config by reading backend selections from env vars."""
     database_backend = _resolve_database_backend(os.environ.get("WHALE_INGEST_DATABASE_BACKEND"))
-    state_cache_backend = _resolve_state_cache_backend(
-        os.environ.get("WHALE_INGEST_STATE_CACHE_BACKEND")
-    )
+    _resolve_state_cache_backend(os.environ.get("WHALE_INGEST_STATE_CACHE_BACKEND"))
     message_backend = _resolve_message_backend(os.environ.get("WHALE_INGEST_MESSAGE_BACKEND"))
-    if state_cache_backend == "relational" and database_backend != "sqlite":
-        raise RuntimeError(
-            "The relational state-cache backend currently requires the sqlite database backend."
-        )
     default_database_path = DEFAULT_SQLITE_DB_PATH
     database_engine = DatabaseEngineConfig(
         pool_size=10,
@@ -220,34 +204,31 @@ def _build_config() -> EnvironmentConfig:
             password=os.environ["WHALE_INGEST_DB_PASSWORD"],
         )
 
-    if state_cache_backend == "relational":
-        state_cache: StateCacheConfig = RelationalStateCacheConfig()
-    else:
-        _require_env_vars(
-            (
-                "WHALE_INGEST_REDIS_HOST",
-                "WHALE_INGEST_REDIS_STATE_HASH_KEY",
-                "WHALE_INGEST_STATION_ID",
-            ),
-            scope="ingest state-cache backend 'redis'",
-        )
-        redis_port = os.environ.get("WHALE_INGEST_REDIS_PORT")
-        redis_db = os.environ.get("WHALE_INGEST_REDIS_DB")
-        redis_decode_responses = os.environ.get("WHALE_INGEST_REDIS_DECODE_RESPONSES")
-        state_cache = RedisStateCacheConfig(
-            host=os.environ["WHALE_INGEST_REDIS_HOST"],
-            port=int(redis_port) if redis_port else 6379,
-            db=int(redis_db) if redis_db else 0,
-            username=os.environ.get("WHALE_INGEST_REDIS_USERNAME") or None,
-            password=os.environ.get("WHALE_INGEST_REDIS_PASSWORD") or None,
-            hash_key=os.environ["WHALE_INGEST_REDIS_STATE_HASH_KEY"],
-            station_id=os.environ["WHALE_INGEST_STATION_ID"],
-            decode_responses=(
-                True
-                if redis_decode_responses in (None, "")
-                else str(redis_decode_responses).lower() != "false"
-            ),
-        )
+    _require_env_vars(
+        (
+            "WHALE_INGEST_REDIS_HOST",
+            "WHALE_INGEST_REDIS_STATE_HASH_KEY",
+            "WHALE_INGEST_STATION_ID",
+        ),
+        scope="ingest state-cache backend 'redis'",
+    )
+    redis_port = os.environ.get("WHALE_INGEST_REDIS_PORT")
+    redis_db = os.environ.get("WHALE_INGEST_REDIS_DB")
+    redis_decode_responses = os.environ.get("WHALE_INGEST_REDIS_DECODE_RESPONSES")
+    state_cache: StateCacheConfig = RedisStateCacheConfig(
+        host=os.environ["WHALE_INGEST_REDIS_HOST"],
+        port=int(redis_port) if redis_port else 6379,
+        db=int(redis_db) if redis_db else 0,
+        username=os.environ.get("WHALE_INGEST_REDIS_USERNAME") or None,
+        password=os.environ.get("WHALE_INGEST_REDIS_PASSWORD") or None,
+        hash_key=os.environ["WHALE_INGEST_REDIS_STATE_HASH_KEY"],
+        station_id=os.environ["WHALE_INGEST_STATION_ID"],
+        decode_responses=(
+            True
+            if redis_decode_responses in (None, "")
+            else str(redis_decode_responses).lower() != "false"
+        ),
+    )
 
     if message_backend == "relational_outbox":
         message: MessageConfig = RelationalOutboxMessageConfig()

@@ -1,9 +1,11 @@
 """SubscriptionAcquisitionRole — 启动订阅采集 session。
 
 设计约定：
-- SUBSCRIBE 启动前必须先 read 一次完整基准状态；
+- 当前协议明确支持订阅时，启动前先 read 一次完整基准状态；
 - initial read baseline 用于填充 latest-state cache；
+- 当前协议明确不支持订阅时，应在 baseline side effect 前 fail-fast；
 - 后续 datachange 只做增量 batch 覆盖；
+- reconnect 策略尚未实现到运行态循环；未来恢复时必须 reconnect -> baseline read -> start_subscription；
 - 订阅 notification 的 queue / micro-batch 在 source_reader 内处理；
 - 本 role 只负责订阅采集策略编排；
 - 参数合法性由 SourceAcquisitionUseCase 保证。
@@ -15,18 +17,27 @@ import asyncio
 import contextlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import cast
 
 from whale.ingest.ports.source.source_acquisition_port import (
+    SourceBatchMismatchError,
+    SourceReadTimeoutError,
     SourceAcquisitionPort,
+    SourceReadError,
+    SourceSubscriptionUnsupportedError,
     SourceSubscriptionHandle,
     SubscriptionStateHandler,
 )
-from whale.ingest.ports.state.source_state_cache_port import SourceStateCachePort
+from whale.ingest.ports.state.source_state_cache_port import (
+    SourceStateCachePort,
+    SourceStateCacheWriteError,
+)
 from whale.ingest.usecases.dtos.acquired_node_state import AcquiredNodeStateBatch
 from whale.ingest.usecases.dtos.source_acquisition_request import (
     SourceAcquisitionRequest,
 )
 from whale.ingest.usecases.dtos.source_acquisition_start_result import (
+    AcquisitionSession,
     SourceAcquisitionStartResult,
 )
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
@@ -65,7 +76,11 @@ class SubscriptionAcquisitionRole:
         self,
         request: SourceAcquisitionRequest,
     ) -> SourceAcquisitionStartResult:
-        """为 request.connections 中的全部 connection 启动订阅。"""
+        """为 request.connections 中的全部 connection 启动订阅。
+
+        Raises:
+            SourceSubscriptionUnsupportedError: 当前协议 adapter 不支持订阅时抛出。
+        """
 
         sessions: list[SubscriptionAcquisitionSession] = []
         start_interval_seconds = (
@@ -77,6 +92,14 @@ class SubscriptionAcquisitionRole:
                 await asyncio.sleep(start_interval_seconds)
 
             try:
+                if not self._acquisition_port.supports_subscription(
+                    request.execution,
+                    connection,
+                ):
+                    raise SourceSubscriptionUnsupportedError(
+                        "subscription_unsupported"
+                    )
+
                 await self._read_initial_baseline(
                     request=request,
                     connection=connection,
@@ -92,13 +115,19 @@ class SubscriptionAcquisitionRole:
                 )
                 sessions.append(SubscriptionAcquisitionSession(handle=handle))
 
-            except Exception:
-                self._state_cache_port.mark_unavailable(
+            except SourceSubscriptionUnsupportedError:
+                self._mark_unavailable(
                     ld_name=connection.ld_name,
-                    status="ERROR",
-                    observed_at=_utc_now(),
-                    reason="subscription start failed",
+                    reason="subscription_unsupported",
                 )
+                await self._close_sessions(sessions)
+                raise
+            except Exception as exc:
+                if not isinstance(exc, SourceStateCacheWriteError):
+                    self._mark_unavailable(
+                        ld_name=connection.ld_name,
+                        reason=_build_failure_reason(exc),
+                    )
                 await self._close_sessions(sessions)
                 raise
 
@@ -106,7 +135,7 @@ class SubscriptionAcquisitionRole:
             request_id=request.request_id,
             task_id=request.task_id,
             mode=request.execution.acquisition_mode.upper(),
-            sessions=sessions,
+            sessions=cast(list[AcquisitionSession], sessions),
         )
 
     async def _read_initial_baseline(
@@ -123,15 +152,16 @@ class SubscriptionAcquisitionRole:
             list(request.items),
         )
 
-        self._update_batch(
+        updated_count = self._update_batch(
             ld_name=connection.ld_name,
             batch=batch,
         )
 
-        self._state_cache_port.mark_alive(
-            ld_name=connection.ld_name,
-            observed_at=batch.client_processed_at,
-        )
+        if updated_count > 0:
+            self._state_cache_port.mark_alive(
+                ld_name=connection.ld_name,
+                observed_at=batch.client_processed_at,
+            )
 
     def _build_state_received_handler(
         self,
@@ -141,14 +171,15 @@ class SubscriptionAcquisitionRole:
         """构造绑定当前 connection 的订阅回调。"""
 
         async def _state_received(batch: AcquiredNodeStateBatch) -> None:
-            self._update_batch(
+            updated_count = self._update_batch(
                 ld_name=connection.ld_name,
                 batch=batch,
             )
-            self._state_cache_port.mark_alive(
-                ld_name=connection.ld_name,
-                observed_at=batch.client_processed_at,
-            )
+            if updated_count > 0:
+                self._state_cache_port.mark_alive(
+                    ld_name=connection.ld_name,
+                    observed_at=batch.client_processed_at,
+                )
 
         return _state_received
 
@@ -168,6 +199,24 @@ class SubscriptionAcquisitionRole:
             batch=batch,
         )
 
+    def _mark_unavailable(
+        self,
+        *,
+        ld_name: str,
+        reason: str,
+    ) -> None:
+        """Best-effort unavailable mark for subscription startup failures."""
+
+        try:
+            self._state_cache_port.mark_unavailable(
+                ld_name=ld_name,
+                status="ERROR",
+                observed_at=_utc_now(),
+                reason=reason,
+            )
+        except SourceStateCacheWriteError:
+            return
+
     @staticmethod
     async def _close_sessions(
         sessions: list[SubscriptionAcquisitionSession],
@@ -183,3 +232,26 @@ def _utc_now() -> datetime:
     """返回当前 UTC 时间。"""
 
     return datetime.now(tz=UTC)
+
+
+def _build_failure_reason(exc: Exception) -> str:
+    """Normalize subscription-side failures into stable reason codes."""
+
+    if isinstance(exc, SourceStateCacheWriteError):
+        return f"cache_write_failed:{exc.error_code}"
+    if isinstance(exc, SourceSubscriptionUnsupportedError):
+        return "subscription_unsupported"
+    if isinstance(exc, SourceBatchMismatchError):
+        return "batch_mismatch"
+    if isinstance(exc, SourceReadTimeoutError):
+        return "source_read_timeout"
+    if isinstance(exc, SourceReadError):
+        lowered = (str(exc) or type(exc).__name__).strip().lower()
+        if "protocol_error" in lowered:
+            return "protocol_error"
+        if "read_failed" in lowered:
+            return "source_read_failed"
+        if "runner_not_available" in lowered:
+            return "runner_not_available"
+        return lowered.replace(" ", "_").replace(":", "_") or "source_read_failed"
+    return (str(exc) or type(exc).__name__).strip().lower().replace(" ", "_").replace(":", "_")

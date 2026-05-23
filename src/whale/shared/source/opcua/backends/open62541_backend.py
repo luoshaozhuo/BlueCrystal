@@ -21,8 +21,29 @@ _CONNECT_TIMEOUT_FACTOR: Final[float] = 2.0
 _PROCESS_STOP_TIMEOUT_S: Final[float] = 2.0
 _READY_RESPONSE_PREFIX: Final[str] = "READY"
 _RESULT_RESPONSE_PREFIX: Final[str] = "RESULT"
+_VALUE_RESPONSE_PREFIX: Final[str] = "VALUE"
 _RUNNER_SUMMARY_PREFIX: Final[str] = "RUNNER_SUMMARY"
 _POLL_DONE_RESPONSE_PREFIX: Final[str] = "POLL_DONE"
+
+
+@dataclass(frozen=True, slots=True)
+class _ParsedReadResult:
+    """一次 RESULT 行解析结果。"""
+
+    value_count: int
+    response_timestamp: datetime | None
+    error_reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _ParsedValueLine:
+    """一次 VALUE 行解析结果。"""
+
+    value_index: int
+    status_code: str | None
+    value_text: str
+    source_timestamp: datetime | None
+    server_timestamp: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,7 +211,6 @@ class Open62541OpcUaClientBackend:
                 raise RuntimeError("open62541 client runner pipes are unavailable")
 
             timeout_s = max(self._connection.timeout_seconds, 1.0)
-            period_ns = 1_000_000_000
             namespace_uri = self._connection.namespace_uri or "-"
             endpoint = self._connection.endpoint
             runner.stdin.write(
@@ -203,12 +223,14 @@ class Open62541OpcUaClientBackend:
             )
             await runner.stdin.drain()
 
-            first_result: tuple[int, datetime | None, str | None] | None = None
+            latest_result: _ParsedReadResult | None = None
+            latest_values: list[RawDataValue | None] = []
             summary_seen = False
             while True:
                 line = await self._read_protocol_line(
                     expected_prefixes=(
                         _RESULT_RESPONSE_PREFIX,
+                        _VALUE_RESPONSE_PREFIX,
                         _RUNNER_SUMMARY_PREFIX,
                         _POLL_DONE_RESPONSE_PREFIX,
                         "ERROR",
@@ -224,7 +246,41 @@ class Open62541OpcUaClientBackend:
                         exception=line,
                     )
                 if line.startswith(_RESULT_RESPONSE_PREFIX):
-                    first_result = self._parse_result_line(line)
+                    latest_result = self._parse_result_line(line)
+                    latest_values = [None] * latest_result.value_count
+                    continue
+                if line.startswith(_VALUE_RESPONSE_PREFIX):
+                    if latest_result is None:
+                        return RawOpcUaReadResult(
+                            ok=False,
+                            data_values=(),
+                            response_timestamp=None,
+                            error_reason="protocol_error",
+                            exception="value_before_result",
+                        )
+                    parsed_value = self._parse_value_line(line)
+                    if parsed_value.value_index < 0 or parsed_value.value_index >= latest_result.value_count:
+                        return RawOpcUaReadResult(
+                            ok=False,
+                            data_values=(),
+                            response_timestamp=latest_result.response_timestamp,
+                            error_reason="protocol_error",
+                            exception=f"value_index_out_of_range:{parsed_value.value_index}",
+                        )
+                    if latest_values[parsed_value.value_index] is not None:
+                        return RawOpcUaReadResult(
+                            ok=False,
+                            data_values=(),
+                            response_timestamp=latest_result.response_timestamp,
+                            error_reason="protocol_error",
+                            exception=f"duplicate_value_index:{parsed_value.value_index}",
+                        )
+                    latest_values[parsed_value.value_index] = RawDataValue(
+                        value=parsed_value.value_text,
+                        source_timestamp=parsed_value.source_timestamp,
+                        server_timestamp=parsed_value.server_timestamp,
+                        status_code=parsed_value.status_code,
+                    )
                     continue
                 if line.startswith(_RUNNER_SUMMARY_PREFIX):
                     summary_seen = True
@@ -232,7 +288,7 @@ class Open62541OpcUaClientBackend:
                 if line.startswith(_POLL_DONE_RESPONSE_PREFIX):
                     break
 
-        if first_result is None:
+        if latest_result is None:
             return RawOpcUaReadResult(
                 ok=False,
                 data_values=(),
@@ -241,13 +297,38 @@ class Open62541OpcUaClientBackend:
                 exception="no_result",
             )
 
-        value_count, response_timestamp, error_reason = first_result
-        data_values = tuple(RawDataValue(value=True) for _ in range(value_count))
+        if latest_result.value_count != len(open62541_plan.node_paths):
+            return RawOpcUaReadResult(
+                ok=False,
+                data_values=(),
+                response_timestamp=latest_result.response_timestamp,
+                error_reason="batch_mismatch",
+                exception=(
+                    f"result value_count {latest_result.value_count} does not match "
+                    f"plan node count {len(open62541_plan.node_paths)}"
+                ),
+            )
+        if latest_result.error_reason is None and any(value is None for value in latest_values):
+            return RawOpcUaReadResult(
+                ok=False,
+                data_values=(),
+                response_timestamp=latest_result.response_timestamp,
+                error_reason="protocol_error",
+                exception=(
+                    f"expected {latest_result.value_count} VALUE lines, "
+                    f"got {sum(1 for value in latest_values if value is not None)}"
+                ),
+            )
+
         return RawOpcUaReadResult(
-            ok=error_reason is None,
-            data_values=data_values if error_reason is None else (),
-            response_timestamp=response_timestamp,
-            error_reason=error_reason,
+            ok=latest_result.error_reason is None,
+            data_values=(
+                tuple(value for value in latest_values if value is not None)
+                if latest_result.error_reason is None
+                else ()
+            ),
+            response_timestamp=latest_result.response_timestamp,
+            error_reason=latest_result.error_reason,
             exception=None if summary_seen else "missing_summary",
         )
 
@@ -285,7 +366,7 @@ class Open62541OpcUaClientBackend:
             if any(line.startswith(prefix) for prefix in expected_prefixes):
                 return line
 
-    def _parse_result_line(self, line: str) -> tuple[int, datetime | None, str | None]:
+    def _parse_result_line(self, line: str) -> _ParsedReadResult:
         fields = line.split("\t")
         if len(fields) != 13 or fields[0] != _RESULT_RESPONSE_PREFIX:
             raise RuntimeError(f"Unexpected runner RESULT response: {line!r}")
@@ -298,4 +379,21 @@ class Open62541OpcUaClientBackend:
             runner_read_start_ts_ns=int(fields[6]),
             runner_read_end_ts_ns=int(fields[7]),
         )
-        return value_count, response_timestamp, error_code
+        return _ParsedReadResult(
+            value_count=value_count,
+            response_timestamp=response_timestamp,
+            error_reason=error_code,
+        )
+
+    def _parse_value_line(self, line: str) -> _ParsedValueLine:
+        fields = line.split("\t")
+        if len(fields) != 9 or fields[0] != _VALUE_RESPONSE_PREFIX:
+            raise RuntimeError(f"Unexpected runner VALUE response: {line!r}")
+
+        return _ParsedValueLine(
+            value_index=int(fields[4]),
+            status_code=None if fields[5] in {"", "-"} else fields[5],
+            value_text="" if fields[6] == "-" else fields[6],
+            source_timestamp=_datetime_from_runner_timestamp(fields[7]),
+            server_timestamp=_datetime_from_runner_timestamp(fields[8]),
+        )

@@ -191,6 +191,49 @@ def test_field_profile_subscribe_cli_builds_request_and_prints_report(
     assert "report_path=" in stdout
 
 
+def test_field_profile_cli_with_service_type(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Verify --service-type is accepted and forwarded to FieldProfileRequest."""
+
+    servers, items, output_dir = _write_input_files(tmp_path)
+    observed: list[FieldProfileRequest] = []
+
+    def _fake_service(
+        request: FieldProfileRequest,
+        *,
+        servers_path: Path,
+        profile_items_path: Path,
+    ) -> FieldProfileServiceResult:
+        del servers_path, profile_items_path
+        observed.append(request)
+        return _result(output_dir, request.run_id, access_mode=request.access_mode)
+
+    monkeypatch.setattr("tools.source_lab.field_profile.run_field_profile_from_files", _fake_service)
+    monkeypatch.setattr("tools.source_lab.field_profile._print_profile_report", lambda result: print("profile-report", result))
+
+    exit_code = main(
+        [
+            "--access-mode", "polling",
+            "--servers", str(servers),
+            "--profile-items", str(items),
+            "--protocol", "iec61850",
+            "--service-type", "MMS_READ",
+            "--process-count", "1",
+            "--server-count", "1",
+            "--hz", "5",
+            "--output-dir", str(output_dir),
+            "--run-id", "svc_test",
+        ]
+    )
+
+    request = observed[0]
+    assert exit_code == 0
+    assert request.service_type == "MMS_READ"
+
+
 def test_print_profile_report_dispatches_to_polling_reporter(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify polling raw results are rendered with the polling reporter."""
 

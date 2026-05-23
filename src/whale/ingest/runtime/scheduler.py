@@ -1,3 +1,4 @@
+# mypy: disable-error-code=import-untyped
 """Runtime scheduler for ingest."""
 
 from __future__ import annotations

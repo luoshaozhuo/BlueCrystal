@@ -68,7 +68,12 @@ class TimeoutConfig:
 
 @dataclass(frozen=True, slots=True)
 class SourceConnection:
-    """Transport-level connection details for one simulated source."""
+    """Transport-level connection details for one simulated source.
+
+    ``protocol`` 是旧 CLI 别名（如 opcua / modbus_tcp / iec61850_goose）；
+    ``application_protocol`` / ``service_type`` 是三元组新字段。
+    构造时提供旧 ``protocol`` 即可，新字段可通过 factory 方法自动推导。
+    """
 
     name: str
     ied_name: str
@@ -77,12 +82,31 @@ class SourceConnection:
     port: int
     transport: str
     protocol: str
+    application_protocol: str | None = None
+    service_type: str | None = None
     namespace_uri: str | None = None
     security: SecurityConfig = field(default_factory=SecurityConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
     heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
     params: dict[str, str | int | float | bool] = field(default_factory=dict)
+
+    @classmethod
+    def from_protocol(cls, *, name: str, ied_name: str, ld_name: str,
+                      host: str, port: int, protocol: str,
+                      transport: str | None = None,
+                      **kwargs) -> "SourceConnection":
+        """Create SourceConnection from old-style protocol name, resolving the triple."""
+        from tools.source_lab.access.runners.registry import resolve_service_triple
+        app_proto, svc_type, tport = resolve_service_triple(protocol)
+        return cls(
+            name=name, ied_name=ied_name, ld_name=ld_name,
+            host=host, port=port, transport=transport or tport,
+            protocol=protocol,
+            application_protocol=app_proto,
+            service_type=svc_type,
+            **kwargs,
+        )
 
 
 @dataclass(frozen=True, slots=True)

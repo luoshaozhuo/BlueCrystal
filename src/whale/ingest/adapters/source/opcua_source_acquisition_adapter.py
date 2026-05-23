@@ -1,25 +1,26 @@
-"""OPC UA acquisition adapter。
+"""OPC UA source 采集适配器。
 
-本模块是 ingest usecase 与共享 OPC UA reader 之间的适配层。
+本模块负责把 ingest DTO 转换为 shared/source 的 open62541 raw reader 调用，
+并将 `RawOpcUaReadResult` 转换为 `AcquiredNodeStateBatch`。
 
-设计约定：
-- adapter 只负责 DTO 转换，不做周期控制、不写 cache、不做 diagnostics；
-- read() 将一次 OPC UA 批量读取结果转换为 AcquiredNodeStateBatch；
-- start_subscription() 启动 reader 订阅，并将 SourceDataChangeBatch 转换为 AcquiredNodeStateBatch；
-- reader 只识别协议层 path，adapter 负责 path -> AcquisitionItemData.node_key 的映射；
-- batch 级时间作为 LD 状态视图的统一时间；
-- value 级 source/server timestamp 只作为乱序保护和诊断信息；
-- subscription initial read baseline 不在 adapter 内做，由 SubscriptionAcquisitionRole 编排。
+当前完成情况：
+- polling / read-once 已构成生产闭环；
+- subscription 当前只暴露能力边界和 fail-fast 行为；
+- 真实 subscription reconnect loop 尚未实现。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import asyncio
 from datetime import UTC, datetime
 
 from whale.ingest.ports.source.source_acquisition_port import (
     SourceAcquisitionPort,
+    SourceBatchMismatchError,
+    SourceReadError,
+    SourceReadTimeoutError,
     SourceSubscriptionHandle,
+    SourceSubscriptionUnsupportedError,
     SubscriptionStateHandler,
 )
 from whale.ingest.usecases.dtos.acquired_node_state import (
@@ -31,59 +32,24 @@ from whale.ingest.usecases.dtos.source_acquisition_request import (
     AcquisitionItemData,
 )
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
-from whale.shared.source.models import (
-    Batch,
-    NodeValueChange,
-    SourceConnectionProfile,
-)
+from whale.shared.source.models import SourceConnectionProfile
+from whale.shared.source.opcua.backends import RawDataValue, RawOpcUaReadResult
 from whale.shared.source.opcua.reader import OpcUaSourceReader
-from whale.shared.source.ports import SourceReaderPort
-
-
-@dataclass(slots=True)
-class OpcUaAdapterSubscriptionHandle:
-    """Adapter 层订阅句柄。
-
-    这个句柄同时持有：
-    - 已经连上的 reader；
-    - 底层 OPC UA subscription handle。
-
-    关闭顺序必须是：
-    1. 先关闭 subscription；
-    2. 再退出 reader 上下文，断开 client。
-    """
-
-    reader: SourceReaderPort
-    subscription_handle: SourceSubscriptionHandle
-    closed: bool = False
-
-    async def close(self) -> None:
-        """关闭订阅和 reader 连接。"""
-
-        if self.closed:
-            return
-
-        self.closed = True
-        try:
-            await self.subscription_handle.close()
-        finally:
-            await self.reader.__aexit__(None, None, None)
-
-
-@dataclass(slots=True)
-class _NoopSubscriptionHandle:
-    """空点位订阅时返回的空句柄。"""
-
-    closed: bool = False
-
-    async def close(self) -> None:
-        """关闭空句柄。"""
-
-        self.closed = True
+from whale.shared.utils.time import ensure_utc
 
 
 class OpcUaSourceAcquisitionAdapter(SourceAcquisitionPort):
-    """执行 OPC UA read / subscribe。"""
+    """执行基于 open62541 raw reader 的 OPC UA 读取。"""
+
+    def supports_subscription(
+        self,
+        execution: AcquisitionExecutionOptions,
+        connection: SourceConnectionData,
+    ) -> bool:
+        """返回当前 open62541 raw reader 是否支持订阅。"""
+
+        del execution, connection
+        return False
 
     async def read(
         self,
@@ -91,21 +57,48 @@ class OpcUaSourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
-        """执行一次 OPC UA 批量读取，并返回 batch。"""
+        """执行一次 OPC UA 批量读取。
 
+        Args:
+            execution: 本次采集执行选项。
+            connection: 一个 source 连接。
+            items: 本连接需要读取的点位列表。
+
+        Returns:
+            一个可直接写入 ingest 状态缓存的批次对象。
+
+        Raises:
+            SourceReadTimeoutError: 当底层读取超时。
+            SourceBatchMismatchError: 当返回值数量与点位数量不一致。
+            SourceReadError: 其他读取失败。
+        """
+
+        addresses = self._resolve_node_paths(connection, items)
         client_received_at = datetime.now(tz=UTC)
-        node_paths = self._resolve_node_paths(connection, items)
 
-        async with self._build_reader(execution, connection) as reader:
-            batch = await reader.read(node_paths, mode="full")
+        try:
+            async with self._build_reader(execution, connection) as reader:
+                plan = reader.prepare_read(addresses)
+                raw = await reader.read_prepared_raw(plan)
+        except asyncio.TimeoutError as exc:
+            raise SourceReadTimeoutError("source read timed out") from exc
+        except FileNotFoundError as exc:
+            raise SourceReadError("runner_not_available") from exc
+        except RuntimeError as exc:
+            message = str(exc)
+            if "does not exist" in message:
+                raise SourceReadError(f"runner_not_available: {message}") from exc
+            raise SourceReadError(message) from exc
+        except Exception as exc:
+            raise SourceReadError(str(exc) or type(exc).__name__) from exc
 
         client_processed_at = datetime.now(tz=UTC)
-
-        return self._to_acquired_batch_from_read_points(
+        return self._to_acquired_batch_from_raw(
             connection=connection,
             items=items,
-            points=list(batch.changes),
-            client_received_at=batch.client_received_at,
+            addresses=addresses,
+            raw=raw,
+            client_received_at=client_received_at,
             client_processed_at=client_processed_at,
         )
 
@@ -117,45 +110,21 @@ class OpcUaSourceAcquisitionAdapter(SourceAcquisitionPort):
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
-        """启动 OPC UA 订阅，并将 reader 微批次转换为 ingest batch。"""
+        """拒绝当前不受支持的订阅模式。
 
-        if not items:
-            return _NoopSubscriptionHandle()
+        Args:
+            execution: 本次采集执行选项。
+            connection: 一个 source 连接。
+            items: 本连接订阅点位列表。
+            state_received: 订阅回调。
 
-        reader = self._build_reader(execution, connection)
-        await reader.__aenter__()
+        Raises:
+            SourceSubscriptionUnsupportedError: 当前 shared reader 不支持订阅。
+        """
 
-        node_paths = self._resolve_node_paths(connection, items)
-        item_resolver = _NodeItemResolver(
-            node_paths=node_paths,
-            items=items,
-        )
-
-        async def _on_data_change(batch: Batch) -> None:
-            acquired_batch = self._to_acquired_batch_from_data_change_batch(
-                connection=connection,
-                item_resolver=item_resolver,
-                batch=batch,
-            )
-
-            if acquired_batch.is_empty():
-                return
-
-            await state_received(acquired_batch)
-
-        try:
-            subscription_handle = await reader.start_subscription(
-                node_paths,
-                interval_ms=execution.interval_ms,
-                on_data_change=_on_data_change,
-            )
-        except Exception:
-            await reader.__aexit__(None, None, None)
-            raise
-
-        return OpcUaAdapterSubscriptionHandle(
-            reader=reader,
-            subscription_handle=subscription_handle,
+        del execution, connection, items, state_received
+        raise SourceSubscriptionUnsupportedError(
+            "subscription acquisition is not supported by current source reader"
         )
 
     @staticmethod
@@ -163,14 +132,14 @@ class OpcUaSourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> list[str]:
-        """将业务点位 relative_path 转换为 OPC UA node path。"""
+        """将业务点位 relative_path 转换为 OPC UA 地址。"""
 
         namespace_uri = connection.namespace_uri.strip() if connection.namespace_uri else ""
         node_paths: list[str] = []
 
         for item in items:
             relative_path = item.relative_path.strip()
-            if relative_path.startswith(("ns=", "nsu=")):
+            if relative_path.startswith(("ns=", "nsu=", "s=")):
                 node_paths.append(relative_path)
                 continue
 
@@ -184,6 +153,16 @@ class OpcUaSourceAcquisitionAdapter(SourceAcquisitionPort):
 
         return node_paths
 
+    @classmethod
+    def _build_reader(
+        cls,
+        execution: AcquisitionExecutionOptions,
+        connection: SourceConnectionData,
+    ) -> OpcUaSourceReader:
+        """构造 shared/source OPC UA reader。"""
+
+        return OpcUaSourceReader(cls._build_connection_profile(execution, connection))
+
     @staticmethod
     def _build_connection_profile(
         execution: AcquisitionExecutionOptions,
@@ -195,152 +174,99 @@ class OpcUaSourceAcquisitionAdapter(SourceAcquisitionPort):
         if not endpoint:
             raise ValueError("Cannot resolve OPC UA endpoint.")
 
+        params: dict[str, str | int | float | bool | None] = {
+            **connection.params,
+            **execution.params,
+        }
+        if execution.client_backend is not None:
+            params["client_backend"] = execution.client_backend
+
         return SourceConnectionProfile(
             endpoint=endpoint,
             namespace_uri=_resolve_namespace_uri(connection),
             timeout_seconds=execution.request_timeout_ms / 1000,
-            params={
-                "subscription_notification_queue_size": (
-                    execution.subscription_notification_queue_size
-                ),
-            },
+            params=params,
         )
 
-    @classmethod
-    def _build_reader(
-        cls,
-        execution: AcquisitionExecutionOptions,
-        connection: SourceConnectionData,
-    ) -> SourceReaderPort:
-        """构造一个满足通用 source reader port 的具体实现。"""
-
-        return OpcUaSourceReader(cls._build_connection_profile(execution, connection))
-
     @staticmethod
-    def _to_acquired_batch_from_read_points(
+    def _to_acquired_batch_from_raw(
         *,
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
-        points: list[NodeValueChange],
+        addresses: list[str],
+        raw: RawOpcUaReadResult,
         client_received_at: datetime,
         client_processed_at: datetime,
     ) -> AcquiredNodeStateBatch:
-        """将一次 read 结果转换为 AcquiredNodeStateBatch。"""
+        """将 raw read 结果转换为 ingest 批次。"""
 
-        values = [
-            AcquiredNodeValue(
-                node_key=item.key,
-                value=str(point.value),
-                quality=point.status,
-                source_timestamp=point.source_timestamp,
-                server_timestamp=point.server_timestamp,
-                client_sequence=None,
+        if not raw.ok:
+            reason = raw.error_reason or raw.exception or "raw_read_failed"
+            raise SourceReadError(f"raw read failed: {reason}")
+        if len(raw.data_values) != len(items):
+            raise SourceBatchMismatchError(
+                f"raw value count {len(raw.data_values)} does not match item count {len(items)}"
             )
-            for item, point in zip(items, points, strict=True)
+
+        batch_observed_at = ensure_utc(raw.response_timestamp or client_received_at)
+        values = [
+            OpcUaSourceAcquisitionAdapter._to_acquired_value(
+                item=item,
+                address=address,
+                raw_value=raw_value,
+                raw=raw,
+            )
+            for item, address, raw_value in zip(items, addresses, raw.data_values, strict=True)
         ]
 
         return AcquiredNodeStateBatch(
             source_id=_resolve_source_id(connection),
-            batch_observed_at=client_received_at,
-            client_received_at=client_received_at,
-            client_processed_at=client_processed_at,
+            batch_observed_at=batch_observed_at,
+            client_received_at=ensure_utc(client_received_at),
+            client_processed_at=ensure_utc(client_processed_at),
             values=values,
             availability_status="VALID",
-            attributes={
-                "acquisition_kind": "read",
-            },
+            attributes={"acquisition_kind": "read"},
         )
 
     @staticmethod
-    def _to_acquired_batch_from_data_change_batch(
+    def _to_acquired_value(
         *,
-        connection: SourceConnectionData,
-        item_resolver: "_NodeItemResolver",
-        batch: Batch,
-    ) -> AcquiredNodeStateBatch:
-        """将 reader 的 Batch 转换为 AcquiredNodeStateBatch。"""
+        item: AcquisitionItemData,
+        address: str,
+        raw_value: object,
+        raw: RawOpcUaReadResult,
+    ) -> AcquiredNodeValue:
+        """将一个 raw DataValue 转换为 ingest 点位值。"""
 
-        values: list[AcquiredNodeValue] = []
+        normalized = raw_value if isinstance(raw_value, RawDataValue) else RawDataValue(value=raw_value)
+        raw_error_reason = raw.error_reason or raw.exception
+        quality = normalized.status_code or ("GOOD" if raw.ok else raw_error_reason)
+        server_timestamp = normalized.server_timestamp or raw.response_timestamp
 
-        for change in batch.changes:
-            item = item_resolver.resolve(change.node_key)
-            if item is None:
-                continue
+        attributes: dict[str, object] = {
+            "profile_item_id": item.profile_item_id,
+            "relative_path": item.relative_path,
+            "protocol_address": address,
+        }
+        if raw_error_reason:
+            attributes["raw_error_reason"] = raw_error_reason
 
-            values.append(
-                AcquiredNodeValue(
-                    node_key=item.key,
-                    value=str(change.value),
-                    quality=change.quality,
-                    source_timestamp=change.source_timestamp,
-                    server_timestamp=change.server_timestamp,
-                    client_sequence=change.client_sequence,
-                )
-            )
-
-        return AcquiredNodeStateBatch(
-            source_id=_resolve_source_id(connection),
-            batch_observed_at=batch.batch_observed_at,
-            client_received_at=batch.client_received_at,
-            client_processed_at=datetime.now(tz=UTC),
-            values=values,
-            availability_status=batch.availability_status,
-            attributes={
-                "acquisition_kind": "subscription_datachange",
-                **batch.attributes,
-            },
+        return AcquiredNodeValue(
+            node_key=item.key,
+            value=str(normalized.value),
+            quality=quality,
+            source_timestamp=(
+                ensure_utc(normalized.source_timestamp)
+                if normalized.source_timestamp is not None
+                else None
+            ),
+            server_timestamp=(
+                ensure_utc(server_timestamp) if server_timestamp is not None else None
+            ),
+            client_sequence=None,
+            attributes=attributes,
         )
-
-
-@dataclass(slots=True)
-class _NodeItemResolver:
-    """OPC UA node path 到 AcquisitionItemData 的解析器。
-
-    asyncua 回调中的 nodeid 字符串可能与订阅时传入的 node path 不完全一致：
-    - 订阅时可能是 nsu=xxx;s=AAA.BBB；
-    - 回调时可能是 ns=2;s=AAA.BBB。
-
-    因此这里同时支持：
-    - 完整 node path 匹配；
-    - ;s= 后逻辑路径匹配；
-    - item.relative_path 匹配。
-    """
-
-    node_paths: list[str]
-    items: list[AcquisitionItemData]
-    _items_by_full_path: dict[str, AcquisitionItemData] = field(
-        init=False,
-        default_factory=dict,
-    )
-    _items_by_logical_path: dict[str, AcquisitionItemData] = field(
-        init=False,
-        default_factory=dict,
-    )
-
-    def __post_init__(self) -> None:
-        for node_path, item in zip(self.node_paths, self.items, strict=True):
-            self._items_by_full_path[node_path] = item
-
-            logical_path = _resolve_logical_path(node_path)
-            if logical_path:
-                self._items_by_logical_path[logical_path] = item
-
-            relative_path = item.relative_path.strip()
-            if relative_path:
-                self._items_by_logical_path[relative_path] = item
-
-    def resolve(self, node_path: str) -> AcquisitionItemData | None:
-        """解析一个 OPC UA node path 对应的采集点位。"""
-
-        item = self._items_by_full_path.get(node_path)
-        if item is not None:
-            return item
-
-        logical_path = _resolve_logical_path(node_path)
-        if logical_path:
-            return self._items_by_logical_path.get(logical_path)
-
-        return None
 
 
 def _resolve_namespace_uri(connection: SourceConnectionData) -> str | None:
@@ -362,10 +288,11 @@ def _build_endpoint(
     host = connection.host.strip()
     port = connection.port
 
-    if not protocol or not transport or not host:
+    if not protocol or not transport or not host or port <= 0:
         return ""
 
-    return f"{protocol}.{transport}://{host}:{port}"
+    scheme = "opc.tcp" if protocol == "opcua" and transport == "tcp" else f"{protocol}.{transport}"
+    return f"{scheme}://{host}:{port}"
 
 
 def _resolve_source_id(connection: SourceConnectionData) -> str:
@@ -376,12 +303,3 @@ def _resolve_source_id(connection: SourceConnectionData) -> str:
     if connection.ied_name.strip():
         return connection.ied_name.strip()
     return "unknown_source"
-
-
-def _resolve_logical_path(node_path: str) -> str | None:
-    """从 OPC UA node path 中提取 ;s= 后的逻辑路径。"""
-
-    if ";s=" not in node_path:
-        return None
-
-    return node_path.split(";s=", maxsplit=1)[1].strip() or None

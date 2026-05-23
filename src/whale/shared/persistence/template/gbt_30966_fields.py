@@ -715,8 +715,8 @@ def build_field_dict() -> dict[str, float]:
     """Build a flat {variable_key: mean_value} dict from all logical nodes."""
     result: dict[str, float] = {}
     for node in ALL_LOGICAL_NODES:
-        for field in node.fields:
-            result[field.key] = field.mean
+        for node_field in node.fields:
+            result[node_field.key] = node_field.mean
     return result
 
 

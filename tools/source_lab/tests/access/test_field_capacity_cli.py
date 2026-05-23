@@ -381,6 +381,40 @@ def test_field_capacity_rejects_conflicting_source_update_hz_inputs(tmp_path: Pa
         )
 
 
+def test_field_capacity_with_service_type(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify --service-type is accepted and forwarded to FieldCapacityRequest."""
+
+    servers, items, output_dir = _write_input_files(tmp_path)
+    observed: list[FieldCapacityRequest] = []
+
+    monkeypatch.setattr(
+        "tools.source_lab.field_capacity.run_field_capacity_from_files",
+        _capture_request(observed, output_dir),
+    )
+
+    exit_code = main(
+        [
+            "--access-mode", "polling",
+            "--servers", str(servers),
+            "--profile-items", str(items),
+            "--protocol", "iec61850",
+            "--service-type", "MMS_READ",
+            "--process-counts", "1",
+            "--server-counts", "1",
+            "--hz", "5",
+            "--output-dir", str(output_dir),
+            "--run-id", "testrun",
+        ]
+    )
+
+    request = observed[0]
+    assert exit_code == 0
+    assert request.service_type == "MMS_READ"
+
+
 def test_field_capacity_subscribe_rejects_sampling_interval_arg(tmp_path: Path) -> None:
     """Verify subscribe capacity rejects direct sampling-interval overrides."""
 

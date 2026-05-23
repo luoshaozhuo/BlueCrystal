@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 
 from tools.source_lab.access.common.io import FieldEndpointMetadata
@@ -45,7 +47,7 @@ def _source(protocol: str = "opcua") -> SourceRuntimeSpec:
     )
 
 
-def test_probe_fails_when_tcp_is_unreachable(monkeypatch) -> None:
+def test_probe_fails_when_tcp_is_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("tools.source_lab.access.probe._tcp_reachable", lambda *args, **kwargs: False)
 
     result = run_probe(_config(), (_source(),))
@@ -63,15 +65,15 @@ def test_probe_marks_non_target_protocol_as_filtered() -> None:
     assert row.reason == "protocol_filtered"
 
 
-def test_probe_marks_requested_non_opcua_protocol_as_unsupported() -> None:
-    result = run_probe(_config("modbus-tcp"), (_source(protocol="modbus-tcp"),))
+def test_probe_marks_unknown_protocol_as_unsupported() -> None:
+    result = run_probe(_config("dnp3"), (_source(protocol="dnp3"),))
 
     row = result.rows[0]
     assert row.status == CapacityStatus.SKIP
     assert row.reason == "unsupported_protocol"
 
 
-def test_probe_reports_runner_exception(monkeypatch) -> None:
+def test_probe_reports_runner_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("tools.source_lab.access.probe._tcp_reachable", lambda *args, **kwargs: True)
 
     def _raise(*args, **kwargs):
@@ -84,7 +86,7 @@ def test_probe_reports_runner_exception(monkeypatch) -> None:
     assert result.rows[0].reason == "runner_exception:RuntimeError"
 
 
-def test_probe_short_read_ok(monkeypatch) -> None:
+def test_probe_short_read_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("tools.source_lab.access.probe._tcp_reachable", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         "tools.source_lab.access.probe.run_serial_polling_probe",
@@ -104,7 +106,7 @@ def test_probe_short_read_ok(monkeypatch) -> None:
     assert row.latency.mean_ms == 3.0
 
 
-def test_probe_detects_value_count_mismatch(monkeypatch) -> None:
+def test_probe_detects_value_count_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("tools.source_lab.access.probe._tcp_reachable", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         "tools.source_lab.access.probe.run_serial_polling_probe",
@@ -116,7 +118,7 @@ def test_probe_detects_value_count_mismatch(monkeypatch) -> None:
     assert result.rows[0].reason == "value_count_mismatch"
 
 
-def test_probe_detects_missing_timestamp(monkeypatch) -> None:
+def test_probe_detects_missing_timestamp(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("tools.source_lab.access.probe._tcp_reachable", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         "tools.source_lab.access.probe.run_serial_polling_probe",
@@ -131,7 +133,7 @@ def test_probe_detects_missing_timestamp(monkeypatch) -> None:
     assert result.rows[0].missing_ts is True
 
 
-def test_probe_latency_samples_include_percentiles(monkeypatch) -> None:
+def test_probe_latency_samples_include_percentiles(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("tools.source_lab.access.probe._tcp_reachable", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         "tools.source_lab.access.probe.run_serial_polling_probe",

@@ -209,13 +209,25 @@ def build_opcua_source_from_repository(
 
     points = tuple(
         SimulatedPoint(
-            ln_name=row.ln_name,
-            do_name=row.do_name,
+            ln_name=(row.ln_name or "").strip(),
+            do_name=(row.do_name or "").strip(),
             unit=row.unit.strip() if row.unit is not None else None,
-            data_type=row.data_type,
+            data_type=(row.data_type or "FLOAT64").strip(),
         )
         for row in point_rows
     )
+
+    host = (server.host or "").strip()
+    namespace_uri = (server.namespace_uri or "").strip() or None
+    transport = (server.transport or "").strip()
+    protocol = (server.application_protocol or "").strip()
+    port = int(server.port or 0)
+    if not host:
+        raise ValueError("Repository server host is required for OPC UA source simulation")
+    if port <= 0:
+        raise ValueError("Repository server port is required for OPC UA source simulation")
+    if not transport or not protocol:
+        raise ValueError("Repository transport and protocol are required for OPC UA source simulation")
 
     return SimulatedSource(
         connection=SourceConnection(
@@ -227,11 +239,11 @@ def build_opcua_source_from_repository(
             ).strip(),
             ied_name=server.ied_name.strip(),
             ld_name=server.ld_name.strip(),
-            host=server.host,
-            port=int(server.port),
-            transport=server.transport,
-            protocol=server.application_protocol,
-            namespace_uri=server.namespace_uri.strip(),
+            host=host,
+            port=port,
+            transport=transport,
+            protocol=protocol,
+            namespace_uri=namespace_uri,
         ),
         points=points,
     )

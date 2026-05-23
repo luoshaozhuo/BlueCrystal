@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from tools.source_lab.opcua.open62541_source_simulator import (
-    Open62541SourceSimulator,
-)
 from tools.source_lab.contracts import SourceSimulator
 from tools.source_lab.model import SimulatedSource
+from tools.source_lab.protocols.registry import get_simulator_factory
 
 
 def _normalize_protocol(value: str) -> str:
@@ -28,8 +26,10 @@ def build_simulator(source: SimulatedSource) -> SourceSimulator:
         ValueError: If protocol is unsupported.
     """
     protocol = _normalize_protocol(source.connection.protocol)
-
-    if protocol == "opcua":
-        return Open62541SourceSimulator(source)
-
-    raise ValueError(f"Unsupported source simulator type: {source.connection.protocol}")
+    try:
+        factory = get_simulator_factory(protocol)
+    except ValueError as exc:
+        raise ValueError(
+            f"Unsupported source simulator type: {source.connection.protocol}"
+        ) from exc
+    return factory(source)

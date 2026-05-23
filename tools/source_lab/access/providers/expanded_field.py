@@ -124,6 +124,7 @@ class ExpandedFieldSourceProvider(SourceProvider):
                         **source.connection.params,
                         "source_update_enabled": self._active_config.source_update_enabled,
                         "source_update_hz": self._active_config.source_update_hz,
+                        "open62541_startup_timeout_seconds": self._active_config.fleet_startup_timeout_s,
                         "open62541_internal_update_enabled": self._active_config.source_update_enabled,
                         "open62541_internal_update_interval_ms": update_interval_ms,
                     },

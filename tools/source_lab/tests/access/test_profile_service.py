@@ -215,6 +215,7 @@ def test_run_field_profile_from_files_dispatches_provider_and_service(
     request = FieldProfileRequest(
         access_mode="polling",
         protocol="opcua",
+        service_type=None,
         process_count=1,
         server_count=1,
         output_dir=None,
@@ -238,6 +239,7 @@ def test_polling_profile_service_writes_reports_and_json(
     request = FieldProfileRequest(
         access_mode="polling",
         protocol="opcua",
+        service_type=None,
         process_count=1,
         server_count=1,
         output_dir=tmp_path,
@@ -283,6 +285,7 @@ def test_polling_profile_service_adds_pyinstrument_warning_when_missing(
     request = FieldProfileRequest(
         access_mode="polling",
         protocol="opcua",
+        service_type=None,
         process_count=1,
         server_count=1,
         output_dir=tmp_path,
@@ -307,6 +310,7 @@ def test_subscribe_profile_service_derives_intervals_and_writes_reports(
     request = FieldProfileRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_count=1,
         server_count=1,
         output_dir=tmp_path,
@@ -361,6 +365,7 @@ def test_subscribe_profile_service_allows_explicit_intervals(
     request = FieldProfileRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_count=1,
         server_count=1,
         output_dir=tmp_path,
@@ -390,6 +395,7 @@ def test_subscribe_profile_service_allows_lower_update_hz_than_sample_hz(tmp_pat
     request = FieldProfileRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_count=1,
         server_count=1,
         output_dir=tmp_path,
@@ -411,6 +417,7 @@ def test_subscribe_profile_service_warns_when_updates_disabled(
     request = FieldProfileRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_count=1,
         server_count=1,
         output_dir=tmp_path,

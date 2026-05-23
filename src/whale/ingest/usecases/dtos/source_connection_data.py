@@ -31,3 +31,4 @@ class SourceConnectionData:
     security_mode: str | None = None
     auth_type: str | None = None
     credential_ref: str | None = None
+    params: dict[str, str | int | float | bool] = field(default_factory=dict)

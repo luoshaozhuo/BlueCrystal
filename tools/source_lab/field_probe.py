@@ -48,6 +48,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default="opcua",
         help="Protocol filter to execute. Unsupported protocols are reported as SKIP.",
     )
+    parser.add_argument(
+        "--service-type",
+        default=None,
+        help="Service type for the protocol (e.g. GOOSE, SV, MMS_READ, REPORT). "
+             "If omitted, derived from --protocol alone.",
+    )
     parser.add_argument("--samples", type=int, default=10, help="Latency sample count per endpoint.")
     parser.add_argument("--timeout", type=float, default=5.0, help="Protocol read timeout in seconds.")
     parser.add_argument(
@@ -95,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     result = run_probe(
         ProbeConfig(
             protocol=args.protocol,
+            service_type=args.service_type,
             timeout_s=args.timeout,
             samples=args.samples,
             concurrency=args.concurrency,

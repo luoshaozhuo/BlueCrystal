@@ -10,8 +10,10 @@ from whale.ingest.ports.source import (
     SourceAcquisitionPort,
 )
 from whale.ingest.ports.state import (
+    SourceStateCacheError,
     SourceStateCachePort,
     SourceStateSnapshotReaderPort,
+    SourceStateCacheWriteError,
 )
 
 __all__ = [
@@ -20,6 +22,8 @@ __all__ = [
     "SourceAcquisitionDefinitionPort",
     "SourceAcquisitionPort",
     "SourceRuntimeConfigPort",
+    "SourceStateCacheError",
     "SourceStateCachePort",
     "SourceStateSnapshotReaderPort",
+    "SourceStateCacheWriteError",
 ]

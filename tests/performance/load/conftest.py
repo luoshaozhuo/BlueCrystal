@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from contextlib import contextmanager
-from pathlib import Path
 
 import pytest
 
@@ -68,7 +67,6 @@ def _pg_tables_created(pg_engine):
 @pytest.fixture()
 def pg_session(pg_engine, _pg_tables_created):
     """Function-scoped session, cleans up before each test."""
-    from sqlalchemy import text
     from sqlalchemy.orm import Session
 
     session = Session(bind=pg_engine, autoflush=False, expire_on_commit=False)

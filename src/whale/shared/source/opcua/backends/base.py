@@ -33,9 +33,9 @@ class Open62541PreparedReadPlan:
 class RawDataValue:
     """Backend-neutral raw data value used by raw-polling backends.
 
-    The current open62541 raw polling backend only guarantees the presence of
-    ``value`` placeholders sized to the number of values returned by the
-    runner.
+    The current open62541 raw polling backend returns one decoded VALUE record
+    per node through the native runner protocol, including ``value``,
+    ``status_code`` and source/server timestamps when available.
     """
 
     value: object

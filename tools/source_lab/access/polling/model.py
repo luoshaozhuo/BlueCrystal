@@ -212,6 +212,7 @@ class ProbeConfig:
     """Configuration for standalone field endpoint probing."""
 
     protocol: str
+    service_type: str | None = None
     timeout_s: float = 5.0
     samples: int = 1
     concurrency: int = 16

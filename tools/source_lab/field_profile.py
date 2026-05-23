@@ -102,6 +102,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--servers", type=Path, required=True)
     parser.add_argument("--profile-items", type=Path, required=True)
     parser.add_argument("--protocol", default="opcua")
+    parser.add_argument(
+        "--service-type",
+        default=None,
+        help="Service type for the protocol (e.g. GOOSE, SV, MMS_READ, REPORT). "
+             "If omitted, derived from --protocol alone.",
+    )
     parser.add_argument("--process-count", type=int, required=True)
     parser.add_argument("--server-count", type=int, required=True)
     parser.add_argument("--duration", type=float, default=30.0)
@@ -144,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     request = FieldProfileRequest(
         access_mode=args.access_mode,
         protocol=protocol,
+        service_type=args.service_type,
         process_count=args.process_count,
         server_count=args.server_count,
         output_dir=args.output_dir,

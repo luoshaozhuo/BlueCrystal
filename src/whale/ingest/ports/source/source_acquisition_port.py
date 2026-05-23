@@ -26,6 +26,30 @@ from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionDa
 SubscriptionStateHandler = Callable[[AcquiredNodeStateBatch], Awaitable[None]]
 
 
+class SourceAcquisitionError(RuntimeError):
+    """source 采集错误基类。"""
+
+
+class SourceReadError(SourceAcquisitionError):
+    """一次 source read 失败。"""
+
+
+class SourceReadTimeoutError(SourceReadError):
+    """一次 source read 因超时失败。"""
+
+
+class SourceBatchMismatchError(SourceReadError):
+    """一次 source read 返回值数量与请求点位数量不匹配。"""
+
+
+class SourceReadOnceFailedError(SourceReadError):
+    """read-once 模式下全部连接读取失败。"""
+
+
+class SourceSubscriptionUnsupportedError(SourceAcquisitionError):
+    """当前 source reader 不支持订阅采集。"""
+
+
 class SourceSubscriptionHandle(Protocol):
     """协议层订阅句柄。"""
 
@@ -35,6 +59,13 @@ class SourceSubscriptionHandle(Protocol):
 
 class SourceAcquisitionPort(Protocol):
     """source 状态采集端口。"""
+
+    def supports_subscription(
+        self,
+        execution: AcquisitionExecutionOptions,
+        connection: SourceConnectionData,
+    ) -> bool:
+        """返回当前 connection 是否支持订阅采集。"""
 
     async def read(
         self,

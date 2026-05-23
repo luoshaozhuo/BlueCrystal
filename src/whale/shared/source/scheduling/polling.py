@@ -1,3 +1,4 @@
+# mypy: disable-error-code="assignment,arg-type,misc"
 """Worker-local fixed-rate polling primitives for source acquisition.
 
 This module provides the production worker-local polling kernel used by

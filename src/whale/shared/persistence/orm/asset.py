@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -24,6 +24,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from whale.shared.persistence import Base
+
+if TYPE_CHECKING:
+    from whale.shared.persistence.orm.organization import Organization
+    from whale.shared.persistence.orm.scada_ingest import IED
 
 
 class AssetType(Base):

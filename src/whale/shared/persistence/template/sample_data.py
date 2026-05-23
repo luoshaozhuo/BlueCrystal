@@ -5,8 +5,6 @@ Usage: python -m whale.shared.persistence.template.sample_data
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from sqlalchemy.orm import Session
 
 from whale.shared.persistence.orm import (
@@ -37,7 +35,7 @@ def generate_all_sample_data() -> None:
 
         org = _create_org(session)
         session.flush()
-        print(f"✓ 组织")
+        print("✓ 组织")
 
         data_types = _create_data_types(session)
         session.flush()
@@ -45,7 +43,7 @@ def generate_all_sample_data() -> None:
 
         wtg_type, model = _create_asset_types_and_models(session)
         session.flush()
-        print(f"✓ 资产类型 + 型号")
+        print("✓ 资产类型 + 型号")
 
         turbines = _create_turbines(session, wtg_type, model, org)
         session.flush()
@@ -53,7 +51,7 @@ def generate_all_sample_data() -> None:
 
         _create_cdc_fc(session)
         session.flush()
-        print(f"✓ CDC/FC 字典")
+        print("✓ CDC/FC 字典")
 
         profile = _create_signal_profile(session, wtg_type, data_types)
         session.flush()

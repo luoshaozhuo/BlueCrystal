@@ -128,6 +128,53 @@ def test_parse_result_line_maps_error_semantics(
     assert (stats.batch_mismatches, stats.missing_response_timestamps, stats.read_errors) == expected
 
 
+def test_run_serial_polling_worker_ignores_value_lines(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    protocol = "\n".join(
+        [
+            "READY",
+            "RESULT\t0\t0\t9\t0\t100\t101\t102\tOK\t1.25\t2.50\t1\t1712345678.250000",
+            "VALUE\t0\t0\t9\t0\tGOOD\t123.4\t1712345678.000000\t1712345678.250000",
+            "RUNNER_SUMMARY\t0\t1\t1\t1\t0\t0\t0\t0\t1.250\t2.500\t0\t0\t0.000\t0.000",
+            "POLL_DONE\t0",
+        ]
+    )
+
+    class _FakeProcess:
+        def __init__(self) -> None:
+            self.stdin = io.StringIO()
+            self.stdout = io.StringIO(protocol)
+            self.returncode = 0
+            self.wait_calls = 0
+            self.terminate_called = False
+            self.kill_called = False
+
+        def wait(self, timeout: float | None = None) -> int:
+            self.wait_calls += 1
+            return 0
+
+        def terminate(self) -> None:
+            self.terminate_called = True
+
+        def kill(self) -> None:
+            self.kill_called = True
+
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling._resolve_runner_path",
+        lambda: Path("/tmp/open62541_client_runner"),
+    )
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+    monkeypatch.setattr(
+        "tools.source_lab.access.runners.open62541_serial_polling.subprocess.Popen",
+        lambda *args, **kwargs: _FakeProcess(),
+    )
+
+    stats = run_serial_polling_worker(0, (_plan(),), 10.0, _config())
+
+    assert stats.ok_reads == 1
+
+
 def test_parse_result_line_rejects_malformed_line() -> None:
     with pytest.raises(RuntimeError, match="Malformed open62541 runner RESULT line"):
         parse_result_line("RESULT\t0\t1")

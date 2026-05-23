@@ -19,6 +19,32 @@ from typing import Protocol
 from whale.ingest.usecases.dtos.acquired_node_state import AcquiredNodeStateBatch
 
 
+class SourceStateCacheError(RuntimeError):
+    """Base error raised by latest-state cache adapters."""
+
+
+class SourceStateCacheWriteError(SourceStateCacheError):
+    """Raised when a latest-state cache write cannot be completed safely.
+
+    Args:
+        error_code: Stable machine-readable error code.
+        message: Optional human-readable detail for logs and diagnostics.
+        retryable: Whether callers may retry the failed operation later.
+    """
+
+    def __init__(
+        self,
+        error_code: str,
+        message: str | None = None,
+        *,
+        retryable: bool = True,
+    ) -> None:
+        detail = message or error_code
+        super().__init__(detail)
+        self.error_code = error_code
+        self.retryable = retryable
+
+
 class SourceStateCachePort(Protocol):
     """更新 source latest-state cache。"""
 

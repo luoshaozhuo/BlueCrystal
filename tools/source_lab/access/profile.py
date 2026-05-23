@@ -16,8 +16,12 @@ from tools.source_lab.access.providers.base import SourceProvider
 from tools.source_lab.access.common.io import build_field_runtime_sources
 from tools.source_lab.access.common.utils import normalize_protocol
 from tools.source_lab.access.runners.base import CapacityRunner, SubscriptionRunner
-from tools.source_lab.access.runners.open62541_serial_polling import OpcUaOpen62541CapacityRunner
-from tools.source_lab.access.runners.open62541_subscription import OpcUaOpen62541SubscribeRunner
+from tools.source_lab.access.runners.registry import (
+    build_capacity_runner,
+    build_subscription_runner,
+    get_protocol_capability,
+    supports_access_mode,
+)
 from tools.source_lab.access.subscribe.model import SubscribeScanConfig
 from tools.source_lab.access.subscribe.profile import SubscribeProfileResult, run_subscribe_profile
 from tools.source_lab.access.subscribe.reporter import print_subscribe_report
@@ -30,6 +34,7 @@ class FieldProfileRequest:
 
     access_mode: str
     protocol: str
+    service_type: str | None
     process_count: int
     server_count: int
     output_dir: Path | None
@@ -200,9 +205,13 @@ def _profile_result_json(
     request: FieldProfileRequest,
     result: FieldProfileServiceResult,
 ) -> str:
+    cap = get_protocol_capability(request.protocol)
     payload = {
         "access_mode": result.access_mode,
         "protocol": result.protocol,
+        "implementation_level": cap.get("implementation_level", ""),
+        "runner_backend": cap.get("backend", ""),
+        "protocol_limitation": cap.get("limitation", ""),
         "process_count": request.process_count,
         "server_count": request.server_count,
         "hz": request.hz,
@@ -345,12 +354,18 @@ def run_field_profile(
 ) -> FieldProfileServiceResult:
     """Run one field-profile configuration and persist artifacts."""
 
+    if not supports_access_mode(request.protocol, request.access_mode):
+        raise ValueError(
+            "protocol/access_mode is not supported: "
+            f"protocol={request.protocol}, access_mode={request.access_mode}"
+        )
+
     if request.access_mode == "polling":
         polling_config = _build_polling_profile_config(request)
         profile_result: PollingProfileResult | SubscribeProfileResult = run_polling_profile(
             polling_config,
             provider=provider,
-            runner=OpcUaOpen62541CapacityRunner(),
+            runner=build_capacity_runner(request.protocol),
             pyinstrument=request.pyinstrument,
             max_lines=request.profile_max_lines,
         )
@@ -359,7 +374,7 @@ def run_field_profile(
         profile_result = run_subscribe_profile(
             subscribe_config,
             provider=provider,
-            runner=OpcUaOpen62541SubscribeRunner(),
+            runner=build_subscription_runner(request.protocol),
             pyinstrument=request.pyinstrument,
             max_lines=request.profile_max_lines,
         )

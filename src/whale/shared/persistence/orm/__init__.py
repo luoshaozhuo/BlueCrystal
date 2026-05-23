@@ -31,6 +31,12 @@ from whale.shared.persistence.orm.scada_ingest import (
     SignalProfile,
     SignalProfileItem,
 )
+from whale.shared.persistence.orm.scada_protocol_param import (
+    ScadaEndpointParamValue,
+    ScadaProtocolParamDef,
+    ScadaSignalParamDef,
+    ScadaSignalProfileItemParamValue,
+)
 
 __all__ = [
     "Organization",
@@ -43,4 +49,6 @@ __all__ = [
     "AcqSignalState", "AcqSignalSample",
     "AcquisitionTask",
     "IngestSourceHealthOrm", "IngestRuntimeEventOrm",
+    "ScadaProtocolParamDef", "ScadaEndpointParamValue",
+    "ScadaSignalParamDef", "ScadaSignalProfileItemParamValue",
 ]

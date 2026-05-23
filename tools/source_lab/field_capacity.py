@@ -142,6 +142,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--servers", type=Path, required=True)
     parser.add_argument("--profile-items", type=Path, required=True)
     parser.add_argument("--protocol", default="opcua")
+    parser.add_argument(
+        "--service-type",
+        default=None,
+        help="Service type for the protocol (e.g. GOOSE, SV, MMS_READ, REPORT). "
+             "If omitted, derived from --protocol alone.",
+    )
     parser.add_argument("--process-counts", default=None)
     parser.add_argument("--process-count-start", type=int, default=None)
     parser.add_argument("--process-count-step", type=int, default=None)
@@ -220,6 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         request = FieldCapacityRequest(
             access_mode="polling",
             protocol=requested_protocol,
+            service_type=args.service_type,
             process_counts=process_counts,
             server_counts=server_counts,
             hz_values=hz_values,
@@ -257,6 +264,7 @@ def main(argv: list[str] | None = None) -> int:
         request = FieldCapacityRequest(
             access_mode="subscribe",
             protocol=requested_protocol,
+            service_type=args.service_type,
             process_counts=process_counts,
             server_counts=server_counts,
             sample_hz_values=sample_hz_values,

@@ -8,6 +8,7 @@ from datetime import datetime
 
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec, TickResult
 from whale.shared.source.models import SourceConnectionProfile
+from whale.shared.source.opcua.backends import PreparedReadPlan
 from whale.shared.source.opcua.reader import OpcUaSourceReader
 
 
@@ -76,7 +77,7 @@ class OpcUaSourceAccessAdapter:
         self._points = points
         self._read_timeout_s = read_timeout_s
         self._reader: OpcUaSourceReader | None = None
-        self._plan: object | None = None
+        self._plan: PreparedReadPlan | None = None
         self._addresses = tuple(normalize_opcua_node_id(point.address) for point in points)
 
     async def connect(self) -> None:

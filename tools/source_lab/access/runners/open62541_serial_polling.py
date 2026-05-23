@@ -31,6 +31,7 @@ from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
 
 _READY_PREFIX = "READY"
 _RESULT_PREFIX = "RESULT"
+_VALUE_PREFIX = "VALUE"
 _POLL_DONE_PREFIX = "POLL_DONE"
 _RUNNER_SUMMARY_PREFIX = "RUNNER_SUMMARY"
 _ERROR_PREFIX = "ERROR"
@@ -322,6 +323,7 @@ def _run_serial_polling_session(
                         process.stdout,
                         allowed_prefixes=(
                             _RESULT_PREFIX,
+                            _VALUE_PREFIX,
                             _POLL_DONE_PREFIX,
                             _RUNNER_SUMMARY_PREFIX,
                         ),
@@ -331,6 +333,8 @@ def _run_serial_polling_session(
                     )
                     if line.startswith(_RESULT_PREFIX):
                         results.append(parse_result_line(line))
+                        continue
+                    if line.startswith(_VALUE_PREFIX):
                         continue
                     if line.startswith(_RUNNER_SUMMARY_PREFIX):
                         summary_line = line

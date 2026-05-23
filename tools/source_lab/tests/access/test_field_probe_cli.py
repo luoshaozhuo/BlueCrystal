@@ -113,3 +113,44 @@ def test_field_probe_cli_builds_probe_config_and_prints_tsv(
     assert "endpoint_id\tprofile_id\tprotocol" in stdout
     assert "latency_mean_ms" in stdout
     assert "ep-1\tpf-1\topcua" in stdout
+
+
+def test_field_probe_cli_with_service_type(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Verify --service-type is accepted and forwarded to ProbeConfig."""
+
+    servers, items = _write_input_files(tmp_path)
+    observed: list[ProbeConfig] = []
+
+    def _fake_run_probe(config: ProbeConfig, sources: tuple[object, ...]) -> ProbeResult:
+        del sources
+        observed.append(config)
+        return ProbeResult(
+            config=config,
+            rows=(),
+        )
+
+    monkeypatch.setattr("tools.source_lab.field_probe.build_field_runtime_sources", lambda *args, **kwargs: ())
+    monkeypatch.setattr("tools.source_lab.field_probe.run_probe", _fake_run_probe)
+
+    exit_code = main(
+        [
+            "--servers", str(servers),
+            "--profile-items", str(items),
+            "--protocol", "iec61850",
+            "--service-type", "GOOSE",
+            "--samples", "3",
+            "--timeout", "5",
+            "--tcp-timeout", "3",
+            "--concurrency", "4",
+        ]
+    )
+
+    config = observed[0]
+    assert exit_code == 0
+    assert config.protocol == "iec61850"
+    assert config.service_type == "GOOSE"
+

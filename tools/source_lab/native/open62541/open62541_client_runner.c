@@ -13,6 +13,16 @@
 #include <time.h>
 
 #define MAX_LINE_LEN 8192
+#define MAX_VALUE_TEXT_LEN 512
+#define MAX_STATUS_TEXT_LEN 64
+
+typedef struct ReadValueSnapshot {
+    bool has_value;
+    double source_timestamp_s;
+    double server_timestamp_s;
+    char status_code[MAX_STATUS_TEXT_LEN];
+    char value_text[MAX_VALUE_TEXT_LEN];
+} ReadValueSnapshot;
 
 typedef struct ReadExecutionResult {
     bool success;
@@ -21,6 +31,8 @@ typedef struct ReadExecutionResult {
     const char *detail;
     int64_t read_start_ts_ns;
     int64_t read_end_ts_ns;
+    ReadValueSnapshot *values;
+    size_t results_size;
 } ReadExecutionResult;
 
 typedef struct SerialEndpointPlan {
@@ -97,6 +109,138 @@ static double ua_datetime_to_unix_seconds(UA_DateTime value) {
         return 0.0;
     }
     return ((double)(value - UA_DATETIME_UNIX_EPOCH)) / ((double)UA_DATETIME_SEC);
+}
+
+static void sanitize_protocol_field(
+    const char *input,
+    char *output,
+    size_t output_size
+) {
+    if(output_size == 0) {
+        return;
+    }
+    if(input == NULL || input[0] == '\0') {
+        snprintf(output, output_size, "-");
+        return;
+    }
+
+    size_t write_index = 0;
+    for(size_t read_index = 0; input[read_index] != '\0' && write_index + 1 < output_size; ++read_index) {
+        char ch = input[read_index];
+        if(ch == '\t' || ch == '\n' || ch == '\r') {
+            ch = ' ';
+        }
+        output[write_index++] = ch;
+    }
+    output[write_index] = '\0';
+}
+
+static bool serialize_variant_value(
+    const UA_Variant *variant,
+    char *buffer,
+    size_t buffer_size
+) {
+    if(buffer_size == 0) {
+        return false;
+    }
+    if(variant == NULL || !variant->data || variant->type == NULL) {
+        snprintf(buffer, buffer_size, "-");
+        return false;
+    }
+    if(!UA_Variant_isScalar(variant)) {
+        snprintf(buffer, buffer_size, "[unsupported_array]");
+        return false;
+    }
+
+    const UA_DataType *type = variant->type;
+    if(type == &UA_TYPES[UA_TYPES_BOOLEAN]) {
+        snprintf(buffer, buffer_size, "%s", (*(UA_Boolean *)variant->data) ? "true" : "false");
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_SBYTE]) {
+        snprintf(buffer, buffer_size, "%d", (int)(*(UA_SByte *)variant->data));
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_BYTE]) {
+        snprintf(buffer, buffer_size, "%u", (unsigned int)(*(UA_Byte *)variant->data));
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_INT16]) {
+        snprintf(buffer, buffer_size, "%d", (int)(*(UA_Int16 *)variant->data));
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_UINT16]) {
+        snprintf(buffer, buffer_size, "%u", (unsigned int)(*(UA_UInt16 *)variant->data));
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_INT32]) {
+        snprintf(buffer, buffer_size, "%d", *(UA_Int32 *)variant->data);
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_UINT32]) {
+        snprintf(buffer, buffer_size, "%u", *(UA_UInt32 *)variant->data);
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_INT64]) {
+        snprintf(buffer, buffer_size, "%lld", (long long)(*(UA_Int64 *)variant->data));
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_UINT64]) {
+        snprintf(buffer, buffer_size, "%llu", (unsigned long long)(*(UA_UInt64 *)variant->data));
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_FLOAT]) {
+        snprintf(buffer, buffer_size, "%.9g", (double)(*(UA_Float *)variant->data));
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_DOUBLE]) {
+        snprintf(buffer, buffer_size, "%.17g", *(UA_Double *)variant->data);
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_STRING]) {
+        UA_String *value = (UA_String *)variant->data;
+        size_t copy_len = value->length < (buffer_size - 1) ? value->length : (buffer_size - 1);
+        memcpy(buffer, value->data, copy_len);
+        buffer[copy_len] = '\0';
+        sanitize_protocol_field(buffer, buffer, buffer_size);
+        return true;
+    }
+    if(type == &UA_TYPES[UA_TYPES_DATETIME]) {
+        snprintf(
+            buffer,
+            buffer_size,
+            "%.6f",
+            ua_datetime_to_unix_seconds(*(UA_DateTime *)variant->data)
+        );
+        return true;
+    }
+
+    sanitize_protocol_field(type->typeName, buffer, buffer_size);
+    return false;
+}
+
+static void snapshot_data_value(
+    const UA_DataValue *value,
+    ReadValueSnapshot *snapshot
+) {
+    memset(snapshot, 0, sizeof(*snapshot));
+    sanitize_protocol_field(
+        value->hasStatus ? UA_StatusCode_name(value->status) : "GOOD",
+        snapshot->status_code,
+        sizeof(snapshot->status_code)
+    );
+    snapshot->source_timestamp_s = value->hasSourceTimestamp
+        ? ua_datetime_to_unix_seconds(value->sourceTimestamp)
+        : 0.0;
+    snapshot->server_timestamp_s = value->hasServerTimestamp
+        ? ua_datetime_to_unix_seconds(value->serverTimestamp)
+        : 0.0;
+    snapshot->has_value = value->hasValue && value->value.type != NULL;
+    if(!snapshot->has_value) {
+        snprintf(snapshot->value_text, sizeof(snapshot->value_text), "-");
+        return;
+    }
+    serialize_variant_value(&value->value, snapshot->value_text, sizeof(snapshot->value_text));
 }
 
 static UA_StatusCode parse_or_build_node_id(
@@ -195,6 +339,8 @@ static bool execute_read_node_ids(
         result->detail = "alloc_failed";
         result->read_start_ts_ns = 0;
         result->read_end_ts_ns = 0;
+        result->values = NULL;
+        result->results_size = 0;
         return false;
     }
 
@@ -211,6 +357,8 @@ static bool execute_read_node_ids(
             result->detail = "nodeid_copy_failed";
             result->read_start_ts_ns = 0;
             result->read_end_ts_ns = 0;
+            result->values = NULL;
+            result->results_size = 0;
             return false;
         }
         nodes_to_read[i].attributeId = UA_ATTRIBUTEID_VALUE;
@@ -225,12 +373,21 @@ static bool execute_read_node_ids(
     int64_t read_start_ts_ns = monotonic_now_ns();
     UA_ReadResponse response = UA_Client_Service_read(client, request);
     int64_t read_end_ts_ns = monotonic_now_ns();
+    ReadValueSnapshot *snapshots = NULL;
 
     bool success = response.responseHeader.serviceResult == UA_STATUSCODE_GOOD;
     size_t value_count = 0;
     if(success) {
+        snapshots = (ReadValueSnapshot *)calloc(response.resultsSize, sizeof(ReadValueSnapshot));
+        if(snapshots == NULL && response.resultsSize > 0) {
+            success = false;
+            result->detail = "alloc_failed";
+        }
         for(size_t i = 0; i < response.resultsSize; ++i) {
             const UA_DataValue *value = &response.results[i];
+            if(snapshots != NULL) {
+                snapshot_data_value(value, &snapshots[i]);
+            }
             if(value->hasValue && value->value.type != NULL) {
                 value_count++;
             }
@@ -240,12 +397,19 @@ static bool execute_read_node_ids(
     result->success = success;
     result->value_count = success ? value_count : 0;
     result->response_timestamp_s = ua_datetime_to_unix_seconds(response.responseHeader.timestamp);
-    result->detail = success ? "-" : UA_StatusCode_name(response.responseHeader.serviceResult);
+    result->detail = success
+        ? (result->detail != NULL ? result->detail : "-")
+        : (result->detail != NULL ? result->detail : UA_StatusCode_name(response.responseHeader.serviceResult));
     result->read_start_ts_ns = read_start_ts_ns;
     result->read_end_ts_ns = read_end_ts_ns;
+    result->values = success ? snapshots : NULL;
+    result->results_size = success ? response.resultsSize : 0;
 
     UA_ReadResponse_clear(&response);
     UA_ReadRequest_clear(&request);
+    if(!success && snapshots != NULL) {
+        free(snapshots);
+    }
     return success;
 }
 
@@ -331,6 +495,7 @@ static bool read_serial_endpoint(
     double *max_read_ms
 ) {
     ReadExecutionResult result;
+    memset(&result, 0, sizeof(result));
     execute_read_node_ids(endpoint->client, endpoint->node_ids, endpoint->node_count, &result);
     bool in_measurement = scheduled_ns >= measure_started_ns && scheduled_ns < measure_ended_ns;
     const char *error_code = "OK";
@@ -392,12 +557,31 @@ static bool read_serial_endpoint(
             result.value_count,
             result.response_timestamp_s > 0.0 ? result.response_timestamp_s : -1.0
         );
+        if(result.success) {
+            for(size_t i = 0; i < result.results_size; ++i) {
+                const ReadValueSnapshot *snapshot = &result.values[i];
+                printf(
+                    "VALUE\t%d\t%d\t%d\t%zu\t%s\t%s\t%.6f\t%.6f\n",
+                    worker_index,
+                    endpoint->local_index,
+                    endpoint->global_index,
+                    i,
+                    snapshot->status_code,
+                    snapshot->value_text,
+                    snapshot->source_timestamp_s > 0.0 ? snapshot->source_timestamp_s : -1.0,
+                    snapshot->server_timestamp_s > 0.0 ? snapshot->server_timestamp_s : -1.0
+                );
+            }
+        }
         fflush(stdout);
         (*total_reads)++;
     } else {
         (*warmup_reads)++;
     }
 
+    if(result.values != NULL) {
+        free(result.values);
+    }
     endpoint->tick_index++;
     return true;
 }

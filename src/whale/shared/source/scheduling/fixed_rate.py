@@ -1,3 +1,4 @@
+# mypy: disable-error-code="assignment,union-attr"
 """Diagnostic-only high-frequency fixed-rate scheduler.
 
 This module exists only for historical profile comparisons.

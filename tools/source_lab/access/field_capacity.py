@@ -20,8 +20,12 @@ from tools.source_lab.access.polling.capacity import scan_source_capacity
 from tools.source_lab.access.polling.model import CapacityMode, CapacityScanConfig, CapacityScanResult, CapacityStatus
 from tools.source_lab.access.providers.base import SourceProvider
 from tools.source_lab.access.providers.file_field import build_field_source_provider
-from tools.source_lab.access.runners.open62541_serial_polling import OpcUaOpen62541CapacityRunner
-from tools.source_lab.access.runners.open62541_subscription import OpcUaOpen62541SubscribeRunner
+from tools.source_lab.access.runners.registry import (
+    build_capacity_runner,
+    build_subscription_runner,
+    get_protocol_capability,
+    supports_access_mode,
+)
 from tools.source_lab.access.subscribe.capacity_model import (
     SubscribeCapacityComboResult,
     SubscribeCapacityLimitSummary,
@@ -86,6 +90,9 @@ class FieldCapacityRow:
     src_hz: float = 0.0
     sub_ms: float = 0.0
     src_ms: float = 0.0
+    implementation_level: str = ""
+    runner_backend: str = ""
+    protocol_limitation: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +101,7 @@ class FieldCapacityRequest:
 
     access_mode: str
     protocol: str
+    service_type: str | None
     process_counts: tuple[int, ...]
     server_counts: tuple[int, ...]
     output_dir: Path
@@ -419,13 +427,14 @@ def _run_polling_field_capacity(
 ) -> tuple[FieldCapacityRow, ...]:
     from tools.source_lab.access.polling.capacity_rows import polling_row
 
-    runner = OpcUaOpen62541CapacityRunner()
+    runner = build_capacity_runner(request.protocol)
     rows: list[FieldCapacityRow] = []
     progress = CapacityProgressBar(
         "polling",
         total=len(request.process_counts) * len(request.server_counts) * len(request.hz_values),
     )
     current = 0
+    cap = get_protocol_capability(request.protocol)
     try:
         for process_count in request.process_counts:
             for server_count in request.server_counts:
@@ -454,15 +463,19 @@ def _run_polling_field_capacity(
                     sampler.start()
                     result = scan_source_capacity(config, provider=provider, runner=runner)
                     cpu = sampler.stop()
-                    rows.append(
-                        polling_row(
-                            result,
-                            process_count=process_count,
-                            point_count=point_count_per_server * server_count,
-                            cpu=cpu,
-                            source_update_enabled=request.source_update_enabled,
-                        )
+                    row = polling_row(
+                        result,
+                        process_count=process_count,
+                        point_count=point_count_per_server * server_count,
+                        cpu=cpu,
+                        source_update_enabled=request.source_update_enabled,
                     )
+                    rows.append(replace(
+                        row,
+                        implementation_level=str(cap.get("implementation_level", "")),
+                        runner_backend=str(cap.get("backend", "")),
+                        protocol_limitation=str(cap.get("limitation", "")),
+                    ))
                     current += 1
                     progress.update(
                         process_count=process_count,
@@ -487,7 +500,7 @@ def _run_subscribe_field_capacity(
     from tools.source_lab.access.capacity import scan_capacity
     from tools.source_lab.access.subscribe.capacity_rows import sample_hz_to_interval_ms, subscribe_row
 
-    runner = OpcUaOpen62541SubscribeRunner()
+    runner = build_subscription_runner(request.protocol)
     rows: list[FieldCapacityRow] = []
     limit_summaries: list[SubscribeCapacityLimitSummary] = []
     resolved_source_update_hz_values = request.source_update_hz_values or (
@@ -538,16 +551,21 @@ def _run_subscribe_field_capacity(
         cpu = sampler.stop()
         if not isinstance(result, SubscribeCapacityResult):
             raise RuntimeError("subscribe capacity returned unexpected result type")
+        cap = get_protocol_capability(request.protocol)
         for combo in result.combos:
-            rows.append(
-                subscribe_row(
-                    combo,
-                    protocol=normalize_protocol(request.protocol),
-                    point_count_per_server=point_count_per_server,
-                    cpu=cpu,
-                    source_update_enabled=request.source_update_enabled,
-                )
+            row = subscribe_row(
+                combo,
+                protocol=normalize_protocol(request.protocol),
+                point_count_per_server=point_count_per_server,
+                cpu=cpu,
+                source_update_enabled=request.source_update_enabled,
             )
+            rows.append(replace(
+                row,
+                implementation_level=str(cap.get("implementation_level", "")),
+                runner_backend=str(cap.get("backend", "")),
+                protocol_limitation=str(cap.get("limitation", "")),
+            ))
         limit_summaries.extend(result.limit_summaries)
     return tuple(rows), tuple(limit_summaries)
 
@@ -559,6 +577,12 @@ def run_field_capacity(
     point_count_per_server: int,
 ) -> FieldCapacityServiceResult:
     """Run field-capacity workloads and persist report artifacts."""
+
+    if not supports_access_mode(request.protocol, request.access_mode):
+        raise ValueError(
+            "protocol/access_mode is not supported: "
+            f"protocol={request.protocol}, access_mode={request.access_mode}"
+        )
 
     if request.access_mode == "polling":
         rows = _run_polling_field_capacity(

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -13,13 +13,15 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-    Text,
     UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from whale.shared.persistence import Base
+
+if TYPE_CHECKING:
+    from whale.shared.persistence.orm.asset import AssetInstance
 
 
 class IED(Base):
@@ -87,11 +89,15 @@ class CommunicationEndpoint(Base):
     )
     application_protocol: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True,
-        comment="应用层协议：OPC_UA / IEC61850 / MODBUS / REST / MQTT / VENDOR"
+        comment="应用层协议：OPC_UA / MODBUS / IEC101 / IEC104 / IEC61850 / MQTT / HTTP_REST"
+    )
+    service_type: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True, index=True,
+        comment="服务类型：READ / SUBSCRIBE / TCP_READ / RTU_READ / INTERROGATION / SPONTANEOUS / MMS_READ / REPORT / GOOSE / SV / REQUEST"
     )
     transport: Mapped[str] = mapped_column(
         String(32), nullable=False, default="TCP",
-        comment="传输层协议：TCP / UDP / HTTPS / MQTT / SERIAL"
+        comment="传输层协议：TCP / SERIAL / ETHERNET_L2 / MQTT / HTTP / HTTPS"
     )
     host: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, comment="主机地址，如 192.168.10.21"

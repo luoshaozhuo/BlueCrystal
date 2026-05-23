@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
 
@@ -19,6 +19,8 @@ class AcquisitionExecutionOptions:
     request_timeout_ms: int
     freshness_timeout_ms: int
     alive_timeout_ms: int
+    client_backend: str | None = None
+    params: dict[str, str | int | float | bool] = field(default_factory=dict)
 
     polling_max_concurrent_connections: int = 4
     polling_connection_start_interval_ms: int = 0

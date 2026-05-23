@@ -86,7 +86,6 @@ def _pg_tables_created(pg_engine):
 @pytest.fixture()
 def pg_session(pg_engine, _pg_tables_created):
     """Function-scoped session: truncate all tables before each test, rollback after."""
-    from sqlalchemy import text
     from sqlalchemy.orm import Session
 
     session = Session(bind=pg_engine, autoflush=False, expire_on_commit=False)

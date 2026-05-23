@@ -164,6 +164,7 @@ def test_polling_pass_keeps_reason_empty_and_cpu_warning_in_warnings(
     request = FieldCapacityRequest(
         access_mode="polling",
         protocol="opcua",
+        service_type=None,
         process_counts=(1,),
         server_counts=(1,),
         hz_values=(5.0,),
@@ -201,6 +202,7 @@ def test_subscribe_pass_keeps_reason_empty_and_cpu_warning_in_warnings(
     request = FieldCapacityRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_counts=(1,),
         server_counts=(1,),
         sample_hz_values=(5.0,),
@@ -241,6 +243,7 @@ def test_subscribe_fail_keeps_business_reason_when_cpu_warning_present(
     request = FieldCapacityRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_counts=(1,),
         server_counts=(1,),
         sample_hz_values=(5.0,),
@@ -277,6 +280,7 @@ def test_subscribe_derives_interval_and_source_update_per_sample_hz(
     request = FieldCapacityRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_counts=(1,),
         server_counts=(1,),
         sample_hz_values=(5.0, 10.0),
@@ -313,6 +317,7 @@ def test_subscribe_uses_explicit_publishing_interval_for_all_sample_hz(
     request = FieldCapacityRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_counts=(1,),
         server_counts=(1,),
         sample_hz_values=(5.0, 10.0),
@@ -349,6 +354,7 @@ def test_subscribe_keeps_pass_when_source_update_hz_below_sample_hz(
     request = FieldCapacityRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_counts=(1,),
         server_counts=(1,),
         sample_hz_values=(5.0, 10.0),
@@ -382,6 +388,7 @@ def test_source_update_disabled_adds_warning_without_overwriting_reason(
     request = FieldCapacityRequest(
         access_mode="subscribe",
         protocol="opcua",
+        service_type=None,
         process_counts=(1,),
         server_counts=(1,),
         sample_hz_values=(5.0, 10.0),

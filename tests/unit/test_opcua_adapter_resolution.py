@@ -1,6 +1,8 @@
-"""Unit tests for OPC UA adapter endpoint and node-path resolution."""
+"""OPC UA adapter 地址解析单元测试。"""
 
 from __future__ import annotations
+
+from typing import Any
 
 from whale.ingest.adapters.source.opcua_source_acquisition_adapter import (
     OpcUaSourceAcquisitionAdapter,
@@ -13,7 +15,7 @@ from whale.ingest.usecases.dtos.source_acquisition_request import (
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
 
 
-def _mk_conn(**params: object) -> SourceConnectionData:
+def _mk_conn(**params: Any) -> SourceConnectionData:
     return SourceConnectionData(
         host=str(params.get("host", "")),
         port=int(params.get("port", 0)),
@@ -39,7 +41,7 @@ def _mk_execution() -> AcquisitionExecutionOptions:
 def test_resolve_endpoint_from_protocol_transport_host_and_port() -> None:
     conn = _mk_conn(host="192.168.1.1", port=4840)
 
-    assert _build_endpoint(_mk_execution(), conn) == "opcua.tcp://192.168.1.1:4840"
+    assert _build_endpoint(_mk_execution(), conn) == "opc.tcp://192.168.1.1:4840"
 
 
 def test_resolve_endpoint_empty_when_host_or_port_is_missing() -> None:

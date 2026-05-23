@@ -11,6 +11,8 @@ from sqlalchemy import inspect, text
 from whale.shared.persistence import Base
 from whale.shared.persistence.session import _db_url, engine
 
+from whale.shared.persistence.template.protocol_view_defs import ensure_protocol_views
+
 _SCADA_SERVER_VIEW_NAME = "v_scada_server"
 _SCADA_SERVER_VIEW_SQL = f"""
 CREATE VIEW {_SCADA_SERVER_VIEW_NAME} AS
@@ -67,6 +69,7 @@ def initialize_db() -> None:
     import_module("whale.shared.persistence.orm")
     Base.metadata.create_all(bind=engine)
     ensure_shared_views(bind=engine)
+    ensure_protocol_views(bind=engine)
 
 
 def reset_db() -> None:

@@ -23,7 +23,10 @@ from datetime import UTC, datetime
 from typing import Any, Protocol, cast
 
 from whale.ingest.config import CONFIG, RedisStateCacheConfig
-from whale.ingest.ports.state.source_state_cache_port import SourceStateCachePort
+from whale.ingest.ports.state.source_state_cache_port import (
+    SourceStateCachePort,
+    SourceStateCacheWriteError,
+)
 from whale.ingest.ports.state.source_state_snapshot_reader_port import (
     CachedNodeValue,
     CachedSourceState,
@@ -33,6 +36,7 @@ from whale.ingest.usecases.dtos.acquired_node_state import (
     AcquiredNodeStateBatch,
     AcquiredNodeValue,
 )
+from whale.shared.crosscutting.resilience.error_classifier import ClassifiedError
 from whale.shared.utils.time import ensure_utc, max_datetime
 
 
@@ -58,7 +62,7 @@ class RedisHashClient(Protocol):
     def hgetall(self, name: str) -> Mapping[str, str] | Mapping[bytes, bytes]:
         """Return all hash fields and values."""
 
-    def pipeline(self) -> RedisPipeline:
+    def pipeline(self, transaction: bool = True) -> RedisPipeline:
         """Return a Redis pipeline for batch operations."""
 
 
@@ -100,13 +104,6 @@ class RedisSourceStateCacheSettings:
                 + ", ".join(missing_names)
             )
 
-        assert config.host is not None
-        assert config.port is not None
-        assert config.db is not None
-        assert config.hash_key is not None
-        assert config.station_id is not None
-        assert config.decode_responses is not None
-
         return cls(
             host=config.host,
             port=config.port,
@@ -120,7 +117,7 @@ class RedisSourceStateCacheSettings:
 
 
 class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort):
-    """Use one Redis hash as the production-recommended latest-state cache."""
+    """Use one Redis hash as the production latest-state cache."""
 
     def __init__(
         self,
@@ -152,52 +149,68 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
             return 0
 
         now = datetime.now(tz=UTC)
-        meta_field = self._build_ld_meta_field(ld_name=ld_name)
-        current_meta = self._load_payload(meta_field)
+        try:
+            meta_field = self._build_ld_meta_field(ld_name=ld_name)
+            current_meta = self._load_payload(meta_field)
+            updated_count = 0
+            value_payloads: list[tuple[str, dict[str, Any]]] = []
 
-        next_meta = self._build_next_meta_payload(
-            ld_name=ld_name,
-            batch=batch,
-            current_meta=current_meta,
-            now=now,
-        )
+            for value in batch.values:
+                value_field = self._build_variable_field(
+                    ld_name=ld_name,
+                    node_key=value.node_key,
+                )
+                current_value_payload = self._load_payload(value_field)
 
-        updated_count = 0
-        pipe = self._client.pipeline()
-        pipe.hset(
-            self._settings.hash_key,
-            meta_field,
-            self._dump_payload(next_meta),
-        )
+                if current_value_payload is not None and not _should_update_value(
+                    incoming=value,
+                    current_payload=current_value_payload,
+                ):
+                    continue
 
-        for value in batch.values:
-            value_field = self._build_variable_field(
-                ld_name=ld_name,
-                node_key=value.node_key,
-            )
-            current_value_payload = self._load_payload(value_field)
+                value_payloads.append(
+                    (
+                        value_field,
+                        self._build_value_payload(
+                            ld_name=ld_name,
+                            batch=batch,
+                            value=value,
+                            now=now,
+                        ),
+                    )
+                )
+                updated_count += 1
 
-            if current_value_payload is not None and not _should_update_value(
-                incoming=value,
-                current_payload=current_value_payload,
-            ):
-                continue
-
-            next_value_payload = self._build_value_payload(
+            next_meta = self._build_next_meta_payload(
                 ld_name=ld_name,
                 batch=batch,
-                value=value,
+                current_meta=current_meta,
                 now=now,
+                values_updated=updated_count > 0,
             )
+
+            pipe = self._client.pipeline(transaction=True)
+            for value_field, next_value_payload in value_payloads:
+                pipe.hset(
+                    self._settings.hash_key,
+                    value_field,
+                    self._dump_payload(next_value_payload),
+                )
             pipe.hset(
                 self._settings.hash_key,
-                value_field,
-                self._dump_payload(next_value_payload),
+                meta_field,
+                self._dump_payload(next_meta),
             )
-            updated_count += 1
-
-        pipe.execute()
-        return updated_count
+            self._execute_pipeline(pipe, operation="update", ld_name=ld_name)
+            return updated_count
+        except SourceStateCacheWriteError:
+            raise
+        except Exception as exc:
+            raise self._build_write_error(
+                operation="update",
+                ld_name=ld_name,
+                exc=exc,
+            ) from exc
 
     def mark_alive(
         self,
@@ -207,41 +220,52 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
     ) -> None:
         """标记一个 LD/source 的采集链路仍然存活。"""
 
-        now = datetime.now(tz=UTC)
-        observed_at = ensure_utc(observed_at)
-        meta_field = self._build_ld_meta_field(ld_name=ld_name)
-        current_meta = self._load_payload(meta_field) or {}
+        try:
+            now = datetime.now(tz=UTC)
+            observed_at = ensure_utc(observed_at)
+            meta_field = self._build_ld_meta_field(ld_name=ld_name)
+            current_meta = self._load_payload(meta_field) or {}
 
-        current_status = str(current_meta.get("availability_status") or "UNKNOWN")
-        next_status = (
-            "VALID"
-            if current_status in {"UNKNOWN", "STALE", "OFFLINE"}
-            else current_status
-        )
+            current_status = str(current_meta.get("availability_status") or "UNKNOWN")
+            next_status = (
+                "VALID"
+                if current_status in {"UNKNOWN", "STALE", "OFFLINE"}
+                else current_status
+            )
 
-        next_meta = {
-            **current_meta,
-            "station_id": self._settings.station_id,
-            "ld_name": ld_name,
-            "source_id": str(current_meta.get("source_id") or ld_name),
-            "availability_status": next_status,
-            "unavailable_reason": None
-            if next_status == "VALID"
-            else current_meta.get("unavailable_reason"),
-            "last_alive_at": _datetime_to_iso(
-                max_datetime(
-                    _parse_datetime(current_meta.get("last_alive_at")),
-                    observed_at,
-                )
-            ),
-            "state_updated_at": now.isoformat(),
-        }
+            next_meta = {
+                **current_meta,
+                "station_id": self._settings.station_id,
+                "ld_name": ld_name,
+                "source_id": str(current_meta.get("source_id") or ld_name),
+                "availability_status": next_status,
+                "unavailable_reason": None
+                if next_status == "VALID"
+                else current_meta.get("unavailable_reason"),
+                "last_alive_at": _datetime_to_iso(
+                    max_datetime(
+                        _parse_datetime(current_meta.get("last_alive_at")),
+                        observed_at,
+                    )
+                ),
+                "state_updated_at": now.isoformat(),
+            }
 
-        self._client.hset(
-            self._settings.hash_key,
-            meta_field,
-            self._dump_payload(next_meta),
-        )
+            pipe = self._client.pipeline(transaction=True)
+            pipe.hset(
+                self._settings.hash_key,
+                meta_field,
+                self._dump_payload(next_meta),
+            )
+            self._execute_pipeline(pipe, operation="mark_alive", ld_name=ld_name)
+        except SourceStateCacheWriteError:
+            raise
+        except Exception as exc:
+            raise self._build_write_error(
+                operation="mark_alive",
+                ld_name=ld_name,
+                exc=exc,
+            ) from exc
 
     def mark_unavailable(
         self,
@@ -253,51 +277,59 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
     ) -> None:
         """将一个 LD/source 标记为不可用或降级状态。"""
 
-        now = datetime.now(tz=UTC)
-        observed_at = ensure_utc(observed_at)
-        meta_field = self._build_ld_meta_field(ld_name=ld_name)
-        current_meta = self._load_payload(meta_field) or {}
+        try:
+            now = datetime.now(tz=UTC)
+            observed_at = ensure_utc(observed_at)
+            meta_field = self._build_ld_meta_field(ld_name=ld_name)
+            current_meta = self._load_payload(meta_field) or {}
 
-        next_meta = {
-            **current_meta,
-            "station_id": self._settings.station_id,
-            "ld_name": ld_name,
-            "source_id": str(current_meta.get("source_id") or ld_name),
-            "availability_status": status,
-            "unavailable_reason": reason,
-            "state_updated_at": _datetime_to_iso(
-                max_datetime(
-                    _parse_datetime(current_meta.get("state_updated_at")),
-                    observed_at,
+            next_meta = {
+                **current_meta,
+                "station_id": self._settings.station_id,
+                "ld_name": ld_name,
+                "source_id": str(current_meta.get("source_id") or ld_name),
+                "availability_status": status,
+                "unavailable_reason": reason,
+                "state_updated_at": _datetime_to_iso(
+                    max_datetime(
+                        _parse_datetime(current_meta.get("state_updated_at")),
+                        observed_at,
+                    )
+                ),
+            }
+
+            pipe = self._client.pipeline(transaction=True)
+            raw_rows = self._client.hgetall(self._settings.hash_key)
+            prefix = self._build_variable_prefix(ld_name=ld_name)
+
+            for raw_field, raw_payload in raw_rows.items():
+                field = self._decode_value(raw_field)
+                if not field.startswith(prefix):
+                    continue
+
+                payload = json.loads(self._decode_value(raw_payload))
+                payload["availability_status"] = status
+                payload["updated_at"] = now.isoformat()
+                pipe.hset(
+                    self._settings.hash_key,
+                    field,
+                    self._dump_payload(payload),
                 )
-            ),
-        }
 
-        pipe = self._client.pipeline()
-        pipe.hset(
-            self._settings.hash_key,
-            meta_field,
-            self._dump_payload(next_meta),
-        )
-
-        raw_rows = self._client.hgetall(self._settings.hash_key)
-        prefix = self._build_variable_prefix(ld_name=ld_name)
-
-        for raw_field, raw_payload in raw_rows.items():
-            field = self._decode_value(raw_field)
-            if not field.startswith(prefix):
-                continue
-
-            payload = json.loads(self._decode_value(raw_payload))
-            payload["availability_status"] = status
-            payload["updated_at"] = now.isoformat()
             pipe.hset(
                 self._settings.hash_key,
-                field,
-                self._dump_payload(payload),
+                meta_field,
+                self._dump_payload(next_meta),
             )
-
-        pipe.execute()
+            self._execute_pipeline(pipe, operation="mark_unavailable", ld_name=ld_name)
+        except SourceStateCacheWriteError:
+            raise
+        except Exception as exc:
+            raise self._build_write_error(
+                operation="mark_unavailable",
+                ld_name=ld_name,
+                exc=exc,
+            ) from exc
 
     def read_snapshot(self) -> list[CachedSourceState]:
         """读取全部 LD/source 的 latest-state 快照。"""
@@ -324,15 +356,9 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
                         node_key=str(payload["node_key"]),
                         value=str(payload["value"]),
                         quality=self._optional_str(payload.get("quality")),
-                        source_timestamp=_parse_datetime(
-                            payload.get("source_timestamp")
-                        ),
-                        server_timestamp=_parse_datetime(
-                            payload.get("server_timestamp")
-                        ),
-                        client_sequence=_optional_int(
-                            payload.get("client_sequence")
-                        ),
+                        source_timestamp=_parse_datetime(payload.get("source_timestamp")),
+                        server_timestamp=_parse_datetime(payload.get("server_timestamp")),
+                        client_sequence=_optional_int(payload.get("client_sequence")),
                         updated_at=_parse_datetime(payload.get("updated_at")),
                         attributes=dict(payload.get("attributes") or {}),
                     )
@@ -341,35 +367,21 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
         snapshots: list[CachedSourceState] = []
         for ld_name in sorted(meta_payloads):
             meta = meta_payloads[ld_name]
-            values = sorted(
-                values_by_ld.get(ld_name, []),
-                key=lambda item: item.node_key,
-            )
+            values = sorted(values_by_ld.get(ld_name, []), key=lambda item: item.node_key)
 
             snapshots.append(
                 CachedSourceState(
                     ld_name=ld_name,
                     source_id=str(meta["source_id"]),
                     availability_status=str(meta["availability_status"]),
-                    unavailable_reason=self._optional_str(
-                        meta.get("unavailable_reason")
-                    ),
-                    batch_observed_at=_parse_datetime(
-                        meta.get("batch_observed_at")
-                    ),
-                    client_received_at=_parse_datetime(
-                        meta.get("client_received_at")
-                    ),
-                    client_processed_at=_parse_datetime(
-                        meta.get("client_processed_at")
-                    ),
+                    unavailable_reason=self._optional_str(meta.get("unavailable_reason")),
+                    batch_observed_at=_parse_datetime(meta.get("batch_observed_at")),
+                    client_received_at=_parse_datetime(meta.get("client_received_at")),
+                    client_processed_at=_parse_datetime(meta.get("client_processed_at")),
                     last_alive_at=_parse_datetime(meta.get("last_alive_at")),
-                    last_value_updated_at=_parse_datetime(
-                        meta.get("last_value_updated_at")
-                    ),
+                    last_value_updated_at=_parse_datetime(meta.get("last_value_updated_at")),
                     state_updated_at=(
-                        _parse_datetime(meta.get("state_updated_at"))
-                        or datetime.now(tz=UTC)
+                        _parse_datetime(meta.get("state_updated_at")) or datetime.now(tz=UTC)
                     ),
                     values=values,
                 )
@@ -384,22 +396,26 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
         batch: AcquiredNodeStateBatch,
         current_meta: dict[str, Any] | None,
         now: datetime,
+        values_updated: bool,
     ) -> dict[str, Any]:
         """构造下一版 LD meta payload。"""
 
         current_meta = current_meta or {}
+        batch_observed_at_current = ensure_utc(batch.batch_observed_at)
+        client_received_at_current = ensure_utc(batch.client_received_at)
+        client_processed_at_current = ensure_utc(batch.client_processed_at)
 
         batch_observed_at = max_datetime(
             _parse_datetime(current_meta.get("batch_observed_at")),
-            batch.batch_observed_at,
+            batch_observed_at_current,
         )
         client_received_at = max_datetime(
             _parse_datetime(current_meta.get("client_received_at")),
-            batch.client_received_at,
+            client_received_at_current,
         )
         client_processed_at = max_datetime(
             _parse_datetime(current_meta.get("client_processed_at")),
-            batch.client_processed_at,
+            client_processed_at_current,
         )
 
         return {
@@ -407,21 +423,25 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
             "station_id": self._settings.station_id,
             "ld_name": ld_name,
             "source_id": batch.source_id,
-            "availability_status": batch.availability_status,
-            "unavailable_reason": None,
+            "availability_status": (
+                batch.availability_status
+                if values_updated
+                else str(current_meta.get("availability_status") or "UNKNOWN")
+            ),
+            "unavailable_reason": None if values_updated else current_meta.get("unavailable_reason"),
             "batch_observed_at": _datetime_to_iso(batch_observed_at),
             "client_received_at": _datetime_to_iso(client_received_at),
             "client_processed_at": _datetime_to_iso(client_processed_at),
             "last_alive_at": _datetime_to_iso(
                 max_datetime(
                     _parse_datetime(current_meta.get("last_alive_at")),
-                    batch.client_processed_at,
+                    client_processed_at_current,
                 )
             ),
             "last_value_updated_at": _datetime_to_iso(
                 max_datetime(
                     _parse_datetime(current_meta.get("last_value_updated_at")),
-                    batch.client_processed_at,
+                    client_processed_at_current if values_updated else None,
                 )
             ),
             "state_updated_at": now.isoformat(),
@@ -446,15 +466,50 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
             "value": value.value,
             "quality": value.quality,
             "availability_status": batch.availability_status,
-            "batch_observed_at": batch.batch_observed_at.isoformat(),
-            "client_received_at": batch.client_received_at.isoformat(),
-            "client_processed_at": batch.client_processed_at.isoformat(),
+            "batch_observed_at": ensure_utc(batch.batch_observed_at).isoformat(),
+            "client_received_at": ensure_utc(batch.client_received_at).isoformat(),
+            "client_processed_at": ensure_utc(batch.client_processed_at).isoformat(),
             "source_timestamp": _datetime_to_iso(value.source_timestamp),
             "server_timestamp": _datetime_to_iso(value.server_timestamp),
             "client_sequence": value.client_sequence,
             "updated_at": now.isoformat(),
             "attributes": value.attributes,
         }
+
+    def _execute_pipeline(
+        self,
+        pipe: RedisPipeline,
+        *,
+        operation: str,
+        ld_name: str,
+    ) -> None:
+        """Execute one Redis pipeline and raise a stable cache error on failure."""
+
+        try:
+            pipe.execute()
+        except Exception as exc:
+            raise self._build_write_error(
+                operation=operation,
+                ld_name=ld_name,
+                exc=exc,
+            ) from exc
+
+    def _build_write_error(
+        self,
+        *,
+        operation: str,
+        ld_name: str,
+        exc: Exception,
+    ) -> SourceStateCacheWriteError:
+        """Convert one Redis client failure into a stable cache write error."""
+
+        classified = _classify_redis_error(exc)
+        message = f"{operation} failed for {ld_name}: {classified.message}"
+        return SourceStateCacheWriteError(
+            classified.error_code,
+            message,
+            retryable=classified.retryable,
+        )
 
     def _load_payload(self, field: str) -> dict[str, Any] | None:
         """读取一个 Redis hash field 并解析 JSON。"""
@@ -463,7 +518,7 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
         if raw_payload is None:
             return None
 
-        return json.loads(self._decode_value(raw_payload))
+        return cast(dict[str, Any], json.loads(self._decode_value(raw_payload)))
 
     def _build_ld_meta_field(self, *, ld_name: str) -> str:
         """构造 LD/source meta 字段名。"""
@@ -551,22 +606,88 @@ def _should_update_value(
     """判断 incoming 点值是否允许覆盖当前点值。"""
 
     if incoming.server_timestamp is not None:
-        current_server_timestamp = _parse_datetime(
-            current_payload.get("server_timestamp")
-        )
+        current_server_timestamp = _parse_datetime(current_payload.get("server_timestamp"))
         if current_server_timestamp is None:
             return True
-        return incoming.server_timestamp >= current_server_timestamp
+        return ensure_utc(incoming.server_timestamp) >= current_server_timestamp
 
     if incoming.client_sequence is not None:
-        current_client_sequence = _optional_int(
-            current_payload.get("client_sequence")
-        )
+        current_client_sequence = _optional_int(current_payload.get("client_sequence"))
         if current_client_sequence is None:
             return True
         return incoming.client_sequence >= current_client_sequence
 
     return True
+
+
+def _classify_redis_error(exc: Exception) -> ClassifiedError:
+    """Classify one Redis client failure into a stable cache error shape."""
+
+    message = str(exc).strip() or type(exc).__name__
+    normalized = message.upper()
+    class_name = type(exc).__name__.lower()
+
+    if "OOM COMMAND NOT ALLOWED" in normalized or "MAXMEMORY" in normalized:
+        return ClassifiedError(
+            error_code="redis_oom",
+            category="cache",
+            retryable=True,
+            message=message,
+        )
+    if "MISCONF" in normalized:
+        return ClassifiedError(
+            error_code="redis_misconf",
+            category="cache",
+            retryable=True,
+            message=message,
+        )
+    if "READONLY" in normalized:
+        return ClassifiedError(
+            error_code="redis_readonly",
+            category="cache",
+            retryable=True,
+            message=message,
+        )
+    if "LOADING" in normalized:
+        return ClassifiedError(
+            error_code="redis_loading",
+            category="cache",
+            retryable=True,
+            message=message,
+        )
+    if "BUSY" in normalized:
+        return ClassifiedError(
+            error_code="redis_busy",
+            category="cache",
+            retryable=True,
+            message=message,
+        )
+    if isinstance(exc, TimeoutError) or "TIMEOUT" in normalized or "TIMEOUT" in class_name.upper():
+        return ClassifiedError(
+            error_code="redis_timeout",
+            category="cache",
+            retryable=True,
+            message=message,
+        )
+    if (
+        isinstance(exc, OSError)
+        or "CONNECTION" in normalized
+        or "BROKEN PIPE" in normalized
+        or "RESET BY PEER" in normalized
+        or "CONNECTION" in class_name.upper()
+    ):
+        return ClassifiedError(
+            error_code="redis_connection_error",
+            category="cache",
+            retryable=True,
+            message=message,
+        )
+    return ClassifiedError(
+        error_code="redis_write_failed",
+        category="cache",
+        retryable=True,
+        message=message,
+    )
 
 
 def _parse_datetime(value: object) -> datetime | None:
@@ -593,5 +714,12 @@ def _optional_int(value: object) -> int | None:
 
     if value is None:
         return None
-
-    return int(value)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        return int(value)
+    return int(str(value))

@@ -10,7 +10,7 @@ from sqlalchemy import inspect
 
 from whale.ingest.config import CONFIG, PostgresDatabaseConfig, SqliteDatabaseConfig
 from whale.ingest.framework.persistence.base import Base
-from whale.ingest.framework.persistence.session import engine, session_scope
+from whale.ingest.framework.persistence.session import engine
 from whale.shared.persistence.init_db import ensure_shared_views
 
 
