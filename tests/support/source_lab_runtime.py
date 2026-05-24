@@ -37,6 +37,18 @@ def prepare_source_lab_runtime_imports() -> None:
         SOURCE_LAB_ROOT / "access" / "runners",
     )
     _ensure_namespace_package("tools.source_lab.opcua", SOURCE_LAB_ROOT / "opcua")
+    _ensure_namespace_package(
+        "tools.source_lab.protocols",
+        SOURCE_LAB_ROOT / "protocols",
+    )
+    _ensure_namespace_package(
+        "tools.source_lab.protocols.common",
+        SOURCE_LAB_ROOT / "protocols" / "common",
+    )
+    _ensure_namespace_package(
+        "tools.source_lab.protocols.modbus",
+        SOURCE_LAB_ROOT / "protocols" / "modbus",
+    )
 
 
 def import_source_lab_module(module_name: str) -> Any:

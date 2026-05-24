@@ -2,6 +2,7 @@
 
 #include <open62541/client.h>
 #include <open62541/client_config_default.h>
+#include <open62541/client_highlevel.h>
 
 #include <errno.h>
 #include <poll.h>
@@ -610,6 +611,173 @@ static bool maybe_consume_stop_command(bool *stop_requested, bool *quit_requeste
     return true;
 }
 
+/* ── WRITE support ──────────────────────────────────────────────────── */
+
+static UA_StatusCode write_variant_value(
+    UA_Client *client,
+    const UA_NodeId *node_id,
+    const char *value_type,
+    const char *value_text
+) {
+    UA_Variant variant;
+    UA_Variant_init(&variant);
+
+    if(strcmp(value_type, "bool") == 0) {
+        UA_Boolean val = (strcmp(value_text, "true") == 0 || strcmp(value_text, "1") == 0);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    } else if(strcmp(value_type, "int32") == 0) {
+        UA_Int32 val = (UA_Int32)strtol(value_text, NULL, 10);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_INT32]);
+    } else if(strcmp(value_type, "uint32") == 0) {
+        UA_UInt32 val = (UA_UInt32)strtoul(value_text, NULL, 10);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_UINT32]);
+    } else if(strcmp(value_type, "int64") == 0) {
+        UA_Int64 val = (UA_Int64)strtoll(value_text, NULL, 10);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_INT64]);
+    } else if(strcmp(value_type, "uint64") == 0) {
+        UA_UInt64 val = (UA_UInt64)strtoull(value_text, NULL, 10);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_UINT64]);
+    } else if(strcmp(value_type, "float") == 0) {
+        UA_Float val = (UA_Float)strtod(value_text, NULL);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_FLOAT]);
+    } else if(strcmp(value_type, "double") == 0) {
+        UA_Double val = strtod(value_text, NULL);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_DOUBLE]);
+    } else if(strcmp(value_type, "string") == 0) {
+        UA_String val = UA_STRING_ALLOC(value_text);
+        UA_Variant_setScalarCopy(&variant, &val, &UA_TYPES[UA_TYPES_STRING]);
+        UA_String_clear(&val);
+    } else {
+        UA_Variant_clear(&variant);
+        return UA_STATUSCODE_BADNOTSUPPORTED;
+    }
+
+    UA_StatusCode status = UA_Client_writeValueAttribute(client, *node_id, &variant);
+    UA_Variant_clear(&variant);
+    return status;
+}
+
+/* Handle one WRITE command: connect, write, disconnect, output result. */
+static void handle_write_command(char *line) {
+    /* WRITE\trequest_id\tendpoint_url\tnamespace_uri\tnode_id\tvalue_type\tvalue */
+    char *fields[8] = {0};
+    int field_count = split_fields(line, fields, 8);
+    if(field_count < 7 || strcmp(fields[0], "WRITE") != 0) {
+        fprintf(stderr, "WRITE protocol_error: field_count=%d\n", field_count);
+        printf("WRITE_RESULT\t-\t-\tok=0\tprotocol_error\tinvalid_write_command_format\n");
+        fflush(stdout);
+        return;
+    }
+
+    char *request_id = fields[1];
+    char request_id_sanitized[MAX_VALUE_TEXT_LEN]; /* fixed: was char* array */
+    char endpoint_url[MAX_VALUE_TEXT_LEN];
+    char namespace_uri[MAX_VALUE_TEXT_LEN];
+    char node_id_text[MAX_VALUE_TEXT_LEN];
+    char value_type[MAX_LINE_LEN];
+    char value_text[MAX_LINE_LEN];
+
+    sanitize_protocol_field(request_id, request_id_sanitized, sizeof(request_id_sanitized));
+    sanitize_protocol_field(fields[2], endpoint_url, sizeof(endpoint_url));
+    sanitize_protocol_field(fields[3], namespace_uri, sizeof(namespace_uri));
+    sanitize_protocol_field(fields[4], node_id_text, sizeof(node_id_text));
+    sanitize_protocol_field(fields[5], value_type, sizeof(value_type));
+    sanitize_protocol_field(fields[6], value_text, sizeof(value_text));
+
+    /* Connect */
+    UA_Client *client = UA_Client_new();
+    if(client == NULL) {
+        fprintf(stderr, "WRITE client_alloc_failed\n");
+        printf("WRITE_RESULT\t%s\t%s\tok=0\tinternal_error\tclient_alloc_failed\n",
+               request_id_sanitized, node_id_text);
+        fflush(stdout);
+        return;
+    }
+
+    UA_ClientConfig *config = UA_Client_getConfig(client);
+    UA_ClientConfig_setDefault(config);
+    disable_client_logging(config);
+    config->timeout = 10000;
+
+    UA_StatusCode status = UA_Client_connect(client, endpoint_url);
+    if(status != UA_STATUSCODE_GOOD) {
+        fprintf(stderr, "WRITE connect_failed: %s\n", UA_StatusCode_name(status));
+        printf("WRITE_RESULT\t%s\t%s\tok=0\tconnect_failed\t%s\n",
+               request_id_sanitized, node_id_text,
+               UA_StatusCode_name(status));
+        fflush(stdout);
+        UA_Client_delete(client);
+        return;
+    }
+
+    /* Resolve namespace if needed */
+    UA_UInt16 ns_index = 0;
+    if(namespace_uri[0] != '\0' && strcmp(namespace_uri, "-") != 0) {
+        UA_Client_getNamespaceIndex(client, UA_STRING((char *)(uintptr_t)namespace_uri), &ns_index);
+    }
+
+    /* Parse node id */
+    UA_NodeId node_id;
+    UA_StatusCode parse_status = parse_or_build_node_id(node_id_text, ns_index, &node_id);
+    if(parse_status != UA_STATUSCODE_GOOD) {
+        fprintf(stderr, "WRITE nodeid_parse_failed: %s\n", UA_StatusCode_name(parse_status));
+        printf("WRITE_RESULT\t%s\t%s\tok=0\tnodeid_parse_failed\t%s\n",
+               request_id_sanitized, node_id_text,
+               UA_StatusCode_name(parse_status));
+        fflush(stdout);
+        UA_Client_disconnect(client);
+        UA_Client_delete(client);
+        return;
+    }
+
+    /* Write */
+    UA_StatusCode write_status = write_variant_value(client, &node_id, value_type, value_text);
+
+    char status_code_buf[MAX_STATUS_TEXT_LEN];
+    sanitize_protocol_field(UA_StatusCode_name(write_status), status_code_buf, sizeof(status_code_buf));
+
+    fprintf(stderr, "WRITE done: node=%s type=%s value=%s status=%s\n",
+            node_id_text, value_type, value_text,
+            write_status == UA_STATUSCODE_GOOD ? "GOOD" : UA_StatusCode_name(write_status));
+    printf("WRITE_RESULT\t%s\t%s\tok=%d\t%s\tvalue_type=%s\n",
+           request_id_sanitized, node_id_text,
+           write_status == UA_STATUSCODE_GOOD ? 1 : 0,
+           write_status == UA_STATUSCODE_GOOD ? "OK" : status_code_buf,
+           value_type);
+    fflush(stdout);
+
+    UA_NodeId_clear(&node_id);
+    UA_Client_disconnect(client);
+    UA_Client_delete(client);
+}
+
+static bool try_handle_non_poll_command(bool *quit_requested) {
+    struct pollfd poll_fd = {.fd = 0, .events = POLLIN, .revents = 0};
+    int poll_result = poll(&poll_fd, 1, 0);
+    if(poll_result <= 0 || (poll_fd.revents & POLLIN) == 0) {
+        return true;
+    }
+
+    char line[MAX_LINE_LEN];
+    if(fgets(line, sizeof(line), stdin) == NULL) {
+        *quit_requested = true;
+        return false;
+    }
+    strip_newline(line);
+    if(line[0] == '\0') {
+        return true;
+    }
+    if(strcmp(line, "QUIT") == 0) {
+        *quit_requested = true;
+        return false;
+    }
+    if(strncmp(line, "WRITE\t", 6) == 0) {
+        handle_write_command(line);
+        return true;
+    }
+    return true;
+}
+
 static int run_serial_loop(void) {
     printf("READY\n");
     fflush(stdout);
@@ -622,6 +790,11 @@ static int run_serial_loop(void) {
         }
         if(strcmp(line, "QUIT") == 0) {
             return 0;
+        }
+        /* Handle WRITE command (non-polling) */
+        if(strncmp(line, "WRITE\t", 6) == 0) {
+            handle_write_command(line);
+            continue;
         }
 
         char *fields[8] = {0};
@@ -827,9 +1000,20 @@ static int run_serial_loop(void) {
     return 0;
 }
 
+static void print_version(void) {
+    printf("open62541_client_runner 1.1.0\n");
+    printf("protocol: stdin/stdout serial polling + write\n");
+    printf("stdin commands: START_SERIAL_POLL, STOP_POLL, WRITE, QUIT\n");
+    printf("stdout prefixes: READY, RESULT, VALUE, WRITE_RESULT, RUNNER_SUMMARY, POLL_DONE, ERROR\n");
+}
+
 int main(int argc, char **argv) {
+    if(argc == 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0)) {
+        print_version();
+        return 0;
+    }
     if(argc != 1) {
-        fprintf(stderr, "usage: %s\n", argv[0]);
+        fprintf(stderr, "usage: %s [--version|-v]\n", argv[0]);
         return 2;
     }
     return run_serial_loop();

@@ -43,7 +43,7 @@ _IMPLEMENTATION_LEVELS = {
     "planned_native_runner",
 }
 
-_ACCESS_MODES = {"polling", "streaming"}
+_ACCESS_MODES = {"polling", "streaming", "write"}
 
 
 # ── SERVICE_CAPABILITIES integrity ──────────────────────────────────
@@ -88,9 +88,9 @@ def test_all_service_capabilities_have_valid_access_mode() -> None:
 
 
 def test_service_capabilities_count() -> None:
-    """Expect a specific number of service capabilities (12 services)."""
-    # Current count: 2 OPC_UA + 2 MODBUS + 2 IEC101 + 2 IEC104
-    #   + 1 MMS_READ + 1 REPORT + 1 GOOSE + 1 SV + 1 MQTT + 2 HTTP_REST = 15
+    """Expect a specific number of service capabilities."""
+    # Current count: 3 OPC_UA (READ + SUBSCRIBE + WRITE) + 2 MODBUS + 2 IEC101
+    #   + 2 IEC104 + 1 MMS_READ + 1 REPORT + 1 GOOSE + 1 SV + 1 MQTT + 2 HTTP_REST = 16
     services = list_service_capabilities()
     assert len(services) >= 12, f"expected at least 12 services, got {len(services)}"
 
@@ -335,6 +335,54 @@ def test_goose_and_sv_use_ethernet_l2_transport() -> None:
 
 
 # ── Protocol capability entry field integrity ────────────────────────
+
+
+# ── Write operation field integrity ────────────────────────────────
+
+
+def test_all_protocols_have_write_operation_fields() -> None:
+    """Every PROTOCOL_CAPABILITIES entry must have supported/unsupported write operation fields."""
+    for name, cap in PROTOCOL_CAPABILITIES.items():
+        assert "supported_write_operations" in cap, f"{name}: missing supported_write_operations"
+        assert "unsupported_write_operations" in cap, f"{name}: missing unsupported_write_operations"
+        supported = cap.get("supported_write_operations", ())
+        unsupported = cap.get("unsupported_write_operations", ())
+        assert isinstance(supported, (tuple, list)), f"{name}: supported_write_operations must be tuple/list"
+        assert isinstance(unsupported, (tuple, list)), f"{name}: unsupported_write_operations must be tuple/list"
+
+
+def test_modbus_tcp_write_operations_are_explicit() -> None:
+    """Modbus TCP must list FC06 as supported, FC05/FC15/FC16 as unsupported."""
+    cap = PROTOCOL_CAPABILITIES["modbus_tcp"]
+    supported = set(cap.get("supported_write_operations", ()))
+    assert "FC06_single_register_write" in supported, (
+        "modbus_tcp must declare FC06_single_register_write in supported_write_operations"
+    )
+    unsupported = set(cap.get("unsupported_write_operations", ()))
+    for fc in ("FC05_single_coil_write", "FC15_multi_coil_write", "FC16_multi_register_write"):
+        assert fc in unsupported, (
+            f"modbus_tcp must declare {fc} in unsupported_write_operations"
+        )
+
+
+def test_production_client_write_protocols_have_supported_operations() -> None:
+    """Protocols with production_client_write=True must have non-empty supported_write_operations."""
+    for name, cap in PROTOCOL_CAPABILITIES.items():
+        if cap.get("production_client_write") is True:
+            supported = cap.get("supported_write_operations", ())
+            assert len(supported) >= 1, (
+                f"{name}: production_client_write=True but supported_write_operations is empty"
+            )
+
+
+def test_production_client_write_false_protocols_have_empty_supported_operations() -> None:
+    """Protocols with production_client_write=False must have empty supported_write_operations."""
+    for name, cap in PROTOCOL_CAPABILITIES.items():
+        if cap.get("production_client_write") is False:
+            supported = cap.get("supported_write_operations", ())
+            assert len(supported) == 0, (
+                f"{name}: production_client_write=False but supported_write_operations={supported}"
+            )
 
 
 def test_all_protocol_capabilities_have_triple_fields() -> None:

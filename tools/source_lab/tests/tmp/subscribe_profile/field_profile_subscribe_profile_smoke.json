@@ -19,23 +19,23 @@
   "report_path": "/home/luosh/Whale/tools/source_lab/tests/tmp/subscribe_profile/field_profile_subscribe_profile_smoke.txt",
   "pyinstrument_path": null,
   "metrics": {
-    "p95_ms": 50.045,
-    "max_ms": 52.067,
+    "p95_ms": 50.065,
+    "max_ms": 52.114,
     "response_period_observable": true,
     "response_period_kind": "data_notify_proxy",
-    "response_p95_ms": 50.045,
-    "response_max_ms": 52.067,
-    "data_p95_ms": 50.035,
-    "data_max_ms": 52.044,
+    "response_p95_ms": 50.065,
+    "response_max_ms": 52.114,
+    "data_p95_ms": 50.059,
+    "data_max_ms": 52.073,
     "effective_source_update_hz": 20.0,
-    "recv_period_p95_ms": 50.045,
-    "recv_period_max_ms": 52.067,
-    "callback_to_flush_lag_p95_ms": 0.025,
-    "callback_to_flush_lag_max_ms": 0.062,
-    "dispatch_gap_max_ms": 2.265,
-    "run_iterate_duration_max_ms": 0.18,
-    "source_period_p95_ms": 50.047,
-    "source_period_max_ms": 50.425,
+    "recv_period_p95_ms": 50.065,
+    "recv_period_max_ms": 52.114,
+    "callback_to_flush_lag_p95_ms": 0.026,
+    "callback_to_flush_lag_max_ms": 0.135,
+    "dispatch_gap_max_ms": 3.338,
+    "run_iterate_duration_max_ms": 0.17,
+    "source_period_p95_ms": 50.048,
+    "source_period_max_ms": 51.338,
     "notification_count": 1201,
     "value_count": 3603,
     "keepalive_count": 0,
@@ -51,121 +51,121 @@
       {
         "global_index": 5,
         "local_index": 5,
-        "previous_notify_timestamp_ns": 242057864277000,
-        "notify_timestamp_ns": 242057916321000,
-        "period_ms": 52.044
+        "previous_notify_timestamp_ns": 306414552079000,
+        "notify_timestamp_ns": 306414604152000,
+        "period_ms": 52.073
       },
       {
-        "global_index": 3,
-        "local_index": 3,
-        "previous_notify_timestamp_ns": 242056950302000,
-        "notify_timestamp_ns": 242057002328000,
-        "period_ms": 52.026
+        "global_index": 9,
+        "local_index": 9,
+        "previous_notify_timestamp_ns": 306414278121000,
+        "notify_timestamp_ns": 306414330179000,
+        "period_ms": 52.058
       },
       {
-        "global_index": 3,
-        "local_index": 3,
-        "previous_notify_timestamp_ns": 242055950328000,
-        "notify_timestamp_ns": 242056002349000,
-        "period_ms": 52.021
+        "global_index": 2,
+        "local_index": 2,
+        "previous_notify_timestamp_ns": 306414432075000,
+        "notify_timestamp_ns": 306414484132000,
+        "period_ms": 52.057
       },
       {
-        "global_index": 8,
-        "local_index": 8,
-        "previous_notify_timestamp_ns": 242059384323000,
-        "notify_timestamp_ns": 242059436337000,
-        "period_ms": 52.014
+        "global_index": 9,
+        "local_index": 9,
+        "previous_notify_timestamp_ns": 306414828119000,
+        "notify_timestamp_ns": 306414880172000,
+        "period_ms": 52.053
       },
       {
         "global_index": 5,
         "local_index": 5,
-        "previous_notify_timestamp_ns": 242058664318000,
-        "notify_timestamp_ns": 242058716331000,
-        "period_ms": 52.013
+        "previous_notify_timestamp_ns": 306409152025000,
+        "notify_timestamp_ns": 306409204055000,
+        "period_ms": 52.03
       }
     ],
     "top_data_period_gap_traces": [
       {
         "global_index": 5,
         "local_index": 5,
-        "previous_notify_timestamp_ns": 242057864277000,
-        "notify_timestamp_ns": 242057916321000,
-        "period_ms": 52.044
+        "previous_notify_timestamp_ns": 306414552079000,
+        "notify_timestamp_ns": 306414604152000,
+        "period_ms": 52.073
       },
       {
-        "global_index": 3,
-        "local_index": 3,
-        "previous_notify_timestamp_ns": 242056950302000,
-        "notify_timestamp_ns": 242057002328000,
-        "period_ms": 52.026
+        "global_index": 9,
+        "local_index": 9,
+        "previous_notify_timestamp_ns": 306414278121000,
+        "notify_timestamp_ns": 306414330179000,
+        "period_ms": 52.058
       },
       {
-        "global_index": 3,
-        "local_index": 3,
-        "previous_notify_timestamp_ns": 242055950328000,
-        "notify_timestamp_ns": 242056002349000,
-        "period_ms": 52.021
+        "global_index": 2,
+        "local_index": 2,
+        "previous_notify_timestamp_ns": 306414432075000,
+        "notify_timestamp_ns": 306414484132000,
+        "period_ms": 52.057
       },
       {
-        "global_index": 8,
-        "local_index": 8,
-        "previous_notify_timestamp_ns": 242059384323000,
-        "notify_timestamp_ns": 242059436337000,
-        "period_ms": 52.014
+        "global_index": 9,
+        "local_index": 9,
+        "previous_notify_timestamp_ns": 306414828119000,
+        "notify_timestamp_ns": 306414880172000,
+        "period_ms": 52.053
       },
       {
         "global_index": 5,
         "local_index": 5,
-        "previous_notify_timestamp_ns": 242058664318000,
-        "notify_timestamp_ns": 242058716331000,
-        "period_ms": 52.013
+        "previous_notify_timestamp_ns": 306409152025000,
+        "notify_timestamp_ns": 306409204055000,
+        "period_ms": 52.03
       }
     ],
     "top_flush_lag_traces": [
       {
-        "global_index": 3,
-        "local_index": 3,
-        "notify_timestamp_ns": 242056002349000,
-        "flush_timestamp_ns": 242056002411000,
-        "lag_ms": 0.062
+        "global_index": 0,
+        "local_index": 0,
+        "notify_timestamp_ns": 306412220105000,
+        "flush_timestamp_ns": 306412220240000,
+        "lag_ms": 0.135
+      },
+      {
+        "global_index": 4,
+        "local_index": 4,
+        "notify_timestamp_ns": 306409996107000,
+        "flush_timestamp_ns": 306409996209000,
+        "lag_ms": 0.102
+      },
+      {
+        "global_index": 9,
+        "local_index": 9,
+        "notify_timestamp_ns": 306414880172000,
+        "flush_timestamp_ns": 306414880247000,
+        "lag_ms": 0.075
       },
       {
         "global_index": 6,
         "local_index": 6,
-        "notify_timestamp_ns": 242054822366000,
-        "flush_timestamp_ns": 242054822426000,
-        "lag_ms": 0.06
+        "notify_timestamp_ns": 306414610107000,
+        "flush_timestamp_ns": 306414610178000,
+        "lag_ms": 0.071
       },
       {
-        "global_index": 6,
-        "local_index": 6,
-        "notify_timestamp_ns": 242058472357000,
-        "flush_timestamp_ns": 242058472414000,
-        "lag_ms": 0.057
-      },
-      {
-        "global_index": 8,
-        "local_index": 8,
-        "notify_timestamp_ns": 242055634392000,
-        "flush_timestamp_ns": 242055634448000,
-        "lag_ms": 0.056
-      },
-      {
-        "global_index": 6,
-        "local_index": 6,
-        "notify_timestamp_ns": 242055572396000,
-        "flush_timestamp_ns": 242055572450000,
-        "lag_ms": 0.054
+        "global_index": 4,
+        "local_index": 4,
+        "notify_timestamp_ns": 306414546130000,
+        "flush_timestamp_ns": 306414546193000,
+        "lag_ms": 0.063
       }
     ],
     "top_dispatch_gap_traces": [
       {
-        "global_index": 5,
-        "local_index": 5,
+        "global_index": 8,
+        "local_index": 8,
         "notification_count": 120,
         "run_iterate_count": 3001,
-        "max_dispatch_gap_ms": 2.265,
-        "max_run_iterate_duration_ms": 0.064,
+        "max_dispatch_gap_ms": 3.338,
+        "max_run_iterate_duration_ms": 0.047,
         "revised_publishing_interval_ms": 50.0,
         "revised_sampling_interval_ms": 50.0
       },
@@ -174,18 +174,8 @@
         "local_index": 0,
         "notification_count": 120,
         "run_iterate_count": 3001,
-        "max_dispatch_gap_ms": 2.262,
-        "max_run_iterate_duration_ms": 0.056,
-        "revised_publishing_interval_ms": 50.0,
-        "revised_sampling_interval_ms": 50.0
-      },
-      {
-        "global_index": 2,
-        "local_index": 2,
-        "notification_count": 120,
-        "run_iterate_count": 3001,
-        "max_dispatch_gap_ms": 2.262,
-        "max_run_iterate_duration_ms": 0.047,
+        "max_dispatch_gap_ms": 3.337,
+        "max_run_iterate_duration_ms": 0.142,
         "revised_publishing_interval_ms": 50.0,
         "revised_sampling_interval_ms": 50.0
       },
@@ -194,18 +184,28 @@
         "local_index": 3,
         "notification_count": 120,
         "run_iterate_count": 3001,
-        "max_dispatch_gap_ms": 2.185,
-        "max_run_iterate_duration_ms": 0.083,
+        "max_dispatch_gap_ms": 3.337,
+        "max_run_iterate_duration_ms": 0.063,
         "revised_publishing_interval_ms": 50.0,
         "revised_sampling_interval_ms": 50.0
       },
       {
-        "global_index": 6,
-        "local_index": 6,
+        "global_index": 2,
+        "local_index": 2,
         "notification_count": 120,
         "run_iterate_count": 3001,
-        "max_dispatch_gap_ms": 2.185,
-        "max_run_iterate_duration_ms": 0.103,
+        "max_dispatch_gap_ms": 3.333,
+        "max_run_iterate_duration_ms": 0.059,
+        "revised_publishing_interval_ms": 50.0,
+        "revised_sampling_interval_ms": 50.0
+      },
+      {
+        "global_index": 7,
+        "local_index": 7,
+        "notification_count": 120,
+        "run_iterate_count": 3001,
+        "max_dispatch_gap_ms": 3.331,
+        "max_run_iterate_duration_ms": 0.051,
         "revised_publishing_interval_ms": 50.0,
         "revised_sampling_interval_ms": 50.0
       }

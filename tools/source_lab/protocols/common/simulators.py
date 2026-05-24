@@ -110,6 +110,15 @@ class ModbusTcpSimulator(_TcpThreadedSimulator):
         tid, pid, _length, unit_id, function_code, start_addr, quantity = struct.unpack(
             ">HHHBBHH", request[:12]
         )
+        if function_code == 6:
+            # FC06: write single register
+            reg_addr = start_addr
+            reg_value = quantity  # In FC06, the 4th field is the value, not quantity
+            self._values[str(reg_addr)] = reg_value
+            # Echo response for FC06
+            pdu = struct.pack(">BHH", function_code, reg_addr, reg_value)
+            mbap = struct.pack(">HHHB", tid, pid, len(pdu) + 1, unit_id)
+            return mbap + pdu
         if function_code != 3:
             return struct.pack(">HHHBBB", tid, pid, 3, unit_id, function_code | 0x80, 1)
         registers = []

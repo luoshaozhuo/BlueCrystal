@@ -9,6 +9,7 @@ from whale.shared.source.models import Batch, SourceConnectionProfile
 from whale.shared.source.opcua.backends import (
     PreparedReadPlan,
     RawOpcUaReadResult,
+    RawWriteItemResult,
     build_client_backend,
 )
 
@@ -48,6 +49,32 @@ class OpcUaSourceReader:
         """Execute one prepared raw read."""
 
         return await self._backend.read_prepared_raw(plan)
+
+    async def write(
+        self,
+        node_id: str,
+        value_type: str,
+        value: str,
+        *,
+        request_id: str = "",
+    ) -> RawWriteItemResult:
+        """Write one value to an OPC UA node.
+
+        Args:
+            node_id: Target OPC UA node ID.
+            value_type: Type hint (bool, int32, uint32, float, double, string).
+            value: String-encoded value.
+            request_id: Optional caller-supplied request ID.
+
+        Returns:
+            Per-item write result.
+        """
+        return await self._backend.write(
+            node_id=node_id,
+            value_type=value_type,
+            value=value,
+            request_id=request_id,
+        )
 
     async def read(
         self,

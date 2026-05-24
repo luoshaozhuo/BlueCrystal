@@ -15,6 +15,7 @@ from whale.shared.source.opcua.backends.base import (
     PreparedReadPlan,
     RawDataValue,
     RawOpcUaReadResult,
+    RawWriteItemResult,
 )
 
 _CONNECT_TIMEOUT_FACTOR: Final[float] = 2.0
@@ -24,6 +25,7 @@ _RESULT_RESPONSE_PREFIX: Final[str] = "RESULT"
 _VALUE_RESPONSE_PREFIX: Final[str] = "VALUE"
 _RUNNER_SUMMARY_PREFIX: Final[str] = "RUNNER_SUMMARY"
 _POLL_DONE_RESPONSE_PREFIX: Final[str] = "POLL_DONE"
+_WRITE_RESULT_RESPONSE_PREFIX: Final[str] = "WRITE_RESULT"
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,6 +334,72 @@ class Open62541OpcUaClientBackend:
             exception=None if summary_seen else "missing_summary",
         )
 
+    async def write(
+        self,
+        node_id: str,
+        value_type: str,
+        value: str,
+        *,
+        request_id: str = "",
+    ) -> RawWriteItemResult:
+        """Write one value to an OPC UA node via the runner subprocess.
+
+        The runner connects to the endpoint configured in the connection profile,
+        writes the value, and disconnects.  A fresh runner process is started if
+        the backend is not currently connected.
+        """
+        if not self._connected or self._runner is None:
+            await self.connect()
+
+        async with self._io_lock:
+            self._ensure_connected()
+            runner = self._runner
+            assert runner is not None
+            if runner.stdin is None or runner.stdout is None:
+                raise RuntimeError("open62541 client runner pipes are unavailable")
+
+            endpoint = self._connection.endpoint
+            namespace_uri = self._connection.namespace_uri or "-"
+            safe_request_id = request_id or "cli"
+            runner.stdin.write(
+                (
+                    f"WRITE\t{safe_request_id}\t{endpoint}\t{namespace_uri}\t"
+                    f"{node_id}\t{value_type}\t{value}\n"
+                ).encode("utf-8")
+            )
+            await runner.stdin.drain()
+
+            timeout_s = max(self._connection.timeout_seconds * 2.0, 5.0)
+            line = await self._read_protocol_line(
+                expected_prefixes=(_WRITE_RESULT_RESPONSE_PREFIX, "ERROR"),
+                timeout_seconds=timeout_s,
+            )
+
+            if line.startswith("ERROR"):
+                return RawWriteItemResult(
+                    node_id=node_id,
+                    ok=False,
+                    status_code="runner_error",
+                    error_message=line,
+                    value_type=value_type,
+                )
+
+            return self._parse_write_result_line(line, node_id, value_type)
+
+    async def write_batch(
+        self,
+        items: Sequence[tuple[str, str, str]],
+        *,
+        request_id: str = "",
+    ) -> list[RawWriteItemResult]:
+        """Write multiple values sequentially, returning per-item results."""
+        results: list[RawWriteItemResult] = []
+        for idx, (node_id, value_type, value) in enumerate(items):
+            item_rid = f"{request_id}_{idx}" if request_id else f"batch_{idx}"
+            result = await self.write(node_id, value_type, value, request_id=item_rid)
+            results.append(result)
+        return results
+
     def _ensure_connected(self) -> None:
         if not self._connected or self._runner is None:
             raise RuntimeError("open62541 OPC UA client backend is not connected")
@@ -396,4 +464,41 @@ class Open62541OpcUaClientBackend:
             value_text="" if fields[6] == "-" else fields[6],
             source_timestamp=_datetime_from_runner_timestamp(fields[7]),
             server_timestamp=_datetime_from_runner_timestamp(fields[8]),
+        )
+
+    def _parse_write_result_line(
+        self,
+        line: str,
+        expected_node_id: str,
+        expected_value_type: str,
+    ) -> RawWriteItemResult:
+        """Parse a WRITE_RESULT line from the runner.
+
+        Expected format::
+            WRITE_RESULT\\t<request_id>\\t<node_id>\\tok=<0|1>\\t<status>\\t<value_type=<type>>
+        """
+        fields = line.split("\t")
+        if len(fields) < 4 or fields[0] != _WRITE_RESULT_RESPONSE_PREFIX:
+            return RawWriteItemResult(
+                node_id=expected_node_id,
+                ok=False,
+                status_code="protocol_error",
+                error_message=f"Unexpected WRITE_RESULT format: {line!r}",
+                value_type=expected_value_type,
+            )
+
+        node_id = fields[2] if len(fields) > 2 else expected_node_id
+        ok_field = fields[3] if len(fields) > 3 else "ok=0"
+        ok = ok_field == "ok=1"
+        status = fields[4] if len(fields) > 4 else None
+        value_type = expected_value_type
+        if len(fields) > 5 and fields[5].startswith("value_type="):
+            value_type = fields[5].split("=", 1)[1]
+
+        return RawWriteItemResult(
+            node_id=node_id,
+            ok=ok,
+            status_code="OK" if ok else status,
+            error_message=None if ok else (status or "write_failed"),
+            value_type=value_type,
         )

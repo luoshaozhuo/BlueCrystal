@@ -6,6 +6,7 @@ from whale.shared.source.opcua.backends.base import (
     PreparedReadPlan,
     RawDataValue,
     RawOpcUaReadResult,
+    RawWriteItemResult,
 )
 from whale.shared.source.opcua.backends.factory import (
     build_client_backend,
@@ -21,6 +22,7 @@ __all__ = [
     "PreparedReadPlan",
     "RawDataValue",
     "RawOpcUaReadResult",
+    "RawWriteItemResult",
     "build_client_backend",
     "normalize_client_backend_name",
     "resolve_client_backend_name",

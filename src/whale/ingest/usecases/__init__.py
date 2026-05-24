@@ -4,5 +4,8 @@
 """
 
 from whale.ingest.usecases.source_acquisition_use_case import SourceAcquisitionUseCase
+from whale.ingest.usecases.state_snapshot_publish_use_case import (
+    StateSnapshotPublishUseCase,
+)
 
-__all__ = ["SourceAcquisitionUseCase"]
+__all__ = ["SourceAcquisitionUseCase", "StateSnapshotPublishUseCase"]

@@ -61,9 +61,20 @@ class RawOpcUaReadResult:
     retry_count: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class RawWriteItemResult:
+    """Result of writing one value to an OPC UA node."""
+
+    node_id: str
+    ok: bool
+    status_code: str | None
+    error_message: str | None
+    value_type: str | None = None
+
+
 @runtime_checkable
 class OpcUaClientBackend(Protocol):
-    """Protocol for OPC UA client backend used by raw polling."""
+    """Protocol for OPC UA client backend used by raw polling and write."""
 
     async def connect(self) -> None:
         """Open backend connection."""
@@ -83,3 +94,23 @@ class OpcUaClientBackend(Protocol):
         plan: PreparedReadPlan,
     ) -> RawOpcUaReadResult:
         """Read prepared DataValues without constructing Batch."""
+
+    async def write(
+        self,
+        node_id: str,
+        value_type: str,
+        value: str,
+        *,
+        request_id: str = "",
+    ) -> RawWriteItemResult:
+        """Write one value to an OPC UA node.
+
+        Args:
+            node_id: Target OPC UA node ID string.
+            value_type: Type hint for the value (bool, int32, uint32, float, double, string).
+            value: String-encoded value to write.
+            request_id: Optional caller-supplied request identifier.
+
+        Returns:
+            Per-item write result.
+        """
