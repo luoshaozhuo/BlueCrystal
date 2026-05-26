@@ -36,6 +36,53 @@ ai_shared/reports/requirements_trace_update_20260526_source_lab_ingest_round2.md
 ai_shared/reports/requirements_trace_update_20260526_source_lab_ingest_round3_final_closure.md — 第3轮最终收口报告
 ai_shared/reports/requirements_trace_ci_deployment_validation_20260526.md — CI与部署态运行归档
 ai_shared/reports/source_lab_ingest_environment_validation_final_archive_20260526.md — 环境型最终运行归档
+ai_shared/reports/source_lab_dynamic_endpoint_runtime_round1_report.md — source_lab动态runtime第1轮报告
+ai_shared/reports/source_lab_dynamic_endpoint_runtime_round2_report.md — source_lab动态runtime第2轮报告
+ai_shared/reports/source_lab_dynamic_endpoint_runtime_round3_final_closure_report.md — source_lab动态runtime第3轮最终收口报告
+ai_shared/reports/source_lab_dynamic_endpoint_runtime_permission_and_state_store_closure_report.md — source_lab动态runtime第4轮权限与状态存储归档
+ai_shared/reports/source_lab_goose_sv_dynamic_raw_socket_gate_report.md — GOOSE/SV raw-socket门禁报告
+ai_shared/reports/source_lab_goose_sv_dynamic_raw_socket_gate_20260526.log — GOOSE/SV raw-socket门禁日志
+ai_shared/reports/source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_report.md — GOOSE/SV setcap后raw-socket门禁报告
+ai_shared/reports/source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_20260526.log — GOOSE/SV setcap后lo门禁日志
+ai_shared/reports/source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_20260526_eth0.log — GOOSE/SV setcap后eth0门禁日志
+ai_shared/reports/source_lab_goose_sv_dynamic_raw_socket_event_sample_diagnostics_report.md — GOOSE/SV event/sample诊断报告
+ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md — GOOSE/SV可控L2与subscriber收口报告
+ai_shared/reports/source_lab_dynamic_endpoint_runtime_final_true_pass_closure_report.md — 动态runtime最终true PASS报告
+scripts/source_lab_l2_test_env.sh — 可控L2 veth测试环境脚本
+scripts/run_source_lab_l2_standalone_gate.sh — GOOSE/SV standalone L2门禁脚本
+tools/source_lab/tests/access/test_iec61850_l2_native_runner_failure_modes.py — L2 native失败模式测试
+tools/source_lab/access/runtime/__init__.py                — 动态runtime包导出
+tools/source_lab/access/runtime/dynamic_cli.py             — 动态runtime最小CLI
+tools/source_lab/access/runtime/endpoint_runtime.py        — endpoint运行时模型
+tools/source_lab/access/runtime/endpoint_registry.py       — endpoint注册表与恢复
+tools/source_lab/access/runtime/native_interactive_control.py — native交互控制边界元数据
+tools/source_lab/access/runtime/session_manager.py         — endpoint会话替换管理
+tools/source_lab/access/runtime/stagger_coordinator.py     — endpoint错峰offset管理
+tools/source_lab/access/runtime/continuity_model.py        — 连续性指标模型
+tools/source_lab/access/runtime/continuity_monitor.py      — 连续性指标监控
+tools/source_lab/access/runtime/state_store.py             — runtime文件状态存储
+tools/source_lab/access/runtime/operation_journal.py       — 动态操作审计日志
+tools/source_lab/tests/test_fleet_partial_lifecycle.py     — fleet局部生命周期测试
+tools/source_lab/tests/access/_dynamic_runtime_test_utils.py — 动态runtime测试辅助
+tools/source_lab/tests/access/test_dynamic_operation_journal_audit.py — 动态审计日志测试
+tools/source_lab/tests/access/test_dynamic_endpoint_patch_matrix.py — 动态patch矩阵测试
+tools/source_lab/tests/access/test_dynamic_runtime_state_store_resilience.py — runtime状态存储韧性测试
+tools/source_lab/tests/access/test_dynamic_opcua_polling_endpoint_adjustment.py — OPC UA polling隔离测试
+tools/source_lab/tests/access/test_dynamic_opcua_subscription_endpoint_adjustment.py — OPC UA订阅隔离测试
+tools/source_lab/tests/access/test_dynamic_native_runner_isolation.py — native runner隔离测试
+tools/source_lab/tests/access/test_dynamic_cli.py — 动态CLI测试
+tools/source_lab/tests/access/test_dynamic_cli_accepted_state.py — accepted-state CLI测试
+tools/source_lab/tests/access/test_dynamic_iec61850_report_endpoint_adjustment.py — IEC61850 Report隔离测试
+tools/source_lab/tests/access/test_dynamic_goose_sv_streaming_endpoint_adjustment.py — GOOSE/SV动态隔离测试
+tools/source_lab/tests/access/test_dynamic_goose_sv_permission_gate.py — GOOSE/SV权限门禁测试
+tools/source_lab/tests/access/test_dynamic_native_interactive_control_boundary.py — native交互边界测试
+tools/source_lab/tests/access/test_dynamic_polling_endpoint_adjustment.py — 动态polling局部调整测试
+tools/source_lab/tests/access/test_dynamic_subscription_endpoint_adjustment.py — 动态订阅局部调整测试
+tools/source_lab/tests/access/test_dynamic_runtime_state_recovery.py — 动态runtime恢复测试
+tools/source_lab/tests/access/test_dynamic_runtime_state_store_integrity.py — runtime状态完整性测试
+tools/source_lab/tests/access/test_dynamic_runtime_state_store_retention.py — runtime状态备份保留测试
+tools/source_lab/tests/access/test_dynamic_runtime_state_store_repair_cli.py — runtime状态修复CLI测试
+scripts/run_source_lab_raw_socket_dynamic_gate.sh — raw socket动态门禁脚本
 ```
 
 ## 根目录
@@ -411,6 +458,17 @@ tools/source_lab/
 │   │   ├── scan.py                    — 订阅扫描
 │   │   └── worker.py                  — 订阅 Worker
 │   │
+│   ├── runtime/                       — endpoint级动态运行时
+│   │   ├── __init__.py
+│   │   ├── endpoint_runtime.py        — endpoint运行时模型
+│   │   ├── endpoint_registry.py       — endpoint动态注册表
+│   │   ├── session_manager.py         — endpoint会话管理
+│   │   ├── stagger_coordinator.py     — endpoint错峰协调
+│   │   ├── continuity_model.py        — 连续性指标模型
+│   │   ├── continuity_monitor.py      — 连续性指标监控
+│   │   ├── state_store.py             — runtime文件状态存储
+│   │   └── operation_journal.py       — 动态操作日志
+│   │
 │   ├── providers/                     — 数据提供者
 │   │   ├── __init__.py
 │   │   ├── base.py                    — 提供者基类
@@ -508,6 +566,7 @@ tools/source_lab/
     │   ├── __init__.py
     │   └── sources.py                  — 测试数据源定义
     ├── test_factory.py                 — 工厂测试
+    ├── test_fleet_partial_lifecycle.py — fleet局部生命周期测试
     ├── test_fleet_startup_controls.py  — 机群启动控制测试
     ├── test_open62541_source_simulation_single_server_smoke.py  — 单服务器冒烟
     ├── test_source_simulation_multi_server_polling_capacity.py  — 多服务器轮询容量
@@ -541,9 +600,28 @@ tools/source_lab/
         ├── test_all_protocols_streaming_capacity.py  — 全协议流式容量
         ├── test_all_protocols_streaming_profile.py   — 全协议流式画像
         ├── test_capacity_progress.py   — 容量进度测试
-        ├── test_capacity_reporter.py   — 容量报告器测试
+	        ├── test_capacity_reporter.py   — 容量报告器测试
         ├── test_capacity_rows.py       — 容量行格式化测试
         ├── test_capacity_service.py    — 容量服务测试
+        ├── _dynamic_runtime_test_utils.py — 动态runtime测试辅助
+        ├── test_dynamic_cli.py         — 动态CLI测试
+        ├── test_dynamic_cli_accepted_state.py — accepted-state CLI测试
+        ├── test_dynamic_endpoint_patch_matrix.py — 动态patch矩阵测试
+        ├── test_dynamic_goose_sv_streaming_endpoint_adjustment.py — GOOSE/SV动态隔离测试
+        ├── test_dynamic_goose_sv_permission_gate.py — GOOSE/SV权限门禁测试
+        ├── test_dynamic_iec61850_report_endpoint_adjustment.py — IEC61850 Report隔离测试
+        ├── test_dynamic_native_interactive_control_boundary.py — native交互边界测试
+        ├── test_dynamic_native_runner_isolation.py — native runner隔离测试
+        ├── test_dynamic_opcua_polling_endpoint_adjustment.py — OPC UA polling隔离测试
+        ├── test_dynamic_opcua_subscription_endpoint_adjustment.py — OPC UA订阅隔离测试
+        ├── test_dynamic_operation_journal_audit.py — 动态审计日志测试
+        ├── test_dynamic_polling_endpoint_adjustment.py — 动态polling局部调整测试
+        ├── test_dynamic_runtime_state_store_resilience.py — runtime状态存储韧性测试
+        ├── test_dynamic_runtime_state_store_integrity.py — runtime状态完整性测试
+        ├── test_dynamic_runtime_state_store_retention.py — runtime状态备份保留测试
+        ├── test_dynamic_runtime_state_store_repair_cli.py — runtime状态修复CLI测试
+        ├── test_dynamic_subscription_endpoint_adjustment.py — 动态订阅局部调整测试
+        ├── test_dynamic_runtime_state_recovery.py — 动态runtime恢复测试
         ├── test_field_capacity_cli.py  — 现场容量 CLI 测试
         ├── test_field_probe_cli.py     — 现场探测 CLI 测试
         ├── test_field_profile_cli.py   — 现场画像 CLI 测试
@@ -556,6 +634,7 @@ tools/source_lab/
     │   ├── test_modbus_client_runner_write_protocol.py  — Modbus TCP 写入协议测试
         ├── test_iec61850_mms_client_runner_write_protocol.py  — IEC 61850 MMS 写入协议测试
         ├── test_iec61850_goose_sv_streaming_e2e.py  — GOOSE/SV 流式 E2E 条件测试
+        ├── test_iec61850_l2_native_runner_failure_modes.py  — L2 native失败模式测试
         ├── test_iec61850_production_capacity_profile_gate.py  — IEC 61850 capacity/profile 门禁测试
         ├── test_iec61850_report_runner_protocol.py  — IEC 61850 Report 运行器协议测试
         ├── test_iec61850_report_capacity_profile_gate.py  — IEC 61850 Report 生产门禁验收测试
@@ -640,6 +719,19 @@ ai_shared/
 │   ├── source_lab_round5_3_followup_adr_index_and_template_governance_closure_report.md — Round 5-3 治理收口补丁报告
 │   ├── source_lab_round5_4_iec61850_goose_sv_event_sample_closure_report.md — Round 5-4 GOOSE/SV 收口报告
 │   ├── source_lab_round5_5_final_protocol_gate_and_goose_sv_ci_validation_report.md — Round 5-5 最终门禁报告
+│   ├── source_lab_dynamic_endpoint_adjustment_probe_report.md — source_lab 动态局部调整探查报告
+│   ├── source_lab_dynamic_endpoint_runtime_round1_report.md — source_lab动态runtime第1轮报告
+│   ├── source_lab_dynamic_endpoint_runtime_round2_report.md — source_lab动态runtime第2轮报告
+│   ├── source_lab_dynamic_endpoint_runtime_round3_final_closure_report.md — source_lab动态runtime第3轮最终收口报告
+│   ├── source_lab_dynamic_endpoint_runtime_permission_and_state_store_closure_report.md — source_lab动态runtime第4轮归档
+│   ├── source_lab_goose_sv_dynamic_raw_socket_gate_report.md — GOOSE/SV raw-socket门禁报告
+│   ├── source_lab_goose_sv_dynamic_raw_socket_gate_20260526.log — GOOSE/SV raw-socket门禁日志
+│   ├── source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_report.md — GOOSE/SV setcap后门禁报告
+│   ├── source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_20260526.log — GOOSE/SV setcap后lo门禁日志
+│   ├── source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_20260526_eth0.log — GOOSE/SV setcap后eth0门禁日志
+│   ├── source_lab_goose_sv_dynamic_raw_socket_event_sample_diagnostics_report.md — GOOSE/SV event/sample诊断报告
+│   ├── source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md — GOOSE/SV可控L2收口报告
+│   ├── source_lab_dynamic_endpoint_runtime_final_true_pass_closure_report.md — 动态runtime最终true PASS报告
 │   └── requirements_trace_update_20260525_source_lab_ingest_round1.md — 需求核验 Round 1 报告
 ├── rules/                             — 公共规则
     ├── routing.md                     — 规则路由
@@ -666,7 +758,10 @@ docs/
 ```text
 scripts/
 ├── cleanup_root_logs.sh               — 清理根目录日志文件
-└── run_ingest_dev.sh                  — 启动 ingest 开发环境
+├── run_ingest_dev.sh                  — 启动 ingest 开发环境
+├── run_source_lab_raw_socket_dynamic_gate.sh — raw socket动态门禁回归
+├── run_source_lab_l2_standalone_gate.sh — GOOSE/SV standalone门禁
+└── source_lab_l2_test_env.sh          — 可控L2 veth环境搭建
 ```
 
 ## AI 工具配置

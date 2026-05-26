@@ -45,9 +45,14 @@ def _find_executable(name: str) -> Path | None:
 
 
 def _l2_interface(spec: RunnerEndpointPlan) -> str:
-    raw = spec.source.endpoint.params.get("l2_interface")
+    raw = spec.source.endpoint.params.get("subscriber_l2_interface")
     if raw is None or str(raw).strip() == "":
-        return os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
+        raw = spec.source.endpoint.params.get("l2_interface")
+    if raw is None or str(raw).strip() == "":
+        return (
+            os.environ.get("SOURCE_LAB_L2_SUBSCRIBER_INTERFACE")
+            or os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
+        )
     return str(raw)
 
 

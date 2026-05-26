@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 import multiprocessing
 import os
@@ -13,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from multiprocessing import queues, synchronize
+from typing import Any
 
 from tools.source_lab.factory import build_simulator
 from tools.source_lab.model import SimulatedPoint, SimulatedSource, UpdateConfig
@@ -139,23 +141,43 @@ def _build_update_writes(
     return writes
 
 
+def _drain_command_queue(
+    command_queue: queues.Queue[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    if command_queue is None:
+        return []
+    commands: list[dict[str, Any]] = []
+    while True:
+        try:
+            commands.append(command_queue.get_nowait())
+        except queue.Empty:
+            return commands
+
+
+async def _drain_command_queue_async(
+    command_queue: queues.Queue[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    return await asyncio.to_thread(_drain_command_queue, command_queue)
+
+
 def _run_simulator_process(
     source: SimulatedSource,
     update_config: UpdateConfig,
     stop_event: synchronize.Event,
     ready_event: synchronize.Event,
     error_queue: queues.Queue[str],
+    command_queue: queues.Queue[dict[str, Any]] | None = None,
+    response_queue: queues.Queue[dict[str, Any]] | None = None,
 ) -> None:
     """[deprecated] Old synchronous SourceSimulator subprocess.
 
     No longer the default path. Replaced by ``_run_facade_process``.
     """
+
     try:
         with build_simulator(source) as simulator:
-            # 一个 source 对应一个独立子进程，尽量贴近真实"一个设备一个 server"。
             ready_event.set()
 
-            # 周期写入放在子进程内部完成，主进程只负责生命周期，不再跨进程持有 simulator。
             update_points = _select_points_for_update(source.points, update_config)
             rng = random.Random(
                 f"{source.connection.name}:{source.connection.host}:{source.connection.port}"
@@ -163,6 +185,40 @@ def _run_simulator_process(
             next_update_at = time.monotonic() + update_config.interval_seconds
 
             while not stop_event.is_set():
+                for command in _drain_command_queue(command_queue):
+                    request_id = str(command.get("request_id", ""))
+                    action = str(command.get("action", ""))
+                    if action != "update_values":
+                        if response_queue is not None:
+                            response_queue.put(
+                                {
+                                    "request_id": request_id,
+                                    "ok": False,
+                                    "message": f"unsupported action: {action}",
+                                }
+                            )
+                        continue
+
+                    try:
+                        simulator.writes(dict(command.get("values", {})))
+                        if response_queue is not None:
+                            response_queue.put(
+                                {
+                                    "request_id": request_id,
+                                    "ok": True,
+                                    "message": "",
+                                }
+                            )
+                    except Exception as exc:
+                        if response_queue is not None:
+                            response_queue.put(
+                                {
+                                    "request_id": request_id,
+                                    "ok": False,
+                                    "message": str(exc),
+                                }
+                            )
+
                 if not update_config.enabled:
                     stop_event.wait(0.1)
                     continue
@@ -195,25 +251,18 @@ def _run_facade_process(
     stop_event: synchronize.Event,
     ready_event: synchronize.Event,
     error_queue: queues.Queue[str],
+    command_queue: queues.Queue[dict[str, Any]] | None = None,
+    response_queue: queues.Queue[dict[str, Any]] | None = None,
 ) -> None:
-    """通过 ServerSimulatorFacade 管理的 simulator 子进程。
+    """Run one facade-managed simulator in its own subprocess."""
 
-    在每个子进程中创建 facade，使用 asyncio 管理其生命周期。
-    这是 `_run_simulator_process` 的替代。
-    """
     try:
-        import asyncio
 
         async def _run() -> None:
             from tools.source_lab.protocols.registry import create_server_simulator
 
             facade = create_server_simulator(source.connection.protocol, source)
-            await facade.load_points(
-                [
-                    p  # type: ignore[arg-type]
-                    for p in source.points
-                ]
-            )
+            await facade.load_points([point for point in source.points])  # type: ignore[arg-type]
             result = await facade.start()
             if result.status.name != "OK":
                 raise RuntimeError(
@@ -230,6 +279,30 @@ def _run_facade_process(
             next_update_at = time.monotonic() + update_config.interval_seconds
 
             while not stop_event.is_set():
+                for command in await _drain_command_queue_async(command_queue):
+                    request_id = str(command.get("request_id", ""))
+                    action = str(command.get("action", ""))
+                    if action != "update_values":
+                        if response_queue is not None:
+                            response_queue.put(
+                                {
+                                    "request_id": request_id,
+                                    "ok": False,
+                                    "message": f"unsupported action: {action}",
+                                }
+                            )
+                        continue
+
+                    result = await facade.update_values(dict(command.get("values", {})))
+                    if response_queue is not None:
+                        response_queue.put(
+                            {
+                                "request_id": request_id,
+                                "ok": result.status.name == "OK",
+                                "message": result.message,
+                            }
+                        )
+
                 if not update_config.enabled:
                     await asyncio.sleep(0.1)
                     continue
@@ -270,9 +343,21 @@ class SourceSimulatorFleet:
     start_concurrency: int = _START_CONCURRENCY_DEFAULT
     start_stagger_ms: int = _START_STAGGER_MS_DEFAULT
     use_facade: bool = True
-    _processes: list[multiprocessing.Process] = field(init=False, repr=False, default_factory=list)
-    _stop_events: list[synchronize.Event] = field(init=False, repr=False, default_factory=list)
-    _ready_events: list[synchronize.Event] = field(init=False, repr=False, default_factory=list)
+    _processes: list[multiprocessing.Process | None] = field(
+        init=False, repr=False, default_factory=list
+    )
+    _stop_events: list[synchronize.Event | None] = field(
+        init=False, repr=False, default_factory=list
+    )
+    _ready_events: list[synchronize.Event | None] = field(
+        init=False, repr=False, default_factory=list
+    )
+    _command_queues: list[queues.Queue[dict[str, Any]] | None] = field(
+        init=False, repr=False, default_factory=list
+    )
+    _response_queues: list[queues.Queue[dict[str, Any]] | None] = field(
+        init=False, repr=False, default_factory=list
+    )
     _error_queue: queues.Queue[str] | None = field(init=False, repr=False, default=None)
 
     @classmethod
@@ -287,8 +372,13 @@ class SourceSimulatorFleet:
         use_facade: bool | None = None,
     ) -> "SourceSimulatorFleet":
         """Build one fleet from externally prepared simulated sources."""
+
         resolved_config = update_config or UpdateConfig()
-        resolved_timeout = startup_timeout_seconds if startup_timeout_seconds is not None else _STARTUP_TIMEOUT_SECONDS
+        resolved_timeout = (
+            startup_timeout_seconds
+            if startup_timeout_seconds is not None
+            else _resolve_startup_timeout_seconds()
+        )
         resolved_start_concurrency = (
             start_concurrency if start_concurrency is not None else _resolve_start_concurrency()
         )
@@ -318,15 +408,12 @@ class SourceSimulatorFleet:
         )
 
     def start(self) -> "SourceSimulatorFleet":
-        if self._processes:
-            return self
-
+        self._ensure_slots()
         try:
             self._start_processes()
         except Exception:
             self.stop()
             raise
-
         return self
 
     def stop(self) -> None:
@@ -334,60 +421,91 @@ class SourceSimulatorFleet:
             self._close_error_queue()
             return
 
-        # 1. 先请求子进程正常退出。
-        for stop_event in self._stop_events:
-            stop_event.set()
-
-        # 2. 给子进程一次正常退出机会。
-        for process in self._processes:
-            if process.pid is None:
+        alive_processes: list[str] = []
+        for index in range(len(self.sources)):
+            process = self._processes[index]
+            if process is None:
                 continue
-            process.join(timeout=self.join_timeout_seconds)
+            self._stop_process_slot(index)
+            lingering = self._processes[index]
+            if lingering is not None and lingering.is_alive():
+                alive_processes.append(lingering.name)
 
-        # 3. 仍未退出则 terminate。
-        for process in self._processes:
-            if process.pid is None:
-                continue
-            if process.is_alive():
-                process.terminate()
-
-        for process in self._processes:
-            if process.pid is None:
-                continue
-            process.join(timeout=self.join_timeout_seconds)
-
-        # 4. 仍未退出则 kill。
-        for process in self._processes:
-            if process.pid is None:
-                continue
-            if process.is_alive():
-                process.kill()
-
-        for process in self._processes:
-            if process.pid is None:
-                continue
-            process.join(timeout=self.join_timeout_seconds)
-
-        alive_processes = []
-        # 5. 释放 process handle。
-        for process in self._processes:
-            if process.pid is None:
-                continue
-            if process.is_alive():
-                alive_processes.append(process.name)
-                continue
-            process.close()
-
-        self._processes.clear()
-        self._stop_events.clear()
-        self._ready_events.clear()
         self._close_error_queue()
+        self._close_control_queues()
 
         if alive_processes:
             raise RuntimeError(
                 "Failed to stop simulator process(es): "
                 + ", ".join(alive_processes)
             )
+
+    def start_source(self, source_id: str | int) -> None:
+        self._ensure_slots()
+        index = self._resolve_source_index(source_id)
+        process = self._processes[index]
+        if process is not None and process.is_alive():
+            return
+
+        startup_deadline = time.monotonic() + self.startup_timeout_seconds
+        self._start_process_slot(index)
+        self._wait_until_ready(pending_indices={index}, deadline=startup_deadline)
+
+    def stop_source(self, source_id: str | int) -> None:
+        self._ensure_slots()
+        self._stop_process_slot(self._resolve_source_index(source_id))
+
+    def restart_source(self, source_id: str | int) -> None:
+        index = self._resolve_source_index(source_id)
+        self.stop_source(index)
+        self.start_source(index)
+
+    def status_source(self, source_id: str | int) -> str:
+        self._ensure_slots()
+        index = self._resolve_source_index(source_id)
+        process = self._processes[index]
+        if process is None:
+            return "stopped"
+        if process.is_alive():
+            return "running"
+        if process.exitcode not in (None, 0):
+            return "failed"
+        return "stopped"
+
+    def update_source_values(
+        self,
+        source_id: str | int,
+        values: dict[str, str | int | float | bool | None],
+    ) -> None:
+        self._ensure_slots()
+        index = self._resolve_source_index(source_id)
+        process = self._processes[index]
+        command_queue = self._command_queues[index]
+        response_queue = self._response_queues[index]
+        if process is None or command_queue is None or response_queue is None or not process.is_alive():
+            raise RuntimeError(f"source is not running: {source_id}")
+
+        request_id = f"{index}-{time.time_ns()}"
+        command_queue.put(
+            {
+                "action": "update_values",
+                "request_id": request_id,
+                "values": values,
+            }
+        )
+
+        deadline = time.monotonic() + self.join_timeout_seconds
+        while time.monotonic() < deadline:
+            try:
+                response = response_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if response.get("request_id") != request_id:
+                continue
+            if not response.get("ok", False):
+                raise RuntimeError(str(response.get("message", "update failed")))
+            return
+        raise TimeoutError(f"timed out waiting update ack for source: {source_id}")
 
     def __enter__(self) -> "SourceSimulatorFleet":
         return self.start()
@@ -396,35 +514,18 @@ class SourceSimulatorFleet:
         self.stop()
 
     def _start_processes(self) -> None:
-        context = multiprocessing.get_context()
-        self._error_queue = context.Queue()
+        self._ensure_slots()
+        if self._error_queue is None:
+            self._error_queue = multiprocessing.get_context().Queue()
         startup_deadline = time.monotonic() + self.startup_timeout_seconds
         startup_window: set[int] = set()
 
-        process_target = _run_facade_process if self.use_facade else _run_simulator_process
+        for index, _source in enumerate(self.sources):
+            process = self._processes[index]
+            if process is not None and process.is_alive():
+                continue
 
-        for index, source in enumerate(self.sources):
-            # ready_event 用来表示子进程已完成 server.start()；
-            # stop_event 用来请求子进程退出；
-            # error_queue 用来把启动失败原因回传给主进程。
-            stop_event = context.Event()
-            ready_event = context.Event()
-            process = context.Process(
-                target=process_target,
-                name=f"source-simulator-{index + 1}",
-                args=(
-                    source,
-                    self.update_config,
-                    stop_event,
-                    ready_event,
-                    self._error_queue,
-                ),
-            )
-            process.start()
-            self._processes.append(process)
-            self._stop_events.append(stop_event)
-            self._ready_events.append(ready_event)
-
+            self._start_process_slot(index)
             startup_window.add(index)
             if self.start_stagger_ms > 0:
                 time.sleep(self.start_stagger_ms / 1000.0)
@@ -444,6 +545,68 @@ class SourceSimulatorFleet:
 
         self._wait_until_ready(deadline=startup_deadline)
 
+    def _start_process_slot(self, index: int) -> None:
+        context = multiprocessing.get_context()
+        if self._error_queue is None:
+            self._error_queue = context.Queue()
+        process_target = _run_facade_process if self.use_facade else _run_simulator_process
+        stop_event = context.Event()
+        ready_event = context.Event()
+        command_queue = context.Queue()
+        response_queue = context.Queue()
+        process = context.Process(
+            target=process_target,
+            name=f"source-simulator-{index + 1}",
+            args=(
+                self.sources[index],
+                self.update_config,
+                stop_event,
+                ready_event,
+                self._error_queue,
+                command_queue,
+                response_queue,
+            ),
+        )
+        process.start()
+        self._processes[index] = process
+        self._stop_events[index] = stop_event
+        self._ready_events[index] = ready_event
+        self._command_queues[index] = command_queue
+        self._response_queues[index] = response_queue
+
+    def _stop_process_slot(self, index: int) -> None:
+        process = self._processes[index]
+        stop_event = self._stop_events[index]
+        if process is None or stop_event is None:
+            return
+
+        stop_event.set()
+        if process.pid is not None:
+            process.join(timeout=self.join_timeout_seconds)
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=self.join_timeout_seconds)
+            if process.is_alive():
+                process.kill()
+                process.join(timeout=self.join_timeout_seconds)
+        if process.pid is not None and not process.is_alive():
+            process.close()
+
+        command_queue = self._command_queues[index]
+        response_queue = self._response_queues[index]
+        if command_queue is not None:
+            command_queue.close()
+            command_queue.join_thread()
+        if response_queue is not None:
+            response_queue.close()
+            response_queue.join_thread()
+
+        self._processes[index] = None
+        self._stop_events[index] = None
+        self._ready_events[index] = None
+        self._command_queues[index] = None
+        self._response_queues[index] = None
+
     def _wait_until_ready(
         self,
         *,
@@ -451,8 +614,14 @@ class SourceSimulatorFleet:
         deadline: float | None = None,
     ) -> None:
         timeout_seconds = self.startup_timeout_seconds
-        resolved_deadline = deadline if deadline is not None else (time.monotonic() + timeout_seconds)
-        pending = set(pending_indices) if pending_indices is not None else set(range(len(self._ready_events)))
+        resolved_deadline = (
+            deadline if deadline is not None else (time.monotonic() + timeout_seconds)
+        )
+        pending = (
+            set(pending_indices)
+            if pending_indices is not None
+            else set(range(len(self._ready_events)))
+        )
 
         while pending:
             startup_errors = self._drain_startup_errors()
@@ -460,11 +629,14 @@ class SourceSimulatorFleet:
                 raise RuntimeError("Failed to start simulator fleet:\n" + "\n".join(startup_errors))
 
             for index in tuple(pending):
-                if self._ready_events[index].is_set():
+                ready_event = self._ready_events[index]
+                process = self._processes[index]
+                if ready_event is None or process is None:
                     pending.remove(index)
                     continue
-
-                process = self._processes[index]
+                if ready_event.is_set():
+                    pending.remove(index)
+                    continue
                 if not process.is_alive():
                     source = self.sources[index]
                     raise RuntimeError(
@@ -481,7 +653,7 @@ class SourceSimulatorFleet:
             if remaining_seconds <= 0:
                 pending_list = sorted(pending)
                 alive_process_count = sum(
-                    1 for process in self._processes if process.is_alive()
+                    1 for process in self._processes if process is not None and process.is_alive()
                 )
                 pending_sources = [
                     f"{self.sources[index].connection.name}@"
@@ -499,10 +671,32 @@ class SourceSimulatorFleet:
                 )
 
             for index in tuple(pending):
-                if self._ready_events[index].wait(
-                    timeout=min(_READY_POLL_SECONDS, remaining_seconds)
-                ):
+                ready_event = self._ready_events[index]
+                if ready_event is None:
                     pending.remove(index)
+                    continue
+                if ready_event.wait(timeout=min(_READY_POLL_SECONDS, remaining_seconds)):
+                    pending.remove(index)
+
+    def _resolve_source_index(self, source_id: str | int) -> int:
+        if isinstance(source_id, int):
+            if 0 <= source_id < len(self.sources):
+                return source_id
+            raise IndexError(f"source index out of range: {source_id}")
+
+        for index, source in enumerate(self.sources):
+            if source.connection.name == source_id:
+                return index
+        raise KeyError(f"source not found: {source_id}")
+
+    def _ensure_slots(self) -> None:
+        target_size = len(self.sources)
+        while len(self._processes) < target_size:
+            self._processes.append(None)
+            self._stop_events.append(None)
+            self._ready_events.append(None)
+            self._command_queues.append(None)
+            self._response_queues.append(None)
 
     def _drain_startup_errors(self) -> list[str]:
         if self._error_queue is None:
@@ -521,3 +715,18 @@ class SourceSimulatorFleet:
         self._error_queue.close()
         self._error_queue.join_thread()
         self._error_queue = None
+
+    def _close_control_queues(self) -> None:
+        for command_queue in self._command_queues:
+            if command_queue is not None:
+                command_queue.close()
+                command_queue.join_thread()
+        for response_queue in self._response_queues:
+            if response_queue is not None:
+                response_queue.close()
+                response_queue.join_thread()
+        self._command_queues.clear()
+        self._response_queues.clear()
+        self._processes.clear()
+        self._stop_events.clear()
+        self._ready_events.clear()

@@ -37,7 +37,7 @@ description: 优先查找并修正已有 ADR，必要时新建 ADR。
 ## 步骤
 
 1. 读取 `ai_shared/adr/ADR索引.md`。
-2. 检索 `ai_shared/adr/` 下已有 ADR 文件名和标题。
+2. 检索 `ai_shared/adr/` 下已有 ADR 文件名和标题。读取template，理解 ADR 结构和内容要求。
 3. 判断是否已有相关 ADR。
 4. 有相关 ADR 时优先补充或修正。
 5. 若新决策替代旧决策，将旧 ADR 标记为 `Superseded`，并在 `Superseded By` 中指向新 ADR。

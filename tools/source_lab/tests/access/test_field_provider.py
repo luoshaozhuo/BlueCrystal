@@ -55,6 +55,29 @@ def _subscribe_config(*, sample_hz: float, source_update_hz: float) -> Subscribe
     )
 
 
+def _find_contiguous_port_start(
+    *,
+    host: str = "127.0.0.1",
+    start: int = 52000,
+    end: int = 64000,
+    width: int = 4,
+) -> int:
+    for candidate in range(start, end - width + 2):
+        sockets: list[socket.socket] = []
+        try:
+            for port in range(candidate, candidate + width):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.bind((host, port))
+                sockets.append(sock)
+            return candidate
+        except OSError:
+            pass
+        finally:
+            for sock in sockets:
+                sock.close()
+    raise AssertionError("failed to find contiguous test ports")
+
+
 def test_field_provider_builds_sources_from_profile_binding(tmp_path: Path) -> None:
     servers = tmp_path / "field_servers.tsv"
     items = tmp_path / "signal_profile_items.tsv"
@@ -351,19 +374,21 @@ def test_expanded_field_provider_overrides_host_and_skips_occupied_ports(tmp_pat
     )
 
     base_sources = build_field_runtime_sources(servers, items)
+    range_start = _find_contiguous_port_start(width=4)
+    expected_ports = (range_start + 1, range_start + 2, range_start + 3)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:
-        occupied.bind(("127.0.0.1", 52000))
+        occupied.bind(("127.0.0.1", range_start))
         provider = ExpandedFieldSourceProvider(
             base_sources,
-            port_start=52000,
-            port_end=52003,
-            port_allocator=PortAllocator.from_range(start=52000, end=52003),
+            port_start=range_start,
+            port_end=range_start + 3,
+            port_allocator=PortAllocator.from_range(start=range_start, end=range_start + 3),
         )
 
         built = provider.build_sources(_config(), server_count=3)
 
     assert tuple(source.endpoint.host for source in built) == ("127.0.0.1", "127.0.0.1", "127.0.0.1")
-    assert tuple(source.endpoint.port for source in built) == (52001, 52002, 52003)
+    assert tuple(source.endpoint.port for source in built) == expected_ports
     assert all(len(source.points) == 1 for source in built)
 
 

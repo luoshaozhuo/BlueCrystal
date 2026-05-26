@@ -55,4 +55,7 @@ markers = [
     "load: performance load tests (not run in regular CI)",
     "stress: performance and stress tests (not run in regular CI)",
     "slow: slow tests that require C native binaries or external services",
+    "requires_raw_socket: tests requiring Linux raw sockets",
+    "requires_cap_net_raw: tests requiring CAP_NET_RAW capability",
+    "requires_root_or_cap_net_raw: tests requiring root or CAP_NET_RAW",
 ]

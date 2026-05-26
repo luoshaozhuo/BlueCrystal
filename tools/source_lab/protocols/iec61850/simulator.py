@@ -624,7 +624,7 @@ class Iec61850GooseSimulatorFacade(BaseSimulatorFacade):
                 SimulatorStatus.NOT_IMPLEMENTED,
                 f"GOOSE publisher not compiled: {runner_path}",
             )
-        interface_id = _l2_interface(self._source)
+        interface_id = _l2_publisher_interface(self._source)
         app_id = str(_l2_app_id(self._source, 1000))
         interval_ms = str(_l2_interval_ms(self._source, 1000))
         return await _start_l2_publisher(
@@ -684,7 +684,7 @@ class Iec61850SvSimulatorFacade(BaseSimulatorFacade):
                 SimulatorStatus.NOT_IMPLEMENTED,
                 f"SV publisher not compiled: {runner_path}",
             )
-        interface_id = _l2_interface(self._source)
+        interface_id = _l2_publisher_interface(self._source)
         app_id = str(_l2_app_id(self._source, 4000))
         sample_rate = str(_l2_sample_rate_hz(self._source, 1))
         return await _start_l2_publisher(
@@ -710,10 +710,25 @@ class Iec61850SvSimulatorFacade(BaseSimulatorFacade):
         )
 
 
-def _l2_interface(source: SimulatedSource) -> str:
-    value = source.connection.params.get("l2_interface")
+def _l2_publisher_interface(source: SimulatedSource) -> str:
+    value = source.connection.params.get("publisher_l2_interface")
     if value is None or str(value).strip() == "":
-        return os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
+        value = source.connection.params.get("l2_interface")
+    if value is None or str(value).strip() == "":
+        value = os.environ.get("SOURCE_LAB_L2_PUBLISHER_INTERFACE")
+    if value is None or str(value).strip() == "":
+        value = os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
+    return str(value)
+
+
+def _l2_subscriber_interface(source: SimulatedSource) -> str:
+    value = source.connection.params.get("subscriber_l2_interface")
+    if value is None or str(value).strip() == "":
+        value = source.connection.params.get("l2_interface")
+    if value is None or str(value).strip() == "":
+        value = os.environ.get("SOURCE_LAB_L2_SUBSCRIBER_INTERFACE")
+    if value is None or str(value).strip() == "":
+        value = os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
     return str(value)
 
 
@@ -843,7 +858,7 @@ async def _probe_l2_subscriber(
         )
     cmd = [
         str(runner_path),
-        _l2_interface(source),
+        _l2_subscriber_interface(source),
         str(_l2_app_id(source, app_id_default)),
         str(int(source.connection.params.get("probe_duration_s", 3))),
     ]
@@ -893,7 +908,7 @@ async def _probe_l2_subscriber(
         return SimulatorResult(
             SimulatorStatus.UNAVAILABLE,
             f"{runner_name} received no {event_label}. raw socket / CAP_NET_RAW / "
-            f"interface={_l2_interface(source)} may be required; noise={noise}",
+            f"interface={_l2_subscriber_interface(source)} may be required; noise={noise}",
         )
     return SimulatorResult(
         SimulatorStatus.OK,

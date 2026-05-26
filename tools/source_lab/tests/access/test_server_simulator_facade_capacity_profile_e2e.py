@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import replace
+import os
 from typing import Iterator
 
 import pytest
@@ -136,8 +137,8 @@ _E2E_CONNECTION_KWARGS: dict[str, dict[str, object]] = {
     "opcua": {"namespace_uri": "urn:whale:e2e:opcua", "ied_name": "OPCUAIED", "ld_name": "LD0"},
     "http_rest": {"namespace_uri": None, "ied_name": "", "ld_name": ""},
     "mqtt": {"namespace_uri": None, "ied_name": "", "ld_name": ""},
-    "iec61850_goose": {"namespace_uri": None, "ied_name": "Simulator", "ld_name": "LLN0", "transport": "ethernet_l2", "params": {"l2_interface": "lo", "app_id": 1000, "publish_interval_ms": 1000}},
-    "iec61850_sv": {"namespace_uri": None, "ied_name": "Simulator", "ld_name": "LLN0", "transport": "ethernet_l2", "params": {"l2_interface": "lo", "app_id": 4000, "sample_rate_hz": 1}},
+    "iec61850_goose": {"namespace_uri": None, "ied_name": "Simulator", "ld_name": "LLN0", "transport": "ethernet_l2", "params": {"app_id": 1000, "publish_interval_ms": 1000}},
+    "iec61850_sv": {"namespace_uri": None, "ied_name": "Simulator", "ld_name": "LLN0", "transport": "ethernet_l2", "params": {"app_id": 4000, "sample_rate_hz": 1}},
 }
 
 
@@ -151,6 +152,20 @@ def _build_e2e_source(protocol: str, port: int) -> SimulatedSource:
         protocol=protocol,
     )
     kwargs.update(_E2E_CONNECTION_KWARGS.get(protocol, {}))
+    if protocol in {"iec61850_goose", "iec61850_sv"}:
+        params = dict(kwargs.get("params", {}))
+        subscriber_interface = (
+            os.environ.get("SOURCE_LAB_L2_SUBSCRIBER_INTERFACE")
+            or os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
+        )
+        publisher_interface = (
+            os.environ.get("SOURCE_LAB_L2_PUBLISHER_INTERFACE")
+            or subscriber_interface
+        )
+        params["l2_interface"] = subscriber_interface
+        params["subscriber_l2_interface"] = subscriber_interface
+        params["publisher_l2_interface"] = publisher_interface
+        kwargs["params"] = params
     points = _E2E_POINTS_BY_PROTOCOL.get(protocol)
     if points is None:
         raise ValueError(f"unsupported protocol for E2E smoke: {protocol}")

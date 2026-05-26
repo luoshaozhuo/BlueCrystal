@@ -8,6 +8,7 @@ instead of reporting a fake pass.
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,12 @@ from tools.source_lab.access.subscribe.profile import run_subscribe_profile
 from tools.source_lab.access.subscribe.scan import scan_source_subscriptions
 from tools.source_lab.protocols.registry import create_server_simulator
 from tools.source_lab.sources import PortAllocator
+
+pytestmark = [
+    pytest.mark.requires_raw_socket,
+    pytest.mark.requires_cap_net_raw,
+    pytest.mark.requires_root_or_cap_net_raw,
+]
 
 
 def _skip_if_l2_unavailable(protocol: str) -> None:
@@ -42,31 +49,45 @@ def _skip_if_l2_unavailable(protocol: str) -> None:
     interface = os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
     if missing:
         pytest.skip(
-            "dependency_missing: "
+            "SKIPPED_DEPENDENCY: dependency_missing: "
             + ",".join(missing)
             + " not compiled. CI: cmake -S tools/source_lab/native "
             "-B tools/source_lab/native/build && cmake --build tools/source_lab/native/build"
         )
-    if not _has_cap_net_raw():
+    if not _has_cap_net_raw(tuple(build_dir / name for name in names)):
         pytest.skip(
-            f"raw_socket_permission_missing: {protocol} requires CAP_NET_RAW/root "
+            f"SKIPPED_ENV_PERMISSION: raw_socket_permission_missing: {protocol} requires CAP_NET_RAW/root "
             f"and a usable L2 interface. interface={interface} "
             f"target={','.join(names)}. CI: sudo -E env SOURCE_LAB_L2_INTERFACE={interface} "
             "pytest -k 'goose or sv' tools/source_lab/tests/access -q"
         )
 
 
-def _has_cap_net_raw() -> bool:
+def _has_cap_net_raw(paths: tuple[Path, ...]) -> bool:
     if os.geteuid() == 0:
         return True
     try:
         for line in Path("/proc/self/status").read_text(encoding="utf-8").splitlines():
             if line.startswith("CapEff:"):
                 value = int(line.split(":", 1)[1].strip(), 16)
-                return bool(value & (1 << 13))
+                if value & (1 << 13):
+                    return True
+                break
     except OSError:
         return False
-    return False
+    for path in paths:
+        try:
+            result = subprocess.run(
+                ["getcap", str(path)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return False
+        if result.returncode != 0 or "cap_net_raw=ep" not in result.stdout:
+            return False
+    return True
 
 
 async def _assert_facade_subscribe(protocol: str, point_key: str) -> None:
