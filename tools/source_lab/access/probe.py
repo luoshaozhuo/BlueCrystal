@@ -1,4 +1,9 @@
-"""Standalone field endpoint probing that is independent from capacity orchestration."""
+"""独立场端协议探测工具，不依赖容量编排。
+
+负责：对给定的（协议、主机、端口）执行连接性检查（TCP）、协议层探测（读/订阅/写）、返回探测结果。
+不负责：模拟协议 server、进行容量打分或压测、数据源发现。
+数据流：ProbeConfig -> 按协议分发到对应 _probe_* -> ServerProbeResult。
+"""
 
 from __future__ import annotations
 

@@ -29,8 +29,8 @@ from whale.ingest.usecases.roles.subscription_acquisition_role import (
 )
 
 _MODEL_MODULE = import_source_lab_module("tools.source_lab.model")
-_ADDRESS_SPACE_MODULE = import_source_lab_module("tools.source_lab.opcua.address_space")
-_SIMULATOR_MODULE = import_source_lab_module("tools.source_lab.opcua.open62541_source_simulator")
+_ADDRESS_SPACE_MODULE = import_source_lab_module("tools.source_lab.protocols.opcua.address_space")
+_SIMULATOR_MODULE = import_source_lab_module("tools.source_lab.protocols.opcua.open62541_source_simulator")
 
 SimulatedPoint = _MODEL_MODULE.SimulatedPoint
 SimulatedSource = _MODEL_MODULE.SimulatedSource

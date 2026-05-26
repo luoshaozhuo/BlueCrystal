@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import cast
@@ -32,6 +33,7 @@ from whale.ingest.ports.state.source_state_cache_port import (
     SourceStateCachePort,
     SourceStateCacheWriteError,
 )
+from whale.ingest.ports.metrics import IngestMetricEvent, IngestMetricsPort
 from whale.ingest.usecases.dtos.acquired_node_state import AcquiredNodeStateBatch
 from whale.ingest.usecases.dtos.source_acquisition_request import (
     SourceAcquisitionRequest,
@@ -68,9 +70,11 @@ class SubscriptionAcquisitionRole:
         *,
         acquisition_port: SourceAcquisitionPort,
         state_cache_port: SourceStateCachePort,
+        metrics_port: IngestMetricsPort | None = None,
     ) -> None:
         self._acquisition_port = acquisition_port
         self._state_cache_port = state_cache_port
+        self._metrics_port = metrics_port
 
     async def start(
         self,
@@ -100,18 +104,9 @@ class SubscriptionAcquisitionRole:
                         "subscription_unsupported"
                     )
 
-                await self._read_initial_baseline(
+                handle = await self._start_with_retry(
                     request=request,
                     connection=connection,
-                )
-
-                handle = await self._acquisition_port.start_subscription(
-                    request.execution,
-                    connection,
-                    list(request.items),
-                    state_received=self._build_state_received_handler(
-                        connection=connection,
-                    ),
                 )
                 sessions.append(SubscriptionAcquisitionSession(handle=handle))
 
@@ -162,6 +157,61 @@ class SubscriptionAcquisitionRole:
                 ld_name=connection.ld_name,
                 observed_at=batch.client_processed_at,
             )
+        self._emit_metric(
+            operation="subscription_baseline_read",
+            source_id=connection.ld_name,
+            protocol=request.execution.protocol,
+            status="SUCCESS",
+            error_code=None,
+            started_at=0.0,
+        )
+
+    async def _start_with_retry(
+        self,
+        *,
+        request: SourceAcquisitionRequest,
+        connection: SourceConnectionData,
+    ) -> SourceSubscriptionHandle:
+        max_retries = int(request.execution.params.get("subscription_max_retry", 0))
+        backoff_ms = int(request.execution.params.get("subscription_backoff_ms", 0))
+        attempt = 0
+        last_exc: Exception | None = None
+        while attempt <= max_retries:
+            started_at = time.monotonic()
+            try:
+                await self._read_initial_baseline(request=request, connection=connection)
+                handle = await self._acquisition_port.start_subscription(
+                    request.execution,
+                    connection,
+                    list(request.items),
+                    state_received=self._build_state_received_handler(connection=connection),
+                )
+                self._emit_metric(
+                    operation="subscription_start",
+                    source_id=connection.ld_name,
+                    protocol=request.execution.protocol,
+                    status="SUCCESS",
+                    error_code=None,
+                    started_at=started_at,
+                )
+                return handle
+            except Exception as exc:
+                last_exc = exc
+                self._emit_metric(
+                    operation="subscription_reconnect",
+                    source_id=connection.ld_name,
+                    protocol=request.execution.protocol,
+                    status="FAILED",
+                    error_code=type(exc).__name__,
+                    started_at=started_at,
+                )
+                attempt += 1
+                if attempt > max_retries:
+                    break
+                if backoff_ms > 0:
+                    await asyncio.sleep(backoff_ms / 1000)
+        assert last_exc is not None
+        raise last_exc
 
     def _build_state_received_handler(
         self,
@@ -226,6 +276,31 @@ class SubscriptionAcquisitionRole:
         for session in reversed(sessions):
             with contextlib.suppress(Exception):
                 await session.close()
+
+    def _emit_metric(
+        self,
+        *,
+        operation: str,
+        source_id: str | None,
+        protocol: str | None,
+        status: str,
+        error_code: str | None,
+        started_at: float,
+    ) -> None:
+        if self._metrics_port is None:
+            return
+        duration_ms = 0.0 if started_at == 0.0 else (time.monotonic() - started_at) * 1000.0
+        self._metrics_port.emit(
+            IngestMetricEvent(
+                operation=operation,
+                source_id=source_id,
+                protocol=protocol,
+                duration_ms=duration_ms,
+                status=status,
+                error_code=error_code,
+                timestamp=datetime.now(tz=UTC),
+            )
+        )
 
 
 def _utc_now() -> datetime:

@@ -57,5 +57,8 @@ class SourceWriteResult:
     trace_id: str | None = None
     """追踪 ID，用于审计和日志关联。"""
 
+    command_id: str | None = None
+    """命令唯一标识，与 SourceWriteRequest.command_id 一致。"""
+
     attributes: dict[str, object] = field(default_factory=dict)
     """扩展属性。"""

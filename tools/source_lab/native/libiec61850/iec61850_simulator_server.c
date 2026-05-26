@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L
 
 #include <libiec61850/iec61850_server.h>
 #include <libiec61850/iec61850_dynamic_model.h>
@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 /* ── Globals ───────────────────────────────────────────────────────── */
 
@@ -23,6 +24,15 @@ static DataAttribute *g_ind1_stVal = NULL;
 static DataAttribute *g_ind2_stVal = NULL;
 static DataAttribute *g_anIn1_mag = NULL;
 static DataAttribute *g_anIn2_mag = NULL;
+
+/* Handles to writable SP (set point) attributes */
+static DataAttribute *g_sp_bool = NULL;
+static DataAttribute *g_sp_int32 = NULL;
+static DataAttribute *g_sp_float = NULL;
+static DataAttribute *g_sp_float64 = NULL;
+static DataAttribute *g_sp_string = NULL;
+static DataAttribute *g_sp_uint32 = NULL;
+static DataAttribute *g_sp_int64 = NULL;
 
 /* ════════════════════════════════════════════════════════════════════ */
 
@@ -108,6 +118,112 @@ static IedModel *create_data_model(void) {
         "t", (ModelNode *)anIn1, IEC61850_TIMESTAMP, IEC61850_FC_MX, 0, 0, 0);
     if (anIn1_t == NULL) goto fail;
     DataAttribute_setValue(anIn1_t, MmsValue_newUtcTime(0));
+
+    /* ── SP (Set Point) writable attributes ───────────────────────── */
+    /* SPCtrl1: Boolean set point (writable via MMS direct write) */
+    DataObject *spCtrl1 = DataObject_create("SPCtrl1", (ModelNode *)ggio1, 0);
+    if (spCtrl1 == NULL) goto fail;
+
+    g_sp_bool = DataAttribute_create(
+        "setVal", (ModelNode *)spCtrl1, IEC61850_BOOLEAN, IEC61850_FC_SP,
+        TRG_OPT_DATA_CHANGED, 0, 0);
+    if (g_sp_bool == NULL) goto fail;
+    DataAttribute_setValue(g_sp_bool, MmsValue_newBoolean(0));
+
+    DataAttribute *spCtrl1_q = DataAttribute_create(
+        "q", (ModelNode *)spCtrl1, IEC61850_QUALITY, IEC61850_FC_SP, 0, 0, 0);
+    if (spCtrl1_q == NULL) goto fail;
+    DataAttribute_setValue(spCtrl1_q, MmsValue_newBitString(13));
+
+    /* SPCtrl2: INT32 set point (writable via MMS direct write) */
+    DataObject *spCtrl2 = DataObject_create("SPCtrl2", (ModelNode *)ggio1, 0);
+    if (spCtrl2 == NULL) goto fail;
+
+    g_sp_int32 = DataAttribute_create(
+        "setVal", (ModelNode *)spCtrl2, IEC61850_INT32, IEC61850_FC_SP,
+        TRG_OPT_DATA_CHANGED, 0, 0);
+    if (g_sp_int32 == NULL) goto fail;
+    DataAttribute_setValue(g_sp_int32, MmsValue_newIntegerFromInt32(0));
+
+    DataAttribute *spCtrl2_q = DataAttribute_create(
+        "q", (ModelNode *)spCtrl2, IEC61850_QUALITY, IEC61850_FC_SP, 0, 0, 0);
+    if (spCtrl2_q == NULL) goto fail;
+    DataAttribute_setValue(spCtrl2_q, MmsValue_newBitString(13));
+
+    /* SPCtrl3: FLOAT32 set point (writable via MMS direct write) */
+    DataObject *spCtrl3 = DataObject_create("SPCtrl3", (ModelNode *)ggio1, 0);
+    if (spCtrl3 == NULL) goto fail;
+
+    g_sp_float = DataAttribute_create(
+        "setVal", (ModelNode *)spCtrl3, IEC61850_FLOAT32, IEC61850_FC_SP,
+        TRG_OPT_DATA_CHANGED, 0, 0);
+    if (g_sp_float == NULL) goto fail;
+    DataAttribute_setValue(g_sp_float, MmsValue_newFloat(0.0f));
+
+    DataAttribute *spCtrl3_q = DataAttribute_create(
+        "q", (ModelNode *)spCtrl3, IEC61850_QUALITY, IEC61850_FC_SP, 0, 0, 0);
+    if (spCtrl3_q == NULL) goto fail;
+    DataAttribute_setValue(spCtrl3_q, MmsValue_newBitString(13));
+
+    /* SPCtrl4: FLOAT64 set point (writable via MMS direct write) */
+    DataObject *spCtrl4 = DataObject_create("SPCtrl4", (ModelNode *)ggio1, 0);
+    if (spCtrl4 == NULL) goto fail;
+
+    g_sp_float64 = DataAttribute_create(
+        "setVal", (ModelNode *)spCtrl4, IEC61850_FLOAT64, IEC61850_FC_SP,
+        TRG_OPT_DATA_CHANGED, 0, 0);
+    if (g_sp_float64 == NULL) goto fail;
+    DataAttribute_setValue(g_sp_float64, MmsValue_newDouble(0.0));
+
+    DataAttribute *spCtrl4_q = DataAttribute_create(
+        "q", (ModelNode *)spCtrl4, IEC61850_QUALITY, IEC61850_FC_SP, 0, 0, 0);
+    if (spCtrl4_q == NULL) goto fail;
+    DataAttribute_setValue(spCtrl4_q, MmsValue_newBitString(13));
+
+    /* SPCtrl5: VISIBLE_STRING set point (writable via MMS direct write) */
+    DataObject *spCtrl5 = DataObject_create("SPCtrl5", (ModelNode *)ggio1, 0);
+    if (spCtrl5 == NULL) goto fail;
+
+    g_sp_string = DataAttribute_create(
+        "setVal", (ModelNode *)spCtrl5, IEC61850_VISIBLE_STRING_64, IEC61850_FC_SP,
+        TRG_OPT_DATA_CHANGED, 0, 0);
+    if (g_sp_string == NULL) goto fail;
+    DataAttribute_setValue(g_sp_string, MmsValue_newVisibleString(""));
+
+    DataAttribute *spCtrl5_q = DataAttribute_create(
+        "q", (ModelNode *)spCtrl5, IEC61850_QUALITY, IEC61850_FC_SP, 0, 0, 0);
+    if (spCtrl5_q == NULL) goto fail;
+    DataAttribute_setValue(spCtrl5_q, MmsValue_newBitString(13));
+
+    /* SPCtrl6: UINT32 set point (writable via MMS direct write) */
+    DataObject *spCtrl6 = DataObject_create("SPCtrl6", (ModelNode *)ggio1, 0);
+    if (spCtrl6 == NULL) goto fail;
+
+    g_sp_uint32 = DataAttribute_create(
+        "setVal", (ModelNode *)spCtrl6, IEC61850_INT32U, IEC61850_FC_SP,
+        TRG_OPT_DATA_CHANGED, 0, 0);
+    if (g_sp_uint32 == NULL) goto fail;
+    DataAttribute_setValue(g_sp_uint32, MmsValue_newIntegerFromInt32(0));
+
+    DataAttribute *spCtrl6_q = DataAttribute_create(
+        "q", (ModelNode *)spCtrl6, IEC61850_QUALITY, IEC61850_FC_SP, 0, 0, 0);
+    if (spCtrl6_q == NULL) goto fail;
+    DataAttribute_setValue(spCtrl6_q, MmsValue_newBitString(13));
+
+    /* SPCtrl7: INT64 set point (writable via MMS direct write) */
+    DataObject *spCtrl7 = DataObject_create("SPCtrl7", (ModelNode *)ggio1, 0);
+    if (spCtrl7 == NULL) goto fail;
+
+    g_sp_int64 = DataAttribute_create(
+        "setVal", (ModelNode *)spCtrl7, IEC61850_INT64, IEC61850_FC_SP,
+        TRG_OPT_DATA_CHANGED, 0, 0);
+    if (g_sp_int64 == NULL) goto fail;
+    DataAttribute_setValue(g_sp_int64, MmsValue_newIntegerFromInt64(0));
+
+    DataAttribute *spCtrl7_q = DataAttribute_create(
+        "q", (ModelNode *)spCtrl7, IEC61850_QUALITY, IEC61850_FC_SP, 0, 0, 0);
+    if (spCtrl7_q == NULL) goto fail;
+    DataAttribute_setValue(spCtrl7_q, MmsValue_newBitString(13));
 
     /* AnIn2: 32-bit float analog input */
     DataObject *anIn2 = DataObject_create("AnIn2", (ModelNode *)ggio1, 0);
@@ -245,9 +361,17 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    /* Suppress library stdout diagnostics during server setup */
+    fflush(stdout);
+    int saved_stdout = dup(STDOUT_FILENO);
+    if (saved_stdout >= 0) {
+        dup2(STDERR_FILENO, STDOUT_FILENO);
+    }
+
     /* Create data model */
     g_model = create_data_model();
     if (g_model == NULL) {
+        if (saved_stdout >= 0) close(saved_stdout);
         fprintf(stderr, "Failed to create data model\n");
         return 1;
     }
@@ -255,6 +379,7 @@ int main(int argc, char **argv) {
     /* Create server config */
     IedServerConfig cfg = IedServerConfig_create();
     if (cfg == NULL) {
+        if (saved_stdout >= 0) close(saved_stdout);
         fprintf(stderr, "Failed to create server config\n");
         IedModel_destroy(g_model);
         return 1;
@@ -266,6 +391,7 @@ int main(int argc, char **argv) {
     /* Create server */
     g_server = IedServer_createWithConfig(g_model, NULL, cfg);
     if (g_server == NULL) {
+        if (saved_stdout >= 0) close(saved_stdout);
         fprintf(stderr, "Failed to create IedServer\n");
         IedServerConfig_destroy(cfg);
         IedModel_destroy(g_model);
@@ -279,6 +405,7 @@ int main(int argc, char **argv) {
     IedServer_start(g_server, port);
 
     if (!IedServer_isRunning(g_server)) {
+        if (saved_stdout >= 0) close(saved_stdout);
         fprintf(stderr, "IedServer failed to start\n");
         IedServer_destroy(g_server);
         IedServerConfig_destroy(cfg);
@@ -289,8 +416,14 @@ int main(int argc, char **argv) {
     /* Enable GOOSE publishing */
     IedServer_enableGoosePublishing(g_server);
 
-    printf("READY\n");
-    fflush(stdout);
+    /* Don't restore stdout — keep all library diagnostics going to stderr.
+     * Write protocol lines (READY/DONE) directly to saved_stdout fd so
+     * that library thread prints like "IED_SERVER: server thread started!"
+     * never pollute the stdout protocol stream. */
+    if (saved_stdout >= 0) {
+        dprintf(saved_stdout, "READY\n");
+        fflush(NULL);
+    }
 
     /* Install signal handler */
     signal(SIGINT, sigint_handler);
@@ -317,8 +450,11 @@ int main(int argc, char **argv) {
     IedServerConfig_destroy(cfg);
     IedModel_destroy(g_model);
 
-    printf("DONE\n");
-    fflush(stdout);
+    if (saved_stdout >= 0) {
+        dprintf(saved_stdout, "DONE\n");
+        fflush(NULL);
+        close(saved_stdout);
+    }
 
     return 0;
 }

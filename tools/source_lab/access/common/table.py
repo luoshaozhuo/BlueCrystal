@@ -1,4 +1,8 @@
-"""Shared fixed-width table rendering helpers."""
+"""固定宽度表格渲染共享工具。
+
+负责：将结构化数据渲染为固定宽度 ASCII 表格。
+不负责：数据格式化、颜色渲染。
+"""
 
 from __future__ import annotations
 

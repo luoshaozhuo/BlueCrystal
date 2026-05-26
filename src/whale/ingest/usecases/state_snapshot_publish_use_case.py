@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -12,6 +13,7 @@ from whale.ingest.ports.message.message_publisher_port import (
     StateSnapshotItem,
     StateSnapshotMessage,
 )
+from whale.ingest.ports.metrics import IngestMetricEvent, IngestMetricsPort
 from whale.ingest.ports.state.source_state_snapshot_reader_port import (
     CachedSourceState,
     SourceStateSnapshotReaderPort,
@@ -43,6 +45,7 @@ class StateSnapshotPublishUseCase:
         reader: SourceStateSnapshotReaderPort,
         publisher: MessagePublisherPort,
         station_id: str,
+        metrics_port: IngestMetricsPort | None = None,
     ) -> None:
         """Store injected ports and the local station identifier.
 
@@ -55,6 +58,7 @@ class StateSnapshotPublishUseCase:
         self._reader = reader
         self._publisher = publisher
         self._station_id = station_id
+        self._metrics_port = metrics_port
 
     def execute(self, request: StateSnapshotPublishRequest) -> StateSnapshotPublishResult:
         """Execute one state-snapshot publish cycle.
@@ -75,11 +79,20 @@ class StateSnapshotPublishUseCase:
         """
         trace_id = request.trace_id
         snapshot_at = datetime.now(tz=UTC)
+        started_at = time.monotonic()
 
         # Step 1: read from cache
         try:
             sources: list[CachedSourceState] = self._reader.read_snapshot()
         except Exception as exc:
+            self._emit_metric(
+                operation="snapshot_publish",
+                source_id=request.source_id,
+                protocol=None,
+                status="FAILED",
+                error_code=type(exc).__name__,
+                started_at=started_at,
+            )
             return StateSnapshotPublishResult(
                 status=PublishStatus.FAILED,
                 source_count=0,
@@ -93,6 +106,14 @@ class StateSnapshotPublishUseCase:
         filtered = self._apply_filters(sources, request)
 
         if not filtered:
+            self._emit_metric(
+                operation="snapshot_publish",
+                source_id=request.source_id,
+                protocol=None,
+                status="NO_DATA",
+                error_code=None,
+                started_at=started_at,
+            )
             return StateSnapshotPublishResult(
                 status=PublishStatus.NO_DATA,
                 source_count=len(sources),
@@ -106,6 +127,14 @@ class StateSnapshotPublishUseCase:
         messages = self._build_messages(filtered, station_id, snapshot_at, request)
 
         if not messages:
+            self._emit_metric(
+                operation="snapshot_publish",
+                source_id=request.source_id,
+                protocol=None,
+                status="NO_DATA",
+                error_code=None,
+                started_at=started_at,
+            )
             return StateSnapshotPublishResult(
                 status=PublishStatus.NO_DATA,
                 source_count=len(filtered),
@@ -118,6 +147,14 @@ class StateSnapshotPublishUseCase:
 
         # Step 4: dry_run check
         if request.dry_run:
+            self._emit_metric(
+                operation="snapshot_publish",
+                source_id=request.source_id,
+                protocol=None,
+                status="DRY_RUN",
+                error_code=None,
+                started_at=started_at,
+            )
             return StateSnapshotPublishResult(
                 status=PublishStatus.DRY_RUN,
                 source_count=len(filtered),
@@ -128,7 +165,16 @@ class StateSnapshotPublishUseCase:
             )
 
         # Step 5: publish
-        return self._publish_all(messages, trace_id, snapshot_at, len(filtered), total_items)
+        result = self._publish_all(messages, trace_id, snapshot_at, len(filtered), total_items)
+        self._emit_metric(
+            operation="snapshot_publish",
+            source_id=request.source_id,
+            protocol=None,
+            status=result.status.value,
+            error_code=None if result.error is None else "publish_failed",
+            started_at=started_at,
+        )
+        return result
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -342,6 +388,30 @@ class StateSnapshotPublishUseCase:
                 )
 
         return aggregated
+
+    def _emit_metric(
+        self,
+        *,
+        operation: str,
+        source_id: str | None,
+        protocol: str | None,
+        status: str,
+        error_code: str | None,
+        started_at: float,
+    ) -> None:
+        if self._metrics_port is None:
+            return
+        self._metrics_port.emit(
+            IngestMetricEvent(
+                operation=operation,
+                source_id=source_id,
+                protocol=protocol,
+                duration_ms=(time.monotonic() - started_at) * 1000.0,
+                status=status,
+                error_code=error_code,
+                timestamp=datetime.now(tz=UTC),
+            )
+        )
 
 
 def _generate_snapshot_id(station_id: str, snapshot_at: datetime) -> str:

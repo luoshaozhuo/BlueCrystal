@@ -19,6 +19,7 @@ from whale.ingest.ports.source.source_acquisition_port import (
     SourceReadOnceFailedError,
     SourceReadTimeoutError,
 )
+from whale.ingest.ports.metrics import IngestMetricEvent, IngestMetricsPort
 from whale.ingest.ports.state.source_state_cache_port import (
     SourceStateCachePort,
     SourceStateCacheWriteError,
@@ -78,10 +79,12 @@ class PollingAcquisitionRole:
         *,
         acquisition_port: SourceAcquisitionPort,
         state_cache_port: SourceStateCachePort,
+        metrics_port: IngestMetricsPort | None = None,
     ) -> None:
         self._acquisition_port = acquisition_port
         self._state_cache_port = state_cache_port
         self._cycle_overrun_count = 0
+        self._metrics_port = metrics_port
 
     def start(
         self,
@@ -203,6 +206,7 @@ class PollingAcquisitionRole:
         """读取单个连接并更新 latest-state cache。"""
 
         try:
+            started_at = time.monotonic()
             batch = await self._acquisition_port.read(request.execution, connection, list(request.items))
             updated_count = self._update_batch(ld_name=connection.ld_name, batch=batch)
             if updated_count > 0:
@@ -210,6 +214,14 @@ class PollingAcquisitionRole:
                     ld_name=connection.ld_name,
                     observed_at=batch.client_processed_at,
                 )
+            self._emit_metric(
+                operation="polling_read",
+                source_id=connection.ld_name,
+                protocol=request.execution.protocol,
+                status="SUCCESS",
+                error_code=None,
+                started_at=started_at,
+            )
             return _ConnectionReadOutcome(ld_name=connection.ld_name, success=not batch.is_empty())
         except asyncio.CancelledError:
             raise
@@ -221,11 +233,43 @@ class PollingAcquisitionRole:
                     reason=reason,
                 )
             LOGGER.warning("Polling read failed for %s: %s", connection.ld_name, reason)
+            self._emit_metric(
+                operation="polling_read",
+                source_id=connection.ld_name,
+                protocol=request.execution.protocol,
+                status="FAILED",
+                error_code=reason,
+                started_at=time.monotonic(),
+            )
             return _ConnectionReadOutcome(
                 ld_name=connection.ld_name,
                 success=False,
                 reason=reason,
             )
+
+    def _emit_metric(
+        self,
+        *,
+        operation: str,
+        source_id: str | None,
+        protocol: str | None,
+        status: str,
+        error_code: str | None,
+        started_at: float,
+    ) -> None:
+        if self._metrics_port is None:
+            return
+        self._metrics_port.emit(
+            IngestMetricEvent(
+                operation=operation,
+                source_id=source_id,
+                protocol=protocol,
+                duration_ms=max(0.0, (time.monotonic() - started_at) * 1000.0),
+                status=status,
+                error_code=error_code,
+                timestamp=datetime.now(tz=UTC),
+            )
+        )
 
     def _update_batch(
         self,

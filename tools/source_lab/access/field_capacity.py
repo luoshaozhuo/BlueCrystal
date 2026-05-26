@@ -1,4 +1,9 @@
-"""Field-capacity orchestration plus report-row rendering helpers."""
+"""现场容量测试编排与报告行渲染辅助。
+
+负责：按 polling/subscribe 两种接入模式执行现场容量扫描，汇总为 FieldCapacityRow 并输出 CSV/JSONL 报告。
+不负责：协议级连接管理与数据源发现（由 provider 层负责）。
+数据流：FieldCapacityRequest -> provider 提供模拟/文件数据源 -> scan_capacity -> FieldCapacityRow -> CSV/JSONL。
+"""
 
 from __future__ import annotations
 

@@ -44,7 +44,37 @@ class Iec101PollingRunner(GenericPollingCapacityRunner):
             ) as conn:
                 conn.sendall(b"\x10\x49\x00\x49\x16")
                 conn.settimeout(config.read_timeout_s)
-                _response = conn.recv(256)
-                return PollingReadSample(ok=True, value_count=len(spec.source.points), response_timestamp_s=time.time())
+                response = conn.recv(4096)
+
+                value_count = 0
+                pos = 0
+                while pos < len(response):
+                    if response[pos] == 0x10:
+                        pos += 5  # 固定帧: 0x10 CI ADDR CHK 0x16
+                        continue
+                    if response[pos] != 0x68:
+                        pos += 1
+                        continue
+                    if pos + 3 >= len(response):
+                        break
+                    L = response[pos + 1]
+                    frame_end = pos + 3 + L + 1
+                    if frame_end > len(response):
+                        break
+                    # ASDU 从 pos+6 开始: 0x68 LEN LEN 0x68 CI ADDR ASDU...
+                    asdu_start = pos + 6
+                    if asdu_start + 1 >= len(response):
+                        pos = frame_end
+                        continue
+                    vsq = response[asdu_start + 1]
+                    elements = vsq & 0x7F  # VSQ 低7位为元素数
+                    if elements == 0:
+                        elements = 1
+                    value_count += elements
+                    pos = frame_end
+
+                if value_count == 0:
+                    return PollingReadSample(ok=False, value_count=0, response_timestamp_s=None, error_code="no_asdu")
+                return PollingReadSample(ok=True, value_count=value_count, response_timestamp_s=time.time())
         except Exception:
             return PollingReadSample(ok=False, value_count=0, response_timestamp_s=None, error_code="transport_error")

@@ -38,6 +38,11 @@ static void millisleep(uint32_t ms) {
 /* ══════════════════════════════════════════════════════════════════ */
 
 int main(int argc, char **argv) {
+    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+        printf("iec61850_goose_publisher_simulator\tversion=1\n");
+        return 0;
+    }
+
     if (argc != 4) {
         fprintf(stderr, "Usage: %s <interface> <app_id> <interval_ms>\n", argv[0]);
         return 2;

@@ -1,4 +1,8 @@
-"""Shared access-mode models used across read-once, polling, and subscribe."""
+"""接入模式数据模型，跨 read-once/polling/subscribe 共享。
+
+负责：定义 AccessMode、AccessBatch、AccessRunSummary 等基础类型。
+不负责：协议特定逻辑、扫描执行。
+"""
 
 from __future__ import annotations
 

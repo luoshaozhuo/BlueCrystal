@@ -37,7 +37,7 @@ Claude Code / Codex 的定位是：
 2. `ai_shared/rules/routing.md`。
 3. routing 指定的必要规则。
 4. 必要时读取 `ai_shared/memory/project_tree.md`。
-5. 必要时读取 `ai_shared/memory/项目说明.md`。
+5. 必要时查找并读取 `ai_shared/memory/` 下所有文件名含"项目说明"的文件。
 6. 当前相关源码、测试、配置、schema。
 
 普通代码修改不读取完整项目说明，不读取全部 ADR，不读取全部规则。

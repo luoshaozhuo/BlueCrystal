@@ -1,10 +1,42 @@
 # Whale 项目目录树
 
 > 能源数据统一平台（风光储电场数据接入底座）
-> 最后更新: 2026-05-24
+> 最后更新: 2026-05-26
 
 本文件维护完整文件级目录树，每个 item 附简短职责注释（不超过 40 中文字符）。
 只用于导航，不替代读取当前源码。
+
+## 本轮增量（2026-05-26）
+
+```text
+src/whale/ingest/ports/command/
+├── __init__.py                      — 写入命令审计端口导出
+└── source_command_audit_port.py     — 写入命令结构化审计端口
+src/whale/ingest/ports/metrics.py    — ingest结构化指标端口
+src/whale/ingest/adapters/observability/
+├── __init__.py                      — 观测sink导出
+└── file_sinks.py                    — JSONL metrics/audit sink
+
+tests/integration/test_ingest_source_cache_message_e2e.py — source->cache->message 组合E2E
+tests/unit/test_source_command_audit.py                   — 写入审计单测
+tests/unit/test_ingest_source_adapter_capability_matrix.py — ingest协议能力矩阵门禁
+tests/unit/test_ingest_no_source_lab_imports.py           — ingest生产路径隔离门禁
+tests/unit/test_subscription_reconnect_baseline.py        — reconnect前baseline策略测试
+tests/unit/test_subscription_reconnect_runtime.py         — subscription重连退避重试门禁
+tests/unit/test_ingest_metrics_events.py                  — ingest结构化指标事件门禁
+tests/unit/test_ingest_observability_sink.py              — JSONL观测sink单测
+tests/unit/test_ingest_security_partition_config.py       — 安全分区配置门禁
+tests/integration/test_ingest_source_cache_message_kafka_e2e.py — Kafka容器级E2E（CI条件）
+tests/integration/test_ingest_observability_sink_smoke.py — JSONL观测sink烟测
+tests/integration/test_ingest_lightweight_load_gate.py    — ingest轻量load门禁
+tests/integration/test_ingest_security_partition_smoke.py — 安全分区样例烟测
+config/ingest/security_partition.example.yaml             — 安全分区配置样例
+ai_shared/reports/ingest_security_partition_boundary.md   — ingest安全分区边界说明
+ai_shared/reports/requirements_trace_update_20260526_source_lab_ingest_round2.md — 第2轮核验报告
+ai_shared/reports/requirements_trace_update_20260526_source_lab_ingest_round3_final_closure.md — 第3轮最终收口报告
+ai_shared/reports/requirements_trace_ci_deployment_validation_20260526.md — CI与部署态运行归档
+ai_shared/reports/source_lab_ingest_environment_validation_final_archive_20260526.md — 环境型最终运行归档
+```
 
 ## 根目录
 
@@ -98,6 +130,9 @@ src/whale/
 │   │   │   ├── modbus_source_write_adapter.py         — Modbus TCP 写入适配器
 │   │   │   ├── opcua_source_acquisition_adapter.py           — OPC UA 采集适配器
 │   │   │   ├── opcua_source_write_adapter.py                 — OPC UA 写入适配器
+│   │   │   ├── iec61850_source_acquisition_adapter.py  — IEC 61850 MMS 采集适配器
+│   │   │   ├── iec61850_source_write_adapter.py        — IEC 61850 MMS 写入适配器
+    │   │   │   ├── iec61850_report_source_acquisition_adapter.py  — IEC 61850 Report 订阅采集适配器
 │   │   │   ├── static_source_acquisition_port_registry.py    — 静态采集端口注册表
 │   │   │   └── static_source_write_port_registry.py          — 静态写入端口注册表
 │   │   └── state/                   — 状态缓存适配器
@@ -194,6 +229,16 @@ src/whale/
 │   │   │       ├── base.py           — 后端基类
 │   │   │       ├── factory.py        — 后端工厂
 │   │   │       └── open62541_backend.py  — open62541 C 后端
+│   │   ├── iec61850/                 — IEC 61850 MMS/Report 读取器
+│   │   │   ├── __init__.py
+│   │   │   ├── reader.py             — Iec61850MmsSourceReader 外观
+│   │   │   ├── report_reader.py      — Iec61850ReportSourceReader 外观
+│   │   │   └── backends/             — IEC 61850 后端实现
+│   │   │       ├── __init__.py
+│   │   │       ├── base.py           — 后端基类与数据类型
+│   │   │       ├── libiec61850_backend.py  — libiec61850 C 子进程后端（MMS）
+│   │   │       ├── report_base.py    — Report 事件数据类型
+│   │   │       └── libiec61850_report_backend.py  — libiec61850 C 子进程后端（Report）
 │   │   └── scheduling/               — 调度工具
 │   │       ├── __init__.py
 │   │       ├── concurrency.py        — 并发控制
@@ -239,6 +284,7 @@ src/whale/
 tests/
 ├── __init__.py
 ├── conftest.py                       — 全局 pytest 夹具
+├── conftest.py                       — 全局 pytest 夹具
 ├── TESTING.md                        — 测试策略说明
 │
 ├── unit/                             — 单元测试
@@ -250,6 +296,11 @@ tests/
     │   ├── test_modbus_source_write_adapter.py         — Modbus TCP 写入适配器测试
 │   ├── test_opcua_adapter_resolution.py — OPC UA 适配器解析测试
 │   ├── test_opcua_source_acquisition_adapter.py  — OPC UA 采集适配器测试
+│   ├── test_iec61850_mms_backend.py         — IEC 61850 MMS 后端单元测试
+│   ├── test_iec61850_source_acquisition_adapter.py  — IEC 61850 MMS 采集适配器测试
+│   ├── test_iec61850_source_write_adapter.py  — IEC 61850 MMS 写入适配器测试
+│   ├── test_iec61850_report_backend.py         — IEC 61850 Report 后端单元测试
+│   ├── test_iec61850_report_acquisition_adapter.py  — IEC 61850 Report 订阅采集适配器测试
 │   ├── test_open62541_backend.py      — open62541 后端测试
 │   ├── test_polling_acquisition_role.py   — 轮询角色测试
 │   ├── test_redis_source_state_cache.py   — Redis 状态缓存测试
@@ -278,6 +329,8 @@ tests/
     │   ├── test_ingest_modbus_source_write.py        — Modbus TCP 写入集成测试
 │   ├── test_ingest_cache_to_kafka_pipeline.py     — 缓存快照到 Kafka 发布集成测试（5 cases）
 │   ├── test_ingest_opcua_source_write.py        — OPC UA 写入集成测试
+│   ├── test_ingest_iec61850_mms_source_write.py  — IEC 61850 MMS 写入集成测试
+│   ├── test_ingest_iec61850_report_subscription.py  — IEC 61850 Report 订阅集成测试
 │   └── test_sqlite_config_init.py              — SQLite 配置初始化
 │
 ├── e2e/                               — 端到端测试
@@ -381,6 +434,7 @@ tools/source_lab/
 │       ├── iec101_event.py            — IEC 101 事件
 │       ├── iec104_polling.py          — IEC 104 轮询
 │       ├── iec104_event.py            — IEC 104 事件
+│       ├── iec61850_l2_streaming.py   — GOOSE/SV L2 订阅运行器
 │       ├── iec61850_mms_polling.py    — IEC 61850 MMS 轮询
 │       ├── iec61850_report.py         — IEC 61850 报告
 │       ├── modbus_rtu_polling.py      — Modbus RTU 轮询
@@ -389,27 +443,34 @@ tools/source_lab/
 │       ├── open62541_serial_polling.py    — open62541 串行轮询
 │       └── open62541_subscription.py      — open62541 订阅
 │
-├── protocols/                         — 协议仿真
+├── protocols/                         — 协议仿真（含 ServerSimulatorFacade）
 │   ├── __init__.py
-│   ├── registry.py                    — 协议注册表
+│   ├── registry.py                    — 协议注册表（含 ServerSimulatorFacade 工厂）
 │   ├── common/                        — 协议公共
 │   │   ├── __init__.py
 │   │   ├── point_mapping.py           — 测点映射
-│   │   └── simulators.py              — 通用模拟器
+│   │   ├── simulators.py              — 通用模拟器
+│   │   ├── simulator_models.py        — ServerSimulatorFacade 数据模型
+│   │   ├── simulator_facade.py        — ServerSimulatorFacade Protocol
+│   │   └── _base_facade.py            — 默认 NOT_IMPLEMENTED 基类
 │   ├── http_rest/__init__.py          — HTTP REST 协议
 │   ├── iec101/__init__.py             — IEC 101 协议
 │   ├── iec104/__init__.py             — IEC 104 协议
 │   ├── iec61850/__init__.py           — IEC 61850 协议
-│   ├── modbus/__init__.py             — Modbus 协议
-│   └── mqtt/__init__.py               — MQTT 协议
-│
-├── opcua/                             — OPC UA 模拟器
-│   ├── __init__.py
-│   ├── address_space.py               — OPC UA 地址空间生成
-│   ├── open62541_source_simulator.py  — open62541 仿真数据源
-│   ├── docs/GBT_30966.2-2022-信息模型.pdf  — 新能源信息模型标准
-│   ├── templates/OPCUANodeSet.xml     — OPC UA 节点集模板
-│   └── templates/OPCUA_client_connections.yaml  — 客户端连接模板
+│   ├── modbus/
+│   │   ├── __init__.py
+│   │   └── simulator.py               — Modbus TCP/RTU facades
+│   ├── mqtt/
+│   │   ├── __init__.py
+│   │   └── simulator.py               — MQTT facade
+│   └── opcua/                         — OPC UA 模拟器
+│       ├── __init__.py
+│       ├── simulator.py               — OPC UA facade
+│       ├── address_space.py           — OPC UA 地址空间生成
+│       ├── open62541_source_simulator.py  — open62541 仿真数据源
+│       ├── docs/GBT_30966.2-2022-信息模型.pdf  — 新能源信息模型标准
+│       ├── templates/OPCUANodeSet.xml     — OPC UA 节点集模板
+│       └── templates/OPCUA_client_connections.yaml  — 客户端连接模板
 │
 ├── native/                            — C 原生运行器源码
 │   ├── CMakeLists.txt                 — CMake 构建配置
@@ -442,7 +503,7 @@ tools/source_lab/
     ├── __init__.py
     ├── README.md
     ├── TEST_AUDIT.md                   — 测试审计记录
-    ├── conftest.py                     — 测试夹具
+    ├── conftest.py                     — 测试夹具（含 load 测试自动跳过）
     ├── support/
     │   ├── __init__.py
     │   └── sources.py                  — 测试数据源定义
@@ -488,10 +549,16 @@ tools/source_lab/
         ├── test_field_profile_cli.py   — 现场画像 CLI 测试
         ├── test_field_provider.py      — 字段提供者测试
         ├── test_iec61850_lightweight_semantics.py  — IEC 61850 轻量语义
+        ├── test_native_cmd_runner_preflight.py  — NativeCmdCapacityRunner 预检测试（7 tests）
         ├── test_native_process_protocol.py  — Native 进程协议测试
         ├── test_native_runners_availability.py  — Native 运行器可用性
         ├── test_opcua_access_adapter.py  — OPC UA 接入适配器测试
     │   ├── test_modbus_client_runner_write_protocol.py  — Modbus TCP 写入协议测试
+        ├── test_iec61850_mms_client_runner_write_protocol.py  — IEC 61850 MMS 写入协议测试
+        ├── test_iec61850_goose_sv_streaming_e2e.py  — GOOSE/SV 流式 E2E 条件测试
+        ├── test_iec61850_production_capacity_profile_gate.py  — IEC 61850 capacity/profile 门禁测试
+        ├── test_iec61850_report_runner_protocol.py  — IEC 61850 Report 运行器协议测试
+        ├── test_iec61850_report_capacity_profile_gate.py  — IEC 61850 Report 生产门禁验收测试
         ├── test_open62541_client_runner_write_protocol.py  — OPC UA 写入协议测试
         ├── test_open62541_serial_polling_runner.py  — OPC UA 串行轮询测试
         ├── test_open62541_subscription_runner.py    — OPC UA 订阅测试
@@ -501,9 +568,14 @@ tools/source_lab/
         ├── test_protocol_matrix.py     — 协议矩阵测试
         ├── test_protocol_registry.py   — 协议注册表测试
         ├── test_protocol_service_capabilities.py  — 协议服务能力
+        ├── test_source_lab_final_protocol_matrix.py  — 最终协议矩阵门禁
         ├── test_protocol_production_readiness_gate.py  — 协议生产准入门禁测试
         ├── test_modbus_tcp_production_capacity_profile_gate.py  — Modbus TCP capacity/profile 门禁测试
         ├── test_protocol_simulator_factory.py  — 协议模拟器工厂
+	        ├── test_server_simulator_facade_contract.py  — ServerSimulatorFacade 契约测试
+	        ├── test_server_simulator_facade_real_protocol_smoke.py  — 真实协议 smoke 测试
+	        ├── test_server_simulator_facade_capacity_profile_e2e.py  — capacity/profile E2E CI 验收
+	        ├── test_server_simulator_factory.py  — ServerSimulatorFacade 工厂测试
         ├── test_subscribe_capacity_entrypoint.py  — 订阅容量入口
         ├── test_subscribe_capacity_reporter.py    — 订阅容量报告
         ├── test_subscribe_scan.py      — 订阅扫描测试
@@ -522,14 +594,31 @@ ai_shared/
 │   ├── ADR-20260523-002-source-lab-task-facade-boundary.md           — source_lab 是 Task Facade 不是 Protocol Client Facade
 │   ├── ADR-20260523-003-source-production-client-and-write-port-boundary.md — production client 与 write port 边界
 │   ├── ADR-20260524-004-source-protocol-production-readiness-gate.md       — 生产协议准入与 capacity/profile 门禁
-│   └── ADR-20260524-005-cache-to-message-queue-publish-use-case.md         — 缓存快照发布用例边界
+│   ├── ADR-20260524-005-cache-to-message-queue-publish-use-case.md         — 缓存快照发布用例边界
+│   ├── ADR-20260524-006-source-lab-protocol-directory-consolidation.md     — source_lab 协议目录统一治理
+│   ├── ADR-20260524-007-iec61850-mms-production-read-write-round1.md      — IEC 61850 MMS 生产读写第一闭环
+│   ├── ADR-20260524-008-iec61850-report-subscription-boundary.md          — IEC 61850 Report 订阅采集第一闭环
+│   └── ADR-20260524-009-source-lab-server-simulator-facade.md             — source_lab 统一模拟器 facade 契约
+├── templates/                         — 模板文件
+│   └── default_report_template.md     — 默认报告输出模板
 ├── memory/                            — 长期记忆
 │   ├── project_tree.md                — 本文件（目录树）
-│   └── 项目说明.md                    — 项目背景说明
+│   ├── Whale项目说明.md                — 项目背景、长期边界、工程原则
+│   ├── Whale_REQ_README.md           — 需求文档规范说明（按模块拆分原则）
+│   ├── Whale_REQ_Project.md          — 项目层面需求说明
+│   ├── Whale_REQ_Ingest.md           — 采集模块需求说明
+│   ├── Whale_REQ_SourceLab.md        — source_lab 需求说明
+│   ├── Whale_REQ_SharedSource.md     — 共享源层需求说明
+│   ├── Whale_REQ_Processing.md       — 数据处理模块需求说明
+│   ├── Whale_REQ_Aggregation.md      — 聚合模块需求说明
+│   ├── Whale_REQ_Storage.md          — 存储模块需求说明
+│   ├── Whale_REQ_MessagePipeline.md  — 消息管道需求说明
+│   ├── Whale_REQ_BatchLayer.md       — 批处理层需求说明
+│   ├── Whale_REQ_SpeedLayer.md       — 速度层需求说明
+│   └── Whale_REQ_Crosscutting.md     — 横切关注点需求说明
 ├── prompts/                           — prompt 模板
 │   └── 外部AI生成CodingAgent执行Prompt模板.md  — 供外部 AI 使用的 prompt 模板
 ├── reports/                           — agent 反馈与验收归档
-│   ├── _template.md                   — 归档模板
 │   ├── four_rounds_engineering_baseline_closure_report.md — 四轮收口自查与工程基线固化报告
 │   ├── cache_to_message_queue_use_case_round4_report.md   — 缓存快照发布用例报告（Round 4）
 │   ├── source_protocol_readiness_gate_round3_report.md    — 协议准入矩阵治理报告（Round 3）
@@ -538,8 +627,21 @@ ai_shared/
 │   ├── source_write_opcua_first_slice_report.md           — OPC UA 写首切片报告
 │   ├── source_lab_and_cache_to_kafka_reading_report.md    — source_lab 与 Kafka 预读报告
 │   ├── source_lab_facade_pattern_probe_report.md          — source_lab Facade 模式探查报告
-│   └── source_lab_server_client_ingest_boundary_report.md — 三层边界探查报告
-└── rules/                             — 公共规则
+│   ├── source_lab_server_client_ingest_boundary_report.md — 三层边界探查报告
+│   ├── iec61850_mms_production_read_write_round1_report.md — IEC 61850 MMS 生产读写第一闭环报告
+│   ├── iec61850_report_subscription_round1_report.md — IEC 61850 Report 订阅第一闭环报告
+│   ├── iec61850_report_subscription_round2_report.md — IEC 61850 Report 订阅采集 Round 2 实施报告
+│   ├── iec61850_report_subscription_stage_closure_report.md — IEC 61850 Report 订阅采集阶段收口报告
+│   ├── source_lab_server_simulator_facade_round1_report.md — source_lab ServerSimulatorFacade Round 1
+│   ├── source_lab_server_simulator_facade_round2_report.md — source_lab ServerSimulatorFacade Round 2
+│   ├── source_lab_server_simulator_facade_round4_ci_e2e_validation_report.md — source_lab ServerSimulatorFacade Round 4 CI E2E 验收
+│   ├── source_lab_server_simulator_facade_capacity_profile_multi_protocol_closure_report.md — capacity/profile 多协议运行闭环
+│   ├── source_lab_server_simulator_facade_round5_3_mqtt_http_rest_opcua_subscribe_and_template_governance_report.md — Round 5-3 协议闭环与模板治理
+│   ├── source_lab_round5_3_followup_adr_index_and_template_governance_closure_report.md — Round 5-3 治理收口补丁报告
+│   ├── source_lab_round5_4_iec61850_goose_sv_event_sample_closure_report.md — Round 5-4 GOOSE/SV 收口报告
+│   ├── source_lab_round5_5_final_protocol_gate_and_goose_sv_ci_validation_report.md — Round 5-5 最终门禁报告
+│   └── requirements_trace_update_20260525_source_lab_ingest_round1.md — 需求核验 Round 1 报告
+├── rules/                             — 公共规则
     ├── routing.md                     — 规则路由
     ├── coding.md                      — 编码规范
     ├── testing.md                     — 测试规范
@@ -579,6 +681,7 @@ scripts/
     ├── commit-message/SKILL.md        — 提交信息生成
     ├── feedback-archive/SKILL.md      — 反馈归档
     ├── heavy-regression/SKILL.md      — 重回归测试
+    ├── requirement-trace/SKILL.md     — 需求跟踪表更新
     ├── project-tree-read/SKILL.md     — 目录树读取
     ├── project-tree-reset/SKILL.md    — 目录树全量重建
     ├── project-tree-update/SKILL.md   — 目录树增量更新
@@ -590,6 +693,7 @@ scripts/
     ├── commit-message/SKILL.md
     ├── feedback-archive/SKILL.md
     ├── heavy-regression/SKILL.md
+    ├── requirement-trace/SKILL.md
     ├── project-tree-read/SKILL.md
     ├── project-tree-reset/SKILL.md
     ├── project-tree-update/SKILL.md

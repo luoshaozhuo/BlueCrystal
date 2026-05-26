@@ -38,6 +38,7 @@ class _FakeWritePort(SourceWritePort):
         ]
         return SourceWriteResult(
             request_id="fake_write",
+            command_id=None,
             dry_run=False,
             success_count=len(item_results),
             failure_count=0,
@@ -49,6 +50,8 @@ class _FakeWritePort(SourceWritePort):
 def _make_request(*, dry_run: bool = False, protocol: str = "opcua") -> SourceWriteRequest:
     return SourceWriteRequest(
         request_id="test-001",
+        command_id="cmd-001",
+        trace_id="trace-001",
         task_id=1,
         execution=SourceWriteExecutionOptions(
             protocol=protocol,
@@ -95,6 +98,8 @@ class TestSourceCommandUseCase:
             request = _make_request(dry_run=True)
             result = await self._use_case.execute(request)
             assert result.dry_run is True
+            assert result.command_id == "cmd-001"
+            assert result.trace_id == "trace-001"
             assert result.success_count == 0
             assert result.failure_count == 1
             assert result.results[0].status_code == "DRY_RUN"
@@ -120,6 +125,8 @@ class TestSourceCommandUseCase:
             result = await self._use_case.execute(request)
             assert result.dry_run is False
             assert result.success_count == 1
+            assert result.command_id == "cmd-001"
+            assert result.trace_id == "trace-001"
             assert self._write_port.last_execution is not None
         asyncio.run(_run())
 
@@ -157,6 +164,18 @@ class TestSourceCommandUseCase:
                 assert False, "Expected ValueError"
             except ValueError as e:
                 assert "protocol is required" in str(e)
+        asyncio.run(_run())
+
+    def test_validate_blank_command_id(self) -> None:
+        """空白 command_id 应拒绝。"""
+        async def _run():
+            request = _make_request(dry_run=True)
+            request.command_id = "  "
+            try:
+                await self._use_case.execute(request)
+                assert False, "Expected ValueError"
+            except ValueError as e:
+                assert "command_id cannot be blank" in str(e)
         asyncio.run(_run())
 
     def test_validate_empty_connections(self) -> None:

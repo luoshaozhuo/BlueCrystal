@@ -308,7 +308,29 @@ class ModbusRtuSimulator(_TcpThreadedSimulator):
             return bytes([unit_id, function_code | 0x80, 1])
         quantity = int.from_bytes(request[4:6], "big")
         byte_count = quantity * 2
-        return bytes([unit_id, function_code, byte_count]) + b"\x00\x01" * quantity
+        registers = bytearray()
+        start_addr = int.from_bytes(request[2:4], "big")
+        for offset in range(quantity):
+            addr = start_addr + offset
+            val = self._values.get(str(addr))
+            if val is None:
+                for point in self._source.points:
+                    try:
+                        if int(point.do_name) == addr:
+                            val = self._values.get(point.key, 0)
+                            break
+                    except (ValueError, TypeError):
+                        continue
+            if val is None:
+                val = 0
+            if isinstance(val, bool):
+                reg = 1 if val else 0
+            elif isinstance(val, (int, float)):
+                reg = int(val) & 0xFFFF
+            else:
+                reg = 0
+            registers.extend(struct.pack(">H", reg))
+        return bytes([unit_id, function_code, byte_count]) + bytes(registers)
 
 
 class Iec101Simulator(_TcpThreadedSimulator):
@@ -318,9 +340,61 @@ class Iec101Simulator(_TcpThreadedSimulator):
         super().__init__(source, name="iec101_gateway_simulator")
 
     def _handle_request(self, request: bytes) -> bytes:
-        # 最小确认帧，用于链路读写探测。
-        del request
-        return b"\x10\x00\x00\x16"
+        # 检测 C_IC_NA_1 询问固定帧: 0x10 0x49 ADDR CHK 0x16
+        if len(request) >= 5 and request[0] == 0x10 and request[1] == 0x49:
+            addr = request[2]
+            ack_chk = (0x00 + addr) & 0xFF
+            response = bytearray([0x10, 0x00, addr, ack_chk, 0x16])
+
+            for i, point in enumerate(self._source.points):
+                ioa = i + 1  # 1-based IOA
+                val = self._values.get(point.key, 0)
+                if isinstance(val, bool):
+                    response.extend(_build_iec101_sp_asdu(ioa, val, addr))
+                else:
+                    response.extend(_build_iec101_me_asdu(ioa, float(val), addr))
+            return bytes(response)
+        return b""
+
+
+# ── IEC101 CS101 帧构建辅助 ──────────────────────────────────────────
+
+
+def _build_iec101_me_asdu(ioa: int, value: float, addr: int = 0) -> bytes:
+    """构建 M_ME_NC_1 可变帧（短浮点测量值）。"""
+    ioa_bytes = ioa.to_bytes(3, "big")
+    val_bytes = struct.pack(">f", value)
+    asdu = bytes([
+        0x0D,           # TYPE: M_ME_NC_1
+        0x01,           # VSQ: 1 element
+        0x14,           # COT: interrogated by station interrogation
+        0x00,           # OA
+        0x00, 0x01,     # CA: common address = 1
+    ]) + ioa_bytes + val_bytes + bytes([0x00])  # QDS: good quality
+    return _build_iec101_variable_frame(asdu, addr)
+
+
+def _build_iec101_sp_asdu(ioa: int, value: bool, addr: int = 0) -> bytes:
+    """构建 M_SP_NA_1 可变帧（单点状态）。"""
+    ioa_bytes = ioa.to_bytes(3, "big")
+    siq = 0x01 if value else 0x00
+    asdu = bytes([
+        0x01,           # TYPE: M_SP_NA_1
+        0x01,           # VSQ: 1 element
+        0x14,           # COT: interrogated by station interrogation
+        0x00,           # OA
+        0x00, 0x01,     # CA: common address = 1
+    ]) + ioa_bytes + bytes([siq])
+    return _build_iec101_variable_frame(asdu, addr)
+
+
+def _build_iec101_variable_frame(asdu: bytes, addr: int = 0) -> bytes:
+    """构建 CS101 可变帧: 0x68 LEN LEN 0x68 CI ADDR ASDU CHK 0x16。"""
+    ci = 0x00
+    L = 4 + len(asdu)  # CI(1) + ADDR(1) + ASDU(N) + CHK(1)
+    chk_data = bytes([ci, addr]) + asdu
+    chk = sum(chk_data) & 0xFF
+    return bytes([0x68, L, L, 0x68, ci, addr]) + asdu + bytes([chk, 0x16])
 
 
 def build_simulator_for_protocol(protocol: str, source: SimulatedSource) -> SourceSimulator:

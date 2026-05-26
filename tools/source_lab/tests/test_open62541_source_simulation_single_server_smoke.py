@@ -19,8 +19,8 @@ import pytest
 
 from whale.shared.source.access import SourceEndpointSpec, SourcePointSpec, build_source_access_adapter
 from whale.shared.source.access.model import TickResult
-from tools.source_lab.opcua.address_space import logical_path
-from tools.source_lab.opcua.open62541_source_simulator import (
+from tools.source_lab.protocols.opcua.address_space import logical_path
+from tools.source_lab.protocols.opcua.open62541_source_simulator import (
     Open62541SourceSimulator,
     resolve_runner_path,
 )

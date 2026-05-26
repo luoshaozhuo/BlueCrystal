@@ -155,6 +155,11 @@ static void goose_listener(GooseSubscriber subscriber, void *parameter) {
 /* ══════════════════════════════════════════════════════════════════ */
 
 int main(int argc, char **argv) {
+    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+        printf("iec61850_goose_subscriber_runner\tversion=1\n");
+        return 0;
+    }
+
     if (argc != 4) {
         fprintf(stderr, "Usage: %s <interface> <app_id> <duration_s>\n", argv[0]);
         return 2;

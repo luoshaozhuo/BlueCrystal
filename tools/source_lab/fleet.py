@@ -146,9 +146,13 @@ def _run_simulator_process(
     ready_event: synchronize.Event,
     error_queue: queues.Queue[str],
 ) -> None:
+    """[deprecated] Old synchronous SourceSimulator subprocess.
+
+    No longer the default path. Replaced by ``_run_facade_process``.
+    """
     try:
         with build_simulator(source) as simulator:
-            # 一个 source 对应一个独立子进程，尽量贴近真实“一个设备一个 server”。
+            # 一个 source 对应一个独立子进程，尽量贴近真实"一个设备一个 server"。
             ready_event.set()
 
             # 周期写入放在子进程内部完成，主进程只负责生命周期，不再跨进程持有 simulator。
@@ -185,6 +189,76 @@ def _run_simulator_process(
         )
 
 
+def _run_facade_process(
+    source: SimulatedSource,
+    update_config: UpdateConfig,
+    stop_event: synchronize.Event,
+    ready_event: synchronize.Event,
+    error_queue: queues.Queue[str],
+) -> None:
+    """通过 ServerSimulatorFacade 管理的 simulator 子进程。
+
+    在每个子进程中创建 facade，使用 asyncio 管理其生命周期。
+    这是 `_run_simulator_process` 的替代。
+    """
+    try:
+        import asyncio
+
+        async def _run() -> None:
+            from tools.source_lab.protocols.registry import create_server_simulator
+
+            facade = create_server_simulator(source.connection.protocol, source)
+            await facade.load_points(
+                [
+                    p  # type: ignore[arg-type]
+                    for p in source.points
+                ]
+            )
+            result = await facade.start()
+            if result.status.name != "OK":
+                raise RuntimeError(
+                    f"facade start failed for {source.connection.name}: "
+                    f"{result.status.name} {result.message}"
+                )
+
+            ready_event.set()
+
+            update_points = _select_points_for_update(source.points, update_config)
+            rng = random.Random(
+                f"{source.connection.name}:{source.connection.host}:{source.connection.port}"
+            )
+            next_update_at = time.monotonic() + update_config.interval_seconds
+
+            while not stop_event.is_set():
+                if not update_config.enabled:
+                    await asyncio.sleep(0.1)
+                    continue
+
+                now = time.monotonic()
+                if now >= next_update_at:
+                    writes = _build_update_writes(update_points, rng)
+                    if writes:
+                        await facade.update_values(writes)
+                    next_update_at += update_config.interval_seconds
+                    while next_update_at <= now:
+                        next_update_at += update_config.interval_seconds
+
+                wait_seconds = min(0.05, max(0.0, next_update_at - time.monotonic()))
+                await asyncio.sleep(wait_seconds)
+
+            await facade.stop()
+
+        asyncio.run(_run())
+    except Exception as exc:
+        error_queue.put(
+            (
+                f"Facade process failed for source={source.connection.name} "
+                f"endpoint={source.connection.host}:{source.connection.port}: {exc}\n"
+                f"{traceback.format_exc()}"
+            )
+        )
+
+
 @dataclass
 class SourceSimulatorFleet:
     """Build, start and stop one homogeneous simulator fleet."""
@@ -195,6 +269,7 @@ class SourceSimulatorFleet:
     join_timeout_seconds: float = 5.0
     start_concurrency: int = _START_CONCURRENCY_DEFAULT
     start_stagger_ms: int = _START_STAGGER_MS_DEFAULT
+    use_facade: bool = True
     _processes: list[multiprocessing.Process] = field(init=False, repr=False, default_factory=list)
     _stop_events: list[synchronize.Event] = field(init=False, repr=False, default_factory=list)
     _ready_events: list[synchronize.Event] = field(init=False, repr=False, default_factory=list)
@@ -209,6 +284,7 @@ class SourceSimulatorFleet:
         startup_timeout_seconds: float | None = None,
         start_concurrency: int | None = None,
         start_stagger_ms: int | None = None,
+        use_facade: bool | None = None,
     ) -> "SourceSimulatorFleet":
         """Build one fleet from externally prepared simulated sources."""
         resolved_config = update_config or UpdateConfig()
@@ -219,6 +295,7 @@ class SourceSimulatorFleet:
         resolved_start_stagger_ms = (
             start_stagger_ms if start_stagger_ms is not None else _resolve_start_stagger_ms()
         )
+        resolved_use_facade = use_facade if use_facade is not None else True
         source_list = tuple(sources)
 
         if not source_list:
@@ -237,6 +314,7 @@ class SourceSimulatorFleet:
             startup_timeout_seconds=resolved_timeout,
             start_concurrency=resolved_start_concurrency,
             start_stagger_ms=resolved_start_stagger_ms,
+            use_facade=resolved_use_facade,
         )
 
     def start(self) -> "SourceSimulatorFleet":
@@ -323,6 +401,8 @@ class SourceSimulatorFleet:
         startup_deadline = time.monotonic() + self.startup_timeout_seconds
         startup_window: set[int] = set()
 
+        process_target = _run_facade_process if self.use_facade else _run_simulator_process
+
         for index, source in enumerate(self.sources):
             # ready_event 用来表示子进程已完成 server.start()；
             # stop_event 用来请求子进程退出；
@@ -330,7 +410,7 @@ class SourceSimulatorFleet:
             stop_event = context.Event()
             ready_event = context.Event()
             process = context.Process(
-                target=_run_simulator_process,
+                target=process_target,
                 name=f"source-simulator-{index + 1}",
                 args=(
                     source,

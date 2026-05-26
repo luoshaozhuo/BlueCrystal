@@ -132,10 +132,10 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "probe": True,
         "write": False,
         "production_client_write": False,
-        "simulator_write_injection": False,
+        "simulator_write_injection": True,
         "supported_write_operations": (),
         "unsupported_write_operations": ("FC05_single_coil_write", "FC06_single_register_write", "FC15_multi_coil_write", "FC16_multi_register_write"),
-        "write_limitation": "Modbus write (FC05/06/15/16) not implemented yet.",
+        "write_limitation": "Modbus RTU write via simulator_write_injection only (TCP gateway mode, not FC05/06/15/16).",
         "implementation_level": "real_native_runner",
         "backend": "libmodbus executable runner",
         "limitation": "",
@@ -161,10 +161,10 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "probe": True,
         "write": False,
         "production_client_write": False,
-        "simulator_write_injection": False,
+        "simulator_write_injection": True,
         "supported_write_operations": (),
         "unsupported_write_operations": ("C_SC", "C_SE", "C_BO"),
-        "write_limitation": "IEC 101 C_SC/C_SE/C_BO not implemented yet.",
+        "write_limitation": "IEC101 write via simulator_write_injection only (TCP gateway mode, not C_SC/C_SE/C_BO).",
         "implementation_level": "real_native_runner",
         "backend": "lib60870-C executable runner",
         "limitation": "",
@@ -223,20 +223,31 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "polling": True,
         "subscribe": False,
         "probe": True,
-        "write": False,
-        "production_client_write": False,
-        "simulator_write_injection": False,
-        "supported_write_operations": (),
-        "unsupported_write_operations": ("Oper_select", "Oper_cancel", "Oper_execute"),
-        "write_limitation": "IEC 61850 MMS control (Oper/Select/Cancel) not implemented yet.",
+        "write": True,
+        "production_client_write": True,
+        "simulator_write_injection": True,
+        "supported_write_operations": ("mms_direct_write",),
+        "unsupported_write_operations": (
+            "select_before_operate",
+            "operate_on_select",
+            "command_termination",
+            "enhanced_security_control",
+            "report_control_block_write",
+            "goose",
+            "sv",
+        ),
+        "write_limitation": "IEC 61850 MMS direct write via libiec61850 native runner WRITE command (2026-05-24). "
+        "Only SP (set point) and CF (configuration) FC data attributes. "
+        "Verified write types: BOOLEAN, INT32, UINT32, INT64, FLOAT32, FLOAT64, VISIBLE_STRING (all 7 types verified via integration write_then_readback). "
+        "No SBO/Oper/Select/Cancel control models. No GOOSE/SV/Report write.",
         "implementation_level": "real_native_runner",
         "backend": "libiec61850 executable runner",
         "limitation": "",
         "application_protocol": "IEC61850",
         "transport": "TCP",
-        "service_types": ("MMS_READ",),
-        "service_type_map": {"polling": "MMS_READ"},
-        "access_modes": ("polling",),
+        "service_types": ("MMS_READ", "MMS_WRITE"),
+        "service_type_map": {"polling": "MMS_READ", "write": "MMS_WRITE"},
+        "access_modes": ("polling", "write"),
         "current_implementation_level": "real_native_runner",
         "current_backend": "libiec61850 executable runner",
         "current_limitation": "",
@@ -253,7 +264,13 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "subscribe": True,
         "probe": True,
         "write": False,
+        "production_client_read": False,
         "production_client_write": False,
+        "production_client_subscribe": True,
+        "supported_subscription_operations": ("report_subscription",),
+        "unsupported_subscription_operations": (
+            "polling_read", "goose", "sv", "brcb", "buffered_report",
+        ),
         "simulator_write_injection": False,
         "supported_write_operations": (),
         "unsupported_write_operations": ("report_write",),
@@ -267,14 +284,80 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "service_type_map": {"subscribe": "REPORT"},
         "access_modes": ("streaming",),
         "current_implementation_level": "real_native_runner",
-        "current_backend": "libiec61850 executable runner",
-        "current_limitation": "",
+        "current_backend": "libiec61850 executable runner (report_runner via stdin/stdout, 2026-05-24)",
+        "current_limitation": "订阅模式。通过 iec61850_report_runner C 子进程实现。已接入 composition。支持最小 reconnect（最多2次）。只支持 URCB，不支持 BRCB。无动态 DataSet 发现。无 GOOSE/SV。",
         "target_implementation_level": "real_native_runner",
         "target_backend": "libiec61850 executable runner",
         "target_limitation": "",
         "native_required": True,
         "native_library": "libiec61850",
         "cli_aliases": ("iec61850_report", "iec61850report"),
+    },
+    # ── IEC 61850 GOOSE ────────────────────────────────────────────
+    "iec61850_goose": {
+        "polling": False,
+        "subscribe": True,
+        "probe": True,
+        "write": False,
+        "production_client_read": False,
+        "production_client_write": False,
+        "production_client_subscribe": False,
+        "supported_subscription_operations": ("goose_event",),
+        "unsupported_subscription_operations": ("polling_read", "mms_write", "report", "sv"),
+        "simulator_write_injection": True,
+        "supported_write_operations": (),
+        "unsupported_write_operations": ("goose_write", "mms_direct_write"),
+        "write_limitation": "IEC 61850 GOOSE is event-only in source_lab simulator facade; write/control semantics are not implemented.",
+        "implementation_level": "real_native_runner",
+        "backend": "libiec61850 GOOSE publisher/subscriber runners",
+        "limitation": "Requires Linux L2 raw socket permissions (CAP_NET_RAW) and a usable interface.",
+        "application_protocol": "IEC61850",
+        "transport": "ETHERNET_L2",
+        "service_types": ("GOOSE",),
+        "service_type_map": {"subscribe": "GOOSE"},
+        "access_modes": ("streaming",),
+        "current_implementation_level": "real_native_runner",
+        "current_backend": "libiec61850 GOOSE publisher/subscriber runners",
+        "current_limitation": "Requires CAP_NET_RAW/raw socket and interface selection; not an ingest production client.",
+        "target_implementation_level": "real_native_runner",
+        "target_backend": "libiec61850 GOOSE executable runner",
+        "target_limitation": "",
+        "native_required": True,
+        "native_library": "libiec61850",
+        "cli_aliases": ("iec61850_goose", "iec61850goose"),
+    },
+    # ── IEC 61850 Sampled Values ───────────────────────────────────
+    "iec61850_sv": {
+        "polling": False,
+        "subscribe": True,
+        "probe": True,
+        "write": False,
+        "production_client_read": False,
+        "production_client_write": False,
+        "production_client_subscribe": False,
+        "supported_subscription_operations": ("sampled_value",),
+        "unsupported_subscription_operations": ("polling_read", "mms_write", "report", "goose"),
+        "simulator_write_injection": True,
+        "supported_write_operations": (),
+        "unsupported_write_operations": ("sv_write", "mms_direct_write"),
+        "write_limitation": "IEC 61850 SV is sampled-value streaming only in source_lab simulator facade; write/control semantics are not implemented.",
+        "implementation_level": "real_native_runner",
+        "backend": "libiec61850 SV publisher/subscriber runners",
+        "limitation": "Requires Linux L2 raw socket permissions (CAP_NET_RAW) and a usable interface.",
+        "application_protocol": "IEC61850",
+        "transport": "ETHERNET_L2",
+        "service_types": ("SV",),
+        "service_type_map": {"subscribe": "SV"},
+        "access_modes": ("streaming",),
+        "current_implementation_level": "real_native_runner",
+        "current_backend": "libiec61850 SV publisher/subscriber runners",
+        "current_limitation": "Requires CAP_NET_RAW/raw socket and interface selection; not an ingest production client.",
+        "target_implementation_level": "real_native_runner",
+        "target_backend": "libiec61850 SV executable runner",
+        "target_limitation": "",
+        "native_required": True,
+        "native_library": "libiec61850",
+        "cli_aliases": ("iec61850_sv", "iec61850sv"),
     },
     # ── MQTT ───────────────────────────────────────────────────────
     "mqtt": {
@@ -283,10 +366,10 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "probe": True,
         "write": False,
         "production_client_write": False,
-        "simulator_write_injection": False,
+        "simulator_write_injection": True,
         "supported_write_operations": (),
         "unsupported_write_operations": ("MQTT_publish",),
-        "write_limitation": "MQTT publish (write) not implemented yet.",
+        "write_limitation": "MQTT publish (write) not implemented yet. Simulator write injection via update_values is available.",
         "implementation_level": "python_lightweight_runner",
         "backend": "Python socket (MQTT handshake)",
         "limitation": "Python lightweight implementation, does not use Paho C native backend.",
@@ -312,10 +395,10 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "probe": True,
         "write": False,
         "production_client_write": False,
-        "simulator_write_injection": False,
+        "simulator_write_injection": True,
         "supported_write_operations": (),
         "unsupported_write_operations": ("HTTP_POST", "HTTP_PUT", "HTTP_PATCH", "HTTP_DELETE"),
-        "write_limitation": "HTTP REST POST/PUT/PATCH (write) not implemented yet.",
+        "write_limitation": "HTTP REST POST/PUT/PATCH (write) not implemented yet. Simulator write injection via update_values is available.",
         "implementation_level": "python_lightweight_runner",
         "backend": "Python urllib (HTTP GET)",
         "limitation": "Python lightweight implementation, not yet validated against full HTTP REST standard.",
@@ -350,6 +433,8 @@ _POLLING_PROBE_PROTOCOLS: Final[tuple[str, ...]] = _POLLING_PROTOCOLS
 _STREAMING_PROBE_PROTOCOLS: Final[tuple[str, ...]] = (
     "mqtt",
     "iec61850_report",
+    "iec61850_goose",
+    "iec61850_sv",
 )
 
 
@@ -483,12 +568,24 @@ SERVICE_CAPABILITIES: Final[dict[tuple[str, str, str], _ProtoCap]] = {
         "native_required": True,
         "native_library": "libiec61850",
     },
+    # ── IEC 61850 MMS Write ────────────────────────────────────────
+    ("IEC61850", "MMS_WRITE", "TCP"): {
+        "access_mode": "write",
+        "current_implementation_level": "real_native_runner",
+        "current_backend": "libiec61850 executable runner via stdin WRITE command",
+        "current_limitation": "Direct MMS write only (SP/CF attributes). All 7 types verified: BOOLEAN, INT32, UINT32, INT64, FLOAT32, FLOAT64, VISIBLE_STRING. No SBO/Oper/Select/Cancel.",
+        "target_implementation_level": "real_native_runner",
+        "target_backend": "libiec61850 executable runner via stdin WRITE command",
+        "target_limitation": "",
+        "native_required": True,
+        "native_library": "libiec61850",
+    },
     # ── IEC 61850 Report ───────────────────────────────────────────
     ("IEC61850", "REPORT", "TCP"): {
         "access_mode": "streaming",
         "current_implementation_level": "real_native_runner",
-        "current_backend": "libiec61850 executable runner",
-        "current_limitation": "",
+        "current_backend": "libiec61850 report_runner via stdin/stdout",
+        "current_limitation": "URCB only, no BRCB. Minimal reconnect (max 2 attempts). No dynamic DataSet discovery.",
         "target_implementation_level": "real_native_runner",
         "target_backend": "libiec61850 executable runner",
         "target_limitation": "",
@@ -498,9 +595,9 @@ SERVICE_CAPABILITIES: Final[dict[tuple[str, str, str], _ProtoCap]] = {
     # ── IEC 61850 GOOSE ────────────────────────────────────────────
     ("IEC61850", "GOOSE", "ETHERNET_L2"): {
         "access_mode": "streaming",
-        "current_implementation_level": "planned_native_runner",
-        "current_backend": "not implemented",
-        "current_limitation": "Not yet implemented; planned via libiec61850.",
+        "current_implementation_level": "real_native_runner",
+        "current_backend": "libiec61850 GOOSE publisher/subscriber runners",
+        "current_limitation": "Requires Linux L2 raw socket permissions (CAP_NET_RAW) and a usable interface.",
         "target_implementation_level": "real_native_runner",
         "target_backend": "libiec61850 GOOSE executable runner",
         "target_limitation": "",
@@ -510,9 +607,9 @@ SERVICE_CAPABILITIES: Final[dict[tuple[str, str, str], _ProtoCap]] = {
     # ── IEC 61850 Sampled Values ───────────────────────────────────
     ("IEC61850", "SV", "ETHERNET_L2"): {
         "access_mode": "streaming",
-        "current_implementation_level": "planned_native_runner",
-        "current_backend": "not implemented",
-        "current_limitation": "Not yet implemented; planned via libiec61850.",
+        "current_implementation_level": "real_native_runner",
+        "current_backend": "libiec61850 SV publisher/subscriber runners",
+        "current_limitation": "Requires Linux L2 raw socket permissions (CAP_NET_RAW) and a usable interface.",
         "target_implementation_level": "real_native_runner",
         "target_backend": "libiec61850 SV executable runner",
         "target_limitation": "",
@@ -618,11 +715,7 @@ _PROTOCOL_ALIASES: Final[dict[str, str]] = {
     "http": "http_rest",
     "httprest": "http_rest",
     "http_rest": "http_rest",
-    # Deprecated aliases — resolve to IEC61850 family stub names
-    # These do NOT have PROTOCOL_CAPABILITIES entries (no standalone runner).
-    # They document that GOOSE/SV are IEC61850 service types, not top-level
-    # protocols.  Attempts to call get_protocol_capability() on them will
-    # raise ValueError with a clear message.
+    # IEC 61850 L2 streaming aliases.
     "iec61850goose": "iec61850_goose",
     "iec61850_goose": "iec61850_goose",
     "iec61850sv": "iec61850_sv",
@@ -657,10 +750,6 @@ def normalize_protocol(value: str) -> str:
 
 def list_supported_protocols() -> tuple[str, ...]:
     """Return the list of fully registered protocol names.
-
-    Deprecated aliases (iec61850_goose, iec61850_sv) are **not** included;
-    they resolve through ``normalize_protocol()`` but have no standalone
-    runner implementation.
     """
     return tuple(PROTOCOL_CAPABILITIES.keys())
 
@@ -684,11 +773,6 @@ def get_protocol_capability(protocol: str) -> dict[str, object]:
             f"protocol {normalized!r} is defined as an alias but has no "
             f"capability entry (deprecated alias or planned service type)."
         )
-        if normalized in ("iec61850_goose", "iec61850_sv"):
-            msg += (
-                f" {normalized} is a deprecated alias for IEC61850 service type. "
-                f"Use --protocol IEC61850 with --service-type (planned CLI extension) instead."
-            )
         raise ValueError(msg)
     return cap
 
@@ -851,12 +935,15 @@ def build_capacity_runner(protocol: str) -> CapacityRunner:
     normalized = normalize_protocol(protocol)
 
     # ── Native runner lookup ────────────────────────────────────────────
+    from tools.source_lab.access.runners.native_cmd import NativeRunnerUnavailableError
     from tools.source_lab.access.runners.native_runner_map import NATIVE_CAPACITY_RUNNERS
     native_cls = NATIVE_CAPACITY_RUNNERS.get(normalized)
     if native_cls is not None:
         try:
-            return native_cls()
-        except RuntimeError:
+            runner = native_cls()
+            runner.check_available()
+            return runner
+        except NativeRunnerUnavailableError:
             pass  # fall through to Python lightweight
 
     # ── Python lightweight fallback ─────────────────────────────────────
@@ -897,6 +984,16 @@ def build_subscription_runner(protocol: str) -> SubscriptionRunner:
     if normalized == "iec61850_report":
         from tools.source_lab.access.runners.iec61850_report import Iec61850ReportRunner
         return Iec61850ReportRunner()
+    if normalized == "iec61850_goose":
+        from tools.source_lab.access.runners.iec61850_l2_streaming import (
+            Iec61850GooseStreamingRunner,
+        )
+        return Iec61850GooseStreamingRunner()
+    if normalized == "iec61850_sv":
+        from tools.source_lab.access.runners.iec61850_l2_streaming import (
+            Iec61850SvStreamingRunner,
+        )
+        return Iec61850SvStreamingRunner()
     if normalized == "mqtt":
         from tools.source_lab.access.runners.mqtt_subscription import MqttSubscriptionRunner
         return MqttSubscriptionRunner()

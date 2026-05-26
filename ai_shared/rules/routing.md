@@ -70,7 +70,7 @@ ai_shared/rules/reporting.md
 额外读取：
 
 ```text
-ai_shared/memory/项目说明.md
+ai_shared/memory/*项目说明*
 ```
 
 并必须读取当前 ORM、migration、schema、repository、相关测试。不得凭记忆推断字段。
@@ -90,7 +90,7 @@ ai_shared/memory/项目说明.md
 只有涉及项目目标、长期需求、非功能需求、安全合规、技术可替换性时，才读取：
 
 ```text
-ai_shared/memory/项目说明.md
+ai_shared/memory/*项目说明*
 ```
 
 普通代码修改不读取项目说明全文。

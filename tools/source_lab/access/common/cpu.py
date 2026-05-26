@@ -1,4 +1,8 @@
-"""CPU and RSS sampling utilities used only for field capacity reporting."""
+"""CPU 与 RSS 采样工具，仅用于场端容量报告。
+
+负责：按进程采集 CPU 和 RSS 指标，提供 CpuSnapshot 协议用于报告行构建。
+不负责：CPU/RSS 数据的持久化、跨进程聚合。
+"""
 
 from __future__ import annotations
 

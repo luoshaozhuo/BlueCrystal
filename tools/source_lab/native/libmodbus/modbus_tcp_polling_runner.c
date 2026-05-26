@@ -9,9 +9,10 @@
  *
  * Interactive stdin commands:
  *   WRITE\trequest_id\thost\tport\tunit_id\treg_addr\tvalue_type\tvalue
+ *   READ\trequest_id\thost\tport\tunit_id\treg_addr\tcount
  *
  * Interactive stdout prefixes:
- *   READY, WRITE_RESULT, ERROR
+ *   READY, WRITE_RESULT, READ_RESULT, ERROR
  */
 
 #include <stdio.h>
@@ -141,6 +142,92 @@ static void handle_write_command(char *line)
     modbus_free(ctx);
 }
 
+/* ── READ command handler (FC03 read holding registers) ───────────────── */
+
+static void handle_read_command(char *line)
+{
+    /* READ\trequest_id\thost\tport\tunit_id\treg_addr\tcount */
+    char *fields[10] = {0};
+    int field_count = split_fields(line, fields, 10);
+    if(field_count < 6 || strcmp(fields[0], "READ") != 0) {
+        fprintf(stderr, "READ protocol_error: field_count=%d\n", field_count);
+        printf("READ_RESULT\t-\tok=0\tprotocol_error\tinvalid_read_command_format\n");
+        fflush(stdout);
+        return;
+    }
+
+    char request_id[MAX_FIELD_LEN];
+    char host[MAX_FIELD_LEN];
+
+    sanitize_field(fields[1], request_id, sizeof(request_id));
+    sanitize_field(fields[2], host, sizeof(host));
+    int port = atoi(fields[3]);
+    int unit_id = atoi(fields[4]);
+    int reg_addr = atoi(fields[5]);
+    int count = (field_count >= 7) ? atoi(fields[6]) : 1;
+
+    if(port <= 0 || port > 65535) {
+        fprintf(stderr, "READ invalid_port: %d\n", port);
+        printf("READ_RESULT\t%s\tok=0\tinvalid_port\tport=%d\n", request_id, port);
+        fflush(stdout);
+        return;
+    }
+    if(count <= 0 || count > 125) {
+        fprintf(stderr, "READ invalid_count: %d\n", count);
+        printf("READ_RESULT\t%s\tok=0\tinvalid_count\tcount=%d\n", request_id, count);
+        fflush(stdout);
+        return;
+    }
+
+    modbus_t *ctx = modbus_new_tcp(host, port);
+    if(ctx == NULL) {
+        fprintf(stderr, "READ modbus_new_tcp_failed\n");
+        printf("READ_RESULT\t%s\tok=0\tinternal_error\tmodbus_new_tcp_failed\n", request_id);
+        fflush(stdout);
+        return;
+    }
+
+    modbus_set_slave(ctx, unit_id);
+
+    if(modbus_connect(ctx) == -1) {
+        fprintf(stderr, "READ connect_failed: %s\n", modbus_strerror(errno));
+        printf("READ_RESULT\t%s\tok=0\tconnect_failed\t%s\n",
+               request_id, modbus_strerror(errno));
+        fflush(stdout);
+        modbus_free(ctx);
+        return;
+    }
+
+    uint16_t *tab = (uint16_t *)malloc(count * sizeof(uint16_t));
+    if(tab == NULL) {
+        fprintf(stderr, "READ malloc_failed\n");
+        printf("READ_RESULT\t%s\tok=0\tinternal_error\tmalloc_failed\n", request_id);
+        fflush(stdout);
+        modbus_close(ctx);
+        modbus_free(ctx);
+        return;
+    }
+
+    int rc = modbus_read_registers(ctx, reg_addr, count, tab);
+    if(rc == -1) {
+        fprintf(stderr, "READ read_failed: %s\n", modbus_strerror(errno));
+        printf("READ_RESULT\t%s\tok=0\tread_failed\t%s\n",
+               request_id, modbus_strerror(errno));
+    } else {
+        fprintf(stderr, "READ done: host=%s port=%d unit=%d addr=%d count=%d ok=%d\n",
+                host, port, unit_id, reg_addr, count, rc);
+        printf("READ_RESULT\t%s\tok=1\tOK", request_id);
+        for(int j = 0; j < rc; j++)
+            printf("\t%u", (unsigned)tab[j]);
+        printf("\n");
+    }
+    fflush(stdout);
+
+    free(tab);
+    modbus_close(ctx);
+    modbus_free(ctx);
+}
+
 /* ── Interactive mode (stdin/stdout) ─────────────────────────────────── */
 
 static int run_interactive(void)
@@ -155,6 +242,10 @@ static int run_interactive(void)
         if(strcmp(line, "QUIT") == 0) return 0;
         if(strncmp(line, "WRITE\t", 6) == 0) {
             handle_write_command(line);
+            continue;
+        }
+        if(strncmp(line, "READ\t", 5) == 0) {
+            handle_read_command(line);
             continue;
         }
         printf("ERROR\tunknown_command\n");
@@ -236,10 +327,10 @@ static int run_polling(int argc, char **argv)
 
 static void print_version(void)
 {
-    printf("modbus_tcp_polling_runner 1.1.0\n");
-    printf("protocol: stdin/stdout polling + write (FC03/FC06)\n");
-    printf("stdin commands: WRITE, QUIT\n");
-    printf("stdout prefixes: READY, WRITE_RESULT, ERROR, SAMPLE, BATCH, SUMMARY, DONE\n");
+    printf("modbus_tcp_polling_runner 1.2.0\n");
+    printf("protocol: stdin/stdout polling + write + read (FC03/FC06)\n");
+    printf("stdin commands: WRITE, READ, QUIT\n");
+    printf("stdout prefixes: READY, WRITE_RESULT, READ_RESULT, ERROR, SAMPLE, BATCH, SUMMARY, DONE\n");
 }
 
 /* ── Entry point ────────────────────────────────────────────────────── */

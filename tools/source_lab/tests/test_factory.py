@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tools.source_lab.opcua.open62541_source_simulator import (
+from tools.source_lab.protocols.opcua.open62541_source_simulator import (
     Open62541SourceSimulator,
 )
 from tools.source_lab.factory import build_simulator

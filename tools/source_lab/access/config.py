@@ -1,4 +1,8 @@
-"""Environment config loading for capacity scans and standalone field probes."""
+"""容量扫描与场端探测的环境变量配置加载。
+
+负责：从环境变量读取 SOURCE_SIM_*/SOURCE_LAB_* 系列配置，构造 CapacityScanConfig/SubscribeScanConfig/ProbeConfig 等配置对象。
+不负责：配置的持久化、运行时修改。
+"""
 
 from __future__ import annotations
 

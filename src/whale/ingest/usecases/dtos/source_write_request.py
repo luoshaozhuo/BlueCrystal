@@ -55,6 +55,12 @@ class SourceWriteRequest:
     request_id: str
     """请求唯一标识，用于追踪和审计。"""
 
+    command_id: str | None = None
+    """命令唯一标识，建议由上游控制平面生成。"""
+
+    trace_id: str | None = None
+    """链路追踪标识，用于跨 use case/adapter 关联。"""
+
     task_id: int = 0
     """关联的任务 ID（可选）。"""
 

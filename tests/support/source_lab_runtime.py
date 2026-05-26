@@ -36,7 +36,11 @@ def prepare_source_lab_runtime_imports() -> None:
         "tools.source_lab.access.runners",
         SOURCE_LAB_ROOT / "access" / "runners",
     )
-    _ensure_namespace_package("tools.source_lab.opcua", SOURCE_LAB_ROOT / "opcua")
+    _ensure_namespace_package("tools.source_lab.opcua", SOURCE_LAB_ROOT / "protocols" / "opcua")
+    _ensure_namespace_package(
+        "tools.source_lab.protocols.opcua",
+        SOURCE_LAB_ROOT / "protocols" / "opcua",
+    )
     _ensure_namespace_package(
         "tools.source_lab.protocols",
         SOURCE_LAB_ROOT / "protocols",

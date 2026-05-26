@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import time
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import build_opener, ProxyHandler
+
+_no_proxy_opener = build_opener(ProxyHandler({}))
 
 from tools.source_lab.access.polling.model import CapacityScanConfig
 from tools.source_lab.access.runners.generic_polling import GenericPollingCapacityRunner, PollingReadSample
@@ -23,7 +25,7 @@ class HttpRestPollingRunner(GenericPollingCapacityRunner):
         query = urlencode({"points": point_names})
         url = f"http://{spec.source.endpoint.host}:{spec.source.endpoint.port}{path}?{query}"
         try:
-            with urlopen(url, timeout=config.read_timeout_s) as response:
+            with _no_proxy_opener.open(url, timeout=config.read_timeout_s) as response:
                 body = response.read().decode("utf-8")
             payload = json.loads(body)
             if isinstance(payload, dict) and isinstance(payload.get("values"), list):

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,7 @@ import pytest
 from tools.source_lab.access.runners.native_cmd import NativeCmdCapacityRunner
 from tools.source_lab.access.runners.native_runner_map import NATIVE_CAPACITY_RUNNERS
 
-_NATIVE_DIR = Path(__file__).resolve().parents[3] / "native" / "build"
+_NATIVE_DIR = Path(__file__).resolve().parents[2] / "native" / "build"
 
 
 def _executable_path(name: str) -> Path:
@@ -69,11 +70,51 @@ def test_iec61850_goose_subscriber_executable() -> None:
         pytest.skip("dependency_missing: iec61850_goose_subscriber_runner not compiled (libiec61850 missing)")
 
 
+def test_iec61850_goose_publisher_executable() -> None:
+    """IEC61850 GOOSE publisher executable must exist or skip."""
+    exe = _executable_path("iec61850_goose_publisher_simulator")
+    if not exe.exists():
+        pytest.skip("dependency_missing: iec61850_goose_publisher_simulator not compiled (libiec61850 missing)")
+
+
 def test_iec61850_sv_subscriber_executable() -> None:
     """IEC61850 SV subscriber executable must exist or skip."""
     exe = _executable_path("iec61850_sv_subscriber_runner")
     if not exe.exists():
         pytest.skip("dependency_missing: iec61850_sv_subscriber_runner not compiled (libiec61850 missing)")
+
+
+def test_iec61850_sv_publisher_executable() -> None:
+    """IEC61850 SV publisher executable must exist or skip."""
+    exe = _executable_path("iec61850_sv_publisher_simulator")
+    if not exe.exists():
+        pytest.skip("dependency_missing: iec61850_sv_publisher_simulator not compiled (libiec61850 missing)")
+
+
+@pytest.mark.parametrize(
+    "name",
+    (
+        "iec61850_goose_publisher_simulator",
+        "iec61850_goose_subscriber_runner",
+        "iec61850_sv_publisher_simulator",
+        "iec61850_sv_subscriber_runner",
+    ),
+)
+def test_iec61850_l2_native_runner_version_contract(name: str) -> None:
+    """GOOSE/SV native binaries must expose a non-network --version probe."""
+    exe = _executable_path(name)
+    if not exe.exists():
+        pytest.skip(f"dependency_missing: {name} not compiled (libiec61850 missing)")
+    result = subprocess.run(
+        [str(exe), "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == 0, result.stderr
+    assert name in result.stdout
+    assert "version=" in result.stdout
 
 
 def test_native_runner_map_has_entries() -> None:

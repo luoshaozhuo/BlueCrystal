@@ -11,6 +11,15 @@ from whale.ingest.adapters.source.modbus_source_acquisition_adapter import (
 from whale.ingest.adapters.source.modbus_source_write_adapter import (
     ModbusSourceWriteAdapter,
 )
+from whale.ingest.adapters.source.iec61850_source_acquisition_adapter import (
+    Iec61850MmsSourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.iec61850_report_source_acquisition_adapter import (
+    Iec61850ReportSourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.iec61850_source_write_adapter import (
+    Iec61850MmsSourceWriteAdapter,
+)
 from whale.ingest.adapters.source.opcua_source_acquisition_adapter import (
     OpcUaSourceAcquisitionAdapter,
 )
@@ -294,22 +303,31 @@ def build_source_write_composition(
     # Build write ports
     opcua_write_port: SourceWritePort = OpcUaSourceWriteAdapter()
     modbus_write_port: SourceWritePort = ModbusSourceWriteAdapter()
+    iec61850_mms_write_port: SourceWritePort = Iec61850MmsSourceWriteAdapter()
     resolved_write_port_registry = write_port_registry or StaticSourceWritePortRegistry(
         ports_by_protocol={
             "opcua": opcua_write_port,
             "modbus_tcp": modbus_write_port,
             "modbustcp": modbus_write_port,
+            "iec61850_mms": iec61850_mms_write_port,
+            "iec61850mms": iec61850_mms_write_port,
         },
     )
 
     # Build acquisition port registry (used by write composition for resolution)
     opcua_acquisition_port: SourceAcquisitionPort = OpcUaSourceAcquisitionAdapter()
     modbus_acquisition_port: SourceAcquisitionPort = ModbusSourceAcquisitionAdapter()
+    iec61850_mms_acquisition_port: SourceAcquisitionPort = Iec61850MmsSourceAcquisitionAdapter()
+    iec61850_report_acquisition_port: SourceAcquisitionPort = Iec61850ReportSourceAcquisitionAdapter()
     resolved_acquisition_registry: SourceAcquisitionPortRegistry = StaticSourceAcquisitionPortRegistry(
         ports_by_protocol={
             "opcua": opcua_acquisition_port,
             "modbus_tcp": modbus_acquisition_port,
             "modbustcp": modbus_acquisition_port,
+            "iec61850_mms": iec61850_mms_acquisition_port,
+            "iec61850mms": iec61850_mms_acquisition_port,
+            "iec61850_report": iec61850_report_acquisition_port,
+            "iec61850report": iec61850_report_acquisition_port,
         },
     )
 
@@ -319,7 +337,7 @@ def build_source_write_composition(
 
     resolved_logger.info(
         "Source write composition built: protocols=%s",
-        sorted(["opcua", "modbus_tcp"]),
+        sorted(["opcua", "modbus_tcp", "iec61850_mms", "iec61850_report"]),
     )
 
     return IngestWriteComposition(

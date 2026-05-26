@@ -110,21 +110,15 @@ def test_service_capabilities_sv_exists() -> None:
 
 
 def test_goose_not_in_list_supported_protocols() -> None:
-    """GOOSE must NOT appear as a standalone top-level protocol."""
+    """GOOSE alias is now registered for source_lab streaming E2E."""
     protocols = list_supported_protocols()
-    assert "iec61850_goose" not in protocols, (
-        "iec61850_goose should not be a top-level protocol; "
-        "it is an IEC61850 service type"
-    )
+    assert "iec61850_goose" in protocols
 
 
 def test_sv_not_in_list_supported_protocols() -> None:
-    """SV must NOT appear as a standalone top-level protocol."""
+    """SV alias is now registered for source_lab streaming E2E."""
     protocols = list_supported_protocols()
-    assert "iec61850_sv" not in protocols, (
-        "iec61850_sv should not be a top-level protocol; "
-        "it is an IEC61850 service type"
-    )
+    assert "iec61850_sv" in protocols
 
 
 def test_goose_alias_resolves_through_normalize() -> None:
@@ -140,15 +134,19 @@ def test_sv_alias_resolves_through_normalize() -> None:
 
 
 def test_goose_alias_no_capability() -> None:
-    """get_protocol_capability('iec61850_goose') must raise ValueError."""
-    with pytest.raises(ValueError, match="deprecated alias"):
-        get_protocol_capability("iec61850_goose")
+    """get_protocol_capability('iec61850_goose') exposes streaming-only capability."""
+    cap = get_protocol_capability("iec61850_goose")
+    assert cap["polling"] is False
+    assert cap["subscribe"] is True
+    assert cap["write"] is False
 
 
 def test_sv_alias_no_capability() -> None:
-    """get_protocol_capability('iec61850_sv') must raise ValueError."""
-    with pytest.raises(ValueError, match="deprecated alias"):
-        get_protocol_capability("iec61850_sv")
+    """get_protocol_capability('iec61850_sv') exposes streaming-only capability."""
+    cap = get_protocol_capability("iec61850_sv")
+    assert cap["polling"] is False
+    assert cap["subscribe"] is True
+    assert cap["write"] is False
 
 
 # ── resolve_service_triple ────────────────────────────────────────────

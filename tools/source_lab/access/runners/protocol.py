@@ -1,4 +1,8 @@
-"""Shared stdout/stderr protocol diagnostics for native access runners."""
+"""原生接入执行器的 stdout/stderr 协议诊断共享工具。
+
+负责：解析原生 runner 进程的 stdout 协议行（READY/DONE/ERROR 等），管理 stderr 线程诊断。
+不负责：协议特定执行逻辑、结果聚合。
+"""
 
 from __future__ import annotations
 

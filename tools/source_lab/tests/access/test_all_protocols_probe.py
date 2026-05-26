@@ -25,6 +25,8 @@ def test_all_protocols_have_probe_mode_or_explicit_support() -> None:
         "iec104": "polling",
         "iec61850_mms": "polling",
         "iec61850_report": "streaming",
+        "iec61850_goose": "streaming",
+        "iec61850_sv": "streaming",
         "mqtt": "streaming",
         "http_rest": "polling",
     }

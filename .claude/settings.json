@@ -22,7 +22,8 @@
       "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/acquisition_task_orm.py)",
       "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/acquisition_model_orm.py)",
       "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/acquisition_variable_orm.py)",
-      "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/variable_state_orm.py)"
+      "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/variable_state_orm.py)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

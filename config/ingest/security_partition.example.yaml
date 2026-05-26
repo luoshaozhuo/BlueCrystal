@@ -1,0 +1,24 @@
+version: 1
+zones:
+  ingest: zone_ingest
+  source: zone_source
+  cache: zone_cache
+  mq: zone_mq
+flows:
+  - from: zone_source
+    to: zone_ingest
+    purpose: acquisition
+  - from: zone_ingest
+    to: zone_cache
+    purpose: state_cache_write
+  - from: zone_cache
+    to: zone_ingest
+    purpose: snapshot_read
+  - from: zone_ingest
+    to: zone_mq
+    purpose: publish
+policy:
+  write_control_requires_separate_approval: true
+  source_write_default_enabled: false
+  simulator_forbidden_in_production: true
+  production_forbid_tools_source_lab_import: true

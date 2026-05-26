@@ -18,11 +18,18 @@ def test_polling_protocols_build_expected_runners() -> None:
         "http_rest": build_capacity_runner("http_rest").name,
     }
 
+    # iec101/modbus_rtu 使用 native runner 需要串口设备；
+    # 无串口环境下回退到 Python lightweight runner
+    import glob
+    _has_serial = len(glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*")) > 0
+    modbus_rtu_expected = "modbus_rtu_native_runner" if _has_serial else "modbus_rtu_polling_runner"
+    iec101_expected = "iec101_native_runner" if _has_serial else "iec101_polling_runner"
+
     assert names == {
         "opcua": "opcua_open62541_serial_runner",
         "modbus_tcp": "modbus_tcp_native_runner",
-        "modbus_rtu": "modbus_rtu_native_runner",
-        "iec101": "iec101_native_runner",
+        "modbus_rtu": modbus_rtu_expected,
+        "iec101": iec101_expected,
         "iec104": "iec104_native_runner",
         "iec61850_mms": "iec61850_mms_native_runner",
         "http_rest": "http_rest_polling_runner",

@@ -44,6 +44,16 @@ _KNOWN_PRODUCTION_READ_PROTOCOLS: dict[str, dict[str, str]] = {
         "read_adapter": "src/whale/ingest/adapters/source/modbus_source_acquisition_adapter.py",
         "write_adapter": "src/whale/ingest/adapters/source/modbus_source_write_adapter.py",
     },
+    "iec61850_mms": {
+        "shared_source": "src/whale/shared/source/iec61850",
+        "read_adapter": "src/whale/ingest/adapters/source/iec61850_source_acquisition_adapter.py",
+        "write_adapter": "src/whale/ingest/adapters/source/iec61850_source_write_adapter.py",
+    },
+    "iec61850_report": {
+        "shared_source": "src/whale/shared/source/iec61850",
+        "read_adapter": "src/whale/ingest/adapters/source/iec61850_report_source_acquisition_adapter.py",
+        "write_adapter": "",
+    },
 }
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]

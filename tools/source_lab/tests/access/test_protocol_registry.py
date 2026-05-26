@@ -36,6 +36,8 @@ def test_list_supported_protocols_contains_required_entries() -> None:
         "iec104",
         "iec61850_mms",
         "iec61850_report",
+        "iec61850_goose",
+        "iec61850_sv",
         "mqtt",
         "http_rest",
     )
@@ -59,6 +61,8 @@ def test_probe_mode_mapping() -> None:
     assert probe_mode_for_protocol("modbus_tcp") == "polling"
     assert probe_mode_for_protocol("mqtt") == "streaming"
     assert probe_mode_for_protocol("iec61850_report") == "streaming"
+    assert probe_mode_for_protocol("iec61850_goose") == "streaming"
+    assert probe_mode_for_protocol("iec61850_sv") == "streaming"
 
 
 def test_build_runner_factories() -> None:
@@ -68,6 +72,8 @@ def test_build_runner_factories() -> None:
     assert build_capacity_runner("modbus_tcp").name == "modbus_tcp_native_runner"
     assert build_subscription_runner("opcua").name == "opcua_open62541_subscription_runner"
     assert build_subscription_runner("mqtt").name == "mqtt_subscription_runner"
+    assert build_subscription_runner("iec61850_goose").name == "iec61850_goose_subscriber_runner"
+    assert build_subscription_runner("iec61850_sv").name == "iec61850_sv_subscriber_runner"
 
 
 def test_unsupported_protocol_raises() -> None:
@@ -122,6 +128,6 @@ def test_no_protocol_falsely_claims_real_native_runner() -> None:
     real_native_protocols = {
         p for p in list_supported_protocols() if get_implementation_level(p) == "real_native_runner"
     }
-    assert real_native_protocols == {"opcua", "modbus_tcp", "modbus_rtu", "iec101", "iec104", "iec61850_mms", "iec61850_report"}, (
+    assert real_native_protocols == {"opcua", "modbus_tcp", "modbus_rtu", "iec101", "iec104", "iec61850_mms", "iec61850_report", "iec61850_goose", "iec61850_sv"}, (
         f"unexpected real_native_runner set: {real_native_protocols}"
     )

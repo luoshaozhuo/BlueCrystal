@@ -1,4 +1,8 @@
-"""Shared progress rendering helpers for capacity-style matrix scans."""
+"""容量扫描进度渲染共享工具。
+
+负责：在终端中渲染容量矩阵扫描的文本进度条。
+不负责：指标计算、结果持久化。
+"""
 
 from __future__ import annotations
 
