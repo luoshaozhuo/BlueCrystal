@@ -37,6 +37,7 @@ class PostgresDatabaseConfig:
     database: str | Path
     username: str
     password: str
+    database_url: str | None = None
     backend: Literal["postgresql"] = "postgresql"
 
 
@@ -66,6 +67,8 @@ class RedisStateCacheConfig:
     hash_key: str
     station_id: str
     decode_responses: bool
+    redis_url: str | None = None
+    socket_connect_timeout_seconds: float = 2.0
     backend: Literal["redis"] = "redis"
 
 StateCacheConfig: TypeAlias = RedisStateCacheConfig
@@ -94,6 +97,10 @@ class KafkaMessageConfig:
     bootstrap_servers: tuple[str, ...]
     topic: str
     ack_timeout_seconds: float
+    acks: str = "all"
+    retries: int = 3
+    request_timeout_ms: int = 5000
+    key_strategy: str = "snapshot_id"
     backend: Literal["kafka"] = "kafka"
 
 
@@ -186,37 +193,52 @@ def _build_config() -> EnvironmentConfig:
             database=os.environ.get("WHALE_INGEST_DB_PATH", default_database_path),
         )
     else:
+        database_url = os.environ.get("WHALE_INGEST_DATABASE_URL", "").strip() or None
+        if database_url is not None:
+            database = PostgresDatabaseConfig(
+                host="",
+                port=5432,
+                database="",
+                username="",
+                password="",
+                database_url=database_url,
+            )
+        else:
+            _require_env_vars(
+                (
+                    "WHALE_INGEST_DB_HOST",
+                    "WHALE_INGEST_DB_NAME",
+                    "WHALE_INGEST_DB_USERNAME",
+                    "WHALE_INGEST_DB_PASSWORD",
+                ),
+                scope="ingest database backend 'postgresql'",
+            )
+            database_port = os.environ.get("WHALE_INGEST_DB_PORT")
+            database = PostgresDatabaseConfig(
+                host=os.environ["WHALE_INGEST_DB_HOST"],
+                port=int(database_port) if database_port else 5432,
+                database=os.environ["WHALE_INGEST_DB_NAME"],
+                username=os.environ["WHALE_INGEST_DB_USERNAME"],
+                password=os.environ["WHALE_INGEST_DB_PASSWORD"],
+                database_url=None,
+            )
+
+    redis_url = os.environ.get("WHALE_INGEST_REDIS_URL", "").strip() or None
+    if redis_url is None:
         _require_env_vars(
             (
-                "WHALE_INGEST_DB_HOST",
-                "WHALE_INGEST_DB_NAME",
-                "WHALE_INGEST_DB_USERNAME",
-                "WHALE_INGEST_DB_PASSWORD",
+                "WHALE_INGEST_REDIS_HOST",
+                "WHALE_INGEST_REDIS_STATE_HASH_KEY",
+                "WHALE_INGEST_STATION_ID",
             ),
-            scope="ingest database backend 'postgresql'",
+            scope="ingest state-cache backend 'redis'",
         )
-        database_port = os.environ.get("WHALE_INGEST_DB_PORT")
-        database = PostgresDatabaseConfig(
-            host=os.environ["WHALE_INGEST_DB_HOST"],
-            port=int(database_port) if database_port else 5432,
-            database=os.environ["WHALE_INGEST_DB_NAME"],
-            username=os.environ["WHALE_INGEST_DB_USERNAME"],
-            password=os.environ["WHALE_INGEST_DB_PASSWORD"],
-        )
-
-    _require_env_vars(
-        (
-            "WHALE_INGEST_REDIS_HOST",
-            "WHALE_INGEST_REDIS_STATE_HASH_KEY",
-            "WHALE_INGEST_STATION_ID",
-        ),
-        scope="ingest state-cache backend 'redis'",
-    )
     redis_port = os.environ.get("WHALE_INGEST_REDIS_PORT")
     redis_db = os.environ.get("WHALE_INGEST_REDIS_DB")
     redis_decode_responses = os.environ.get("WHALE_INGEST_REDIS_DECODE_RESPONSES")
     state_cache: StateCacheConfig = RedisStateCacheConfig(
-        host=os.environ["WHALE_INGEST_REDIS_HOST"],
+        redis_url=redis_url,
+        host=os.environ.get("WHALE_INGEST_REDIS_HOST", "127.0.0.1"),
         port=int(redis_port) if redis_port else 6379,
         db=int(redis_db) if redis_db else 0,
         username=os.environ.get("WHALE_INGEST_REDIS_USERNAME") or None,
@@ -227,6 +249,9 @@ def _build_config() -> EnvironmentConfig:
             True
             if redis_decode_responses in (None, "")
             else str(redis_decode_responses).lower() != "false"
+        ),
+        socket_connect_timeout_seconds=float(
+            os.environ.get("WHALE_INGEST_REDIS_CONNECT_TIMEOUT_SECONDS", "2.0")
         ),
     )
 
@@ -261,6 +286,15 @@ def _build_config() -> EnvironmentConfig:
             topic=os.environ["WHALE_INGEST_KAFKA_TOPIC"],
             ack_timeout_seconds=float(
                 os.environ.get("WHALE_INGEST_KAFKA_ACK_TIMEOUT_SECONDS", "5.0")
+            ),
+            acks=os.environ.get("WHALE_INGEST_KAFKA_ACKS", "all"),
+            retries=int(os.environ.get("WHALE_INGEST_KAFKA_RETRIES", "3")),
+            request_timeout_ms=int(
+                os.environ.get("WHALE_INGEST_KAFKA_REQUEST_TIMEOUT_MS", "5000")
+            ),
+            key_strategy=os.environ.get(
+                "WHALE_INGEST_KAFKA_KEY_STRATEGY",
+                "snapshot_id",
             ),
         )
 

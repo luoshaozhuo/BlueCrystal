@@ -257,8 +257,10 @@ class TestReportAdapterStartSubscription:
             assert callable(kwargs["error_callback"])
             await handle.close()
 
-    @pytest.mark.asyncio
-    async def test_does_not_import_source_lab(self) -> None:
+class TestReportAdapterNoSourceLabImport:
+    """与 async test class 分离，避免 STRICT mode 下 class 内混排 sync/async。"""
+
+    def test_adapter_does_not_import_source_lab(self) -> None:
         """验证 adapter 源码不 import source_lab。"""
         import ast
         import inspect

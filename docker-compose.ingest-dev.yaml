@@ -1,4 +1,38 @@
 services:
+  ingest-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whale-ingest-runtime
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: ["api"]
+    ports:
+      - "18000:8000"
+    environment:
+      WHALE_INGEST_DATABASE_BACKEND: sqlite
+      WHALE_INGEST_DB_PATH: /app/data/ingest/whale.ingest.db
+      WHALE_INGEST_STATE_CACHE_BACKEND: redis
+      WHALE_INGEST_REDIS_HOST: redis
+      WHALE_INGEST_REDIS_PORT: "6379"
+      WHALE_INGEST_REDIS_STATE_HASH_KEY: whale:ingest:state
+      WHALE_INGEST_STATION_ID: whale-dev
+      WHALE_INGEST_MESSAGE_BACKEND: relational_outbox
+      WHALE_SHARED_DB_BACKEND: sqlite
+      WHALE_SHARED_DB_PATH: /app/data/shared/whale.db
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     container_name: whale-ingest-postgres

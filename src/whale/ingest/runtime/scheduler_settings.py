@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from whale.ingest.runtime.modes import RuntimeMode
+
 
 @dataclass(slots=True)
 class JobStoreSettings:
@@ -36,6 +38,11 @@ class SchedulerSettings:
 
     scheduler_type: str = "blocking"
     timezone: str = "UTC"
+    runtime_mode: RuntimeMode = RuntimeMode.STANDALONE
+    node_key: str = "node-1"
+    heartbeat_interval_seconds: int = 10
+    heartbeat_timeout_seconds: int = 30
+    lease_ttl_seconds: int = 30
     pull_max_in_flight: int = 8
     jobstore: JobStoreSettings = field(default_factory=JobStoreSettings)
     executors: ExecutorSettings = field(default_factory=ExecutorSettings)

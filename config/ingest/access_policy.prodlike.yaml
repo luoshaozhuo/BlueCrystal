@@ -1,0 +1,31 @@
+# Production-like access policy baseline
+# Used by FileAccessPolicy in prodlike smoke and deployment.
+# deny-all fallback — only explicitly allowed actions pass.
+
+policies:
+  # ── API CRUD ─────────────────────────────────────────────────────────
+  - actors: ["admin", "operator", "role:ingest"]
+    action: "*"
+    resource_type: "*"
+    resource_id: "*"
+
+  - actors: ["viewer"]
+    action: "read"
+    resource_type: "*"
+    resource_id: "*"
+
+  - actors: ["viewer"]
+    action: "list"
+    resource_type: "*"
+    resource_id: "*"
+
+  - actors: ["smoke-test"]
+    action: "*"
+    resource_type: "*"
+    resource_id: "*"
+
+  # ── Write / control ──────────────────────────────────────────────────
+  - actors: ["admin"]
+    action: "write"
+    resource_type: "source_write"
+    resource_id: "*"

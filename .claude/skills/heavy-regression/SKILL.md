@@ -1,25 +1,14 @@
 ---
 name: heavy-regression
-description: 用户明确要求时运行重回归、长测或发布前验证。
+description: 执行 heavy-regression 工作流；规范源见 ai_shared/agent_config/skills/heavy-regression.md。
 ---
 
 # heavy-regression
 
-## 功能
+本 skill 的规范源位于：
 
-用户明确要求时运行重回归、长测或发布前验证。
+```text
+ai_shared/agent_config/skills/heavy-regression.md
+```
 
-## 通用要求
-
-1. 使用中文输出。
-2. 不默认读取所有文档。
-3. 只读取完成本技能所需的文件。
-4. 当前仓库文件是事实来源。
-5. 反馈必须简洁。
-
-## 步骤
-
-1. 读取 `ai_shared/rules/validation-routing.md`。
-2. 根据用户指定范围运行重回归或长测。
-3. 汇总通过项、失败项、耗时、失败摘要。
-4. 不擅自扩大范围。
+执行时必须读取该文件并按其要求执行。不得降低该规范中的要求。

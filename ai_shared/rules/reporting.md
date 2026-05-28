@@ -1,74 +1,70 @@
 # Agent 中文反馈与归档规则
 
-## 1. 反馈语言
+所有 agent 默认必须用中文反馈。
 
-所有 agent 默认必须用中文反馈。除非用户明确要求英文，不使用英文作为主要反馈语言。
-
-## 2. 反馈风格
-
-1. 言简意赅。
-2. 只汇报与任务相关的信息。
-3. 不粘贴大段日志。
-4. 不堆砌工具输出。
-5. 明确成功、失败、未验证和风险。
-6. 不用空泛表述，如“已优化”“已修复”，必须说明具体内容。
-
-## 3. 固定反馈格式
-
-只有当用户 prompt 未明确指定输出格式/反馈形式时，才使用以下格式。如果用户 prompt 已明确要求输出格式，则优先按 prompt 格式输出；只有 prompt 未指定反馈格式时，才使用默认反馈模板。
-
-每轮任务完成后使用以下格式：
+## 1. Agent result 格式
 
 ```text
-## 修改文件
+Agent result:
+- agent:
+- files read:
+- files changed:
+- rules used:
+- skills used:
+- commands run:
+- passed:
+- failed:
+- skipped:
+- pending:
+- evidence:
+- risk:
+- next handoff suggestion:
+```
+
+## 2. 主会话最终反馈格式
+
+```text
+修改文件：
 - ...
 
-## 行为变化
+行为变化：
 - ...
 
-## 检查与测试
-- 已执行：...
-- 未执行：...，原因：...
+Agent 使用：
+- code-implementer:
+- test-validator:
+- project-steward:
 
-## project_tree 状态
-- 已更新 / 无需更新 / 建议更新
+检查与测试：
+- 已执行：
+- failed：
+- skipped：
+- pending：
+- 未执行及原因：
 
-## ADR / 规则建议
-- 无 / 建议运行 adr-upsert / 建议运行 rule-update
+project_tree：
+- 已更新 / 无需更新 / 未更新原因：
 
-## 剩余风险
+ADR：
+- 已更新 / 无需更新 / 建议更新：
+
+报告：
 - ...
 
-## 下一步建议
+是否收口：
+- 是/否：
+- 理由：
+
+剩余风险：
+- ...
+
+下一步：
 - ...
 ```
 
-简单任务可以压缩，但不得省略测试、未验证项和风险。
+## 3. 禁止事项
 
-## 4. 反馈归档
-
-`feedback-archive` 仅在用户明确要求“归档反馈”时执行。
-
-如果用户要求归档反馈，应在：
-
-```text
-ai_shared/reports/
-```
-
-下建立简短记录。
-
-命名建议：
-
-```text
-YYYYMMDD-HHMM-short-topic.md
-```
-
-归档内容只保留：
-
-- 任务目标。
-- 修改摘要。
-- 验证摘要。
-- 风险。
-- 后续建议。
-
-不得归档大段日志和完整 diff。
+1. 不粘贴大段日志。
+2. 不把未执行命令写成通过。
+3. 不把环境 pending 写成通过。
+4. 不把 skipped、mock、fake 写成真实通过。

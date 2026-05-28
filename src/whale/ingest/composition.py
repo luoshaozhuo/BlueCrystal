@@ -41,12 +41,18 @@ from whale.ingest.decorators import (
     AuditedSourceAcquisitionPort,
     AuditedStateCachePort,
     AuthorizedSourceAcquisitionPort,
+    AuthorizedSourceWritePort,
     DebugSourceAcquisitionPort,
     DebugStateCachePort,
     LoggingSourceAcquisitionPort,
     LoggingStateCachePort,
     MetricsStateCachePort,
     RetryingSourceAcquisitionPort,
+)
+from whale.ingest.domain.write_security_profile import (
+    ProtocolWriteProfile,
+    ReadbackStrategy,
+    WriteSecurityProfile,
 )
 from whale.ingest.ports.source.source_acquisition_port import (
     SourceAcquisitionError,
@@ -282,6 +288,9 @@ def _normalize_error_code(value: str) -> str:
 def build_source_write_composition(
     *,
     write_port_registry: SourceWritePortRegistry | None = None,
+    access_policy: AccessPolicyPort | None = None,
+    principal: Principal | None = None,
+    write_security_profile: WriteSecurityProfile | None = None,
     logger: logging.Logger | None = None,
 ) -> IngestWriteComposition:
     """Build the ingest write/control composition.
@@ -289,6 +298,12 @@ def build_source_write_composition(
     Args:
         write_port_registry: Optional custom write port registry.
             Defaults to a static registry with OPC UA support only.
+        access_policy: Optional access policy for authorization.
+            Defaults to an allow-all policy.
+        principal: Optional principal for authorization.
+            Defaults to a service principal named "ingest".
+        write_security_profile: Optional security profile controlling
+            which protocols may write. Defaults to a deny-all profile.
         logger: Optional logger instance.
 
     Returns:
@@ -297,13 +312,37 @@ def build_source_write_composition(
     Notes:
         - Default composition only supports OPC UA.
         - Write is DISABLED by default (WHALE_INGEST_SOURCE_WRITE_ENABLED must be set).
+        - Authorization is allow-all by default (for backwards compatibility).
+          Production deployments should inject a restricted access policy.
     """
     resolved_logger = logger or LOGGER
+    resolved_access_policy = access_policy or _AllowAllAccessPolicy()
+    resolved_principal = principal or Principal(
+        principal_id="ingest",
+        principal_type="service",
+        roles=("ingest",),
+    )
+    resolved_write_security_profile = write_security_profile or WriteSecurityProfile()
 
-    # Build write ports
-    opcua_write_port: SourceWritePort = OpcUaSourceWriteAdapter()
-    modbus_write_port: SourceWritePort = ModbusSourceWriteAdapter()
-    iec61850_mms_write_port: SourceWritePort = Iec61850MmsSourceWriteAdapter()
+    # Build write ports with authorization decorator
+    opcua_write_port: SourceWritePort = AuthorizedSourceWritePort(
+        inner=OpcUaSourceWriteAdapter(),
+        principal=resolved_principal,
+        access_policy=resolved_access_policy,
+        security_profile=resolved_write_security_profile,
+    )
+    modbus_write_port: SourceWritePort = AuthorizedSourceWritePort(
+        inner=ModbusSourceWriteAdapter(),
+        principal=resolved_principal,
+        access_policy=resolved_access_policy,
+        security_profile=resolved_write_security_profile,
+    )
+    iec61850_mms_write_port: SourceWritePort = AuthorizedSourceWritePort(
+        inner=Iec61850MmsSourceWriteAdapter(),
+        principal=resolved_principal,
+        access_policy=resolved_access_policy,
+        security_profile=resolved_write_security_profile,
+    )
     resolved_write_port_registry = write_port_registry or StaticSourceWritePortRegistry(
         ports_by_protocol={
             "opcua": opcua_write_port,

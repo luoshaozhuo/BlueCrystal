@@ -1,25 +1,30 @@
-# Codex 入口
+# OpenAI Codex 入口
 
-Codex 会自动读取 `AGENTS.md`。本仓库的详细执行规则不在本文件展开，避免重复维护。
+本仓库 OpenAI Codex 与 Claude Code 共用根目录 `CLAUDE.md` 作为主入口规则。
 
-Codex 必须将 `CLAUDE.md` 视为本仓库主执行规则。不要只读取 `AGENTS.md` 后直接执行任务。
-
-请先读取并遵守：
+Codex 执行任务前必须读取：
 
 ```text
 CLAUDE.md
-```
-
-然后按照 `CLAUDE.md` 指示继续读取：
-
-```text
 ai_shared/rules/routing.md
 ```
 
-要求：
+然后按 `CLAUDE.md` 和 `routing.md` 执行，不要默认读取全部 docs / ADR / reports / project_tree。
 
-1. 默认用中文回答和反馈。
-2. 不维护 Codex 专属规则副本。
-3. 不默认读取全部文档。
-4. 当前源码、测试、配置、schema 是事实来源。
-5. 如本文件与 `CLAUDE.md` 冲突，以 `CLAUDE.md` 为准。
+当 `CLAUDE.md` 要求使用 Claude Code agent：
+
+```text
+@agent-code-implementer
+@agent-test-validator
+@agent-project-steward
+```
+
+Codex 应使用项目 custom agent 执行等价委派：
+
+```text
+spawn code-implementer
+spawn test-validator
+spawn project-steward
+```
+
+除此之外，不在本文件复制或改写规则。

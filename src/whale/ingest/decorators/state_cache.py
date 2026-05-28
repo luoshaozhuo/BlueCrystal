@@ -71,7 +71,24 @@ class AuditedStateCachePort(SourceStateCachePort):
     audit_sink: AuditEventSinkPort
 
     def update(self, *, ld_name: str, batch: AcquiredNodeStateBatch) -> int:
-        updated = self.inner.update(ld_name=ld_name, batch=batch)
+        try:
+            updated = self.inner.update(ld_name=ld_name, batch=batch)
+        except Exception as exc:
+            _emit_audit_best_effort(
+                audit_sink=self.audit_sink,
+                event=AuditEvent(
+                    event_name="state_cache.update",
+                    observed_at=batch.client_processed_at,
+                    classification=DataClassification.INTERNAL,
+                    resource_id=ld_name,
+                    outcome="failure",
+                    attributes={"error": type(exc).__name__},
+                ),
+                logger=LOGGER,
+                operation="state_cache.update",
+                resource_id=ld_name,
+            )
+            raise
         _emit_audit_best_effort(
             audit_sink=self.audit_sink,
             event=AuditEvent(

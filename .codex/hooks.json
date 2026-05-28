@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/ai_shared/agent_config/hooks/block-dangerous-bash.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking dangerous shell command"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Edit|MultiEdit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)/ai_shared/agent_config/hooks/no-source-lab-import-gate.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checking source_lab production boundary"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/ai_shared/agent_config/hooks/docstring-cn-gate.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking docstring/comment rules"
+          }
+        ]
+      }
+    ]
+  }
+}

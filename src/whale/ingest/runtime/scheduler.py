@@ -1,372 +1,339 @@
-# mypy: disable-error-code=import-untyped
-"""Runtime scheduler for ingest."""
+"""DB-backed ingest scheduler with minimal multi-node semantics."""
 
 from __future__ import annotations
 
-import asyncio
-import time
-from collections import defaultdict
-from collections.abc import Callable
-from threading import Event
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from hashlib import sha256
+from uuid import uuid4
 
-from apscheduler.events import (  # type: ignore[import-untyped]
-    EVENT_JOB_ERROR,
-    EVENT_JOB_EXECUTED,
-    JobExecutionEvent,
+from whale.ingest.domain.audit_event import IngestAuditEvent
+from whale.ingest.ports.audit import IngestAuditSinkPort
+from whale.ingest.runtime.fencing import redact_fencing_token
+from whale.ingest.runtime.job_assignment import (
+    JobAssignment,
+    JobAssignmentRepository,
+    RuntimeJobRepository,
 )
-from apscheduler.schedulers.base import BaseScheduler  # type: ignore[import-untyped]
-
-from whale.ingest.ports.runtime.source_runtime_config_port import (
-    SourceRuntimeConfigData,
-    SourceRuntimeConfigPort,
-)
-from whale.ingest.runtime.acquisition_mode import AcquisitionMode
-from whale.ingest.runtime.job_status import JobStatus
-from whale.ingest.runtime.scheduler_job import (
-    AcquisitionStatus,
-    ScheduledSourceJob,
-)
-from whale.ingest.runtime.scheduler_factory import build_scheduler
+from whale.ingest.runtime.lease import LeaseService
+from whale.ingest.runtime.modes import RuntimeMode
+from whale.ingest.runtime.node_runtime import NodeHeartbeat, NodeRuntimeRepository
 from whale.ingest.runtime.scheduler_settings import SchedulerSettings
-from whale.ingest.usecases.build_runtime_plan_usecase import RuntimePlanBuildUseCase
-from whale.ingest.usecases.dtos.source_acquisition_request import (
-    AcquisitionExecutionOptions,
-    SourceAcquisitionRequest,
-)
-from whale.ingest.usecases.polling_acquisition_usecase import (
-    PollingAcquisitionUseCase,
-)
-from whale.ingest.usecases.subscribe_acquisition_usecase import (
-    SubscribeAcquisitionUseCase,
-)
 
-PollingAcquisitionUseCaseFactory = Callable[[], PollingAcquisitionUseCase]
-SubscribeAcquisitionUseCaseFactory = Callable[[], SubscribeAcquisitionUseCase]
+
+@dataclass(slots=True)
+class SchedulerSnapshot:
+    """Lightweight scheduler status snapshot."""
+
+    node_key: str
+    runtime_mode: RuntimeMode
+    assigned_jobs: tuple[str, ...]
+    fencing_tokens: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulerExecutionDecision:
+    """Execution decision for one worker/job/fencing token tuple."""
+
+    allowed: bool
+    result: str
+    reason_code: str | None
 
 
 class SourceScheduler:
-    """Drive ingest use cases from runtime configurations."""
+    """DB-backed scheduler that keeps standalone as a multi-node special case."""
 
     def __init__(
         self,
-        runtime_config_port: SourceRuntimeConfigPort,
-        plan_build_usecase: RuntimePlanBuildUseCase,
-        polling_acquisition_usecase_factory: PollingAcquisitionUseCaseFactory,
-        subscribe_acquisition_usecase_factory: SubscribeAcquisitionUseCaseFactory,
-        settings: SchedulerSettings | None = None,
+        *,
+        settings: SchedulerSettings,
+        node_repository: NodeRuntimeRepository,
+        job_repository: RuntimeJobRepository,
+        assignment_repository: JobAssignmentRepository,
+        lease_service: LeaseService,
+        audit_sink: IngestAuditSinkPort | None = None,
     ) -> None:
-        """Initialize the scheduler with required dependencies."""
-        self._runtime_config_port = runtime_config_port
-        self._plan_build_usecase = plan_build_usecase
-        self._polling_usecase_factory = polling_acquisition_usecase_factory
-        self._subscribe_usecase_factory = subscribe_acquisition_usecase_factory
-        self._settings = settings or SchedulerSettings()
-        self._scheduler: BaseScheduler = build_scheduler(self._settings)
-        self._jobs: dict[str, ScheduledSourceJob] = {}
+        self._settings = settings
+        self._node_repository = node_repository
+        self._job_repository = job_repository
+        self._assignment_repository = assignment_repository
+        self._lease_service = lease_service
+        self._audit_sink = audit_sink
 
-        self._scheduler.add_listener(
-            self._on_job_executed_or_failed,
-            EVENT_JOB_EXECUTED | EVENT_JOB_ERROR,
+    @property
+    def node_key(self) -> str:
+        """Return the configured node key."""
+
+        return self._settings.node_key
+
+    def heartbeat(self, *, now: datetime | None = None) -> None:
+        """Persist one node heartbeat."""
+
+        resolved_now = now or datetime.now(tz=UTC)
+        self._node_repository.upsert_heartbeat(
+            NodeHeartbeat(
+                node_key=self._settings.node_key,
+                runtime_mode=self._settings.runtime_mode,
+                heartbeat_at=resolved_now,
+            )
+        )
+        self._emit_event(
+            action="scheduler.node_heartbeat",
+            resource_type="node",
+            resource_id=self._settings.node_key,
+            decision="ALLOW",
+            result="SUCCESS",
         )
 
-    def run(self) -> None:
-        """Load enabled execution plans and start the scheduler."""
-        self.reload()
-        self._scheduler.start()
+    def assign_jobs(self, *, now: datetime | None = None) -> SchedulerSnapshot:
+        """Assign jobs according to the active runtime mode."""
 
-    def wait_until_terminal(self, timeout_seconds: float) -> bool:
-        """Wait until all registered jobs reach terminal states."""
-        deadline = time.monotonic() + timeout_seconds
-        terminal_statuses = {JobStatus.FINISHED, JobStatus.FAILED, JobStatus.STOPPED}
+        resolved_now = now or datetime.now(tz=UTC)
+        self._lease_service.expire_due_leases(now=resolved_now)
+        alive_nodes = self._alive_node_keys(now=resolved_now)
+        assigned_jobs: list[str] = []
+        fencing_tokens: dict[str, int] = {}
+        failover_count = 0
 
-        while time.monotonic() < deadline:
-            if all(job.status in terminal_statuses for job in self._jobs.values()):
-                return True
-            time.sleep(0.05)
+        for row in self._job_repository.list_enabled_jobs():
+            desired_owner = self._desired_owner(
+                job_id=row.job_id,
+                partition_key=row.partition_key,
+                alive_nodes=alive_nodes,
+            )
+            current_lease = self._lease_service.get_snapshot(lease_name=f"job:{row.job_id}")
+            stale_holder = current_lease is not None and current_lease.holder_key not in alive_nodes
+            expired = current_lease is not None and current_lease.expires_at <= resolved_now
 
-        return all(job.status in terminal_statuses for job in self._jobs.values())
+            if stale_holder:
+                self._lease_service.force_expire(
+                    lease_name=f"job:{row.job_id}",
+                    now=resolved_now,
+                )
+                self._assignment_repository.deactivate_job(row.job_id)
+                failover_count += 1
+                self._emit_event(
+                    action="scheduler.lease_expire",
+                    resource_type="job",
+                    resource_id=row.job_id,
+                    decision="ALLOW",
+                    result="EXPIRED",
+                    reason_code="NODE_TIMEOUT",
+                    attributes={"job_id": row.job_id},
+                )
+                current_lease = None
 
-    def has_failures(self) -> bool:
-        """Return whether any registered job failed."""
-        return any(
-            job.status is JobStatus.FAILED
-            or (job.last_result is not None and job.last_result.status is AcquisitionStatus.FAILED)
-            for job in self._jobs.values()
-        )
+            if expired:
+                self._assignment_repository.deactivate_job(row.job_id)
+                self._emit_event(
+                    action="scheduler.lease_expire",
+                    resource_type="job",
+                    resource_id=row.job_id,
+                    decision="ALLOW",
+                    result="EXPIRED",
+                    reason_code="LEASE_EXPIRED",
+                    attributes={"job_id": row.job_id},
+                )
+                current_lease = None
 
-    def stop(self, wait: bool = True) -> None:
-        """Request runtime jobs to stop and shutdown the scheduler."""
-        for runtime_job in self._jobs.values():
-            if runtime_job.stop_event is not None:
-                runtime_job.stop_event.set()
+            if desired_owner != self._settings.node_key:
+                continue
 
-        if self._scheduler.running:
-            self._scheduler.shutdown(wait=wait)
+            result = self._lease_service.acquire(
+                lease_name=f"job:{row.job_id}",
+                lease_scope="job",
+                resource_id=row.job_id,
+                holder_key=self._settings.node_key,
+                ttl_seconds=self._settings.lease_ttl_seconds,
+                now=resolved_now,
+            )
+            if not result.acquired:
+                self._emit_event(
+                    action="scheduler.lease_acquire",
+                    resource_type="job",
+                    resource_id=row.job_id,
+                    decision="DENY",
+                    result="CONFLICT",
+                    reason_code=result.reason,
+                    attributes={
+                        "job_id": row.job_id,
+                        "fencing_token_hash": redact_fencing_token(result.fencing_token),
+                    },
+                )
+                continue
 
-        for runtime_job in self._jobs.values():
-            if runtime_job.status in {JobStatus.SCHEDULED, JobStatus.RUNNING}:
-                runtime_job.status = JobStatus.STOPPED
-
-    def reload(self) -> None:
-        """Reload enabled execution plans and register jobs again."""
-        self._clear_registered_jobs()
-        self._register_jobs()
-
-    def get_runtime_jobs(self) -> list[ScheduledSourceJob]:
-        """Return in-memory runtime jobs."""
-        return list(self._jobs.values())
-
-    def _register_jobs(self) -> None:
-        """Register jobs from enabled runtime configs."""
-        runtime_configs = self._runtime_config_port.list_enabled()
-        polling_groups: dict[str, list[SourceRuntimeConfigData]] = defaultdict(list)
-        subscription_groups: dict[str, list[SourceRuntimeConfigData]] = defaultdict(list)
-
-        for runtime_config in runtime_configs:
-            mode = self._get_acquisition_mode(runtime_config)
-            protocol = runtime_config.protocol
-
-            if mode is AcquisitionMode.ONCE:
-                self._register_once_job(runtime_config)
-            elif mode is AcquisitionMode.POLLING:
-                polling_groups[protocol].append(runtime_config)
-            elif mode is AcquisitionMode.SUBSCRIPTION:
-                subscription_groups[protocol].append(runtime_config)
+            if current_lease is not None and current_lease.holder_key == self._settings.node_key:
+                action = "scheduler.lease_renew"
+                result_code = "SUCCESS"
             else:
-                raise ValueError(f"Unsupported acquisition mode: {mode}")
-
-        for protocol, group in polling_groups.items():
-            self._register_polling_job(
-                protocol=protocol,
-                runtime_configs=tuple(group),
+                action = "scheduler.lease_acquire"
+                result_code = "SUCCESS"
+                self._assignment_repository.deactivate_job(row.job_id)
+            self._assignment_repository.assign(
+                JobAssignment(
+                    job_id=row.job_id,
+                    node_key=self._settings.node_key,
+                    active=True,
+                    assigned_at=resolved_now,
+                )
+            )
+            assigned_jobs.append(row.job_id)
+            fencing_tokens[row.job_id] = result.fencing_token
+            self._emit_event(
+                action=action,
+                resource_type="job",
+                resource_id=row.job_id,
+                decision="ALLOW",
+                result=result_code,
+                attributes={
+                    "job_id": row.job_id,
+                    "lease_id": result.lease_id,
+                    "fencing_token_hash": redact_fencing_token(result.fencing_token),
+                    "assignment_lag_ms": max(
+                        int((resolved_now - _as_utc(row.updated_at)).total_seconds() * 1000),
+                        0,
+                    ),
+                    "lease_renewal_latency_ms": 0,
+                },
             )
 
-        for protocol, group in subscription_groups.items():
-            self._register_subscription_job(
-                protocol=protocol,
-                runtime_configs=tuple(group),
+        if failover_count:
+            self._emit_event(
+                action="scheduler.failover_count",
+                resource_type="scheduler",
+                resource_id=self._settings.node_key,
+                decision="ALLOW",
+                result="SUCCESS",
+                attributes={"failover_count": failover_count},
             )
 
-    def _register_once_job(self, runtime_config: SourceRuntimeConfigData) -> None:
-        """Register one immediate ONCE job."""
-        runtime_config_id = runtime_config.runtime_config_id
-        job_id = self._build_once_job_id(runtime_config_id)
-
-        if job_id in self._jobs:
-            return
-
-        self._scheduler.add_job(
-            self._run_once_job,
-            id=job_id,
-            replace_existing=False,
-            args=[runtime_config],
+        return SchedulerSnapshot(
+            node_key=self._settings.node_key,
+            runtime_mode=self._settings.runtime_mode,
+            assigned_jobs=tuple(assigned_jobs),
+            fencing_tokens=fencing_tokens,
         )
 
-        self._jobs[job_id] = ScheduledSourceJob(
-            aps_job_id=job_id,
-            status=JobStatus.SCHEDULED,
-            runtime_configs=(runtime_config,),
-        )
+    def bootstrap(self, *, now: datetime | None = None) -> SchedulerSnapshot:
+        """Persist heartbeat and reconcile assignments."""
 
-    def _register_polling_job(
+        resolved_now = now or datetime.now(tz=UTC)
+        self.heartbeat(now=resolved_now)
+        return self.assign_jobs(now=resolved_now)
+
+    def release_jobs(self, job_ids: list[str], *, now: datetime | None = None) -> None:
+        """Release one set of job leases from the current node."""
+
+        resolved_now = now or datetime.now(tz=UTC)
+        for job_id in job_ids:
+            self._lease_service.release(
+                lease_name=f"job:{job_id}",
+                holder_key=self._settings.node_key,
+                now=resolved_now,
+            )
+            self._assignment_repository.deactivate_job(job_id)
+            self._emit_event(
+                action="scheduler.lease_release",
+                resource_type="job",
+                resource_id=job_id,
+                decision="ALLOW",
+                result="SUCCESS",
+            )
+
+    def validate_execution(
         self,
         *,
-        protocol: str,
-        runtime_configs: tuple[SourceRuntimeConfigData, ...],
-    ) -> None:
-        """Register one long-running polling job for one protocol."""
-        job_id = self._build_polling_job_id(protocol)
-        if job_id in self._jobs:
-            return
+        job_id: str,
+        holder_key: str,
+        fencing_token: int,
+        now: datetime | None = None,
+    ) -> SchedulerExecutionDecision:
+        """Return whether one worker may execute a job under a given token."""
 
-        stop_event = Event()
-        self._scheduler.add_job(
-            self._run_polling_job,
-            id=job_id,
-            replace_existing=False,
-            args=[runtime_configs, stop_event],
+        resolved_now = now or datetime.now(tz=UTC)
+        allowed = self._lease_service.validate_execution(
+            lease_name=f"job:{job_id}",
+            holder_key=holder_key,
+            fencing_token=fencing_token,
+            now=resolved_now,
         )
-
-        self._jobs[job_id] = ScheduledSourceJob(
-            runtime_configs=runtime_configs,
-            aps_job_id=job_id,
-            status=JobStatus.SCHEDULED,
-            stop_event=stop_event,
+        if allowed:
+            return SchedulerExecutionDecision(True, "SUCCESS", None)
+        self._emit_event(
+            action="scheduler.fencing_reject",
+            resource_type="job",
+            resource_id=job_id,
+            decision="DENY",
+            result="FENCED",
+            reason_code="FENCING_TOKEN_MISMATCH",
+            attributes={
+                "job_id": job_id,
+                "fencing_token_hash": redact_fencing_token(fencing_token),
+            },
         )
+        return SchedulerExecutionDecision(False, "FENCED", "FENCING_TOKEN_MISMATCH")
 
-    def _register_subscription_job(
+    def _alive_node_keys(self, *, now: datetime) -> list[str]:
+        rows = self._node_repository.list_alive_nodes(
+            now=now,
+            heartbeat_timeout_seconds=self._settings.heartbeat_timeout_seconds,
+        )
+        node_keys = sorted(row.node_key for row in rows)
+        if self._settings.node_key not in node_keys:
+            node_keys.append(self._settings.node_key)
+            node_keys.sort()
+        return node_keys
+
+    def _desired_owner(
         self,
         *,
-        protocol: str,
-        runtime_configs: tuple[SourceRuntimeConfigData, ...],
+        job_id: str,
+        partition_key: str | None,
+        alive_nodes: list[str],
+    ) -> str:
+        if not alive_nodes:
+            return self._settings.node_key
+        if self._settings.runtime_mode in {RuntimeMode.STANDALONE, RuntimeMode.ACTIVE_STANDBY}:
+            return alive_nodes[0]
+
+        key = partition_key or job_id
+        digest = sha256(key.encode("utf-8")).hexdigest()
+        index = int(digest[:8], 16) % len(alive_nodes)
+        return alive_nodes[index]
+
+    def _emit_event(
+        self,
+        *,
+        action: str,
+        resource_type: str,
+        resource_id: str | None,
+        decision: str,
+        result: str,
+        reason_code: str | None = None,
+        attributes: dict[str, object] | None = None,
     ) -> None:
-        """Register one merged long-running subscription job."""
-        job_id = self._build_subscription_job_id(protocol)
-        if job_id in self._jobs:
+        if self._audit_sink is None:
             return
-
-        stop_event = Event()
-        self._scheduler.add_job(
-            self._run_subscription_job,
-            id=job_id,
-            replace_existing=False,
-            args=[runtime_configs, stop_event],
-        )
-
-        self._jobs[job_id] = ScheduledSourceJob(
-            runtime_configs=runtime_configs,
-            aps_job_id=job_id,
-            status=JobStatus.SCHEDULED,
-            stop_event=stop_event,
-        )
-
-    def _run_once_job(self, runtime_config: SourceRuntimeConfigData) -> None:
-        """Execute one ONCE job."""
-        runtime_config_id = runtime_config.runtime_config_id
-        job_id = self._build_once_job_id(runtime_config_id)
-        runtime_job = self._jobs.get(job_id)
-
-        if runtime_job is not None:
-            runtime_job.status = JobStatus.RUNNING
-
-        requests = [
-            SourceAcquisitionRequest(
-                request_id=request.request_id,
-                task_id=request.task_id,
-                execution=AcquisitionExecutionOptions(
-                    protocol=request.execution.protocol,
-                    transport=request.execution.transport,
-                    acquisition_mode=request.execution.acquisition_mode,
-                    interval_ms=request.execution.interval_ms,
-                    max_iteration=1,
-                    request_timeout_ms=request.execution.request_timeout_ms,
-                    freshness_timeout_ms=request.execution.freshness_timeout_ms,
-                    alive_timeout_ms=request.execution.alive_timeout_ms,
-                ),
-                connections=list(request.connections),
-                items=list(request.items),
+        self._audit_sink.emit(
+            IngestAuditEvent(
+                request_id=f"scheduler-{uuid4()}",
+                actor=self._settings.node_key,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                decision=decision,
+                result=result,
+                reason_code=reason_code,
+                http_status=None,
+                trace_id=None,
+                client_ip=None,
+                node_id=self._settings.node_key,
+                attributes=attributes or {},
             )
-            for request in self._plan_build_usecase.build_requests([runtime_config])
-        ]
-        results = asyncio.run(self._polling_usecase_factory().execute_once(requests[0]))
-        if runtime_job is not None:
-            runtime_job.last_result = results[0] if results else None
+        )
 
-    def _run_polling_job(
-        self,
-        runtime_configs: tuple[SourceRuntimeConfigData, ...],
-        stop_event: Event,
-    ) -> None:
-        """Start one merged long-running polling job."""
-        first_config = runtime_configs[0]
-        job_id = self._build_polling_job_id(first_config.protocol)
-        runtime_job = self._jobs.get(job_id)
 
-        if runtime_job is not None:
-            runtime_job.status = JobStatus.RUNNING
-
-        requests = self._plan_build_usecase.build_requests(list(runtime_configs))
-        asyncio.run(self._run_polling_requests(requests, stop_event))
-        if runtime_job is not None:
-            runtime_job.status = JobStatus.STOPPED if stop_event.is_set() else JobStatus.FINISHED
-
-    def _run_subscription_job(
-        self,
-        runtime_configs: tuple[SourceRuntimeConfigData, ...],
-        stop_event: Event,
-    ) -> None:
-        """Start one merged long-running subscription job."""
-        job_id = self._build_subscription_job_id(runtime_configs[0].protocol)
-        runtime_job = self._jobs.get(job_id)
-
-        if runtime_job is not None:
-            runtime_job.status = JobStatus.RUNNING
-
-        requests = self._plan_build_usecase.build_requests(list(runtime_configs))
-        asyncio.run(self._run_subscription_requests(requests, stop_event))
-        if runtime_job is not None:
-            runtime_job.status = JobStatus.STOPPED if stop_event.is_set() else JobStatus.FINISHED
-
-    async def _run_polling_requests(
-        self,
-        requests: list[SourceAcquisitionRequest],
-        stop_event: Event,
-    ) -> None:
-        """并发启动多个 polling 聚合请求。"""
-
-        async with asyncio.TaskGroup() as task_group:
-            for request in requests:
-                task_group.create_task(
-                    self._polling_usecase_factory().execute(
-                        request=request,
-                        stop_event=stop_event,
-                    )
-                )
-
-    async def _run_subscription_requests(
-        self,
-        requests: list[SourceAcquisitionRequest],
-        stop_event: Event,
-    ) -> None:
-        """并发启动多个 subscription 聚合请求。"""
-
-        async with asyncio.TaskGroup() as task_group:
-            for request in requests:
-                task_group.create_task(
-                    self._subscribe_usecase_factory().execute(
-                        request=request,
-                        stop_event=stop_event,
-                    )
-                )
-
-    def _on_job_executed_or_failed(self, event: JobExecutionEvent) -> None:
-        """Handle APScheduler job completion events."""
-        runtime_job = self._jobs.get(event.job_id)
-        if runtime_job is None:
-            return
-
-        if runtime_job.status is JobStatus.STOPPED:
-            return
-
-        if event.exception is None and (
-            runtime_job.last_result is None
-            or runtime_job.last_result.status is not AcquisitionStatus.FAILED
-        ):
-            runtime_job.status = JobStatus.FINISHED
-        else:
-            runtime_job.status = JobStatus.FAILED
-
-    def _clear_registered_jobs(self) -> None:
-        """Remove all APScheduler jobs and clear runtime registry."""
-        for runtime_job in self._jobs.values():
-            if runtime_job.stop_event is not None:
-                runtime_job.stop_event.set()
-
-        for aps_job in self._scheduler.get_jobs():
-            aps_job.remove()
-        self._jobs.clear()
-
-    @staticmethod
-    def _build_once_job_id(runtime_config_id: int) -> str:
-        """Build one stable job identifier for ONCE mode."""
-        return f"once:{runtime_config_id}"
-
-    @staticmethod
-    def _build_polling_job_id(protocol: str) -> str:
-        """Build one stable job identifier for a protocol-level polling job."""
-        return f"polling:{protocol}"
-
-    @staticmethod
-    def _build_subscription_job_id(protocol: str) -> str:
-        """Build one stable job identifier for a merged subscription protocol."""
-        return f"subscription:{protocol}"
-
-    @staticmethod
-    def _get_acquisition_mode(runtime_config: SourceRuntimeConfigData) -> AcquisitionMode:
-        """Extract acquisition mode from one runtime config."""
-        try:
-            return AcquisitionMode(runtime_config.acquisition_mode.upper())
-        except ValueError as exc:
-            raise ValueError(
-                f"Unsupported acquisition mode: {runtime_config.acquisition_mode}"
-            ) from exc
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

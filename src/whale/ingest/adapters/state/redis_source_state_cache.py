@@ -78,6 +78,8 @@ class RedisSourceStateCacheSettings:
     hash_key: str
     station_id: str
     decode_responses: bool = True
+    redis_url: str | None = None
+    socket_connect_timeout_seconds: float = 2.0
 
     @classmethod
     def from_config(
@@ -105,6 +107,7 @@ class RedisSourceStateCacheSettings:
             )
 
         return cls(
+            redis_url=config.redis_url,
             host=config.host,
             port=config.port,
             db=config.db,
@@ -112,6 +115,7 @@ class RedisSourceStateCacheSettings:
             password=config.password,
             hash_key=config.hash_key,
             station_id=config.station_id,
+            socket_connect_timeout_seconds=config.socket_connect_timeout_seconds,
             decode_responses=config.decode_responses,
         )
 
@@ -558,6 +562,21 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
                 "Redis support requires the `redis` package to be installed."
             ) from exc
 
+        kwargs = {
+            "decode_responses": settings.decode_responses,
+            "socket_connect_timeout": settings.socket_connect_timeout_seconds,
+        }
+        if settings.redis_url:
+            return cast(
+                RedisHashClient,
+                Redis.from_url(
+                    settings.redis_url,
+                    db=settings.db,
+                    username=settings.username,
+                    password=settings.password,
+                    **kwargs,
+                ),
+            )
         return cast(
             RedisHashClient,
             Redis(
@@ -566,7 +585,7 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
                 db=settings.db,
                 username=settings.username,
                 password=settings.password,
-                decode_responses=settings.decode_responses,
+                **kwargs,
             ),
         )
 

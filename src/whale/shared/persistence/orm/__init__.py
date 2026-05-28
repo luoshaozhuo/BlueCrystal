@@ -20,6 +20,16 @@ from whale.shared.persistence.orm.ingest_diagnostics import (
     IngestRuntimeEventOrm,
     IngestSourceHealthOrm,
 )
+from whale.shared.persistence.orm.ingest_runtime import (
+    IngestAuditEventOrm,
+    IngestBundleMetadata,
+    IngestFencingToken,
+    IngestJobAssignment,
+    IngestJobLease,
+    IngestRuntimeConfigVersion,
+    IngestRuntimeJob,
+    IngestRuntimeNode,
+)
 from whale.shared.persistence.orm.organization import Organization
 from whale.shared.persistence.orm.scada_ingest import (
     CDCDict,
@@ -49,6 +59,9 @@ __all__ = [
     "AcqSignalState", "AcqSignalSample",
     "AcquisitionTask",
     "IngestSourceHealthOrm", "IngestRuntimeEventOrm",
+    "IngestRuntimeNode", "IngestRuntimeJob", "IngestJobAssignment",
+    "IngestJobLease", "IngestFencingToken", "IngestBundleMetadata",
+    "IngestAuditEventOrm", "IngestRuntimeConfigVersion",
     "ScadaProtocolParamDef", "ScadaEndpointParamValue",
     "ScadaSignalParamDef", "ScadaSignalProfileItemParamValue",
 ]

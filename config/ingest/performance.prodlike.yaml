@@ -1,0 +1,62 @@
+# Production-like performance targets and resource limits for ingest runtime.
+# Used by run_ingest_prodlike_performance_profile.sh for baseline validation.
+
+baseline:
+  # ── Throughput targets (synthetic benchmark, not real hardware) ─────────
+  throughput:
+    jobs_per_second: 100           # Minimum sustained job executions/sec
+    events_per_second: 500         # Minimum audit events emitted/sec
+    bundle_imports_per_second: 10  # Minimum bundle import throughput
+
+  # ── Latency / timing thresholds ────────────────────────────────────────
+  latency:
+    assignment_lag_p95_ms: 5000    # P95 job assignment lag
+    lease_renewal_p99_ms: 2000     # P99 lease renewal duration
+    heartbeat_jitter_p99_ms: 1000  # P99 heartbeat interval jitter
+    api_p99_response_ms: 500       # P99 API endpoint response time
+
+  # ── Resource baselines ─────────────────────────────────────────────────
+  resources:
+    max_memory_mb: 512             # Max RSS before profile warning
+    max_open_fds: 200              # Max file descriptors in steady state
+    max_db_connections: 20         # Max concurrent DB connections (pool)
+    max_http_connections: 10       # Max concurrent outbound HTTP connections
+
+  # ── Error budgets ──────────────────────────────────────────────────────
+  error_budget:
+    max_rejected_bundles_pct: 0    # No bundles should be rejected
+    max_lease_conflict_rate: 0.01  # Lease conflicts / total assignments
+    max_timeout_rate: 0.001        # Job timeout / total executions
+
+limits:
+  # ── Thread pools ───────────────────────────────────────────────────────
+  threadpool:
+    scheduler_max_workers: 8       # APScheduler ThreadPoolExecutor max
+    worker_max_workers: 4          # Worker runtime thread pool max
+    db_pool_size: 10               # SQLAlchemy connection pool size
+    db_pool_overflow: 5            # SQLAlchemy pool max overflow
+    http_pool_size: 10             # HTTP connection pool (urllib3)
+
+  # ── Queue sizes ────────────────────────────────────────────────────────
+  queues:
+    audit_buffer_max: 1000         # Max buffered audit events before blocking
+    scheduler_queue_max: 100       # APScheduler job queue max size
+
+  # ── Timeout budgets ────────────────────────────────────────────────────
+  timeouts:
+    api_read_timeout_seconds: 30   # Ingest API read timeout
+    api_write_timeout_seconds: 60  # Ingest API write/bundle import timeout
+    external_policy_timeout_seconds: 5.0
+    external_audit_sink_timeout_seconds: 5.0
+    db_query_timeout_seconds: 10   # Max query duration before warning
+    lease_acquire_timeout_seconds: 3
+
+scheduler:
+  # ── Scheduler timing (production) ──────────────────────────────────────
+  heartbeat_interval_seconds: 10
+  heartbeat_timeout_seconds: 30
+  lease_ttl_seconds: 30
+  pull_max_in_flight: 8
+  misfire_grace_time_seconds: 30
+  job_coalesce: true
+  max_instances_per_job: 1

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from whale.ingest.ports.source.source_write_port import SourceWritePort
@@ -20,9 +21,12 @@ from whale.ingest.usecases.dtos.source_write_request import (
     SourceWriteExecutionOptions,
     SourceWriteItemData,
 )
-from whale.ingest.usecases.dtos.source_write_result import SourceWriteItemResult, SourceWriteResult
+from whale.ingest.usecases.dtos.source_write_result import (
+    SourceWriteItemResult,
+    SourceWriteResult,
+)
 from whale.shared.source.models import SourceConnectionProfile
-from whale.shared.source.opcua.backends import RawWriteItemResult
+from whale.shared.source.opcua.backends import RawOpcUaReadResult, RawWriteItemResult
 from whale.shared.source.opcua.reader import OpcUaSourceReader
 
 
@@ -111,6 +115,52 @@ class OpcUaSourceWriteAdapter(SourceWritePort):
             client_completed_at=datetime.now(tz=UTC),
             attributes={"protocol": "opcua"},
         )
+
+    async def readback(
+        self,
+        execution: SourceWriteExecutionOptions,
+        connection: SourceConnectionData,
+        items: list[SourceWriteItemData],
+        write_result: SourceWriteResult,
+    ) -> dict[str, str]:
+        """Read back values after a write to confirm them.
+
+        Connects to the OPC UA server and reads the current value of each
+        written node, returning a ``{node_id: value_str}`` mapping for use
+        by ``SourceCommandUseCase`` readback verification.
+
+        Args:
+            execution: The original write execution options.
+            connection: Target source connection (same as write).
+            items: The items that were written.
+            write_result: The write result (used for metadata).
+
+        Returns:
+            Mapping of ``node_id`` → ``str(value)`` for each written node.
+        """
+        endpoint = self._build_endpoint(execution, connection)
+        if not endpoint:
+            return {}
+
+        namespace_uri = connection.namespace_uri.strip() if connection.namespace_uri else None
+        profile = SourceConnectionProfile(
+            endpoint=endpoint,
+            namespace_uri=namespace_uri,
+            timeout_seconds=max(execution.request_timeout_ms / 1000, 2.0),
+            params=dict(execution.params),
+        )
+
+        node_ids = [item.node_id for item in items]
+
+        async with OpcUaSourceReader(profile) as reader:
+            plan = reader.prepare_read(node_ids)
+            raw: RawOpcUaReadResult = await reader.read_prepared_raw(plan)
+            if not raw.ok:
+                return {}
+            result: dict[str, str] = {}
+            for node_id, dv in zip(node_ids, raw.data_values, strict=False):
+                result[node_id] = str(dv.value) if dv is not None else ""
+            return result
 
     @staticmethod
     def _build_endpoint(

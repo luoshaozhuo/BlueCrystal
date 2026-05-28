@@ -21,6 +21,9 @@ class SourceCommandAuditEvent:
     result: str
     failure_reason: str | None
     timestamp: datetime
+    decision: str = "ALLOW"
+    reason_code: str | None = None
+    fencing_token: int | None = None
 
 
 class SourceCommandAuditPort(Protocol):

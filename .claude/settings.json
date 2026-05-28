@@ -1,29 +1,61 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./**/*id_rsa*)",
+      "Read(./**/*private_key*)",
+      "Bash(rm -rf *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(git push *)",
+      "Bash(sudo *)",
+      "Bash(chmod -R 777 *)"
+    ],
     "allow": [
-      "Bash(tesseract --version)",
-      "Bash(tesseract --list-langs)",
-      "Read(//home/luosh/miniconda3/envs/projecta/share/tessdata/**)",
-      "Bash(/home/luosh/miniconda3/envs/projecta/bin/python)",
-      "Bash(/home/luosh/miniconda3/envs/projecta/bin/python -c ' *)",
-      "Bash(python -m whale.shared.persistence.template.sample_data)",
-      "Bash(conda list *)",
-      "Bash(python -c \"from tools.opcua_sim.templates.gbt_30966_fields import LogicalNodeField; print\\('OK'\\)\")",
-      "Bash(python -c ' *)",
-      "Bash(python -c \"import asyncua; print\\(asyncua.__version__\\)\")",
-      "Bash(uals -u opc.tcp://127.0.0.1:40001 -n \"ns=2;s=WindFarm\" -d 2)",
-      "Bash(pkill -f \"opcua\")",
-      "Bash(python -m pytest tests/e2e/test_opcua_sim_db_driven_e2e.py -v --timeout=60 -s)",
-      "Bash(python -m pytest tests/e2e/test_opcua_sim_db_driven_e2e.py -v --timeout=60)",
-      "Bash(python -m pytest tests/stress/test_opcua_sim_stress.py -v --timeout=900 -s)",
-      "Bash(STRESS_DURATION_S=30 python tests/stress/test_pipeline_from_db_stress.py)",
-      "Bash(awk '{print $NF}')",
-      "Bash(xargs -r kill)",
-      "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/acquisition_task_orm.py)",
-      "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/acquisition_model_orm.py)",
-      "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/acquisition_variable_orm.py)",
-      "Bash(rm /home/luosh/Whale/src/whale/ingest/framework/persistence/orm/variable_state_orm.py)",
-      "Bash(python3 -c ' *)"
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git grep *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(python -m py_compile *)",
+      "Bash(ruff check *)",
+      "Bash(mypy *)",
+      "Bash(pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(docker compose * config)",
+      "Bash(docker compose * ps)",
+      "Bash(docker compose * logs *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/block-dangerous-bash.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/no-source-lab-import-gate.sh"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/docstring-cn-gate.py"
+          }
+        ]
+      }
     ]
   }
 }

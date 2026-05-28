@@ -149,6 +149,29 @@ class AcquisitionTask(Base):
         default=True,
         comment="配置态启停标记，不表示运行状态",
     )
+    priority: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=100,
+        comment="任务优先级，数值越小优先级越高",
+    )
+    partition_key: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        nullable=True,
+        comment="多节点分区键，用于 dual_active_partitioned",
+    )
+    assignment_policy: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="AUTO",
+        comment="任务分配策略：AUTO / PINNED / DISABLED",
+    )
+    version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        comment="乐观并发控制版本号",
+    )
     freshness_timeout_ms: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

@@ -90,6 +90,7 @@ class FakeRedisClient(RedisHashClient):
 
 def _settings(*, decode_responses: bool = True) -> RedisSourceStateCacheSettings:
     return RedisSourceStateCacheSettings(
+        redis_url=None,
         host="127.0.0.1",
         port=6379,
         db=0,
@@ -97,6 +98,7 @@ def _settings(*, decode_responses: bool = True) -> RedisSourceStateCacheSettings
         password=None,
         hash_key="whale:test",
         station_id="station-a",
+        socket_connect_timeout_seconds=1.0,
         decode_responses=decode_responses,
     )
 

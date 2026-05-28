@@ -7,30 +7,40 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import URL, create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-from whale.ingest.config import CONFIG, PostgresDatabaseConfig, SqliteDatabaseConfig
+from whale.ingest.config import (
+    CONFIG,
+    PostgresDatabaseConfig,
+    SqliteDatabaseConfig,
+    _build_config,
+)
 
 
 def create_db_url() -> URL:
     """Build the database URL from the configured ingest database backend."""
-    database = CONFIG.database.database
-    if isinstance(CONFIG.database, SqliteDatabaseConfig):
+    config = _build_config()
+    database = config.database.database
+    if isinstance(config.database, SqliteDatabaseConfig):
         database_path = Path(database)
         if not database_path.is_absolute():
             database_path = (Path(__file__).resolve().parents[2] / database_path).resolve()
+        database_path.parent.mkdir(parents=True, exist_ok=True)
         return URL.create(
             drivername="sqlite",
             database=str(database_path),
         )
 
-    assert isinstance(CONFIG.database, PostgresDatabaseConfig)
+    assert isinstance(config.database, PostgresDatabaseConfig)
+    if config.database.database_url:
+        return make_url(config.database.database_url)
     return URL.create(
         drivername="postgresql+psycopg",
-        username=CONFIG.database.username,
-        password=CONFIG.database.password,
-        host=CONFIG.database.host,
-        port=CONFIG.database.port,
+        username=config.database.username,
+        password=config.database.password,
+        host=config.database.host,
+        port=config.database.port,
         database=str(database),
     )
 

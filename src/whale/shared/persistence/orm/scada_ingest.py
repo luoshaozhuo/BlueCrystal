@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    text,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -59,6 +60,7 @@ class IED(Base):
     metadata_json: Mapped[dict] = mapped_column(
         JSON, default=dict, comment="IED 扩展属性，如 SCL 来源文件、工程版本、厂家私有标识"
     )
+    record_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"), comment="乐观并发版本号")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
 
@@ -129,6 +131,7 @@ class CommunicationEndpoint(Base):
     metadata_json: Mapped[dict] = mapped_column(
         JSON, default=dict, comment="扩展属性，如 网络区域、冗余组、厂家私有连接字段"
     )
+    record_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"), comment="乐观并发版本号")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
 
@@ -213,6 +216,7 @@ class SignalProfile(Base):
     metadata_json: Mapped[dict] = mapped_column(
         JSON, default=dict, comment="方案扩展信息，如 来源文件、适用机型、适用协议、点表版本"
     )
+    record_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"), comment="乐观并发版本号")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
 
@@ -288,6 +292,7 @@ class SignalProfileItem(Base):
         String(255), nullable=True, comment="显示名称，如 有功功率 / 风速 / 转速 / 运行状态"
     )
     description: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="点位说明")
+    record_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"), comment="乐观并发版本号")
 
     signal_profile: Mapped["SignalProfile"] = relationship(back_populates="items")
     data_type: Mapped["ScadaDataType"] = relationship()

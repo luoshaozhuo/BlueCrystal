@@ -1,0 +1,11 @@
+defaults:
+  duration_seconds: 300
+  api_workers: 1
+  ingest_workers: 2
+  job_count: 8
+  poll_interval_ms: 1000
+  failure_profile: none
+  heartbeat_interval_seconds: 5
+  heartbeat_timeout_seconds: 15
+  lease_ttl_seconds: 10
+  pull_max_in_flight: 8

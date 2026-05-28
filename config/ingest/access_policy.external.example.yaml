@@ -1,0 +1,15 @@
+# External Access Policy Service — Example Configuration
+#
+# This file is an EXAMPLE for configuring ExternalAccessPolicy to
+# delegate authorization decisions to a remote HTTP service.
+
+endpoint_url: "http://iam.internal.example.com:8080/api/v1/authorize"
+timeout_seconds: 5.0
+
+# fail_closed: true  → deny on connection error (production default)
+# fail_closed: false → allow with warning on connection error (requires explicit config)
+fail_closed: true
+
+# cache_ttl_seconds: 0 → no caching, evaluate every request
+# cache_ttl_seconds: 60 → cache decisions for 60 seconds (reduces load on external service)
+cache_ttl_seconds: 0

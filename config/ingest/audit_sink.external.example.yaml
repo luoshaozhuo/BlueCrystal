@@ -1,0 +1,21 @@
+# External Audit / SIEM Sink — Example Configuration
+#
+# This file is an EXAMPLE for configuring HttpIngestAuditSink to
+# forward audit events to an external SIEM or audit platform.
+
+endpoint_url: "http://siem.internal.example.com:8080/api/v1/events"
+timeout_seconds: 5.0
+
+# batch_size: 1   → send every event immediately
+# batch_size: 50  → buffer up to 50 events before flushing (reduces HTTP calls)
+batch_size: 10
+
+# retry_count: 0     → no retry on failure
+# retry_count: 3     → retry 3 times with exponential backoff
+retry_count: 2
+retry_backoff_seconds: 1.0
+
+# When using DualIngestAuditSink, pair with JsonlIngestAuditSink for fallback:
+#   primary: JsonlIngestAuditSink(path)
+#   secondary: HttpIngestAuditSink(endpoint_url)
+# This ensures events are not lost when the HTTP sink is unreachable.

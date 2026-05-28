@@ -16,12 +16,14 @@ from __future__ import annotations
 import os
 import time
 from datetime import UTC, datetime
+from inspect import isawaitable
 
 from whale.ingest.ports.command.source_command_audit_port import (
     SourceCommandAuditEvent,
     SourceCommandAuditPort,
 )
 from whale.ingest.ports.metrics import IngestMetricEvent, IngestMetricsPort
+from whale.ingest.ports.runtime.write_lease_port import WriteLeasePort
 from whale.ingest.ports.source.source_write_port import SourceWritePort
 from whale.ingest.ports.source.source_write_port_registry import SourceWritePortRegistry
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
@@ -48,10 +50,12 @@ class SourceCommandUseCase:
         write_port_registry: SourceWritePortRegistry,
         audit_port: SourceCommandAuditPort | None = None,
         metrics_port: IngestMetricsPort | None = None,
+        write_lease_port: WriteLeasePort | None = None,
     ) -> None:
         self._write_port_registry = write_port_registry
         self._audit_port = audit_port
         self._metrics_port = metrics_port
+        self._write_lease_port = write_lease_port
 
     async def execute(self, request: SourceWriteRequest) -> SourceWriteResult:
         """校验并执行一次设备写入请求。
@@ -102,6 +106,65 @@ class SourceCommandUseCase:
         connection = request.connections[0] if request.connections else SourceConnectionData(
             host="", port=0, ied_name="", ld_name="", namespace_uri="",
         )
+        lease_resource_id = connection.ld_name or connection.ied_name or "unknown"
+        fencing_token: int | None = None
+
+        if self._write_lease_port is not None:
+            try:
+                lease_decision = self._write_lease_port.acquire(
+                    resource_id=lease_resource_id,
+                    holder_key=execution.actor or "ingest",
+                    requested_fencing_token=_int_param(execution.params.get("fencing_token")),
+                )
+            except TypeError:
+                lease_decision = self._write_lease_port.acquire(
+                    resource_id=lease_resource_id,
+                    holder_key=execution.actor or "ingest",
+                )
+            fencing_token = lease_decision.fencing_token
+            if not lease_decision.allowed:
+                self._emit_audit(
+                    request=request,
+                    result=lease_decision.result,
+                    failure_reason=lease_decision.reason_code,
+                    decision="DENY",
+                    reason_code=lease_decision.reason_code,
+                    fencing_token=fencing_token,
+                )
+                self._emit_metric(
+                    request=request,
+                    operation="source_command",
+                    status=lease_decision.result,
+                    started_at=started_at,
+                    error_code=lease_decision.reason_code or lease_decision.result,
+                )
+                raise RuntimeError(
+                    f"Write lease denied: {lease_decision.reason_code or lease_decision.result}"
+                )
+
+        precheck = getattr(port, "precheck", None)
+        if callable(precheck):
+            precheck_result = precheck(execution=execution, connection=connection, items=request.items)
+            if isawaitable(precheck_result):
+                precheck_result = await precheck_result
+            if precheck_result not in (True, None):
+                reason = str(precheck_result)
+                self._emit_audit(
+                    request=request,
+                    result="FAILED",
+                    failure_reason=reason,
+                    decision="ALLOW",
+                    reason_code="PRECHECK_FAILED",
+                    fencing_token=fencing_token,
+                )
+                self._emit_metric(
+                    request=request,
+                    operation="source_command",
+                    status="FAILED",
+                    started_at=started_at,
+                    error_code="PRECHECK_FAILED",
+                )
+                raise RuntimeError(reason)
 
         # 调用 port 写入
         try:
@@ -115,6 +178,9 @@ class SourceCommandUseCase:
                 request=request,
                 result="FAILED",
                 failure_reason=str(exc) or type(exc).__name__,
+                decision="ALLOW",
+                reason_code=type(exc).__name__,
+                fencing_token=fencing_token,
             )
             self._emit_metric(
                 request=request,
@@ -123,11 +189,23 @@ class SourceCommandUseCase:
                 started_at=started_at,
                 error_code=type(exc).__name__,
             )
+            if self._write_lease_port is not None:
+                self._write_lease_port.release(
+                    resource_id=lease_resource_id,
+                    holder_key=execution.actor or "ingest",
+                )
             raise
         if result.trace_id is None:
             result.trace_id = request.trace_id
         result.command_id = request.command_id
-        self._emit_audit(request=request, result="SUCCESS", failure_reason=None)
+        self._emit_audit(
+            request=request,
+            result="SUCCESS",
+            failure_reason=None,
+            decision="ALLOW",
+            reason_code=None,
+            fencing_token=fencing_token,
+        )
         self._emit_metric(
             request=request,
             operation="source_command",
@@ -135,6 +213,50 @@ class SourceCommandUseCase:
             started_at=started_at,
             error_code=None,
         )
+        readback = getattr(port, "readback", None)
+        if execution.params.get("require_readback") and callable(readback):
+            readback_values = readback(
+                execution=execution,
+                connection=connection,
+                items=request.items,
+                write_result=result,
+            )
+            if isawaitable(readback_values):
+                readback_values = await readback_values
+            readback_map = dict(readback_values or {})
+            mismatches = [
+                item.node_id
+                for item in request.items
+                if str(readback_map.get(item.node_id)) != str(item.value)
+            ]
+            if mismatches:
+                self._emit_audit(
+                    request=request,
+                    result="FAILED",
+                    failure_reason="readback_mismatch",
+                    decision="ALLOW",
+                    reason_code="READBACK_MISMATCH",
+                    fencing_token=fencing_token,
+                )
+                self._emit_metric(
+                    request=request,
+                    operation="source_command",
+                    status="FAILED",
+                    started_at=started_at,
+                    error_code="READBACK_MISMATCH",
+                )
+                if self._write_lease_port is not None:
+                    self._write_lease_port.release(
+                        resource_id=lease_resource_id,
+                        holder_key=execution.actor or "ingest",
+                    )
+                raise RuntimeError("Write readback mismatch.")
+            result.attributes["readback"] = "confirmed"
+        if self._write_lease_port is not None:
+            self._write_lease_port.release(
+                resource_id=lease_resource_id,
+                holder_key=execution.actor or "ingest",
+            )
         return result
 
     @staticmethod
@@ -209,6 +331,9 @@ class SourceCommandUseCase:
         request: SourceWriteRequest,
         result: str,
         failure_reason: str | None,
+        decision: str = "ALLOW",
+        reason_code: str | None = None,
+        fencing_token: int | None = None,
     ) -> None:
         if self._audit_port is None:
             return
@@ -224,8 +349,11 @@ class SourceCommandUseCase:
                 protocol=execution.protocol,
                 source_id=source_id,
                 target=",".join(item.node_id for item in request.items),
+                decision=decision,
                 result=result,
                 failure_reason=failure_reason,
+                reason_code=reason_code,
+                fencing_token=fencing_token,
                 timestamp=datetime.now(tz=UTC),
             )
         )
@@ -252,3 +380,12 @@ class SourceCommandUseCase:
                 timestamp=datetime.now(tz=UTC),
             )
         )
+
+
+def _int_param(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
