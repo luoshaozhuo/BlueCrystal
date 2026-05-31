@@ -5,14 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 import socket
-from typing import Any
 from urllib.request import build_opener, ProxyHandler
 
 _no_proxy_opener = build_opener(ProxyHandler({}))
 
-from tools.source_lab.model import SimulatedSource
-from tools.source_lab.protocols.common._base_facade import BaseSimulatorFacade
-from tools.source_lab.protocols.common.simulator_models import (
+# 必须在全局 opener 创建后导入项目模块，确保 urllib 全局状态已初始化
+from tools.source_lab.model import SimulatedSource  # noqa: E402
+from tools.source_lab.protocols.common._base_facade import BaseSimulatorFacade  # noqa: E402
+from tools.source_lab.protocols.common.simulator_models import (  # noqa: E402
     ReadSimulatorResult,
     SimulatorCapabilities,
     SimulatorHealth,
@@ -20,7 +20,7 @@ from tools.source_lab.protocols.common.simulator_models import (
     SimulatorResult,
     SimulatorStatus,
 )
-from tools.source_lab.protocols.common.simulators import HttpRestSimulator
+from tools.source_lab.protocols.common.simulators import HttpRestSimulator  # noqa: E402
 
 
 class HttpRestSimulatorFacade(BaseSimulatorFacade):

@@ -9,7 +9,7 @@ import asyncio
 import json
 import socket
 from contextlib import closing
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 import pytest

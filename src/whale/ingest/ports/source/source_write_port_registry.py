@@ -1,4 +1,7 @@
-"""Source write port registry for ingest."""
+"""端口接口定义。
+
+定义调用方契约和实现方责任，相关功能。
+"""
 
 from __future__ import annotations
 
@@ -8,7 +11,7 @@ from whale.ingest.ports.source.source_write_port import SourceWritePort
 
 
 class SourceWritePortRegistry(Protocol):
-    """Resolve one write port implementation for a protocol."""
+    """根据协议解析写入端口实现。"""
 
     def get(self, protocol: str) -> SourceWritePort:
-        """Return the write port registered for the given protocol."""
+        """返回给定协议注册的写入端口。"""

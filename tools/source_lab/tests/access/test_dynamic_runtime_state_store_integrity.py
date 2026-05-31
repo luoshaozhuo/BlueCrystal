@@ -1,14 +1,20 @@
+"""dynamic runtime state store 完整性测试。
+
+验证 state store 数据的完整性、一致性和原子写入。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import json
 import threading
 from pathlib import Path
+from typing import cast
 
 from tools.source_lab.access.runtime import RuntimeStateStore
 
 
 def _read_raw(path: Path) -> dict[str, object]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, object], json.loads(path.read_text(encoding="utf-8")))
 
 
 def test_state_store_writes_checksum(tmp_path: Path) -> None:

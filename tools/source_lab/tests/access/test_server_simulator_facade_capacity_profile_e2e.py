@@ -30,41 +30,37 @@ from tools.source_lab.access.subscribe.profile import run_subscribe_profile
 from tools.source_lab.fleet import SourceSimulatorFleet
 from tools.source_lab.model import SimulatedPoint, SimulatedSource, SourceConnection, UpdateConfig
 from tools.source_lab.sources import PortAllocator
+from tools.source_lab.access.runners.base import CapacityRunner, SubscriptionRunner
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec  # type: ignore[import-untyped]
 
 
-def _build_runner(protocol: str):
+def _build_runner(protocol: str) -> CapacityRunner:
     """Construct capacity runner。
 
     对于 iec61850_mms，使用 NativeCmdCapacityRunner 直接通过 libiec61850
     进行 MMS 读取（Python 探针不支持 C 模拟器所需的完整 COTP+MMS 握手）。
     其他协议保留 Python lightweight polling runner（GenericPollingCapacityRunner 子类）。
     """
+    from tools.source_lab.access.runners.registry import RunnerInfo
     if protocol == "modbus_tcp":
         from tools.source_lab.access.runners.modbus_tcp_polling import ModbusTcpPollingRunner
         return ModbusTcpPollingRunner()
-    if protocol == "iec61850_mms":
+    if protocol in ("iec61850_mms", "iec104", "iec101", "modbus_rtu"):
         from tools.source_lab.access.runners.registry import build_capacity_runner
-        return build_capacity_runner(protocol)
-    if protocol == "iec104":
-        from tools.source_lab.access.runners.registry import build_capacity_runner
-        return build_capacity_runner(protocol)
+        info = build_capacity_runner(protocol)
+        if isinstance(info, RunnerInfo):
+            return info.runner
+        return info
     if protocol == "opcua":
         from tools.source_lab.access.runners.open62541_serial_polling import OpcUaOpen62541CapacityRunner
         return OpcUaOpen62541CapacityRunner()
-    if protocol == "iec101":
-        from tools.source_lab.access.runners.registry import build_capacity_runner
-        return build_capacity_runner(protocol)
-    if protocol == "modbus_rtu":
-        from tools.source_lab.access.runners.registry import build_capacity_runner
-        return build_capacity_runner(protocol)
     if protocol == "http_rest":
         from tools.source_lab.access.runners.http_rest_polling import HttpRestPollingRunner
         return HttpRestPollingRunner()
     raise ValueError(f"no Python runner for {protocol}")
 
 
-def _build_subscription_runner(protocol: str):
+def _build_subscription_runner(protocol: str) -> SubscriptionRunner:
     """Construct subscription runner for streaming protocols."""
     if protocol == "mqtt":
         from tools.source_lab.access.runners.mqtt_subscription import MqttSubscriptionRunner
@@ -153,7 +149,10 @@ def _build_e2e_source(protocol: str, port: int) -> SimulatedSource:
     )
     kwargs.update(_E2E_CONNECTION_KWARGS.get(protocol, {}))
     if protocol in {"iec61850_goose", "iec61850_sv"}:
-        params = dict(kwargs.get("params", {}))
+        # kwargs["params"] 实际为 dict[str, object]，但 kwargs 整体推断为 dict[str, object]，
+        # .get("params", {}) 返回值为 object，显式 cast 为 dict。
+        raw_params: dict[str, object] = kwargs.get("params", {})  # type: ignore[assignment]
+        params = dict(raw_params)
         subscriber_interface = (
             os.environ.get("SOURCE_LAB_L2_SUBSCRIBER_INTERFACE")
             or os.environ.get("SOURCE_LAB_L2_INTERFACE", "lo")
@@ -549,7 +548,6 @@ def test_capacity_profile_has_no_protocol_if_else() -> None:
     - profile.py 的 run_field_profile 只按 access_mode 分发
     - 无 protocol 字符串比较
     """
-    import inspect
     import ast
     from pathlib import Path
 

@@ -46,52 +46,101 @@ def build_registry(state_dir: str | None = None) -> EndpointRuntimeRegistry:
 
 
 def _config_from_payload(payload: dict[str, object]) -> EndpointRuntimeConfig:
-    source_data = dict(payload["source"])
-    endpoint_data = dict(source_data["endpoint"])
-    points_data = list(source_data["points"])
+    """将 JSON payload 字典转换为 EndpointRuntimeConfig。
+
+    JSON 反序列化边界处需要 isinstance 收窄，避免将 object 直接传给
+    dict/int/float 构造器。
+    """
+    source_raw = payload.get("source")
+    if not isinstance(source_raw, dict):
+        raise ValueError(f"source must be a dict, got {type(source_raw)}")
+    source_data: dict[str, object] = source_raw
+
+    endpoint_raw = source_data.get("endpoint")
+    if not isinstance(endpoint_raw, dict):
+        raise ValueError("source.endpoint must be a dict")
+    endpoint_data: dict[str, object] = endpoint_raw
+
+    points_raw = source_data.get("points")
+    if not isinstance(points_raw, list):
+        raise ValueError("source.points must be a list")
+    points_data: list[object] = points_raw
+
+    params_raw = endpoint_data.get("params", {})
+    if not isinstance(params_raw, dict):
+        params_raw = {}
+
+    # 从 endpoint_data dict 提取字段时显式转换为目标类型，
+    # 避免 object -> int/str/Optional 的 mypy 类型不匹配
+    endpoint_port_raw = endpoint_data.get("port", 0)
+    endpoint_port: int = int(endpoint_port_raw)  # type: ignore[call-overload]  # JSON 反序列化边界，dict.get 返回 object
+
+    ns_uri_raw = endpoint_data.get("namespace_uri")
+    namespace_uri: str | None = str(ns_uri_raw) if ns_uri_raw is not None else None
+
     source = SourceRuntimeSpec(
         endpoint=SourceEndpointSpec(
             name=str(endpoint_data["name"]),
             host=str(endpoint_data["host"]),
-            port=int(endpoint_data["port"]),
+            port=endpoint_port,
             protocol=str(endpoint_data["protocol"]),
             transport=str(endpoint_data.get("transport", "tcp")),
-            namespace_uri=endpoint_data.get("namespace_uri"),
+            namespace_uri=namespace_uri,
             ied_name=str(endpoint_data.get("ied_name", "")),
             ld_name=str(endpoint_data.get("ld_name", "")),
-            params=dict(endpoint_data.get("params", {})),
+            params=params_raw,
         ),
         points=tuple(
             SourcePointSpec(
-                address=str(point["address"]),
-                name=point.get("name"),
-                data_type=point.get("data_type"),
-                ln_name=point.get("ln_name"),
-                do_name=point.get("do_name"),
-                unit=point.get("unit"),
+                address=str(point["address"]) if isinstance(point, dict) else "",
+                name=point.get("name") if isinstance(point, dict) else None,
+                data_type=point.get("data_type") if isinstance(point, dict) else None,
+                ln_name=point.get("ln_name") if isinstance(point, dict) else None,
+                do_name=point.get("do_name") if isinstance(point, dict) else None,
+                unit=point.get("unit") if isinstance(point, dict) else None,
             )
             for point in points_data
+            if isinstance(point, dict)
         ),
     )
+
+    target_hz_raw = payload.get("target_hz")
+    target_hz: float | None = None
+    if target_hz_raw is not None:
+        target_hz = float(target_hz_raw)  # type: ignore[arg-type]  # JSON 反序列化边界，object 原语经 isinstance 已在 get 之后由运行时保证
+
+    publishing_interval_raw = payload.get("publishing_interval_ms")
+    publishing_interval_ms: float | None = None
+    if publishing_interval_raw is not None:
+        publishing_interval_ms = float(publishing_interval_raw)  # type: ignore[arg-type]
+
+    read_timeout_raw = payload.get("read_timeout_s", 5.0)
+    read_timeout_s: float = float(read_timeout_raw) if read_timeout_raw is not None else 5.0  # type: ignore[arg-type]
+
+    config_version_raw = payload.get("config_version", 1)
+    if config_version_raw is not None:
+        config_version: int = int(config_version_raw)  # type: ignore[call-overload]  # JSON 反序列化边界
+    else:
+        config_version = 1
+
     return EndpointRuntimeConfig(
         endpoint_id=str(payload["endpoint_id"]),
         protocol=str(payload["protocol"]),
         mode=EndpointMode(str(payload["mode"])),
         source=source,
-        target_hz=float(payload["target_hz"]) if payload.get("target_hz") is not None else None,
-        publishing_interval_ms=(
-            float(payload["publishing_interval_ms"])
-            if payload.get("publishing_interval_ms") is not None
-            else None
-        ),
-        read_timeout_s=float(payload.get("read_timeout_s", 5.0)),
-        config_version=int(payload.get("config_version", 1)),
+        target_hz=target_hz,
+        publishing_interval_ms=publishing_interval_ms,
+        read_timeout_s=read_timeout_s,
+        config_version=config_version,
     )
 
 
 def _runtime_payload(runtime: object) -> dict[str, object]:
     if hasattr(runtime, "to_dict"):
-        return _redact_payload(dict(runtime.to_dict()))
+        raw: object = _redact_payload(dict(runtime.to_dict()))
+        if isinstance(raw, dict):
+            return raw
+        return {"runtime": str(runtime)}
     return {"runtime": str(runtime)}
 
 
@@ -105,7 +154,8 @@ def _redact_payload(payload: object) -> object:
 
 
 def _schemas() -> dict[str, dict[str, object]]:
-    endpoint_schema = {
+    # 使用显式类型标注避免 mypy 推断 inner dict 为 Collection[str] 导致类型不匹配
+    endpoint_schema: dict[str, object] = {
         "type": "object",
         "required": ["endpoint_id", "protocol", "mode", "source", "config_version"],
         "properties": {
@@ -185,7 +235,8 @@ def _validate_endpoint_payload(payload: dict[str, object]) -> list[str]:
         if str(endpoint.get("host", "")).strip() == "":
             errors.append("invalid:source.endpoint.host")
         try:
-            if int(endpoint.get("port", 0)) <= 0:
+            endpoint_port_raw = endpoint.get("port", 0)
+            if int(endpoint_port_raw) <= 0:  # type: ignore[call-overload]  # JSON 反序列化边界
                 errors.append("invalid:source.endpoint.port")
         except (TypeError, ValueError):
             errors.append("invalid:source.endpoint.port")
@@ -198,7 +249,8 @@ def _validate_endpoint_payload(payload: dict[str, object]) -> list[str]:
     elif protocol not in _SUPPORTED_PROTOCOLS_BY_MODE[mode]:
         errors.append("invalid:protocol_for_mode")
     try:
-        if int(payload.get("config_version", 0)) <= 0:
+        config_ver_raw = payload.get("config_version", 0)
+        if int(config_ver_raw) <= 0:  # type: ignore[call-overload]  # JSON 反序列化边界
             errors.append("invalid:config_version")
     except (TypeError, ValueError):
         errors.append("invalid:config_version")
@@ -232,8 +284,18 @@ def validate_accepted_state_payload(payload: object) -> list[str]:
 
 
 def _emit(payload: dict[str, object]) -> int:
+    """将 payload 序列化为 JSON 写入 stdout 并返回退出码。
+
+    退出码从 payload 中读取，通过 isinstance 收窄类型后转为 int。
+    """
     sys.stdout.write(json.dumps(_redact_payload(payload), ensure_ascii=True, indent=2) + "\n")
-    return int(payload.get("exit_code", 0))
+    exit_code_raw = payload.get("exit_code", 0)
+    if isinstance(exit_code_raw, (int, float)):
+        return int(exit_code_raw)
+    try:
+        return int(str(exit_code_raw))
+    except (ValueError, TypeError):
+        return 0
 
 
 def _write_json_file(path: str, payload: object) -> None:
@@ -335,12 +397,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "recover":
-        runtimes = registry.recover()
+        recovered = registry.recover()
         return _emit(
             {
                 "command": "recover",
-                "recovered_count": len(runtimes),
-                "runtimes": [_runtime_payload(runtime) for runtime in runtimes] if args.print_runtime else [],
+                "recovered_count": len(recovered),
+                "runtimes": [_runtime_payload(runtime) for runtime in recovered] if args.print_runtime else [],
                 "exit_code": 0,
             }
         )
@@ -402,11 +464,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         redacted = not args.raw or args.redacted
         payload = state_store.export_accepted_state(redacted=redacted)
         _write_json_file(args.output, payload)
+        endpoints_list = payload.get("endpoints", [])
+        if not isinstance(endpoints_list, list):
+            endpoints_list = []
         return _emit(
             {
                 "command": args.command,
                 "output": args.output,
-                "count": len(payload["endpoints"]),
+                "count": len(endpoints_list),
                 "redacted": payload["redacted"],
                 "exit_code": 0,
             }
@@ -426,9 +491,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
     if args.command == "import-accepted-state":
-        payload = json.loads(Path(args.file).read_text(encoding="utf-8"))
-        errors = validate_accepted_state_payload(payload)
-        if isinstance(payload, dict) and bool(payload.get("redacted")):
+        raw_payload = json.loads(Path(args.file).read_text(encoding="utf-8"))
+        errors = validate_accepted_state_payload(raw_payload)
+        if isinstance(raw_payload, dict) and bool(raw_payload.get("redacted")):
             errors = [*errors, "redacted_bundle_not_importable"]
         if errors:
             state_store.append_journal_entry(
@@ -452,7 +517,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "exit_code": 1,
                 }
             )
-        state_store.import_accepted_state(payload)
+        # validate_accepted_state_payload 收窄后 raw_payload 必为 dict
+        assert isinstance(raw_payload, dict)
+        state_store.import_accepted_state(raw_payload)
+        endpoint_count: int = len(raw_payload.get("endpoints", [])) if isinstance(raw_payload.get("endpoints"), list) else 0
         state_store.append_journal_entry(
             {
                 "operation_id": f"cli-import-{utc_now_iso()}",
@@ -461,7 +529,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "decision": "ALLOW",
                 "result": "SUCCESS",
                 "reason_code": "accepted_state_imported",
-                "count": len(payload["endpoints"]),
+                "count": endpoint_count,
                 "timestamp": utc_now_iso(),
             }
         )
@@ -470,7 +538,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "command": args.command,
                 "file": args.file,
                 "valid": True,
-                "count": len(payload["endpoints"]),
+                "count": endpoint_count,
                 "exit_code": 0,
             }
         )

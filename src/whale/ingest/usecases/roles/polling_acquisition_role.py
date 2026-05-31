@@ -81,6 +81,7 @@ class PollingAcquisitionRole:
         state_cache_port: SourceStateCachePort,
         metrics_port: IngestMetricsPort | None = None,
     ) -> None:
+        """初始化轮询采集角色。Args: adapter: 采集适配器。state_cache: 状态缓存 port。"""
         self._acquisition_port = acquisition_port
         self._state_cache_port = state_cache_port
         self._cycle_overrun_count = 0
@@ -303,7 +304,7 @@ class PollingAcquisitionRole:
         ld_name: str,
         reason: str,
     ) -> None:
-        """Best-effort unavailable mark for source-side failures."""
+        """尽力标记数据源端失败为不可用状态。"""
 
         try:
             self._state_cache_port.mark_unavailable(
@@ -334,7 +335,7 @@ def _utc_now() -> datetime:
 
 
 def _normalize_source_error_code(value: str) -> str:
-    """Normalize one source-side error string into a stable code."""
+    """将源端错误字符串规范化为稳定错误码。"""
 
     lowered = value.strip().lower()
     if "runner_not_available" in lowered:

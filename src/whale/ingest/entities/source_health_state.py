@@ -1,7 +1,6 @@
-"""Source-health entity for ingest.
+"""数据源健康状态实体。
 
-This is a minimal reusable ingest entity. Future iterations may extend it with
-fields such as last success time, error message, and recovery state.
+定义数据源的健康评估指标和状态。
 """
 
 from __future__ import annotations
@@ -11,7 +10,7 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class SourceHealthState:
-    """Minimal health status for one source."""
+    """单个数据源的最小健康状态。"""
 
     source_id: str
     status: str

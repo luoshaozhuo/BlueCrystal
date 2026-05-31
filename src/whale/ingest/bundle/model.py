@@ -1,4 +1,7 @@
-"""Bundle model for ingest runtime configuration export/import."""
+"""Bundle 数据模型。
+
+定义 bundle 的元数据和内容结构。
+"""
 
 from __future__ import annotations
 
@@ -8,7 +11,7 @@ from pydantic import BaseModel, Field
 
 
 class AcquisitionTaskBundleItem(BaseModel):
-    """Serializable acquisition-task record stored inside one bundle."""
+    """bundle 内存储的可序列化采集任务记录。"""
 
     task_name: str
     ld_instance_id: int
@@ -24,7 +27,7 @@ class AcquisitionTaskBundleItem(BaseModel):
 
 
 class IngestBundle(BaseModel):
-    """Serializable ingest bundle envelope."""
+    """可序列化的 ingest bundle 信封。"""
 
     schema_version: str = "1.0"
     bundle_version: str

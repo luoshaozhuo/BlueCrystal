@@ -6,12 +6,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: whale_ingest
-      POSTGRES_USER: ${WHALE_INGEST_PRODLIKE_PG_USER}
-      POSTGRES_PASSWORD: ${WHALE_INGEST_PRODLIKE_PG_PASSWORD}
+      POSTGRES_USER: ${WHALE_INGEST_PRODLIKE_PG_USER:-whale}
+      POSTGRES_PASSWORD: ${WHALE_INGEST_PRODLIKE_PG_PASSWORD:-whale}
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U whale -d whale_ingest"]
+      test: ["CMD-SHELL", "pg_isready -U ${WHALE_INGEST_PRODLIKE_PG_USER:-whale} -d whale_ingest"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -74,7 +74,7 @@ services:
     environment:
       # PostgreSQL runtime DB
       WHALE_INGEST_DATABASE_BACKEND: postgresql
-      WHALE_INGEST_DATABASE_URL: postgresql+psycopg://${WHALE_INGEST_PRODLIKE_PG_USER}:${WHALE_INGEST_PRODLIKE_PG_PASSWORD}@postgres:5432/whale_ingest
+      WHALE_INGEST_DATABASE_URL: postgresql+psycopg://${WHALE_INGEST_PRODLIKE_PG_USER:-whale}:${WHALE_INGEST_PRODLIKE_PG_PASSWORD:-whale}@postgres:5432/whale_ingest
       # Redis state cache
       WHALE_INGEST_STATE_CACHE_BACKEND: redis
       WHALE_INGEST_REDIS_URL: redis://redis:6379/0
@@ -121,7 +121,7 @@ services:
     command: ["worker", "--runtime-mode", "dual_active_partitioned", "--node-key", "worker-a"]
     environment:
       WHALE_INGEST_DATABASE_BACKEND: postgresql
-      WHALE_INGEST_DATABASE_URL: postgresql+psycopg://${WHALE_INGEST_PRODLIKE_PG_USER}:${WHALE_INGEST_PRODLIKE_PG_PASSWORD}@postgres:5432/whale_ingest
+      WHALE_INGEST_DATABASE_URL: postgresql+psycopg://${WHALE_INGEST_PRODLIKE_PG_USER:-whale}:${WHALE_INGEST_PRODLIKE_PG_PASSWORD:-whale}@postgres:5432/whale_ingest
       WHALE_INGEST_STATE_CACHE_BACKEND: redis
       WHALE_INGEST_REDIS_URL: redis://redis:6379/0
       WHALE_INGEST_REDIS_STATE_HASH_KEY: whale:ingest:state
@@ -147,7 +147,7 @@ services:
     command: ["worker", "--runtime-mode", "dual_active_partitioned", "--node-key", "worker-b"]
     environment:
       WHALE_INGEST_DATABASE_BACKEND: postgresql
-      WHALE_INGEST_DATABASE_URL: postgresql+psycopg://${WHALE_INGEST_PRODLIKE_PG_USER}:${WHALE_INGEST_PRODLIKE_PG_PASSWORD}@postgres:5432/whale_ingest
+      WHALE_INGEST_DATABASE_URL: postgresql+psycopg://${WHALE_INGEST_PRODLIKE_PG_USER:-whale}:${WHALE_INGEST_PRODLIKE_PG_PASSWORD:-whale}@postgres:5432/whale_ingest
       WHALE_INGEST_STATE_CACHE_BACKEND: redis
       WHALE_INGEST_REDIS_URL: redis://redis:6379/0
       WHALE_INGEST_REDIS_STATE_HASH_KEY: whale:ingest:state

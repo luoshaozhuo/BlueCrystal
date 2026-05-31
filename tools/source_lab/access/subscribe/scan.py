@@ -62,7 +62,7 @@ def scan_source_subscriptions(
     """Run subscription scan across the configured server-count ramp."""
 
     progress = SubscribeProgressReporter.from_config(config, runner_name=runner.name)
-    started_at = progress.scan_started()
+    _started_at = progress.scan_started()
     level_results: list[SubscribeLevelResult] = []
     try:
         for server_count in iter_int_ramp(

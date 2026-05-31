@@ -262,7 +262,9 @@ def _run_facade_process(
             from tools.source_lab.protocols.registry import create_server_simulator
 
             facade = create_server_simulator(source.connection.protocol, source)
-            await facade.load_points([point for point in source.points])  # type: ignore[arg-type]
+            # SimulatedPoint (model.py) 与 SimulatorPoint (simulator_models.py)
+            # 字段形状不同但语义等价；tools 模块不进入生产路径，此忽略可控。
+            await facade.load_points([point for point in source.points])  # type: ignore[arg-type,misc]
             result = await facade.start()
             if result.status.name != "OK":
                 raise RuntimeError(
@@ -311,7 +313,10 @@ def _run_facade_process(
                 if now >= next_update_at:
                     writes = _build_update_writes(update_points, rng)
                     if writes:
-                        await facade.update_values(writes)
+                        # dict 不变性：_build_update_writes 返回 NonNullable dict，
+                        # facade.update_values 接受 Nullable dict。两者语义兼容，
+                        # 仅 mypy 的 invariant dict 检查需要忽略。
+                        await facade.update_values(writes)  # type: ignore[arg-type]
                     next_update_at += update_config.interval_seconds
                     while next_update_at <= now:
                         next_update_at += update_config.interval_seconds

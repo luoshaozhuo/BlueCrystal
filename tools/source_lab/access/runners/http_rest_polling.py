@@ -9,9 +9,10 @@ from urllib.request import build_opener, ProxyHandler
 
 _no_proxy_opener = build_opener(ProxyHandler({}))
 
-from tools.source_lab.access.polling.model import CapacityScanConfig
-from tools.source_lab.access.runners.generic_polling import GenericPollingCapacityRunner, PollingReadSample
-from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
+# 必须在全局 opener 创建后导入项目模块，确保 urllib 全局状态已初始化
+from tools.source_lab.access.polling.model import CapacityScanConfig  # noqa: E402
+from tools.source_lab.access.runners.generic_polling import GenericPollingCapacityRunner, PollingReadSample  # noqa: E402
+from tools.source_lab.access.common.scheduling import RunnerEndpointPlan  # noqa: E402
 
 
 class HttpRestPollingRunner(GenericPollingCapacityRunner):

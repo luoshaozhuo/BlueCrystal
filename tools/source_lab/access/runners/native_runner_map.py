@@ -136,7 +136,7 @@ class _Iec61850MmsNativeRunner(NativeCmdCapacityRunner):
         for pt in points:
             ln = pt.ln_name or ep.params.get("ln_class", "MMXU")
             do_name = pt.do_name
-            da_name = ""
+            _da_name_fallback = ""
             # Split do.da if do_name contains "."
             if "." in do_name:
                 parts = do_name.split(".", 1)

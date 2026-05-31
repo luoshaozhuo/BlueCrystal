@@ -9,6 +9,14 @@ from tools.source_lab.access.runtime.continuity_model import EndpointContinuityM
 
 
 class ContinuityMonitor:
+    """Endpoint 连续性监控器，负责采集周期的连续性统计和异常检测。
+
+    跟踪每个 endpoint 的采样间隔、事件间隔，按预期周期判定 gap 和 missed tick。
+    支持 operation tagging（标记操作影响的 endpoint），用于动态调整时的 unaffected endpoint 连续性验证。
+    所有统计方法为线程安全（RLock 保护）。
+
+    不负责：阈值告警动作（只记录指标，不触发通知或自动修复）。
+    """
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._metrics: dict[str, EndpointContinuityMetrics] = {}

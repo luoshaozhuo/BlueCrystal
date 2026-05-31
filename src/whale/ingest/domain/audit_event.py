@@ -1,4 +1,8 @@
-"""Structured audit event schema for ingest runtime and API."""
+"""审计事件领域模型。
+
+定义审计事件的核心数据结构，
+包括操作者、操作类型、资源、决策、结果等字段。
+"""
 
 from __future__ import annotations
 
@@ -18,7 +22,7 @@ _SENSITIVE_MARKERS = (
 
 
 def redact_value(value: Any) -> Any:
-    """Recursively redact sensitive nested values."""
+    """递归脱敏嵌套的敏感值。"""
 
     if isinstance(value, dict):
         return {key: redact_pair(key, item) for key, item in value.items()}
@@ -28,7 +32,7 @@ def redact_value(value: Any) -> Any:
 
 
 def redact_pair(key: str, value: Any) -> Any:
-    """Redact one key/value pair when the key is sensitive."""
+    """对敏感键的键值对进行脱敏。"""
 
     normalized = key.strip().lower().replace(" ", "_")
     if any(marker in normalized for marker in _SENSITIVE_MARKERS):
@@ -38,7 +42,7 @@ def redact_pair(key: str, value: Any) -> Any:
 
 @dataclass(frozen=True, slots=True)
 class IngestAuditEvent:
-    """One structured ingest audit event."""
+    """一条结构化的 ingest 审计事件。"""
 
     request_id: str
     actor: str | None
@@ -59,7 +63,7 @@ class IngestAuditEvent:
     attributes: dict[str, Any] = field(default_factory=dict)
 
     def sanitized_payload(self) -> dict[str, Any]:
-        """Return one JSON/DB friendly redacted payload."""
+        """返回 JSON/数据库友好的脱敏 payload。"""
 
         payload = asdict(self)
         payload["attributes"] = redact_value(payload["attributes"])

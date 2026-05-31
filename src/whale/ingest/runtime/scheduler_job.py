@@ -1,4 +1,7 @@
-"""Runtime job model for ingest scheduler."""
+"""调度任务定义。
+
+封装 APScheduler job 的配置和执行逻辑。
+"""
 
 from __future__ import annotations
 
@@ -14,7 +17,7 @@ from whale.ingest.runtime.job_status import JobStatus
 
 
 class AcquisitionStatus(StrEnum):
-    """Represent the business status of one refresh acquisition step."""
+    """代表一次刷新采集步骤的业务状态。"""
 
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
@@ -24,7 +27,7 @@ class AcquisitionStatus(StrEnum):
 
 @dataclass(slots=True)
 class SourceStateAcquisitionResult:
-    """Expose the business outcome of one source acquisition execution."""
+    """暴露一次源采集执行的业务结果。"""
 
     plan_id: str
     task_id: int
@@ -43,7 +46,7 @@ class SourceStateAcquisitionResult:
 
 @dataclass(slots=True)
 class ScheduledSourceJob:
-    """In-memory runtime state for one scheduled source job."""
+    """单个调度源任务的内存运行时状态。"""
 
     aps_job_id: str
     status: JobStatus

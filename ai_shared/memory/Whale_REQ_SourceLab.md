@@ -180,14 +180,61 @@
 - 不得把 simulator 等同 production client。
 - 不得恢复 tools/source_lab/opcua。
 
-## 八、需求跟踪表
+## 八、工具模块部署准入与证据边界
+
+本章只描述 `source_lab` 作为独立工具模块的部署准入、权限边界和证据边界。`source_lab` 不是 production source client，不进入 `ingest` production runtime path，也不替代 `shared_source` 的真实 production client 能力。
+
+### SL-READY-001 source_lab 独立工具部署准入
+
+- 类型：工具部署准入
+- 优先级：高
+- 需求描述：
+  - source_lab 应能作为独立工具模块运行 simulator、probe、profile、capacity 和 native runner 预检。
+- 验收要点：
+  - 可独立运行 simulator / probe / profile / capacity。
+  - native runner 预检清晰。
+  - 缺少 native binary 时返回明确 unavailable，并给出 protocol、runner、path、build hint。
+  - stdout/stderr 协议稳定，不把噪声输出解析为有效数据。
+  - timeout 和资源清理可验证。
+  - 不依赖 ingest production runtime。
+  - 不替代 SharedSource production client。
+
+### SL-READY-002 source_lab 权限与运行环境边界
+
+- 类型：工具部署准入
+- 优先级：高
+- 需求描述：
+  - source_lab 涉及 native runner、raw socket、GOOSE/SV、network namespace 等能力时，必须显式说明运行权限和环境边界。
+- 验收要点：
+  - source_lab 不进入 ingest production runtime path。
+  - source_lab 不作为 production client。
+  - raw socket / GOOSE / SV 只能在受控 L2 环境运行。
+  - 需要 root、capability、network namespace、veth 或 raw socket 权限时必须显式说明。
+  - 运行后必须清理进程、端口、临时文件和网络命名空间。
+  - source_lab 不得默认部署到生产控制区。
+
+### SL-READY-003 source_lab 证据边界
+
+- 类型：工具部署准入
+- 优先级：高
+- 需求描述：
+  - source_lab 的测试通过结果必须保留工具证据边界，不得自动外推为 ingest 或 shared_source 的生产就绪。
+- 验收要点：
+  - source_lab PASS 只能证明 simulator/tool/protocol validation。
+  - source_lab PASS 不能自动证明 ingest production-ready。
+  - PROTOCOL_CAPABILITIES 静态声明不能作为 runtime readiness 事实来源。
+  - gateway mode、NOT_IMPLEMENTED、受控 L2 环境必须保留证据标签。
+  - GOOSE/SV true PASS 必须带受控 L2 环境条件。
+  - SharedSource production client 的真实协议能力仍以 SharedSource 需求和测试为准。
+
+## 九、需求跟踪表
 
 | 编号 | 上承需求 | 标题 | 类型 | 优先级 | 责任模块 | 验证等级 | 实现状态 | 实现证据 | 验收测试 | 差距 | 下一步 | 更新时间 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | SL-FR-001 | P-FR-001 | 统一 ServerSimulatorFacade | FR | 高 | source_lab | L3 | 测试通过 | `tools/source_lab/protocols/common/simulator_facade.py`; `tools/source_lab/protocols/registry.py`; `tools/source_lab/tests/access/test_server_simulator_facade_contract.py` | `pytest tools/source_lab/tests/access/test_server_simulator_facade_contract.py -q` -> 137 passed; `pytest tools/source_lab/tests/access/test_source_lab_final_protocol_matrix.py -q` -> 3 passed | 无主要差距；GOOSE/SV 仍按 CI pending 单独标注 | 第3轮复核最终矩阵无回退 | 2026-05-25 |
 | SL-FR-002 | P-FR-001 | 协议 server simulator | FR | 高 | source_lab | L3 | 测试通过（受控L2环境） | `tools/source_lab/protocols/`; `tools/source_lab/native/`; `scripts/source_lab_l2_test_env.sh`; `scripts/run_source_lab_l2_standalone_gate.sh`; `ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md` | `bash scripts/run_source_lab_l2_standalone_gate.sh` -> GOOSE/SV standalone PASS；`unshare -Urn ... pytest tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py -q -rs` -> 6 passed | 宿主机 `lo/eth0` 仍不稳定；GOOSE/SV true PASS 依赖受控 `veth/netns` L2 环境 | 保持宿主机普通接口 failed 历史归档；CI 优先复用受控 L2 环境 | 2026-05-26 |
 | SL-FR-003 | P-NFR-001 | probe/profile/capacity 工具 | FR | 高 | source_lab | L4 | 测试通过（受控L2环境） | `tools/source_lab/access/`; `tools/source_lab/tests/access/test_server_simulator_facade_capacity_profile_e2e.py`; `tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py`; `ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md` | `unshare -Urn ... pytest tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py -q -rs` -> 6 passed；`unshare -Urn ... pytest tools/source_lab/tests/access -q` -> 734 passed, 3 skipped | GOOSE/SV capacity/profile 通过依赖受控 L2 环境；宿主机普通接口仍不作为默认通过条件 | 将 `unshare -Urn + veth` 固化为 raw-socket CI/本地推荐入口 | 2026-05-26 |
-| SL-FR-004 | P-NFR-004 | 多协议 native runner 管理 | FR | 高 | source_lab | L3 | 测试通过 | `tools/source_lab/access/runners/native_cmd.py`; `tools/source_lab/access/runners/native_runner_map.py`; `tools/source_lab/tests/access/test_native_runners_availability.py` | `pytest tools/source_lab/tests/access/test_native_runners_availability.py -q` -> 17 passed, 2 skipped | 可选库缺失场景仍会 skip；GOOSE/SV 运行依赖 CAP_NET_RAW | 保持 build hint/version gate；CI 补权限验证 | 2026-05-25 |
+| SL-FR-004 | P-NFR-004 | 多协议 native runner 管理 | FR | 高 | source_lab | L3 | 测试通过 | `tools/source_lab/access/runners/native_cmd.py`; `tools/source_lab/access/runners/native_runner_map.py`; `tools/source_lab/access/runners/registry.py`; `tools/source_lab/tests/access/test_native_runners_availability.py`; `tools/source_lab/tests/access/test_native_cmd_timeout.py`; `tools/source_lab/tests/access/test_protocol_production_readiness_gate.py`; `tools/source_lab/access/profile.py` | `pytest tools/source_lab/tests/access/test_native_runners_availability.py -q` -> 17 passed, 2 skipped; `pytest tools/source_lab/tests/access/test_native_cmd_timeout.py -q` -> 3 passed; `pytest tools/source_lab/tests/access/test_protocol_production_readiness_gate.py -q` -> 34 passed | Round 12: `PROTOCOL_CAPABILITIES` 重命名为 `DECLARED_PROTOCOL_CAPABILITIES`（标注 static metadata only），保留向后兼容别名；registry.py mypy 8 errors 清零；runtime readiness API 仍应作为调用方首选 | 继续迁移非 gate 调用方到 runtime readiness API | 2026-05-30 |
 | SL-FR-005 | P-FR-001 | 动态 endpoint runtime | FR | 高 | source_lab | L4 | 运行闭环通过 | `tools/source_lab/access/runtime/`; `tools/source_lab/tests/access/test_dynamic_polling_endpoint_adjustment.py`; `tools/source_lab/tests/access/test_dynamic_subscription_endpoint_adjustment.py`; `tools/source_lab/tests/access/test_dynamic_opcua_polling_endpoint_adjustment.py`; `tools/source_lab/tests/access/test_dynamic_opcua_subscription_endpoint_adjustment.py`; `tools/source_lab/tests/access/test_dynamic_iec61850_report_endpoint_adjustment.py`; `tools/source_lab/tests/access/test_dynamic_goose_sv_streaming_endpoint_adjustment.py`; `ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md` | `pytest tools/source_lab/tests/access/test_dynamic_goose_sv_permission_gate.py -q` -> 2 passed；`pytest tools/source_lab/tests/access/test_source_lab_final_protocol_matrix.py -q` -> 3 passed；`unshare -Urn ... pytest tools/source_lab/tests/access/test_dynamic_goose_sv_streaming_endpoint_adjustment.py -q -rs` -> 7 passed；`unshare -Urn ... pytest tools/source_lab/tests/access -q` -> 734 passed, 3 skipped | GOOSE/SV dynamic true PASS 依赖受控 `veth/netns`；accepted state raw export 仍可能包含连接参数；state store 非加密 | 保持 raw accepted-state 风险边界；将受控 L2 环境作为 streaming dynamic 推荐执行方式 | 2026-05-26 |
 | SL-NFR-001 | P-NFR-001 | 真实性与可复现性 | NFR | 高 | source_lab | L3 | 运行闭环通过 | `tools/source_lab/tests/access/test_source_lab_final_protocol_matrix.py`; `tools/source_lab/tests/access/test_dynamic_goose_sv_streaming_endpoint_adjustment.py`; `tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py`; `scripts/source_lab_l2_test_env.sh`; `ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md` | `pytest tools/source_lab/tests/access/test_source_lab_final_protocol_matrix.py -q` -> 3 passed；`unshare -Urn ... pytest tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py -q -rs` -> 6 passed；`unshare -Urn ... pytest tools/source_lab/tests/access/test_dynamic_goose_sv_streaming_endpoint_adjustment.py -q -rs` -> 7 passed；`unshare -Urn ... pytest tools/source_lab/tests -q` -> 743 passed, 12 skipped | 宿主机 `lo/eth0` 仍不可作为默认复现环境；Modbus RTU/IEC101 仍为 gateway mode | 将受控 L2 环境脚本纳入 raw-socket 推荐验证路径 | 2026-05-26 |
 | SL-NFR-002 | P-NFR-002 | 稳定性与资源清理 | NFR | 高 | source_lab | L3 | 运行闭环通过 | `tools/source_lab/fleet.py`; `tools/source_lab/access/runners/native_process.py`; `tools/source_lab/access/runtime/state_store.py`; `scripts/source_lab_l2_test_env.sh`; `ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md` | `pytest tools/source_lab/tests/access/test_dynamic_runtime_state_store_integrity.py -q` -> 6 passed；`pytest tools/source_lab/tests/access/test_dynamic_runtime_state_store_retention.py -q` -> 5 passed；`pytest tools/source_lab/tests/access/test_dynamic_runtime_state_store_repair_cli.py -q` -> 3 passed；`unshare -Urn ... pytest tools/source_lab/tests/access -q` -> 734 passed, 3 skipped | state store 仍非加密；raw accepted-state 仍需受控目录 | 保持工具级持久化边界，不扩展为生产 secret storage | 2026-05-26 |
@@ -195,3 +242,7 @@
 | SL-AR-002 | P-AR-002 | protocols / native / access 分层 | AR | 高 | source_lab | L2 | 测试通过 | `tools/source_lab/protocols/`; `tools/source_lab/native/`; `tools/source_lab/access/`; `test_protocol_directory_structure.py` | `pytest tools/source_lab/tests/access/test_protocol_directory_structure.py -q` -> 26 passed | 无主要差距；旧 `tools/source_lab/opcua` 仍需持续门禁 | 第3轮复核旧路径未回归 | 2026-05-25 |
 | SL-TEST-001 | P-NFR-004 | simulator contract 与真实协议测试 | TEST | 高 | source_lab | L3 | 运行闭环通过 | `test_server_simulator_facade_contract.py`; `test_server_simulator_facade_real_protocol_smoke.py`; `test_source_lab_final_protocol_matrix.py`; `test_dynamic_iec61850_report_endpoint_adjustment.py`; `test_dynamic_goose_sv_streaming_endpoint_adjustment.py`; `test_dynamic_goose_sv_permission_gate.py`; `ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md` | `pytest tools/source_lab/tests/access/test_server_simulator_facade_contract.py -q` -> 137 passed；`pytest tools/source_lab/tests/access/test_source_lab_final_protocol_matrix.py -q` -> 3 passed；`unshare -Urn ... pytest tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py -q -rs` -> 6 passed；`unshare -Urn ... pytest tools/source_lab/tests/access/test_dynamic_goose_sv_streaming_endpoint_adjustment.py -q -rs` -> 7 passed | 受控 L2 环境是 GOOSE/SV 真实事件 smoke 的必要前提；宿主机普通接口仍不稳定 | 保留 `lo/eth0` failed 历史诊断，不回写成 pending | 2026-05-26 |
 | SL-TEST-002 | P-NFR-001 | capacity/profile E2E | TEST | 高 | source_lab | L4 | 运行闭环通过 | `test_server_simulator_facade_capacity_profile_e2e.py`; `test_iec61850_report_capacity_profile_gate.py`; `test_iec61850_goose_sv_streaming_e2e.py`; `ai_shared/reports/source_lab_goose_sv_l2_env_and_native_subscriber_closure_report.md` | `pytest tools/source_lab/tests/access/test_server_simulator_facade_capacity_profile_e2e.py -q` -> 26 passed, 4 skipped；`pytest tools/source_lab/tests/access/test_iec61850_report_capacity_profile_gate.py -q` -> 13 passed；`unshare -Urn ... pytest tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py -q -rs` -> 6 passed；`unshare -Urn ... pytest tools/source_lab/tests/access -q` -> 734 passed, 3 skipped | GOOSE/SV capacity/profile 通过依赖受控 `veth/netns`，宿主机普通接口仍不作为默认通过证据 | 将 raw-socket E2E 与 full access 回归都固定到受控 L2 环境 | 2026-05-26 |
+
+| SL-READY-001 | P-NFR-001/P-AR-002 | source_lab 独立工具部署准入 | READY | 高 | source_lab | L3 | 部分实现 | `ai_shared/reports/source_lab_mypy_phase1_closure_round13.md`; `ai_shared/reports/source_lab_mypy_phase2_closure_round14.md`; `ai_shared/reports/source_lab_tests_mypy_closure_round15.md`; `tools/source_lab/`; native runner 管理；profile/capacity tests；`tools/source_lab/access/profile.py` | Round 15: source_lab 全量 mypy 0 errors / 202 files（cmd/src/tests 全覆盖）——这是 mypy 治理终点；compileall PASS；ruff PASS；import boundary PASS | raw L2 权限边界依旧需要显式环境约束；10 个 source_lab access 测试 environment-failed（native runner 二进制缺失，非代码问题）；source_lab mypy 治理已 closed，但仍有 L5 field readback pending | 补 native runner 二进制构建/部署自动化；补 GOOSE/SV L2 环境权限矩阵固定 | 2026-05-31 |
+| SL-READY-002 | P-NFR-005/P-AR-002 | source_lab 权限与运行环境边界 | READY | 高 | source_lab | L3 | 部分实现 | `scripts/source_lab_l2_test_env.sh`; GOOSE/SV L2 tests; dynamic runtime tests | 受控 L2 环境下 GOOSE/SV 证据已归档 | raw socket/root/capability/netns 运行边界需持续显式化；source_lab 不得默认部署到生产控制区 | 补工具运行权限矩阵和清理验证 | 待更新 |
+| SL-READY-003 | P-AR-002 | source_lab 证据边界 | READY | 高 | source_lab | L2/L3 | 部分实现 | `tools/source_lab/access/runners/registry.py`; `tools/source_lab/access/profile.py`; `test_protocol_production_readiness_gate.py`; final protocol matrix; `ai_shared/reports/source_lab_tests_mypy_closure_round15.md` | Round 15: 全量 mypy 0 errors / 202 files（cmd/src/tests 全覆盖），quality gate 证据全部更新；readiness gate 已不再把静态 capability dict 直接当作 runtime ready；subscription/polling 都能输出 declared/actual 差异 | 静态 dict 仍存在于矩阵/元数据路径，source_lab PASS 仍不得外推为 ingest production-ready | 继续把元数据展示与运行态 readiness API 分离，并维持边界测试 | 2026-05-31 |

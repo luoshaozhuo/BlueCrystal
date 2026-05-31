@@ -16,7 +16,10 @@ def extract_command(payload: str) -> str:
         return payload
     tool_input = data.get("tool_input") or data.get("input") or {}
     if isinstance(tool_input, dict):
-        return str(tool_input.get("command") or tool_input.get("cmd") or "")
+        command = tool_input.get("command") or tool_input.get("cmd") or ""
+        if isinstance(command, list):
+            return " ".join(str(part) for part in command)
+        return str(command)
     return payload
 
 
@@ -30,15 +33,17 @@ def main() -> int:
         r"\bgit\s+push\b",
         r"\bsudo\b",
         r"\bchmod\s+-R\s+777\b",
-        r"\bcat\s+\.env",
+        r"\bcat\s+\.env\b",
+        r"\bcat\s+.*secret",
+        r"\bcat\s+.*credential",
     ]
     for pattern in patterns:
-        if re.search(pattern, command):
+        if re.search(pattern, command, flags=re.IGNORECASE):
             print(json.dumps({
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": f"危险命令被阻断: {pattern}",
+                    "permissionDecisionReason": f"危险命令被拦截: {command}",
                 }
             }, ensure_ascii=False))
             return 2

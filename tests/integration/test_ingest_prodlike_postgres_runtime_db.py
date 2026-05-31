@@ -10,13 +10,12 @@ from __future__ import annotations
 import os
 
 import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from whale.ingest.framework.persistence import (
     create_runtime_engine,
     create_runtime_session_factory,
-    initialize_runtime_database,
     migrate_runtime_database,
 )
 from whale.ingest.framework.persistence.runtime_db import probe_runtime_readiness

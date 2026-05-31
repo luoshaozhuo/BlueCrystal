@@ -11,12 +11,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
 
 from whale.ingest.adapters.audit.db_audit_sink import DbIngestAuditSink
 from whale.ingest.adapters.observability.file_sinks import JsonlIngestAuditSink
-from whale.ingest.domain.audit_event import IngestAuditEvent, redact_value
+from whale.ingest.domain.audit_event import IngestAuditEvent
 from whale.ingest.framework.persistence import (
     create_runtime_engine,
     create_runtime_session_factory,

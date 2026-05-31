@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from dataclasses import replace
 from pathlib import Path
-from typing import cast
 
 import pytest
 
@@ -14,8 +12,6 @@ from tools.source_lab.access.capacity import (
     SubscribeCapacityComboResult,
     SubscribeCapacityLimitSummary,
     SubscribeCapacityResult,
-    build_subscribe_capacity_rows,
-    print_capacity_table,
 )
 from tools.source_lab.access.polling.model import CapacityMode, CapacityStatus
 from tools.source_lab.access.subscribe.model import (

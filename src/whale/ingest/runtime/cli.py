@@ -1,4 +1,9 @@
-"""Typer CLI for ingest runtime entrypoints."""
+"""ingest CLI 入口。
+
+提供命令行接口启动 ingest worker/scheduler 等运行时组件。
+配置来源：环境变量、配置文件、CLI 参数。
+失败退出语义：非零退出码表示启动失败。
+"""
 
 from __future__ import annotations
 
@@ -37,6 +42,7 @@ from whale.ingest.runtime import (
     SourceScheduler,
     WorkerRuntime,
 )
+from whale.ingest.runtime.handlers import AcquisitionJobHandler
 from whale.ingest.runtime.scheduler_settings import SchedulerSettings
 from whale.shared.persistence.orm.ingest_runtime import IngestRuntimeJob
 
@@ -103,14 +109,18 @@ def _build_scheduler(runtime_mode: RuntimeMode = RuntimeMode.STANDALONE, node_ke
 
 
 class _NoopJobHandler:
-    """Built-in handler for prodlike smoke and endurance scheduler activity."""
+    """prodlike 冒烟和耐久性调度活动的内置 handler。"""
 
     def execute(self, job: IngestRuntimeJob) -> None:
+        """执行操作并返回结果。"""
         raw_sleep_ms = job.config_json.get("simulate_duration_ms")
         if raw_sleep_ms in (None, ""):
             return
         try:
-            sleep_ms = max(0, int(raw_sleep_ms))
+            if isinstance(raw_sleep_ms, (int, float, str)):
+                sleep_ms = max(0, int(raw_sleep_ms))
+            else:
+                return
         except (TypeError, ValueError):
             return
         if sleep_ms > 0:
@@ -121,10 +131,36 @@ def _build_worker_runtime(
     *,
     runtime_mode: RuntimeMode,
     node_key: str,
+    acquisition_handler: AcquisitionJobHandler | None = None,
 ) -> WorkerRuntime:
+    """构建 WorkerRuntime 实例。
+
+    Args:
+        runtime_mode: 运行时模式。
+        node_key: 节点标识。
+        acquisition_handler: 可选的 production 采集 handler。
+            若为 None（默认），"acquisition" job_type 使用 noop handler。
+            若提供，则替代默认 noop 实现，使用真实的 SourceAcquisitionUseCase。
+    """
     engine, session_factory = _build_session_factory()
     del engine
     lease_service = LeaseService(session_factory, FencingTokenRepository(session_factory))
+    # dict 类型使用 JobHandler Protocol 以保证 WorkerRuntime 类型检查通过。
+    # _NoopJobHandler 和 AcquisitionJobHandler 均通过 execute() 方法
+    # 满足 JobHandler 结构子类型约束。
+    handlers: dict[str, object] = {  # type: ignore[assignment]  # Protocol structural subtype
+        "noop": _NoopJobHandler(),
+    }
+    if acquisition_handler is not None:
+        handlers["acquisition"] = acquisition_handler
+    else:
+        # TODO: 生产环境应注入真实的 acquisition_handler。
+        # 当前 acquisition 类型 job 以 noop 处理，等待 composition 装配。
+        handlers["acquisition"] = _NoopJobHandler()
+    handlers["publish"] = _NoopJobHandler()
+    # handlers dict 中所有值均通过 execute() 方法满足 JobHandler 结构子类型，
+    # mypy 无法验证 Protocol 结构子类型与 Union 类型的组合。
+    from typing import cast
     return WorkerRuntime(
         settings=_build_scheduler_settings(runtime_mode=runtime_mode, node_key=node_key),
         node_repository=NodeRuntimeRepository(session_factory),
@@ -133,11 +169,7 @@ def _build_worker_runtime(
         lease_service=lease_service,
         fencing_token_repository=FencingTokenRepository(session_factory),
         audit_sink=_build_audit_sink(session_factory),
-        handlers={
-            "noop": _NoopJobHandler(),
-            "acquisition": _NoopJobHandler(),
-            "publish": _NoopJobHandler(),
-        },
+        handlers=cast(dict, handlers),
     )
 
 
@@ -171,7 +203,7 @@ def _write_worker_summary(
 
 @app.command("migrate")
 def migrate() -> None:
-    """Initialize or migrate the runtime schema."""
+    """初始化或迁移运行时数据库 schema。"""
 
     engine = create_runtime_engine()
     migrate_runtime_database(engine)
@@ -180,7 +212,7 @@ def migrate() -> None:
 
 @app.command("api")
 def api(smoke_exit: bool = typer.Option(False, help="Create the API app and exit.")) -> None:
-    """Start or smoke the API runtime."""
+    """启动或冒烟测试 API 运行时。"""
 
     _, session_factory = _build_session_factory()
     audit_sink = _build_audit_sink(session_factory)
@@ -212,7 +244,7 @@ def worker(
     runtime_mode: RuntimeMode = typer.Option(RuntimeMode.STANDALONE),
     node_key: str = typer.Option("worker-1"),
 ) -> None:
-    """Start or smoke the worker runtime."""
+    """启动或冒烟测试 worker 运行时。"""
 
     scheduler = _build_scheduler(runtime_mode=runtime_mode, node_key=node_key)
     snapshot = scheduler.bootstrap()
@@ -260,7 +292,7 @@ def api_worker(
     runtime_mode: RuntimeMode = typer.Option(RuntimeMode.STANDALONE),
     node_key: str = typer.Option("api-worker-1"),
 ) -> None:
-    """Start or smoke the combined API/worker runtime."""
+    """启动或冒烟测试组合 API/worker 运行时。"""
 
     _, session_factory = _build_session_factory()
     audit_sink = _build_audit_sink(session_factory)
@@ -284,7 +316,7 @@ def export_bundle(
     path: Path = typer.Option(..., exists=False, dir_okay=False),
     redacted: bool = typer.Option(False),
 ) -> None:
-    """Export the current acquisition-task configuration into one bundle file."""
+    """将当前采集任务配置导出到一个 bundle 文件。"""
 
     _, session_factory = _build_session_factory()
     service = BundleService(
@@ -302,7 +334,7 @@ def import_bundle(
     path: Path = typer.Option(..., exists=True, dir_okay=False),
     dry_run: bool = typer.Option(False),
 ) -> None:
-    """Import one bundle file into the runtime DB."""
+    """将一个 bundle 文件导入到运行时数据库。"""
 
     _, session_factory = _build_session_factory()
     service = BundleService(

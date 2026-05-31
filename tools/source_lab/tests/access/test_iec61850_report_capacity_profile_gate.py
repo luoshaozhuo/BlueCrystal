@@ -15,9 +15,9 @@
 """
 from __future__ import annotations
 
-import asyncio
 import subprocess
 import time
+from collections.abc import Generator
 from contextlib import closing
 from pathlib import Path
 
@@ -97,7 +97,7 @@ def test_report_runner_version_output() -> None:
 
 
 @pytest.fixture(scope="module")
-def simulator_port() -> int:
+def simulator_port() -> Generator[int, None, None]:
     """Start the IEC 61850 simulator and yield its port."""
     assert SIMULATOR_PATH is not None
     port = _find_free_port()
@@ -140,7 +140,6 @@ def test_report_runner_connects_and_reads_ready(simulator_port: int) -> None:
 
     # Verify stdout noise = 0 immediately after READY
     import select
-    import sys
     if hasattr(select, "select"):
         r, _, _ = select.select([proc.stdout], [], [], 0.1)
         if r:
@@ -282,13 +281,13 @@ class TestIec61850ReportRegistry:
 
     def test_no_goose_or_sv_falsely_marked(self) -> None:
         cap = PROTOCOL_CAPABILITIES["iec61850_report"]
-        unsupported = cap.get("unsupported_subscription_operations", ())
+        unsupported: tuple[str, ...] = cap.get("unsupported_subscription_operations", ())  # type: ignore[assignment]
         assert "goose" in unsupported, "goose must be in unsupported_subscription_operations"
         assert "sv" in unsupported, "sv must be in unsupported_subscription_operations"
 
     def test_supported_subscription_operations(self) -> None:
         cap = PROTOCOL_CAPABILITIES["iec61850_report"]
-        supported = cap.get("supported_subscription_operations", ())
+        supported: tuple[str, ...] = cap.get("supported_subscription_operations", ())  # type: ignore[assignment]
         assert "report_subscription" in supported
         assert "brcb" not in supported, "BRCB not yet supported"
 

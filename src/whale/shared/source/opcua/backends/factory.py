@@ -1,3 +1,8 @@
+"""OPC UA 客户端后端工厂。
+
+提供后端名称规范化和实例化逻辑，
+将配置中的后端名称映射到具体后端类。
+"""
 from __future__ import annotations
 
 from whale.shared.source.models import SourceConnectionProfile

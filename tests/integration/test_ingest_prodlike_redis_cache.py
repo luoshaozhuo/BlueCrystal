@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 import pytest
 
 from whale.ingest.adapters.state.redis_source_state_cache import (
-    RedisHashClient,
     RedisSourceStateCache,
     RedisSourceStateCacheSettings,
 )

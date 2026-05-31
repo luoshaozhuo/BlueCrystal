@@ -60,6 +60,18 @@ DecisionHook = Callable[[str, str, dict[str, object]], tuple[bool, str]]
 
 
 class EndpointRuntimeRegistry:
+    """Endpoint 运行时注册表，集中管理 endpoint 的全生命周期操作。
+
+    提供 add/update/pause/resume/stop/delete 等 CRUD 操作，所有操作经过：
+    - 权限决策（decision_hook）；
+    - 配置验证（validate_config/validate_patch）；
+    - 乐观并发控制（expected_version）；
+    - 操作日志记录（operation journal）；
+    - 状态持久化（state_store）。
+
+    支持从持久化快照恢复（recover），包括备份容错和部分恢复。
+    不负责：底层的 session 线程管理（委托给 EndpointSessionManager）。
+    """
     def __init__(
         self,
         *,
@@ -561,28 +573,46 @@ class EndpointRuntimeRegistry:
             recovery_errors = list(bundle.errors.values())
             selected_backups = bundle.selected_backups
 
-            runtime_snapshot_data: dict[str, dict[str, object]]
-            continuity_snapshot_data: dict[str, dict[str, object]]
+            # bundle payload 来自 JSON 反序列化边界，类型为 object，
+            # 但运行时为 mapping 结构。使用 isinstance 收窄类型。
+            _rs_payload = bundle.runtime_snapshot.payload
+            _cs_payload = bundle.continuity_snapshot.payload
+            if isinstance(_rs_payload, dict):
+                runtime_snapshot_payload: dict[str, object] = _rs_payload
+            else:
+                runtime_snapshot_payload = dict(_rs_payload)  # type: ignore[arg-type,call-overload]
+            if isinstance(_cs_payload, dict):
+                continuity_snapshot_payload: dict[str, object] = _cs_payload
+            else:
+                continuity_snapshot_payload = dict(_cs_payload)  # type: ignore[arg-type,call-overload]
+
+            runtime_snapshot_data: dict[str, dict[str, object]] = {}
+            continuity_snapshot_data: dict[str, dict[str, object]] = {}
             try:
-                runtime_snapshot_data = {
-                    endpoint_id: dict(payload)
-                    for endpoint_id, payload in dict(bundle.runtime_snapshot.payload).items()
-                }
+                for endpoint_id, raw_val in runtime_snapshot_payload.items():
+                    if isinstance(raw_val, dict):
+                        runtime_snapshot_data[endpoint_id] = raw_val
+                    elif isinstance(raw_val, list):
+                        # 回退：尝试转为 dict
+                        runtime_snapshot_data[endpoint_id] = dict(raw_val)  # type: ignore[arg-type]
             except Exception as exc:
                 runtime_snapshot_data = {}
                 recovery_errors.append(f"runtime_snapshot_invalid_shape: {type(exc).__name__}: {exc}")
             try:
-                continuity_snapshot_data = {
-                    endpoint_id: dict(payload)
-                    for endpoint_id, payload in dict(bundle.continuity_snapshot.payload).items()
-                }
+                for endpoint_id, raw_val in continuity_snapshot_payload.items():
+                    if isinstance(raw_val, dict):
+                        continuity_snapshot_data[endpoint_id] = raw_val
+                    elif isinstance(raw_val, list):
+                        continuity_snapshot_data[endpoint_id] = dict(raw_val)  # type: ignore[arg-type]
             except Exception as exc:
                 continuity_snapshot_data = {}
                 recovery_errors.append(f"continuity_snapshot_invalid_shape: {type(exc).__name__}: {exc}")
 
             self._stagger_coordinator.load_snapshot(
                 {
-                    endpoint_id: int(payload.get("stagger_offset_ns", 0))
+                    # payload 是 dict[str, object]，来自 JSON 反序列化边界，
+                    # stagger_offset_ns 运行时为数值类型。
+                    endpoint_id: int(payload.get("stagger_offset_ns", 0))  # type: ignore[arg-type,call-overload]
                     for endpoint_id, payload in runtime_snapshot_data.items()
                 }
             )
@@ -700,40 +730,55 @@ class EndpointRuntimeRegistry:
         if "host" in patch:
             endpoint = dataclass_replace(endpoint, host=str(patch["host"]))
         if "port" in patch:
-            endpoint = dataclass_replace(endpoint, port=int(patch["port"]))
+            # patch 值来自 JSON 反序列化边界，类型为 object，
+            # 但运行时保证 port 可转为 int。
+            # JSON 反序列化边界：patch 值类型为 object，
+            # 运行时保证 port 为可转为 int 的数值。
+            endpoint = dataclass_replace(endpoint, port=int(patch["port"]))  # type: ignore[arg-type,call-overload]
         if "protocol" in patch:
             endpoint = dataclass_replace(endpoint, protocol=str(patch["protocol"]))
 
         merged_params = dict(endpoint.params)
         if "params" in patch:
-            merged_params.update(dict(patch["params"]))
+            # params/security_params 是 JSON 反序列化的 object，
+            # 运行时保证为可迭代键值对，用 isinstance 收窄类型。
+            raw_params = patch["params"]
+            if isinstance(raw_params, dict):
+                merged_params.update(dict(raw_params))
+            elif hasattr(raw_params, 'items'):
+                merged_params.update(dict(getattr(raw_params, 'items')()))  # type: ignore[arg-type]
         if "security_params" in patch:
-            merged_params.update(dict(patch["security_params"]))
+            raw_sp = patch["security_params"]
+            if isinstance(raw_sp, dict):
+                merged_params.update(dict(raw_sp))
+            elif hasattr(raw_sp, 'items'):
+                merged_params.update(dict(getattr(raw_sp, 'items')()))  # type: ignore[arg-type]
         if merged_params != endpoint.params:
             endpoint = dataclass_replace(endpoint, params=merged_params)
 
-        points = tuple(patch["points"]) if "points" in patch else source.points
+        raw_points = patch.get("points")
+        points = tuple(raw_points) if raw_points is not None and isinstance(raw_points, list) else source.points
         source = dataclass_replace(source, endpoint=endpoint, points=points)
 
         mode = config.mode
         if "mode" in patch:
             mode = EndpointMode(str(patch["mode"]))
+        # JSON 反序列化边界：patch 中的数值字段类型为 object，
+        # 运行时保证可转为 float/int。
+        target_hz_raw = patch.get("target_hz")
+        target_hz = float(target_hz_raw) if target_hz_raw is not None else config.target_hz  # type: ignore[arg-type]
+        pub_interval_raw = patch.get("publishing_interval_ms")
+        pub_interval = float(pub_interval_raw) if pub_interval_raw is not None else config.publishing_interval_ms  # type: ignore[arg-type]
+        read_timeout_raw = patch.get("read_timeout_s", config.read_timeout_s)
+        read_timeout = float(read_timeout_raw)  # type: ignore[arg-type]
         return EndpointRuntimeConfig(
             endpoint_id=config.endpoint_id,
             protocol=str(patch.get("protocol", config.protocol)),
             mode=mode,
             source=source,
-            target_hz=(
-                float(patch["target_hz"])
-                if patch.get("target_hz") is not None
-                else config.target_hz
-            ),
-            publishing_interval_ms=(
-                float(patch["publishing_interval_ms"])
-                if patch.get("publishing_interval_ms") is not None
-                else config.publishing_interval_ms
-            ),
-            read_timeout_s=float(patch.get("read_timeout_s", config.read_timeout_s)),
+            target_hz=target_hz,
+            publishing_interval_ms=pub_interval,
+            read_timeout_s=read_timeout,
             config_version=config.config_version + 1,
         )
 
@@ -779,9 +824,11 @@ class EndpointRuntimeRegistry:
             if new_protocol not in _SUPPORTED_PROTOCOLS_BY_MODE.get(mode, set()):
                 return "unsupported_protocol_change"
 
-        if "points" in patch and not tuple(patch["points"]):
-            return "empty_points"
-        if "port" in patch and int(patch["port"]) <= 0:
+        if "points" in patch:
+            raw_points = patch["points"]
+            if not isinstance(raw_points, (list, tuple)) or len(raw_points) == 0:
+                return "empty_points"
+        if "port" in patch and int(patch["port"]) <= 0:  # type: ignore[arg-type,call-overload]
             return "invalid_port"
         if "host" in patch and str(patch["host"]).strip() == "":
             return "invalid_host"
@@ -795,7 +842,11 @@ class EndpointRuntimeRegistry:
         changed_fields: list[str] = []
         for field in sorted(patch.keys()):
             if field == "params":
-                params = dict(patch[field])
+                raw_field = patch[field]
+                if isinstance(raw_field, dict):
+                    params = raw_field
+                else:
+                    params = dict(raw_field)  # type: ignore[arg-type,call-overload]
                 if any(key.lower() in SENSITIVE_PARAM_KEYS for key in params):
                     changed_fields.append("security_params")
                 protocol_fields = sorted(

@@ -5,8 +5,44 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+def _as_float(value: object, default: float) -> float:
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _as_int(value: object, default: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
 @dataclass(slots=True)
 class EndpointContinuityMetrics:
+    """Endpoint 连续性指标数据模型。
+
+    记录单个 endpoint 在运行时采集周期中的连续性统计信息，
+    包括采样次数、间隔异常、丢包、重启次数、权限状态等。
+    支持 to_dict/from_dict 序列化，用于持久化快照和恢复。
+
+    不负责：连续性判定阈值（由 ContinuityMonitor 根据业务规则计算）。
+    """
     endpoint_uptime_ms: float = 0.0
     endpoint_gap_count: int = 0
     endpoint_max_gap_ms: float = 0.0
@@ -67,26 +103,29 @@ class EndpointContinuityMetrics:
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "EndpointContinuityMetrics":
         return cls(
-            endpoint_uptime_ms=float(data.get("endpoint_uptime_ms", 0.0)),
-            endpoint_gap_count=int(data.get("endpoint_gap_count", 0)),
-            endpoint_max_gap_ms=float(data.get("endpoint_max_gap_ms", 0.0)),
-            endpoint_expected_samples=int(data.get("endpoint_expected_samples", 0)),
-            endpoint_actual_samples=int(data.get("endpoint_actual_samples", 0)),
-            endpoint_missed_tick_count=int(data.get("endpoint_missed_tick_count", 0)),
-            endpoint_restart_count=int(data.get("endpoint_restart_count", 0)),
-            endpoint_pause_count=int(data.get("endpoint_pause_count", 0)),
-            endpoint_config_version=int(data.get("endpoint_config_version", 1)),
+            endpoint_uptime_ms=_as_float(data.get("endpoint_uptime_ms", 0.0), 0.0),
+            endpoint_gap_count=_as_int(data.get("endpoint_gap_count", 0), 0),
+            endpoint_max_gap_ms=_as_float(data.get("endpoint_max_gap_ms", 0.0), 0.0),
+            endpoint_expected_samples=_as_int(data.get("endpoint_expected_samples", 0), 0),
+            endpoint_actual_samples=_as_int(data.get("endpoint_actual_samples", 0), 0),
+            endpoint_missed_tick_count=_as_int(data.get("endpoint_missed_tick_count", 0), 0),
+            endpoint_restart_count=_as_int(data.get("endpoint_restart_count", 0), 0),
+            endpoint_pause_count=_as_int(data.get("endpoint_pause_count", 0), 0),
+            endpoint_config_version=_as_int(data.get("endpoint_config_version", 1), 1),
             endpoint_last_event_at=(
                 str(data["endpoint_last_event_at"])
                 if data.get("endpoint_last_event_at") is not None
                 else None
             ),
-            endpoint_event_count=int(data.get("endpoint_event_count", 0)),
-            endpoint_sample_count=int(data.get("endpoint_sample_count", 0)),
-            endpoint_callback_gap_count=int(data.get("endpoint_callback_gap_count", 0)),
-            endpoint_callback_max_gap_ms=float(data.get("endpoint_callback_max_gap_ms", 0.0)),
-            endpoint_stream_restart_count=int(data.get("endpoint_stream_restart_count", 0)),
-            endpoint_stream_drop_count=int(data.get("endpoint_stream_drop_count", 0)),
+            endpoint_event_count=_as_int(data.get("endpoint_event_count", 0), 0),
+            endpoint_sample_count=_as_int(data.get("endpoint_sample_count", 0), 0),
+            endpoint_callback_gap_count=_as_int(data.get("endpoint_callback_gap_count", 0), 0),
+            endpoint_callback_max_gap_ms=_as_float(
+                data.get("endpoint_callback_max_gap_ms", 0.0),
+                0.0,
+            ),
+            endpoint_stream_restart_count=_as_int(data.get("endpoint_stream_restart_count", 0), 0),
+            endpoint_stream_drop_count=_as_int(data.get("endpoint_stream_drop_count", 0), 0),
             endpoint_permission_status=(
                 str(data["endpoint_permission_status"])
                 if data.get("endpoint_permission_status") is not None
@@ -98,7 +137,7 @@ class EndpointContinuityMetrics:
                 else None
             ),
             endpoint_runner_pid=(
-                int(data["endpoint_runner_pid"])
+                _as_int(data["endpoint_runner_pid"], 0)
                 if data.get("endpoint_runner_pid") is not None
                 else None
             ),
@@ -107,11 +146,13 @@ class EndpointContinuityMetrics:
                 if data.get("endpoint_runner_handle_id") is not None
                 else None
             ),
-            stagger_offset_ns=int(data.get("stagger_offset_ns", 0)),
+            stagger_offset_ns=_as_int(data.get("stagger_offset_ns", 0), 0),
             stagger_offset_changed=bool(data.get("stagger_offset_changed", False)),
-            unaffected_endpoint_samples=int(data.get("unaffected_endpoint_samples", 0)),
-            unaffected_endpoint_continuity_breaks=int(
+            unaffected_endpoint_samples=_as_int(data.get("unaffected_endpoint_samples", 0), 0),
+            unaffected_endpoint_continuity_breaks=_as_int(
                 data.get("unaffected_endpoint_continuity_breaks", 0)
+                ,
+                0,
             ),
             dynamic_operation_id=(
                 str(data["dynamic_operation_id"])

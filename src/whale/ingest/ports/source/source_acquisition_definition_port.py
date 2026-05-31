@@ -1,4 +1,7 @@
-"""Source acquisition definition port."""
+"""端口接口定义。
+
+定义调用方契约和实现方责任，相关功能。
+"""
 
 from __future__ import annotations
 
@@ -32,10 +35,10 @@ class SourceAcquisitionDefinition:
 
 
 class SourceAcquisitionDefinitionPort(Protocol):
-    """Load source acquisition definition from runtime configuration."""
+    """从运行时配置加载源采集定义。"""
 
     def get_config(
         self,
         runtime_config: SourceRuntimeConfigData,
     ) -> SourceAcquisitionDefinition:
-        """Return source acquisition definition."""
+        """返回源采集定义。"""

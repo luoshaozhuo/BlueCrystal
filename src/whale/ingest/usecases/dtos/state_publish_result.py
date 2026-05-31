@@ -1,4 +1,7 @@
-"""DTO for state snapshot publish results."""
+"""数据传输对象。
+
+定义 use case 层输入输出数据结构，与 ORM 模型解耦。
+"""
 
 from __future__ import annotations
 
@@ -8,6 +11,7 @@ from enum import Enum
 
 
 class PublishStatus(Enum):
+    """发布状态枚举。"""
     SUCCESS = "SUCCESS"
     NO_DATA = "NO_DATA"
     PARTIAL = "PARTIAL"
@@ -17,20 +21,7 @@ class PublishStatus(Enum):
 
 @dataclass(slots=True)
 class StateSnapshotPublishResult:
-    """Result of one state snapshot publish operation.
-
-    Fields:
-        status: Overall status enum.
-        source_count: Number of sources read from cache.
-        item_count: Total node values across all sources.
-        message_count: Number of messages published.
-        published_count: Number of items successfully published.
-        skipped_count: Number of items skipped.
-        failed_count: Number of items that failed to publish.
-        trace_id: Correlation trace id.
-        snapshot_at: When the snapshot was taken (UTC).
-        error: Error message if the operation failed.
-    """
+    """一次状态快照发布操作的结果 DTO。记录发布条目数和成功/失败状态。"""
 
     status: PublishStatus
     source_count: int
@@ -46,11 +37,11 @@ class StateSnapshotPublishResult:
 
     @property
     def is_success(self) -> bool:
-        """Return True when snapshot was published or dry-run without failure."""
+        """快照发布成功或 dry-run 无失败时返回 True。"""
         return self.status in (PublishStatus.SUCCESS, PublishStatus.NO_DATA, PublishStatus.DRY_RUN)
 
     def merge(self, other: StateSnapshotPublishResult) -> StateSnapshotPublishResult:
-        """Merge another partial result into this one for multi-message reporting."""
+        """将另一个部分结果合并到当前结果中，用于多消息报告。"""
         self.item_count += other.item_count
         self.message_count += other.message_count
         self.published_count += other.published_count

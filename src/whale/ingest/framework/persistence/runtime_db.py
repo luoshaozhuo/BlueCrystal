@@ -1,4 +1,7 @@
-"""Helpers for ingest runtime DB initialization and migration smoke."""
+"""框架基础设施。
+
+提供持久化、数据库初始化等底层能力。
+"""
 
 from __future__ import annotations
 
@@ -15,20 +18,20 @@ from whale.shared.persistence import Base
 
 
 def create_runtime_engine(database_url: str | URL | None = None) -> Engine:
-    """Create one runtime SQLAlchemy engine with connection health check."""
+    """创建运行时 SQLAlchemy 引擎，带连接健康检查。"""
 
     resolved_url = database_url or create_db_url()
     return create_engine(resolved_url, future=True, pool_pre_ping=True)
 
 
 def create_runtime_session_factory(engine: Engine) -> sessionmaker[Session]:
-    """Create one runtime session factory from an engine."""
+    """从引擎创建运行时 session 工厂。"""
 
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
 def initialize_runtime_database(engine: Engine) -> None:
-    """Create all runtime-visible tables and views."""
+    """创建所有运行时可见的表和视图。"""
 
     # Import ORM modules before create_all so metadata is fully populated.
     import whale.shared.persistence.orm  # noqa: F401
@@ -38,7 +41,7 @@ def initialize_runtime_database(engine: Engine) -> None:
 
 
 def migrate_runtime_database(engine: Engine) -> None:
-    """Run the current runtime migration strategy via Alembic."""
+    """通过 Alembic 运行当前运行时迁移策略。"""
 
     config = Config(str(resolve_alembic_ini_path()))
     config.set_main_option(
@@ -49,19 +52,20 @@ def migrate_runtime_database(engine: Engine) -> None:
 
 
 def probe_runtime_readiness(engine: Engine, timeout_seconds: int = 5) -> bool:
-    """Return whether the runtime database accepts a trivial query.
-
-    Uses a short-lived engine with connect timeout so this never hangs
-    when PostgreSQL is unreachable (e.g. during fault injection tests).
-    """
+    """探测运行时数据库是否可接受简单查询。返回 True 表示数据库连接正常。"""
 
     url = make_url(engine.url)
+    connect_args: dict[str, object] = {}
+    engine_kwargs: dict[str, object] = {}
+    if url.get_backend_name() in ("postgresql",):
+        connect_args["connect_timeout"] = timeout_seconds
+        engine_kwargs["pool_size"] = 1
+        engine_kwargs["max_overflow"] = 0
     probe_engine = create_engine(
         url,
-        connect_args={"connect_timeout": timeout_seconds},
+        connect_args=connect_args,
         pool_pre_ping=False,
-        pool_size=1,
-        max_overflow=0,
+        **engine_kwargs,
     )
     try:
         with probe_engine.connect() as connection:
@@ -72,6 +76,9 @@ def probe_runtime_readiness(engine: Engine, timeout_seconds: int = 5) -> bool:
 
 
 def resolve_alembic_ini_path() -> Path:
-    """Return the repository-local alembic.ini path."""
+    """探测运行时数据库是否可接受简单查询。返回布尔值表示数据库连接和基础功能是否正常。
+
+Uses a short-lived engine with connect timeout so this never hangs
+when PostgreSQL is unreachable (e.g. during fault injection tests)."""
 
     return Path(__file__).resolve().parents[5] / "alembic.ini"

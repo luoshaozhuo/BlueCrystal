@@ -12,7 +12,6 @@ from whale.ingest.adapters.source.iec61850_report_source_acquisition_adapter imp
 )
 from whale.ingest.ports.source.source_acquisition_port import (
     SourceReadError,
-    SourceSubscriptionUnsupportedError,
 )
 from whale.ingest.usecases.dtos.acquired_node_state import AcquiredNodeStateBatch
 from whale.ingest.usecases.dtos.source_acquisition_request import (

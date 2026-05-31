@@ -1,3 +1,8 @@
+"""OPC UA 客户端后端抽象基类。
+
+定义 OpcUaClientBackend 的异步接口契约，
+所有具体后端实现（如 open62541 backend）必须实现本接口。
+"""
 from __future__ import annotations
 
 from collections.abc import Sequence

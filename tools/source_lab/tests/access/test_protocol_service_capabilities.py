@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from tools.source_lab.access.runners.registry import (
     APPLICATION_PROTOCOLS,
@@ -352,11 +351,13 @@ def test_all_protocols_have_write_operation_fields() -> None:
 def test_modbus_tcp_write_operations_are_explicit() -> None:
     """Modbus TCP must list FC06 as supported, FC05/FC15/FC16 as unsupported."""
     cap = PROTOCOL_CAPABILITIES["modbus_tcp"]
-    supported = set(cap.get("supported_write_operations", ()))
+    supported_ops: tuple[str, ...] = cap.get("supported_write_operations", ())  # type: ignore[assignment]
+    supported = set(supported_ops)
     assert "FC06_single_register_write" in supported, (
         "modbus_tcp must declare FC06_single_register_write in supported_write_operations"
     )
-    unsupported = set(cap.get("unsupported_write_operations", ()))
+    unsupported_ops: tuple[str, ...] = cap.get("unsupported_write_operations", ())  # type: ignore[assignment]
+    unsupported = set(unsupported_ops)
     for fc in ("FC05_single_coil_write", "FC15_multi_coil_write", "FC16_multi_register_write"):
         assert fc in unsupported, (
             f"modbus_tcp must declare {fc} in unsupported_write_operations"
@@ -367,7 +368,7 @@ def test_production_client_write_protocols_have_supported_operations() -> None:
     """Protocols with production_client_write=True must have non-empty supported_write_operations."""
     for name, cap in PROTOCOL_CAPABILITIES.items():
         if cap.get("production_client_write") is True:
-            supported = cap.get("supported_write_operations", ())
+            supported: tuple[str, ...] = cap.get("supported_write_operations", ())  # type: ignore[assignment]
             assert len(supported) >= 1, (
                 f"{name}: production_client_write=True but supported_write_operations is empty"
             )
@@ -377,7 +378,7 @@ def test_production_client_write_false_protocols_have_empty_supported_operations
     """Protocols with production_client_write=False must have empty supported_write_operations."""
     for name, cap in PROTOCOL_CAPABILITIES.items():
         if cap.get("production_client_write") is False:
-            supported = cap.get("supported_write_operations", ())
+            supported: tuple[str, ...] = cap.get("supported_write_operations", ())  # type: ignore[assignment]
             assert len(supported) == 0, (
                 f"{name}: production_client_write=False but supported_write_operations={supported}"
             )

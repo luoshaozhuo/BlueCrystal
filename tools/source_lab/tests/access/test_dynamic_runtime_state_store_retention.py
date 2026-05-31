@@ -1,12 +1,18 @@
+"""dynamic runtime state store 保留策略测试。
+
+验证 state store 的保留/清理策略行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+import pytest
 
 from tools.source_lab.access.runtime import RuntimeStateStore
 
 
-def test_runtime_state_store_retains_recent_versioned_backups(tmp_path: Path, monkeypatch) -> None:
+def test_runtime_state_store_retains_recent_versioned_backups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOURCE_LAB_RUNTIME_SNAPSHOT_RETENTION", "3")
     store = RuntimeStateStore(str(tmp_path / "runtime"))
     for index in range(6):
@@ -15,7 +21,7 @@ def test_runtime_state_store_retains_recent_versioned_backups(tmp_path: Path, mo
     assert len(backups) == 3
 
 
-def test_runtime_state_store_recovery_prefers_recent_valid_backup(tmp_path: Path, monkeypatch) -> None:
+def test_runtime_state_store_recovery_prefers_recent_valid_backup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOURCE_LAB_RUNTIME_SNAPSHOT_RETENTION", "4")
     store = RuntimeStateStore(str(tmp_path / "runtime"))
     store.save_registry({"ep-1": {"value": 1}})
@@ -29,7 +35,7 @@ def test_runtime_state_store_recovery_prefers_recent_valid_backup(tmp_path: Path
     assert bundle.registry.payload == {"ep-1": {"value": 2}}
 
 
-def test_runtime_state_store_inspect_reports_backup_metadata(tmp_path: Path, monkeypatch) -> None:
+def test_runtime_state_store_inspect_reports_backup_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SOURCE_LAB_RUNTIME_SNAPSHOT_RETENTION", "2")
     store = RuntimeStateStore(str(tmp_path / "runtime"))
     store.save_continuity_snapshot({"ep-1": {"endpoint_actual_samples": 1}})
@@ -37,7 +43,9 @@ def test_runtime_state_store_inspect_reports_backup_metadata(tmp_path: Path, mon
 
     summary = store.inspect_state_store()
     continuity = summary["continuity_snapshot"]
+    assert isinstance(continuity["backup_count"], int)
     assert continuity["backup_count"] >= 1
+    assert isinstance(continuity["retention"], int)
     assert continuity["retention"] == 2
     assert continuity["latest_backup"] is not None
 

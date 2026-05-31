@@ -1,8 +1,16 @@
-"""Node query routes for ingest runtime API."""
+"""管理 节点 资源的 API 路由。
+
+每个 handler 在请求入口做权限检查（access_evaluator），
+变更操作支持 dry_run 模式和乐观并发控制（expected_version），
+所有操作通过 audit_sink 记录审计事件，
+事务在 try/finally 中管理 Session 生命周期。
+
+不负责：资源的业务逻辑编排（由 use case 层负责）。
+"""
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
@@ -16,16 +24,16 @@ from whale.shared.persistence.orm import IngestRuntimeNode
 router = APIRouter(prefix="/api/v1/nodes", tags=["nodes"])
 
 
-def _open_session(factory):
+def _open_session(factory: sessionmaker[Session] | Callable[[], Session]) -> Session:
     return factory() if callable(factory) else factory()
 
 
-def _authorize(request, action, resource_id=None):
+def _authorize(request: Request, action: str, resource_id: str | None = None) -> None:
     if not request.app.state.access_evaluator(request, action, "node", resource_id):
         raise denied(action=action, resource_type="node", resource_id=resource_id)
 
 
-def _response(row) -> NodeResponse:
+def _response(row: IngestRuntimeNode) -> NodeResponse:
     return NodeResponse(
         node_key=row.node_key,
         runtime_mode=row.runtime_mode,
@@ -40,6 +48,7 @@ def _response(row) -> NodeResponse:
 
 @router.get("/{node_key}", response_model=NodeResponse)
 def get_node(node_key: str, request: Request) -> NodeResponse:
+    """获取指定的资源记录。"""
     _authorize(request, "node.read", node_key)
     session = _open_session(request.app.state.session_factory)
     try:
@@ -57,9 +66,11 @@ def get_node(node_key: str, request: Request) -> NodeResponse:
 @router.get("", response_model=PaginatedResponse[NodeResponse])
 def list_nodes(
     request: Request,
+    
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> PaginatedResponse[NodeResponse]:
+    """获取节点的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
     _authorize(request, "node.list")
     session = _open_session(request.app.state.session_factory)
     try:

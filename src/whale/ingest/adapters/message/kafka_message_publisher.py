@@ -1,5 +1,10 @@
 # mypy: disable-error-code=import-untyped
-"""Kafka publisher for ingest state snapshot messages."""
+"""消息发布适配器。
+
+实现 MessagePublisherPort，将状态快照发布到消息中间件。
+外部依赖：Kafka / Redis。
+失败处理：失败不传播到调用方，记录 error 后继续。
+"""
 
 from __future__ import annotations
 
@@ -15,14 +20,14 @@ from whale.ingest.runtime.message_pipeline_settings import KafkaMessageSettings
 
 
 class KafkaSendFuture(Protocol):
-    """Minimal send future contract used by the Kafka publisher."""
+    """Kafka 发布器使用的最小发送 Future 契约。"""
 
     def get(self, timeout: float | None = None) -> object:
-        """Wait for the published message result."""
+        """等待已发布消息的结果。"""
 
 
 class KafkaProducerClient(Protocol):
-    """Minimal Kafka producer contract used by the publisher."""
+    """发布器使用的最小 Kafka 生产者契约。"""
 
     def send(
         self,
@@ -30,23 +35,24 @@ class KafkaProducerClient(Protocol):
         key: bytes,
         value: bytes,
     ) -> KafkaSendFuture:
-        """Send one message to Kafka."""
+        """向 Kafka 发送一条消息。"""
 
     def flush(self) -> None:
-        """Flush producer buffers."""
+        """Flush 生产者缓冲区，确保所有未发送消息被提交到 Kafka broker。"""
 
 
 class KafkaMessagePublisher(MessagePublisherPort):
-    """Publish snapshot messages into one Kafka topic."""
+    """将状态快照消息发布到一个 Kafka topic。"""
 
     def __init__(
         self,
         settings: KafkaMessageSettings,
         producer: KafkaProducerClient | None = None,
     ) -> None:
-        """Store Kafka settings and an optional injected producer."""
+        """Flush 生产者缓冲区，确保所有未发送消息被提交到 Kafka broker。"""
         self._settings = settings
         self._initialization_error: Exception | None = None
+        self._producer: KafkaProducerClient | None
         if producer is not None:
             self._producer = producer
         else:
@@ -57,7 +63,7 @@ class KafkaMessagePublisher(MessagePublisherPort):
                 self._initialization_error = exc
 
     def publish_snapshot(self, message: StateSnapshotMessage) -> MessagePublishResult:
-        """Publish one snapshot message into Kafka."""
+        """将单个快照消息发布到 Kafka。"""
         payload = message.to_json().encode("utf-8")
         if self._initialization_error is not None or self._producer is None:
             return MessagePublishResult(
@@ -96,7 +102,7 @@ class KafkaMessagePublisher(MessagePublisherPort):
             )
 
     def _build_key(self, message: StateSnapshotMessage) -> bytes:
-        """Build one Kafka partition key from the configured strategy."""
+        """根据配置策略构造 Kafka 分区键。"""
 
         if self._settings.key_strategy == "source_id" and message.items:
             source_id = message.items[0].device_id or message.items[0].device_code
@@ -105,9 +111,9 @@ class KafkaMessagePublisher(MessagePublisherPort):
 
     @staticmethod
     def _build_producer(settings: KafkaMessageSettings) -> KafkaProducerClient:
-        """Build one real Kafka producer lazily."""
+        """延迟构造真实的 Kafka 生产者实例。"""
         try:
-            from kafka import KafkaProducer  # type: ignore[import-untyped]
+            from kafka import KafkaProducer  # type: ignore[import-untyped]  # kafka-python 无类型 stub，运行时可用
         except ImportError as exc:
             raise RuntimeError(
                 "Kafka publishing requires the `kafka-python` package to be installed."
@@ -125,7 +131,7 @@ class KafkaMessagePublisher(MessagePublisherPort):
 
 
 def _classify_kafka_error(error: Exception) -> str:
-    """Map Kafka failures into stable publish error categories."""
+    """将 Kafka 失败映射为稳定的发布错误类别。"""
 
     lowered = str(error).lower()
     if "timeout" in lowered:

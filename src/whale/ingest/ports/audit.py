@@ -1,4 +1,7 @@
-"""Audit sink port for ingest runtime and API."""
+"""端口接口定义。
+
+定义调用方契约和实现方责任，相关功能。
+"""
 
 from __future__ import annotations
 
@@ -8,7 +11,7 @@ from whale.ingest.domain.audit_event import IngestAuditEvent
 
 
 class IngestAuditSinkPort(Protocol):
-    """Persist or forward one ingest audit event."""
+    """持久化或转发一条 ingest 审计事件。"""
 
     def emit(self, event: IngestAuditEvent) -> None:
-        """Emit one redacted audit event."""
+        """发送一条脱敏后的审计事件。"""

@@ -24,6 +24,7 @@ from tools.source_lab.access.runners.open62541_subscription import (
     OpcUaOpen62541SubscribeRunner,
 )
 from tools.source_lab.access.runners.registry import (
+    RunnerInfo,
     build_capacity_runner,
     build_subscription_runner,
 )
@@ -59,12 +60,21 @@ class _SessionControl:
 
 
 class EndpointSessionManager:
+    """Endpoint 会话管理器，控制 endpoint 的启动、暂停、恢复、停止和替换。
+
+    每个 endpoint 使用独立的后台线程运行采集循环（polling/subscribe/streaming）。
+    支持 stagger offset 延迟启动，避免多个 endpoint 同时发起连接。
+    由 EndpointRuntimeRegistry 通过组合持有，不直接对外暴露操作接口。
+
+    不负责：endpoint 的注册/发现/持久化（由 registry 和 state_store 负责）。
+    """
+
     def __init__(
         self,
         *,
         continuity_monitor: ContinuityMonitor,
         stagger_coordinator: StaggerCoordinator,
-        polling_runner_factory: Callable[[str], CapacityRunner] | None = None,
+        polling_runner_factory: Callable[[str], RunnerInfo | CapacityRunner] | None = None,
         subscription_runner_factory: Callable[[str], SubscriptionRunner] | None = None,
     ) -> None:
         self._continuity_monitor = continuity_monitor
@@ -183,6 +193,9 @@ class EndpointSessionManager:
         handle: NativeSessionHandle,
     ) -> None:
         runner = self._polling_runner_factory(config.protocol)
+        # RunnerInfo unwrap: 如果工厂返回 RunnerInfo，提取底层 CapacityRunner
+        if isinstance(runner, RunnerInfo):
+            runner = runner.runner
         plan = RunnerEndpointPlan(
             global_index=0,
             source=config.source,

@@ -13,9 +13,15 @@ Architecture:
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
+from typing import TypedDict
 
+from whale.shared.source.runner_resolution import (
+    ResolvedRunnerPath,
+    build_runner_unavailable_message,
+    is_source_lab_dev_runner_path,
+    resolve_native_runner_path,
+)
 from whale.shared.source.iec61850.backends.report_base import (
     RawReportEvent,
     RawReportEventHandler,
@@ -34,15 +40,22 @@ _RECONNECT_BASE_DELAY_S: float = 1.0
 _RECONNECT_MAX_DELAY_S: float = 5.0
 
 
+class _SubscribeArgs(TypedDict):
+    """重连时复用的订阅参数快照。"""
+
+    host: str
+    port: int
+    ied_name: str
+    rcb_ref: str
+    timeout_seconds: float
+
+
 def resolve_report_runner_path() -> Path:
     """Resolve the IEC 61850 report runner executable path."""
-    env_path = os.environ.get("WHALE_IEC61850_REPORT_RUNNER_PATH")
-    if env_path:
-        return Path(env_path).expanduser().resolve()
-
-    source_lab_root = Path(__file__).resolve().parents[6] / "tools" / "source_lab"
-    suffix = ".exe" if os.name == "nt" else ""
-    return source_lab_root / "native" / "build" / f"iec61850_report_runner{suffix}"
+    return resolve_native_runner_path(
+        executable_stem="iec61850_report_runner",
+        specific_env_var="WHALE_IEC61850_REPORT_RUNNER_PATH",
+    ).path
 
 
 class LibIec61850ReportBackend:
@@ -58,7 +71,13 @@ class LibIec61850ReportBackend:
         # Reconnect state
         self._max_reconnect_attempts: int = 0
         self._reconnect_attempts: int = 0
-        self._subscribe_args: dict[str, object] = {}
+        self._subscribe_args: _SubscribeArgs = {
+            "host": "",
+            "port": 0,
+            "ied_name": "",
+            "rcb_ref": "",
+            "timeout_seconds": 10.0,
+        }
 
     @property
     def is_active(self) -> bool:
@@ -117,9 +136,24 @@ class LibIec61850ReportBackend:
         """Create the report runner subprocess."""
         runner_path = resolve_report_runner_path()
         if not runner_path.exists():
+            resolution = resolve_native_runner_path(
+                executable_stem="iec61850_report_runner",
+                specific_env_var="WHALE_IEC61850_REPORT_RUNNER_PATH",
+            )
+            if runner_path != resolution.path:
+                resolution = ResolvedRunnerPath(
+                    executable_name=runner_path.name,
+                    path=runner_path,
+                    source="custom_override",
+                    evidence_level="unknown",
+                    used_dev_fallback=is_source_lab_dev_runner_path(runner_path),
+                )
             raise RuntimeError(
-                "IEC 61850 report runner executable does not exist: "
-                f"{runner_path}. Build `iec61850_report_runner` first with CMake."
+                build_runner_unavailable_message(
+                    runner_label="IEC 61850 report runner",
+                    specific_env_var="WHALE_IEC61850_REPORT_RUNNER_PATH",
+                    resolution=resolution,
+                )
             )
 
         args = self._subscribe_args
@@ -271,7 +305,7 @@ class LibIec61850ReportBackend:
 
         # Wait for READY
         args = self._subscribe_args
-        timeout_seconds = float(args.get("timeout_seconds", 10.0))
+        timeout_seconds = args["timeout_seconds"]
         await self._wait_for_ready(timeout_seconds)
 
         # Restart reader loop (old loop already returned)

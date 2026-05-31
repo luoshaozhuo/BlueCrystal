@@ -6,7 +6,6 @@ import pytest
 
 from tools.source_lab.protocols.common.simulator_models import (
     SimulatorCapabilities,
-    SimulatorStatus,
 )
 from tools.source_lab.protocols.registry import (
     create_server_simulator,

@@ -1,10 +1,5 @@
-"""APScheduler-driven worker runtime for ingest.
-
-Pulls enabled jobs from the runtime DB, acquires/renews lease with fencing
-tokens, executes only when the lease and ownership are valid, and emits metrics
-for each tick.  Graceful shutdown releases releasable leases; any unreleased
-lease is covered by lease expiry on other nodes.
-"""
+"""基于 APScheduler 的 ingest worker 运行时。管理作业调度、心跳和指标。"""
+# mypy: disable-error-code=import-untyped
 
 from __future__ import annotations
 
@@ -12,9 +7,8 @@ import logging
 import math
 import threading
 import time
-from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import uuid4
 
 from apscheduler.executors.pool import ThreadPoolExecutor
@@ -25,13 +19,11 @@ from whale.ingest.domain.audit_event import IngestAuditEvent
 from whale.ingest.ports.audit import IngestAuditSinkPort
 from whale.ingest.runtime.fencing import FencingTokenRepository, redact_fencing_token
 from whale.ingest.runtime.job_assignment import (
-    JobAssignment,
     JobAssignmentRepository,
     RuntimeJobRepository,
 )
 from whale.ingest.runtime.lease import LeaseService
-from whale.ingest.runtime.modes import RuntimeMode
-from whale.ingest.runtime.node_runtime import NodeHeartbeat, NodeRuntimeRepository
+from whale.ingest.runtime.node_runtime import NodeRuntimeRepository
 from whale.ingest.runtime.scheduler import SourceScheduler
 from whale.ingest.runtime.scheduler_settings import SchedulerSettings
 from whale.shared.persistence.orm.ingest_runtime import IngestRuntimeJob
@@ -51,35 +43,40 @@ _JOB_DURATION_MS = "job_duration_ms"
 
 
 class JobHandler(Protocol):
-    """Protocol for one job-type handler used by WorkerRuntime dispatch."""
+    """WorkerRuntime 分发的作业类型 handler 协议。定义 execute 接口契约。"""
 
     def execute(self, job: IngestRuntimeJob) -> None:
-        """Execute one job. Raise on failure to record job_failed metric."""
+        """执行一个作业。失败时抛出异常以记录 job_failed 指标。"""
 
 
 class WorkerRuntimeMetrics:
-    """Minimal in-memory metrics counter for the worker runtime."""
+    """Worker 运行时的最小内存指标计数器。跟踪执行次数、成功/失败数。"""
 
     def __init__(self) -> None:
+        """初始化 worker 指标收集器。"""
         self._lock = threading.Lock()
         self._counters: dict[str, int] = {}
         self._gauges: dict[str, float] = {}
         self._samples: dict[str, list[float]] = {}
 
     def inc(self, name: str, value: int = 1) -> None:
+        """递增计数器。"""
         with self._lock:
             self._counters[name] = self._counters.get(name, 0) + value
 
     def gauge(self, name: str, value: float) -> None:
+        """设置仪表值。"""
         with self._lock:
             self._gauges[name] = value
             self._samples.setdefault(name, []).append(value)
 
     def snapshot(self) -> dict[str, int | float]:
+        """获取指标快照。"""
         with self._lock:
             return {**self._counters, **self._gauges}
 
     def summary(self) -> dict[str, int | float]:
+        """返回指标摘要。"""
         with self._lock:
             summary: dict[str, int | float] = {**self._counters, **self._gauges}
             for name, values in self._samples.items():
@@ -91,18 +88,7 @@ class WorkerRuntimeMetrics:
 
 
 class WorkerRuntime:
-    """Ingest worker runtime driven by APScheduler.
-
-    Responsibilities:
-    - Start a background scheduler that periodically reconciles job assignments
-      from the runtime DB and triggers execution for owned jobs.
-    - Acquire/renew lease and produce a fencing token before executing.
-    - Skip execution when lease cannot be acquired or owner does not match.
-    - Detect missed ticks (overruns) and record them as metrics.
-    - Support stagger_offset_ms to spread job starts across the same interval.
-    - Graceful shutdown: stop accepting new work, cancel running schedulers,
-      and release leases that belong to this node.
-    """
+    """基于 APScheduler 的 ingest worker 运行时。管理心跳、作业调和和指标。"""
 
     def __init__(
         self,
@@ -117,6 +103,7 @@ class WorkerRuntime:
         metrics: WorkerRuntimeMetrics | None = None,
         handlers: dict[str, JobHandler] | None = None,
     ) -> None:
+        """初始化 worker 运行时。Args: settings: 配置实例。job_repository: 作业仓库。handler_registry: handler 注册字典。"""
         self._settings = settings
         self._node_repository = node_repository
         self._job_repository = job_repository
@@ -154,18 +141,21 @@ class WorkerRuntime:
 
     @property
     def node_key(self) -> str:
+        """获取当前节点标识键。"""
         return self._settings.node_key
 
     @property
     def metrics_snapshot(self) -> dict[str, int | float]:
+        """获取指标快照字典。"""
         return self._metrics.snapshot()
 
     @property
     def metrics_summary(self) -> dict[str, int | float]:
+        """返回当前 worker 运行指标摘要。"""
         return self._metrics.summary()
 
     def start(self) -> None:
-        """Start the heartbeat loop and the APScheduler reconcile tick."""
+        """启动心跳循环和 APScheduler 调和 tick。注册定期任务并开始调度。"""
         self._started_at = datetime.now(tz=UTC)
 
         # Heartbeat every N seconds
@@ -197,12 +187,7 @@ class WorkerRuntime:
         )
 
     def stop(self, *, timeout_seconds: int = 15) -> dict[str, int | float]:
-        """Gracefully stop the worker runtime.
-
-        1. Shut down APScheduler (no new jobs, wait for running).
-        2. Release all leases owned by this node from the runtime DB.
-        3. Return a final metrics snapshot.
-        """
+        """优雅停止 worker 运行时。关闭调度器并清理资源。"""
         _logger.info("WorkerRuntime stopping node=%s", self._settings.node_key)
         self._shutdown_event.set()
 
@@ -242,7 +227,7 @@ class WorkerRuntime:
     # ---- internal ticks -----------------------------------------------------
 
     def _tick_heartbeat(self) -> None:
-        """Persist one heartbeat and emit audit/metric."""
+        """持久化一次心跳并发出审计和指标事件。更新节点存活状态。"""
         try:
             now = datetime.now(tz=UTC)
             self._scheduler.heartbeat(now=now)
@@ -250,7 +235,7 @@ class WorkerRuntime:
             _logger.exception("Heartbeat tick failed")
 
     def _tick_reconcile(self) -> None:
-        """Reconcile job assignments and execute owned jobs."""
+        """调和作业分配并执行本节点拥有的作业。从数据库获取分配，逐个委托 handler 执行。"""
         now = datetime.now(tz=UTC)
         try:
             snapshot = self._scheduler.assign_jobs(now=now)
@@ -265,7 +250,22 @@ class WorkerRuntime:
             self._execute_one(job_id=job_id, fencing_token=fencing_token, now=now)
 
     def _execute_one(self, *, job_id: str, fencing_token: int, now: datetime) -> None:
-        """Validate lease, then execute (or mark skipped)."""
+        """验证租约后执行一个 job，或标记跳过。
+
+        异常处理策略：
+        - 如果 handler 不存在（_do_execute 返回 False），记录 job_handler_not_found 指标，
+          不标记 completed，不上抛异常。
+        - 如果 handler 抛出异常，记录 job_failed 指标和 audit 事件，然后 re-raise，
+          交由 APScheduler 处理（misfire/re-schedule）。
+        - 如果 lease 验证失败，记录 job_skipped_no_lease 指标，不执行 handler。
+        - finally 块不处理 lease 释放：lease 由 scheduler.assign_jobs 在下一 tick 覆盖。
+
+        Note:
+            真实设备采集 handler 当前为待注册状态。CLI 入口 cli.py 注册了 noop/acquisition/
+            publish 三类 mock handler，但 production 级别的采集 handler 尚未接入。
+            _do_execute 通过 job_row.job_type 分发到 self._handlers 字典，
+            若 job_type 未注册，记录 HANDLER_NOT_FOUND 并返回 False。
+        """
         decision = self._scheduler.validate_execution(
             job_id=job_id,
             holder_key=self._settings.node_key,
@@ -362,6 +362,7 @@ class WorkerRuntime:
                     "fencing_token_hash": redact_fencing_token(fencing_token),
                 },
             )
+            raise
 
     def _do_execute(self, job_row: IngestRuntimeJob) -> bool:
         """Execute one job by dispatching to the registered handler for its type.
@@ -369,6 +370,13 @@ class WorkerRuntime:
         Returns True when a handler was found and called (even if it raised).
         Returns False when no handler is registered, so the caller can avoid
         recording the job as completed.
+
+        Note:
+            真实设备采集 handler 当前为待实现状态。CLI 入口 cli.py 注册了
+            noop/acquisition/publish 三类 handler，但 acquisition handler 仅
+            为 noop 占位，未连接真实的 SourceAcquisitionUseCase。
+            当 production 采集 handler 就绪后，需在此处按 job_type 注册。
+            在此之前，_do_execute 通过 HANDLER_NOT_FOUND 机制通知上层。
         """
         handler = self._handlers.get(job_row.job_type)
         if handler is None:
@@ -424,29 +432,45 @@ class WorkerRuntime:
 
 
 def _get_interval_ms(config: dict[str, object]) -> int | None:
-    """Extract interval_ms from job config JSON."""
+    """从作业配置 JSON 中提取 interval_ms 字段。"""
     raw = config.get("interval_ms")
     if raw is None:
         return None
-    try:
+    if isinstance(raw, bool):
         return int(raw)
-    except (TypeError, ValueError):
-        return None
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        return int(raw)
+    if isinstance(raw, str):
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+    return None
 
 
 def _get_stagger_ms(config: dict[str, object]) -> int | None:
-    """Extract stagger_offset_ms from job config JSON."""
+    """从作业配置 JSON 中提取 stagger_offset_ms 字段。"""
     raw = config.get("stagger_offset_ms")
     if raw is None:
         return None
-    try:
+    if isinstance(raw, bool):
         return int(raw)
-    except (TypeError, ValueError):
-        return None
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        return int(raw)
+    if isinstance(raw, str):
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+    return None
 
 
 def _percentile(values: list[float], quantile: float) -> float:
-    """Return one deterministic nearest-rank percentile for a non-empty list."""
+    """对非空有序列表计算确定性最近秩百分位数。使用线性插值。"""
 
     ordered = sorted(values)
     if len(ordered) == 1:

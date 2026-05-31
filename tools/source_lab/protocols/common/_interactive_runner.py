@@ -19,7 +19,6 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import IO
 
 from tools.source_lab.access.runners.protocol import (
     ProtocolDiagnostics,
@@ -117,7 +116,7 @@ class NativeInteractiveRunner:
 
         # Read response
         deadline = time.monotonic() + timeout
-        buf = ""
+        _buf = ""
         assert self._process.stdout is not None
         while time.monotonic() < deadline:
             line = self._process.stdout.readline()

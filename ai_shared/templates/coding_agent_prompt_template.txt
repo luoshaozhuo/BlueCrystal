@@ -9,73 +9,50 @@
 ```text
 1. 不要重复 CLAUDE.md 中的固定编码流程。
 2. 不要重复 ai_shared/rules/reporting.md 中的最终反馈格式。
-3. 不要重复 ai_shared/rules/coding.md / testing.md / validation-routing.md 的完整规则。
+3. 不要重复 ai_shared/rules/coding.md / testing.md / validation-routing.md / quality-gate.md 的完整规则。
 4. 不要重复 skill 全文。
 5. 不要写 report 模板。
 ```
 
 生成 prompt 只需要写清楚本轮任务目标、事实基线、必须读取的上下文、允许/禁止修改范围、三个 subagent 的 handoff 内容、验收标准和报告目标。
 
-## 2. 生成 prompt 前必须知道的 agent
-
-仓库已固定使用三段式 agent 流程：
+## 2. 固定 agent 流程
 
 ```text
 @agent-code-implementer -> @agent-test-validator -> @agent-project-steward -> 主会话收口
 ```
 
-三个 agent 的职责如下：
-
-```text
-code-implementer：
-- 编码、必要中文注释、Google-style docstring、相关测试修改。
-- 必须使用 changed-files-gate 和 code-quality-gate。
-- 必要时使用 project-tree-read。
-- 不负责长期文档归档。
-
-test-validator：
-- 独立验证真实工作区变更。
-- 必须使用 changed-files-gate 和 code-quality-gate。
-- 负责 py_compile / ruff / mypy / pytest 等验证和失败分类。
-- 不修改源码、测试或文档。
-
-project-steward：
-- 根据已验证证据更新 report、project_tree、ADR、需求跟踪表和规则。
-- 必须使用 changed-files-gate。
-- 按需使用 project-tree-update、requirement-trace、adr-upsert、report-archive、rule-update。
-- 不修改源码和测试，除非本轮 prompt 明确授权。
-```
-
 ## 3. 可用 skills
-
-生成 prompt 时，可以在 handoff 的 `skills to use` 中引用以下 skill：
 
 ```text
 changed-files-gate
 code-quality-gate
-project-tree-read
 project-tree-update
 project-tree-reset
 requirement-trace
 adr-upsert
-report-archive
 rule-update
 heavy-regression
 commit-message
-feedback-archive
 ```
 
-不要在 prompt 中复制 skill 细则，只写需要使用哪些 skill。
+说明：
+
+```text
+1. project-tree-read 不再作为 skill；读取 project_tree 是普通导航规则。
+2. report-archive 不再作为 skill；报告归档由 project-steward 按 reporting.md 直接写入 ai_shared/reports/。
+3. feedback-archive 不再作为 skill；用户反馈归档归入 reporting.md。
+4. 只在 handoff 中引用需要的 skill，不复制 skill 细则。
+```
 
 ## 4. 可用 memory / 文档入口
 
-生成 prompt 时，按任务需要选择，不要默认全读：
+按任务需要选择，不要默认全读：
 
 ```text
 ai_shared/memory/project_tree.md
-ai_shared/memory/Whale_REQ_Ingest.md
-ai_shared/memory/Whale_REQ_*.md
-ai_shared/memory/Whale项目说明.md 或其他文件名含“项目说明”的文件
+ai_shared/memory/*REQ*.md
+ai_shared/memory/*项目说明*.md
 ai_shared/adr/ADR索引.md
 ai_shared/reports/<上一轮报告>.md
 ```
@@ -83,14 +60,12 @@ ai_shared/reports/<上一轮报告>.md
 注意：
 
 ```text
-1. project_tree 只用于定位，不替代源码读取。
+1. project_tree 只用于定位，不能替代源码读取。
 2. 需求、ADR、报告只在本轮需要时列入 required files。
 3. 真实事实必须以当前源码、测试、配置、schema 为准。
 ```
 
 ## 5. Prompt 输出格式
-
-下面是网页版 LLM 应输出给 coding agent 的 prompt 格式。
 
 ---
 
@@ -118,8 +93,6 @@ ai_shared/reports/<上一轮报告>.md
 CLAUDE.md
 ai_shared/rules/routing.md
 {REQUIRED_CONTEXT_1}
-{REQUIRED_CONTEXT_2}
-{REQUIRED_CONTEXT_3}
 ```
 
 说明：
@@ -134,16 +107,12 @@ ai_shared/rules/routing.md
 
 ```text
 {ALLOWED_PATH_1}
-{ALLOWED_PATH_2}
-{ALLOWED_PATH_3}
 ```
 
 ## 4. 禁止修改
 
 ```text
 {FORBIDDEN_PATH_1}
-{FORBIDDEN_PATH_2}
-{FORBIDDEN_PATH_3}
 ```
 
 ## 5. @agent-code-implementer handoff
@@ -154,24 +123,20 @@ Agent handoff:
   - {IMPLEMENT_TASK}
 - allowed paths:
   - {ALLOWED_PATH_1}
-  - {ALLOWED_PATH_2}
 - forbidden:
   - {FORBIDDEN_PATH_1}
-  - {FORBIDDEN_PATH_2}
 - required files:
   - ai_shared/rules/routing.md
   - {IMPLEMENT_REQUIRED_FILE_1}
-  - {IMPLEMENT_REQUIRED_FILE_2}
 - changed files:
   - 使用 changed-files-gate，编码前后各执行一次
 - evidence available:
   - {IMPLEMENT_EVIDENCE_1}
 - rules to read:
-  - routing 指定的 coding / testing / validation / quality / docstring 规则
+  - routing 指定的 coding / testing / validation / quality / comment-doc 规则
 - skills to use:
   - changed-files-gate
   - code-quality-gate
-  - project-tree-read if needed
 - commands to run:
   - {IMPLEMENT_COMMAND_1}
 - expected output:
@@ -202,14 +167,12 @@ Agent handoff:
   - testing
   - validation-routing
   - quality-gate
-  - python-docstring-cn
+  - comment-doc
 - skills to use:
   - changed-files-gate
   - code-quality-gate
 - commands to run:
   - {TEST_COMMAND_1}
-  - {TEST_COMMAND_2}
-  - {TEST_COMMAND_3}
 - expected output:
   - Agent result
 ```
@@ -222,7 +185,6 @@ Agent handoff:
   - 根据已验证结果更新文档、目录树、ADR、需求跟踪和报告
 - allowed paths:
   - ai_shared/
-  - {DOC_ALLOWED_PATH_1}
 - forbidden:
   - src/
   - tests/
@@ -243,10 +205,9 @@ Agent handoff:
   - reporting
 - skills to use:
   - changed-files-gate
-  - project-tree-update
+  - project-tree-update if needed
   - requirement-trace if needed
   - adr-upsert if needed
-  - report-archive
   - rule-update if needed
 - commands to run:
   - {DOC_COMMAND_1}
@@ -259,8 +220,8 @@ Agent handoff:
 ## 8. 验收标准
 
 ```text
-1. 本轮引入 failed = 0，或明确环境 pending。
-2. Python 改动已考虑 py_compile / ruff / mypy / pytest。
+1. 本轮引入 failed = 0，或明确 environment-pending。
+2. 改动已按语言和影响范围执行语法/编译、lint、type-check、测试。
 3. 行为变化有测试证据。
 4. 新增、删除、移动、重命名、职责变化文件已触发 project-tree-update 判断。
 5. 需求状态没有高估。

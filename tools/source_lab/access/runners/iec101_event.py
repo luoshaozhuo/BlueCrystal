@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import socket
-import time
 
 from tools.source_lab.access.runners.generic_streaming import GenericStreamingSubscriptionRunner, StreamingSample
 from tools.source_lab.access.common.scheduling import RunnerEndpointPlan

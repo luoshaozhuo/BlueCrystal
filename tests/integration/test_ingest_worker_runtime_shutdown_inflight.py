@@ -2,12 +2,9 @@
 from __future__ import annotations
 
 import threading
-import time
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
-from sqlalchemy.orm import Session, sessionmaker
 
 from whale.ingest.framework.persistence import (
     create_runtime_engine,

@@ -1,4 +1,8 @@
-"""Runtime job and assignment models."""
+"""任务分配逻辑。
+
+实现调度器与 worker 之间的任务分配策略，
+包括分区键路由和作业亲和性。
+"""
 
 from __future__ import annotations
 
@@ -14,7 +18,7 @@ from whale.shared.persistence.orm import IngestJobAssignment, IngestRuntimeJob
 
 @dataclass(slots=True)
 class RuntimeJob:
-    """Minimal scheduler-visible runtime job."""
+    """调度器可见的最小运行时任务。"""
 
     job_id: str
     job_type: str
@@ -28,7 +32,7 @@ class RuntimeJob:
 
 @dataclass(slots=True)
 class JobAssignment:
-    """Minimal runtime assignment DTO."""
+    """最小运行时分配 DTO。"""
 
     job_id: str
     node_key: str
@@ -38,13 +42,15 @@ class JobAssignment:
 
 
 class RuntimeJobRepository:
-    """Persist runtime jobs for scheduler discovery."""
+    """持久化运行时任务供调度器发现。"""
 
     def __init__(self, session_factory: sessionmaker[Session] | Callable[[], Session]) -> None:
+        """初始化作业仓库。Args: session_factory: 数据库会话工厂。"""
         self._session_factory = session_factory
 
     def upsert_job(self, job: RuntimeJob) -> IngestRuntimeJob:
-        """Insert or update one runtime job row."""
+        """初始化作业仓库。Args: session_factory: 数据库会话工厂。"""
+        """插入或更新一条运行时任务记录。"""
 
         session = self._session_factory()
         try:
@@ -76,7 +82,7 @@ class RuntimeJobRepository:
             session.close()
 
     def list_enabled_jobs(self) -> list[IngestRuntimeJob]:
-        """Return all enabled jobs."""
+        """返回所有已启用的任务。"""
 
         session = self._session_factory()
         try:
@@ -91,7 +97,7 @@ class RuntimeJobRepository:
             session.close()
 
     def get(self, job_id: str) -> IngestRuntimeJob | None:
-        """Return one runtime job."""
+        """返回单个运行时任务。"""
 
         session = self._session_factory()
         try:
@@ -101,13 +107,15 @@ class RuntimeJobRepository:
 
 
 class JobAssignmentRepository:
-    """Persist job assignment rows."""
+    """持久化任务分配记录。"""
 
     def __init__(self, session_factory: sessionmaker[Session] | Callable[[], Session]) -> None:
+        """初始化作业仓库。Args: session_factory: 数据库会话工厂。"""
         self._session_factory = session_factory
 
     def assign(self, assignment: JobAssignment) -> IngestJobAssignment:
-        """Insert or update one assignment."""
+        """初始化作业仓库。Args: session_factory: 数据库会话工厂。"""
+        """插入或更新一条分配记录。"""
 
         session = self._session_factory()
         try:
@@ -137,7 +145,7 @@ class JobAssignmentRepository:
             session.close()
 
     def get_active_assignment(self, job_id: str) -> IngestJobAssignment | None:
-        """Return the active assignment for one job."""
+        """返回单个任务的活跃分配。"""
 
         session = self._session_factory()
         try:
@@ -153,7 +161,7 @@ class JobAssignmentRepository:
             session.close()
 
     def list_active_assignments(self) -> list[IngestJobAssignment]:
-        """Return all active assignments."""
+        """返回所有活跃分配。"""
 
         session = self._session_factory()
         try:
@@ -168,7 +176,7 @@ class JobAssignmentRepository:
             session.close()
 
     def deactivate_job(self, job_id: str) -> None:
-        """Deactivate all active assignments for one job."""
+        """停用单个任务的所有活跃分配。"""
 
         session = self._session_factory()
         try:

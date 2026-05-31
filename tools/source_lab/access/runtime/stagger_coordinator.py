@@ -8,6 +8,15 @@ from tools.source_lab.access.runtime.endpoint_runtime import EndpointRuntimeConf
 
 
 class StaggerCoordinator:
+    """Endpoint 启动错峰协调器，分配 stagger offset 避免并发冲击。
+
+    根据当前已注册 endpoint 数量和预期周期计算每个新 endpoint 的纳秒级偏移量，
+    确保多个 endpoint 不会在同一时刻同时发起外部连接。
+    支持 offset 的持久化快照和恢复。
+
+    不负责：offset 的实时调整、endpoint 生命周期管理。
+    """
+
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._offsets: dict[str, int] = {}

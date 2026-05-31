@@ -72,6 +72,7 @@ class SubscriptionAcquisitionRole:
         state_cache_port: SourceStateCachePort,
         metrics_port: IngestMetricsPort | None = None,
     ) -> None:
+        """初始化订阅采集角色。Args: adapter: 采集适配器。state_cache: 状态缓存 port。"""
         self._acquisition_port = acquisition_port
         self._state_cache_port = state_cache_port
         self._metrics_port = metrics_port
@@ -255,7 +256,7 @@ class SubscriptionAcquisitionRole:
         ld_name: str,
         reason: str,
     ) -> None:
-        """Best-effort unavailable mark for subscription startup failures."""
+        """尽力标记订阅启动失败为不可用状态。"""
 
         try:
             self._state_cache_port.mark_unavailable(
@@ -310,7 +311,7 @@ def _utc_now() -> datetime:
 
 
 def _build_failure_reason(exc: Exception) -> str:
-    """Normalize subscription-side failures into stable reason codes."""
+    """将订阅端失败规范化为稳定的原因码。"""
 
     if isinstance(exc, SourceStateCacheWriteError):
         return f"cache_write_failed:{exc.error_code}"

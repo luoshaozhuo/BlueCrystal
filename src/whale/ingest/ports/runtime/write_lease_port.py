@@ -1,4 +1,8 @@
-"""Write lease port used by SourceCommandUseCase."""
+"""ingest 运行时 write lease port。
+
+负责 相关功能，包含并发模型、租约、fencing token、
+异常传播和资源释放语义。
+"""
 
 from __future__ import annotations
 
@@ -9,7 +13,7 @@ from typing import Protocol
 
 @dataclass(frozen=True, slots=True)
 class WriteLeaseDecisionData:
-    """Result returned by a write lease guard."""
+    """写入租约守卫返回的结果。"""
 
     allowed: bool
     result: str
@@ -19,7 +23,7 @@ class WriteLeaseDecisionData:
 
 
 class WriteLeasePort(Protocol):
-    """Guard real write/control execution with a dedicated lease."""
+    """使用专用租约保护真实的写入/控制执行。"""
 
     def acquire(
         self,
@@ -28,10 +32,10 @@ class WriteLeasePort(Protocol):
         holder_key: str,
         requested_fencing_token: int | None = None,
     ) -> WriteLeaseDecisionData:
-        """Acquire one write lease."""
+        """获取一个写入租约。"""
 
     def renew(self, *, resource_id: str, holder_key: str) -> WriteLeaseDecisionData:
-        """Renew one write lease."""
+        """续期一个写入租约。"""
 
     def validate(
         self,
@@ -40,7 +44,7 @@ class WriteLeasePort(Protocol):
         holder_key: str,
         fencing_token: int,
     ) -> WriteLeaseDecisionData:
-        """Validate one write lease token."""
+        """验证写入租约 token。"""
 
     def release(self, *, resource_id: str, holder_key: str) -> None:
-        """Release one write lease."""
+        """释放一个写入租约。"""

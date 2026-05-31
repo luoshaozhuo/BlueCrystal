@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import socket
-from typing import Any
 
 from tools.source_lab.model import SimulatedSource
 from tools.source_lab.protocols.common._base_facade import BaseSimulatorFacade

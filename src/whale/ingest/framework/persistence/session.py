@@ -1,4 +1,7 @@
-"""SQLAlchemy engine and session helpers for the ingest framework."""
+"""框架基础设施。
+
+提供持久化、数据库初始化等底层能力。
+"""
 
 from __future__ import annotations
 
@@ -19,7 +22,7 @@ from whale.ingest.config import (
 
 
 def create_db_url() -> URL:
-    """Build the database URL from the configured ingest database backend."""
+    """根据配置的 ingest 数据库后端构造数据库 URL。"""
     config = _build_config()
     database = config.database.database
     if isinstance(config.database, SqliteDatabaseConfig):
@@ -63,7 +66,7 @@ SessionLocal = sessionmaker(
 
 
 def get_session() -> Generator[Session, None, None]:
-    """Yield one database session for framework-managed request scopes."""
+    """为框架管理的请求作用域生成一个数据库 session。"""
     session = SessionLocal()
     try:
         yield session
@@ -73,7 +76,7 @@ def get_session() -> Generator[Session, None, None]:
 
 @contextmanager
 def session_scope() -> Generator[Session, None, None]:
-    """Yield one database session for local context-managed usage."""
+    """为本地上下文管理用途生成一个数据库 session。"""
     session = SessionLocal()
     try:
         yield session
@@ -82,5 +85,5 @@ def session_scope() -> Generator[Session, None, None]:
 
 
 def dispose_engine() -> None:
-    """Dispose SQLAlchemy engine and close pooled connections."""
+    """释放 SQLAlchemy 引擎并关闭连接池。"""
     engine.dispose()

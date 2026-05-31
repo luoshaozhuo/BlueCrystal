@@ -10,7 +10,6 @@ from whale.ingest.adapters.source.iec104_source_acquisition_adapter import (
     Iec104SourceAcquisitionAdapter,
 )
 from whale.ingest.ports.source.source_acquisition_port import (
-    SourceBatchMismatchError,
     SourceReadError,
     SourceSubscriptionUnsupportedError,
 )

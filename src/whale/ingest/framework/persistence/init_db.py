@@ -1,4 +1,7 @@
-"""Database initialization entrypoint for the ingest framework."""
+"""框架基础设施。
+
+提供持久化、数据库初始化等底层能力。
+"""
 
 from __future__ import annotations
 
@@ -9,13 +12,13 @@ from pathlib import Path
 from sqlalchemy import inspect
 
 from whale.ingest.config import CONFIG, PostgresDatabaseConfig, SqliteDatabaseConfig
-from whale.ingest.framework.persistence.base import Base
 from whale.ingest.framework.persistence.session import engine
+from whale.shared.persistence import Base
 from whale.shared.persistence.init_db import ensure_shared_views
 
 
 def init_db() -> None:
-    """Create ORM tables and optionally load sample data."""
+    """创建 ORM 表并可选加载示例数据。"""
     if _has_existing_schema():
         confirmation = input(_build_delete_confirmation_prompt()).strip()
         if confirmation != "delete":
@@ -29,7 +32,7 @@ def init_db() -> None:
 
 
 def initialize_db(*, insert_sample_data: bool) -> None:
-    """Create ORM tables and optionally load the default sample data."""
+    """创建 ORM 表并可选加载默认示例数据。"""
     import_module("whale.ingest.framework.persistence.orm")
     import_module("whale.shared.persistence.orm")
     Base.metadata.create_all(bind=engine)
@@ -41,20 +44,20 @@ def initialize_db(*, insert_sample_data: bool) -> None:
 
 
 def reset_db() -> None:
-    """Remove current persisted storage for the configured ingest database."""
+    """移除当前为配置的 ingest 数据库持久化的存储。"""
     import_module("whale.ingest.framework.persistence.orm")
     _clear_existing_storage()
 
 
 def load_default_sample_data() -> None:
-    """Load the built-in sample data templates into the current ingest database."""
+    """将内置示例数据模板加载到当前 ingest 数据库。"""
     from whale.shared.persistence.template.sample_data import generate_all_sample_data
 
     generate_all_sample_data()
 
 
 def _resolve_database_path() -> Path:
-    """Return the concrete SQLite database path."""
+    """返回具体的 SQLite 数据库路径。"""
     if not isinstance(CONFIG.database, SqliteDatabaseConfig):
         raise RuntimeError("Current ingest database backend is not sqlite.")
     database = CONFIG.database.database
@@ -65,13 +68,13 @@ def _resolve_database_path() -> Path:
 
 
 def _has_existing_schema() -> bool:
-    """Return whether the current configured database already contains tables."""
+    """返回当前配置的数据库是否已包含表。"""
     inspector = inspect(engine)
     return bool(inspector.get_table_names())
 
 
 def _clear_existing_storage() -> None:
-    """Remove existing stored schema for the configured database."""
+    """移除配置数据库的已有存储 schema。"""
     if isinstance(CONFIG.database, SqliteDatabaseConfig):
         database_path = _resolve_database_path()
         engine.dispose()
@@ -86,7 +89,7 @@ def _clear_existing_storage() -> None:
 
 
 def _storage_display_name() -> str:
-    """Return a user-facing description of the configured storage target."""
+    """返回用户可读的配置存储目标描述。"""
     if isinstance(CONFIG.database, SqliteDatabaseConfig):
         return f"Database at {_resolve_database_path()}"
     assert isinstance(CONFIG.database, PostgresDatabaseConfig)
@@ -94,7 +97,7 @@ def _storage_display_name() -> str:
 
 
 def _build_delete_confirmation_prompt() -> str:
-    """Return the localized delete confirmation prompt."""
+    """返回本地化的删除确认提示。"""
     if isinstance(CONFIG.database, SqliteDatabaseConfig):
         return (
             f"{_storage_display_name()} 已包含数据表。"
@@ -110,7 +113,7 @@ def _build_delete_confirmation_prompt() -> str:
 
 
 def _build_argument_parser() -> argparse.ArgumentParser:
-    """Build the command-line parser for non-interactive DB initialization."""
+    """构造非交互式数据库初始化的命令行解析器。"""
     parser = argparse.ArgumentParser(description="Initialize the ingest persistence database.")
     parser.add_argument(
         "--reset",
@@ -131,7 +134,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    """Run the init-db entrypoint in interactive or non-interactive mode."""
+    """以交互或非交互模式运行 init-db 入口。"""
     args = _build_argument_parser().parse_args()
 
     if not args.non_interactive and not args.reset and not args.sample_data:

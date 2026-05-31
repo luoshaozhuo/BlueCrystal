@@ -21,7 +21,7 @@ from tools.source_lab.tests.access.test_server_simulator_facade_capacity_profile
 )
 from tools.source_lab.access.polling.model import CapacityStatus
 from tools.source_lab.access.subscribe.model import SubscribeScanResult
-from tools.source_lab.access.subscribe.profile import run_subscribe_profile
+from tools.source_lab.access.subscribe.profile import SubscribeProfileResult, run_subscribe_profile
 from tools.source_lab.access.subscribe.scan import scan_source_subscriptions
 from tools.source_lab.protocols.registry import create_server_simulator
 from tools.source_lab.sources import PortAllocator
@@ -139,7 +139,7 @@ def test_sv_streaming_capacity_e2e_via_facade() -> None:
     assert top.final_metrics.value_count > 0
 
 
-def _run_streaming_profile(protocol: str):
+def _run_streaming_profile(protocol: str) -> SubscribeProfileResult:
     _skip_if_l2_unavailable(protocol)
     allocator = PortAllocator.from_range(start=41701, end=42000)
     source = _build_e2e_source(protocol, allocator.allocate_many(1)[0])

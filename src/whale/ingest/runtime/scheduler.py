@@ -1,4 +1,12 @@
-"""DB-backed ingest scheduler with minimal multi-node semantics."""
+"""采集调度器。
+
+基于 APScheduler 实现定时采集任务调度，
+管理任务的添加、删除、暂停和恢复。
+
+并发模型：单进程内多线程调度。
+失败处理：任务异常不影响其他任务继续执行。
+资源生命周期：shutdown 时等待运行中任务完成。
+"""
 
 from __future__ import annotations
 
@@ -23,7 +31,7 @@ from whale.ingest.runtime.scheduler_settings import SchedulerSettings
 
 @dataclass(slots=True)
 class SchedulerSnapshot:
-    """Lightweight scheduler status snapshot."""
+    """轻量级调度器状态快照。"""
 
     node_key: str
     runtime_mode: RuntimeMode
@@ -33,7 +41,7 @@ class SchedulerSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class SchedulerExecutionDecision:
-    """Execution decision for one worker/job/fencing token tuple."""
+    """单个 worker/任务/fencing token 三元组的执行决策。"""
 
     allowed: bool
     result: str
@@ -41,7 +49,7 @@ class SchedulerExecutionDecision:
 
 
 class SourceScheduler:
-    """DB-backed scheduler that keeps standalone as a multi-node special case."""
+    """基于数据库的调度器，将单节点作为多节点特例处理。"""
 
     def __init__(
         self,
@@ -53,6 +61,7 @@ class SourceScheduler:
         lease_service: LeaseService,
         audit_sink: IngestAuditSinkPort | None = None,
     ) -> None:
+        """初始化调度器。Args: settings: 调度器配置。job_repository: 作业仓库。executor: APScheduler 执行器。"""
         self._settings = settings
         self._node_repository = node_repository
         self._job_repository = job_repository
@@ -62,12 +71,12 @@ class SourceScheduler:
 
     @property
     def node_key(self) -> str:
-        """Return the configured node key."""
+        """返回配置的节点键。"""
 
         return self._settings.node_key
 
     def heartbeat(self, *, now: datetime | None = None) -> None:
-        """Persist one node heartbeat."""
+        """持久化一个节点心跳。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         self._node_repository.upsert_heartbeat(
@@ -86,7 +95,7 @@ class SourceScheduler:
         )
 
     def assign_jobs(self, *, now: datetime | None = None) -> SchedulerSnapshot:
-        """Assign jobs according to the active runtime mode."""
+        """根据活跃运行时模式分配任务。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         self._lease_service.expire_due_leases(now=resolved_now)
@@ -215,14 +224,14 @@ class SourceScheduler:
         )
 
     def bootstrap(self, *, now: datetime | None = None) -> SchedulerSnapshot:
-        """Persist heartbeat and reconcile assignments."""
+        """持久化心跳并对账分配。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         self.heartbeat(now=resolved_now)
         return self.assign_jobs(now=resolved_now)
 
     def release_jobs(self, job_ids: list[str], *, now: datetime | None = None) -> None:
-        """Release one set of job leases from the current node."""
+        """从当前节点释放一组任务租约。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         for job_id in job_ids:
@@ -248,7 +257,7 @@ class SourceScheduler:
         fencing_token: int,
         now: datetime | None = None,
     ) -> SchedulerExecutionDecision:
-        """Return whether one worker may execute a job under a given token."""
+        """返回 worker 是否可在给定 token 下执行任务。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         allowed = self._lease_service.validate_execution(

@@ -6,12 +6,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import os
 import sys
 
 from .common.scheduling import parse_float_list_or_ramp, parse_int_list_or_ramp
 from .polling.model import CapacityMode, CapacityScanConfig, ProbeConfig
-from .subscribe.capacity_plan import SubscribeCapacityMatrixPlan
 from .subscribe.model import SubscribeScanConfig
 
 
@@ -368,8 +368,6 @@ def from_env_for_simulator_subscribe() -> SubscribeScanConfig:
         ),
     )
 
-
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)

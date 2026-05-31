@@ -8,11 +8,9 @@ Python Iec104Simulator 只作为数据持有器，不绑定端口。
 from __future__ import annotations
 
 import asyncio
-import os
 import socket
 import subprocess
 import threading
-from pathlib import Path
 from typing import Any
 
 from tools.source_lab.access.runners.protocol import (

@@ -1,10 +1,10 @@
-"""Idempotency key support for ingest runtime CRUD API."""
+"""幂等键支持模块。为 ingest 运行时 CRUD API 提供防重复请求的中间件和服务。"""
 
 from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -29,21 +29,26 @@ _HEADER_KEY = b"idempotency-key"
 
 
 def _get_idempotency_key(scope: Scope) -> str:
-    """Read Idempotency-Key header from raw ASGI scope without consuming receive."""
-    for key, value in scope.get("headers", []):
+    """从原始 ASGI scope 读取 Idempotency-Key 头，不消费 receive 流。"""
+    headers = scope.get("headers")
+    if not isinstance(headers, list):
+        return ""
+    typed_headers = cast(list[tuple[bytes, bytes]], headers)
+    for key, value in typed_headers:
         if key.lower() == _HEADER_KEY:
             return value.decode().strip()
     return ""
 
 
 class IdempotencyService:
-    """DB-backed idempotency key management."""
+    """基于数据库的幂等键管理服务。使用唯一约束实现幂等键的原子声明和缓存。"""
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
+        """初始化幂等服务。Args: session_factory: 数据库会话工厂。"""
         self._factory = session_factory
 
     def get_cached(self, key: str) -> IngestIdempotencyRecord | None:
-        """Look up an existing idempotency record."""
+        """查找已有的幂等记录。返回缓存的 HTTP 状态码、头和响应体，或 None 表示未命中。"""
         session: Session = self._factory()
         try:
             from sqlalchemy import select
@@ -57,11 +62,7 @@ class IdempotencyService:
             session.close()
 
     def try_claim(self, key: str, fingerprint: str) -> bool:
-        """Atomically claim an idempotency key.
-
-        Returns True if this is the first use (INSERT succeeded).
-        Returns False if the key is already taken.
-        """
+        """原子性声明幂等键。使用数据库唯一约束确保同一键只被一个请求持有。"""
         session: Session = self._factory()
         try:
             record = IngestIdempotencyRecord(
@@ -80,7 +81,7 @@ class IdempotencyService:
             session.close()
 
     def cache_response(self, key: str, status: int, body: dict[str, Any]) -> None:
-        """Store the response for a previously claimed key."""
+        """为已声明的幂等键存储响应。缓存 HTTP 状态码、头部和 body 供后续重试使用。"""
         session: Session = self._factory()
         try:
             from sqlalchemy import select
@@ -99,11 +100,7 @@ class IdempotencyService:
 
 
 async def _read_and_buffer_body(receive: Receive) -> tuple[bytes, Receive]:
-    """Read the full request body from receive while buffering all messages.
-
-    Returns (body, replay_receive) where replay_receive replays all
-    buffered messages before falling through to the original receive.
-    """
+    """从 ASGI receive 读取完整请求体并缓存所有消息。确保中间件可重复访问请求体。"""
     messages: list[Message] = []
     body_parts: list[bytes] = []
 
@@ -129,18 +126,14 @@ async def _read_and_buffer_body(receive: Receive) -> tuple[bytes, Receive]:
 
 
 class IdempotencyMiddleware:
-    """ASGI middleware that handles Idempotency-Key header for mutating requests.
-
-    - If the key is new: claims it, lets the request proceed, caches the response.
-    - If the key exists with matching fingerprint: returns the cached response.
-    - If the key exists with different fingerprint: returns 422.
-    - 5xx responses are not cached, allowing safe retry.
-    """
+    """处理变更请求 Idempotency-Key 头的 ASGI 中间件。拦截携带幂等键的写请求并做去重处理。"""
 
     def __init__(self, app: ASGIApp) -> None:
+        """初始化幂等中间件。Args: app: 下游 ASGI 应用。service: 幂等服务实例。"""
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """ASGI 中间件入口。拦截携带幂等键的变更请求并做去重处理。"""
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return

@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 
 import pytest
 
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 from tools.source_lab.access.polling.capacity import scan_source_capacity
+from tools.source_lab.access.polling.metrics import WorkerRawStats
 from tools.source_lab.access.polling.model import CapacityLevelMetrics, CapacityMode, CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
+from tools.source_lab.access.subscribe.model import SubscribeScanConfig
 
 
 class _Provider:
     def build_sources(
         self,
-        config: CapacityScanConfig,
+        config: CapacityScanConfig | SubscribeScanConfig,
         *,
         server_count: int,
     ) -> tuple[SourceRuntimeSpec, ...]:
@@ -28,12 +30,26 @@ class _Provider:
         points = (SourcePointSpec(address="IED.LD.LN.DO"),)
         return tuple(SourceRuntimeSpec(endpoint=endpoint, points=points) for _ in range(server_count))
 
-    def started(self, sources: tuple[SourceRuntimeSpec, ...]):
+    def started(self, sources: tuple[SourceRuntimeSpec, ...]) -> AbstractContextManager[None]:
         return nullcontext()
 
 
 class _Runner:
+    """测试用 CapacityRunner stub。
+
+    scan_source_capacity 将 runner 透传到 run_level_once（被测函数已 monkeypatch），
+    因此 run_worker 永远不会被实际调用。提供 stub 实现以满足 mypy 协议检查。
+    """
     name = "fake_runner"
+
+    def run_worker(
+        self,
+        worker_index: int,
+        specs: tuple,  # type: ignore[type-arg]  # RunnerEndpointPlan 在此测试中不构造
+        target_hz: float,
+        config: CapacityScanConfig,
+    ) -> WorkerRawStats:
+        raise NotImplementedError("stub runner, 不应在被 monkeypatch 的测试中调用")
 
 
 def _config(*, progress_enabled: bool = True) -> CapacityScanConfig:

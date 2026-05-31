@@ -1,4 +1,7 @@
-"""Decorator-style port wrappers for ingest crosscutting concerns."""
+"""装饰器模块。
+
+为采集、写入、缓存等横切关注点提供装饰器封装。
+"""
 
 from whale.ingest.decorators.source_acquisition import (
     AuditedSourceAcquisitionPort,

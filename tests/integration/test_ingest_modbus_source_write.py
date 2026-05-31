@@ -18,6 +18,7 @@ import os
 import socket
 from contextlib import closing
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -43,8 +44,6 @@ from whale.ingest.usecases.dtos.source_write_request import (
     SourceWriteItemData,
     SourceWriteRequest,
 )
-from whale.shared.source.modbus.backends import resolve_client_runner_path
-
 _MODEL_MODULE = import_source_lab_module("tools.source_lab.model")
 _SIMULATORS_MODULE = import_source_lab_module("tools.source_lab.protocols.common.simulators")
 
@@ -54,9 +53,22 @@ SourceConnection = _MODEL_MODULE.SourceConnection
 ModbusTcpSimulator = _SIMULATORS_MODULE.ModbusTcpSimulator
 
 
-def _require_runner() -> None:
-    if not resolve_client_runner_path().exists():
+def _resolve_dev_runner_path() -> Path | None:
+    build_dir = Path(__file__).resolve().parents[2] / "tools" / "source_lab" / "native" / "build"
+    for candidate in (
+        build_dir / "modbus_tcp_polling_runner",
+        build_dir / "modbus_tcp_polling_runner.exe",
+    ):
+        if candidate.exists():
+            return candidate.resolve()
+    return None
+
+
+def _require_runner() -> Path:
+    runner_path = _resolve_dev_runner_path()
+    if runner_path is None:
         pytest.skip("modbus TCP runner executable does not exist")
+    return runner_path
 
 
 def _choose_available_port() -> int:
@@ -87,7 +99,7 @@ def _build_source(port: int) -> SimulatedSource:
 @pytest.mark.integration
 def test_modbus_write_then_read_verify_value_changed() -> None:
     """写入后通过读取验证值已变化。"""
-    _require_runner()
+    runner_path = _require_runner()
 
     port = _choose_available_port()
     source = _build_source(port)
@@ -95,6 +107,7 @@ def test_modbus_write_then_read_verify_value_changed() -> None:
     registry = StaticSourceWritePortRegistry(ports_by_protocol={"modbus_tcp": write_port})
     use_case = SourceCommandUseCase(write_port_registry=registry)
     os.environ["WHALE_INGEST_SOURCE_WRITE_ENABLED"] = "true"
+    os.environ["WHALE_MODBUS_CLIENT_RUNNER_PATH"] = str(runner_path)
 
     connection_data = SourceConnectionData(
         host=source.connection.host,
@@ -183,18 +196,21 @@ def test_modbus_write_then_read_verify_value_changed() -> None:
     finally:
         if "WHALE_INGEST_SOURCE_WRITE_ENABLED" in os.environ:
             del os.environ["WHALE_INGEST_SOURCE_WRITE_ENABLED"]
+        if "WHALE_MODBUS_CLIENT_RUNNER_PATH" in os.environ:
+            del os.environ["WHALE_MODBUS_CLIENT_RUNNER_PATH"]
 
 
 @pytest.mark.integration
 def test_modbus_write_dry_run_does_not_change_value() -> None:
     """dry_run 模式不应改变实际值。"""
-    _require_runner()
+    runner_path = _require_runner()
 
     port = _choose_available_port()
     source = _build_source(port)
     write_port = ModbusSourceWriteAdapter()
     registry = StaticSourceWritePortRegistry(ports_by_protocol={"modbus_tcp": write_port})
     use_case = SourceCommandUseCase(write_port_registry=registry)
+    os.environ["WHALE_MODBUS_CLIENT_RUNNER_PATH"] = str(runner_path)
 
     connection_data = SourceConnectionData(
         host=source.connection.host,
@@ -276,18 +292,21 @@ def test_modbus_write_dry_run_does_not_change_value() -> None:
     finally:
         if "WHALE_INGEST_SOURCE_WRITE_ENABLED" in os.environ:
             del os.environ["WHALE_INGEST_SOURCE_WRITE_ENABLED"]
+        if "WHALE_MODBUS_CLIENT_RUNNER_PATH" in os.environ:
+            del os.environ["WHALE_MODBUS_CLIENT_RUNNER_PATH"]
 
 
 @pytest.mark.integration
 def test_modbus_write_disabled_refuses_real_write() -> None:
     """未启用写入时，真实写请求应被拒绝。"""
-    _require_runner()
+    runner_path = _require_runner()
 
     port = _choose_available_port()
     source = _build_source(port)
     write_port = ModbusSourceWriteAdapter()
     registry = StaticSourceWritePortRegistry(ports_by_protocol={"modbus_tcp": write_port})
     use_case = SourceCommandUseCase(write_port_registry=registry)
+    os.environ["WHALE_MODBUS_CLIENT_RUNNER_PATH"] = str(runner_path)
 
     if "WHALE_INGEST_SOURCE_WRITE_ENABLED" in os.environ:
         del os.environ["WHALE_INGEST_SOURCE_WRITE_ENABLED"]
@@ -321,5 +340,9 @@ def test_modbus_write_disabled_refuses_real_write() -> None:
         ],
     )
 
-    with pytest.raises(RuntimeError, match="Real device write is disabled"):
-        asyncio.run(use_case.execute(write_request))
+    try:
+        with pytest.raises(RuntimeError, match="Real device write is disabled"):
+            asyncio.run(use_case.execute(write_request))
+    finally:
+        if "WHALE_MODBUS_CLIENT_RUNNER_PATH" in os.environ:
+            del os.environ["WHALE_MODBUS_CLIENT_RUNNER_PATH"]

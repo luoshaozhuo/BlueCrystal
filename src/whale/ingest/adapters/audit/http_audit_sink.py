@@ -1,7 +1,8 @@
-"""HTTP-based audit sink for forwarding events to an external audit platform / SIEM.
+"""审计日志适配器。
 
-Non-blocking on the main business path: failures record last_error but don't
-propagate exceptions to the caller.
+实现 AuditSinkPort，将结构化审计事件持久化或转发。
+外部依赖：数据库（SQLAlchemy）/ HTTP 客户端。
+失败处理：失败不传播到调用方，记录 error 后继续。
 """
 
 from __future__ import annotations
@@ -10,7 +11,6 @@ import json
 import logging
 import threading
 import time
-from collections.abc import Callable
 from typing import Any
 
 import urllib.request
@@ -24,14 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 class HttpIngestAuditSink(IngestAuditSinkPort):
-    """Forward audit events to an external HTTP endpoint.
+    """将审计事件转发到外部 HTTP 端点。
 
     Args:
-        endpoint_url: Target URL (POST).
-        timeout_seconds: HTTP request timeout.
-        batch_size: Max events per batch before flush (default 1 = immediate).
-        retry_count: How many times to retry on failure (default 0).
-        retry_backoff_seconds: Base backoff between retries.
+        endpoint_url: 目标 URL（POST）。
+        timeout_seconds: HTTP 请求超时秒数。
+        batch_size: 批量 flush 前最大事件数（默认 1，即立即发送）。
+        retry_count: 失败重试次数（默认 0）。
+        retry_backoff_seconds: 重试间隔基数秒数。
     """
 
     def __init__(
@@ -43,6 +43,7 @@ class HttpIngestAuditSink(IngestAuditSinkPort):
         retry_count: int = 0,
         retry_backoff_seconds: float = 1.0,
     ) -> None:
+        """初始化 HTTP 审计 sink。Args: endpoint_url: 目标 HTTP 端点 URL。timeout_seconds: 请求超时秒数。batch_size: 批量大小。retry_count: 重试次数。retry_backoff_seconds: 重试退避基数秒数。"""
         self._endpoint_url = endpoint_url.rstrip("/") + "/events"
         self._timeout = timeout_seconds
         self._opener = build_opener(ProxyHandler({}))
@@ -54,22 +55,23 @@ class HttpIngestAuditSink(IngestAuditSinkPort):
         self.last_error: Exception | None = None
 
     def emit(self, event: IngestAuditEvent) -> None:
-        """Buffer and optionally flush the event to the external endpoint.
-
-        Never raises on the caller: errors are recorded in last_error.
-        """
+        """缓存并可选 flush 审计事件到外部端点。按 batch_size 决定立即发送或累积后批量发送。"""
         with self._lock:
             self._buffer.append(event)
             if len(self._buffer) >= self._batch_size:
                 self._flush()
 
     def flush(self) -> None:
-        """Explicitly flush buffered events."""
+        """缓存并可选地 flush 审计事件到外部端点。根据 batch_size 决定立即发送或累积后批量发送。
+
+Never raises on the caller: errors are recorded in last_error."""
         with self._lock:
             self._flush()
 
     def _flush(self) -> None:
-        """Send buffered events to the external endpoint."""
+        """将缓冲的审计事件发送到外部端点。
+
+失败记录到 error_count 和 last_error，不传播异常。"""
         if not self._buffer:
             return
 
@@ -105,7 +107,7 @@ class HttpIngestAuditSink(IngestAuditSinkPort):
 
     @staticmethod
     def _serialize(event: IngestAuditEvent) -> dict[str, Any]:
-        """Convert one audit event to a safe JSON-serializable dict."""
+        """将单个审计事件转换为安全的 JSON 可序列化字典。"""
         payload = event.sanitized_payload()
         return {
             "request_id": payload["request_id"],

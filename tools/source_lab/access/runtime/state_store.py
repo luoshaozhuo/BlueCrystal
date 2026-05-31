@@ -25,6 +25,24 @@ _SNAPSHOT_FILES = (
 )
 
 
+def _as_object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): item for key, item in value.items()}
+
+
+def _as_nested_object_dict(value: object) -> dict[str, dict[str, object]]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): _as_object_dict(item) for key, item in value.items()}
+
+
+def _as_object_dict_list(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    return [_as_object_dict(item) for item in value]
+
+
 def _utc_now_compact() -> str:
     return datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S%fZ")
 
@@ -77,6 +95,16 @@ class RecoveryLoadBundle:
 
 
 class RuntimeStateStore:
+    """文件系统持久化的运行时状态存储。
+
+    管理四类快照文件（accepted_endpoints、endpoint_registry、runtime_snapshot、
+    continuity_snapshot）和操作日志（operation_journal）。
+    支持原子写入（temp + replace）、校验和验证、版本化备份、保留裁剪和完整性修复。
+    所有写入操作通过文件锁（fcntl flock）保证并发安全。
+
+    不负责：业务逻辑校验、endpoint 生命周期调度（由 registry 负责）。
+    """
+
     def __init__(self, base_dir: str | None = None) -> None:
         resolved_dir = (
             base_dir
@@ -255,7 +283,10 @@ class RuntimeStateStore:
             endpoint_id = str(item.get("endpoint_id", ""))
             state = str(registry.get(endpoint_id, {}).get("state", "running"))
             item["state"] = state
-            bundle_endpoints.append(item if not redacted else _redact_object(item))
+            if redacted:
+                bundle_endpoints.append(_as_object_dict(_redact_object(item)))
+            else:
+                bundle_endpoints.append(item)
         bundle = {
             "schema_version": "1.0",
             "bundle_version": _utc_now_compact(),
@@ -275,25 +306,25 @@ class RuntimeStateStore:
         self._write_json(self.accepted_endpoints_path, payload)
 
     def load_accepted_endpoints(self) -> list[dict[str, object]]:
-        return list(self._read_json(self.accepted_endpoints_path, default=[]))
+        return _as_object_dict_list(self._read_json(self.accepted_endpoints_path, default=[]))
 
     def save_registry(self, payload: dict[str, dict[str, object]]) -> None:
         self._write_json(self.registry_path, payload)
 
     def load_registry(self) -> dict[str, dict[str, object]]:
-        return dict(self._read_json(self.registry_path, default={}))
+        return _as_nested_object_dict(self._read_json(self.registry_path, default={}))
 
     def save_runtime_snapshot(self, payload: dict[str, dict[str, object]]) -> None:
         self._write_json(self.runtime_snapshot_path, payload)
 
     def load_runtime_snapshot(self) -> dict[str, dict[str, object]]:
-        return dict(self._read_json(self.runtime_snapshot_path, default={}))
+        return _as_nested_object_dict(self._read_json(self.runtime_snapshot_path, default={}))
 
     def save_continuity_snapshot(self, payload: dict[str, dict[str, object]]) -> None:
         self._write_json(self.continuity_path, payload)
 
     def load_continuity_snapshot(self) -> dict[str, dict[str, object]]:
-        return dict(self._read_json(self.continuity_path, default={}))
+        return _as_nested_object_dict(self._read_json(self.continuity_path, default={}))
 
     def load_recovery_bundle(self) -> RecoveryLoadBundle:
         return RecoveryLoadBundle(

@@ -1,4 +1,9 @@
-"""Request audit context helpers and middleware."""
+"""审计中间件。
+
+拦截 HTTP 请求并构造审计事件（IngestAuditEventOrm），
+通过 app.state.audit_sink 写入审计日志。
+提供 build_audit_event 工具函数供路由 handler 复用。
+"""
 
 from __future__ import annotations
 
@@ -6,14 +11,15 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
 from whale.ingest.domain.audit_event import IngestAuditEvent
 
 
 @dataclass(frozen=True, slots=True)
 class AuditContext:
-    """Request-scoped audit context."""
+    """请求作用域的审计上下文。"""
 
     request_id: str
     trace_id: str
@@ -23,9 +29,14 @@ class AuditContext:
 
 
 class IngestAuditMiddleware(BaseHTTPMiddleware):
-    """Attach request-scoped audit metadata without starting side effects."""
+    """附加请求作用域的审计元数据，不产生副作用。"""
 
-    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
+        """分发请求到下游 ASGI 应用。"""
         request_id = request.headers.get("x-request-id") or str(uuid4())
         trace_id = request.headers.get("x-trace-id") or request_id
         actor = request.headers.get("x-actor")
@@ -58,7 +69,7 @@ def build_audit_event(
     changed_fields: list[str] | None = None,
     attributes: dict[str, object] | None = None,
 ) -> IngestAuditEvent:
-    """Build one structured audit event from the current request."""
+    """从当前请求构造结构化审计事件。"""
 
     context: AuditContext = request.state.audit_context
     return IngestAuditEvent(

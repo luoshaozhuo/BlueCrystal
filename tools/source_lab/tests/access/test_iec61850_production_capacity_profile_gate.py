@@ -22,10 +22,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-import pytest
 
-from tools.source_lab.access.runners.base import CapacityRunner
-from tools.source_lab.access.runners.iec61850_mms_polling import Iec61850MmsPollingRunner
 from tools.source_lab.access.runners.registry import build_capacity_runner
 
 # ── Binary resolution ────────────────────────────────────────────────────
@@ -157,6 +154,7 @@ class TestIec61850MmsCapacityProfileGate:
             # After READY, check no more protocol lines within 1s
             import select
             if select.select([simulator.stdout], [], [], 1.0)[0]:
+                assert simulator.stdout is not None
                 extra = simulator.stdout.readline().strip()
                 assert False, f"stdout noise detected after READY: {extra!r}"
         finally:

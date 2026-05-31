@@ -19,6 +19,7 @@ from tools.source_lab.access.runners.base import CapacityRunner, SubscriptionRun
 from tools.source_lab.access.runners.registry import (
     build_capacity_runner,
     build_subscription_runner,
+    describe_protocol_runtime_readiness,
     get_protocol_capability,
     supports_access_mode,
 )
@@ -206,12 +207,22 @@ def _profile_result_json(
     result: FieldProfileServiceResult,
 ) -> str:
     cap = get_protocol_capability(request.protocol)
+    readiness = describe_protocol_runtime_readiness(
+        request.protocol,
+        "streaming" if request.access_mode == "subscribe" else request.access_mode,
+    )
     payload = {
         "access_mode": result.access_mode,
         "protocol": result.protocol,
         "implementation_level": cap.get("implementation_level", ""),
         "runner_backend": cap.get("backend", ""),
         "protocol_limitation": cap.get("limitation", ""),
+        "declared_implementation_level": readiness.declared_implementation_level,
+        "actual_implementation_level": readiness.actual_implementation_level,
+        "actual_runtime_availability": readiness.actual_runtime_availability,
+        "runtime_constraint_tags": list(readiness.runtime_constraint_tags),
+        "runtime_fallback_reason": readiness.fallback_reason,
+        "runtime_native_check_error": readiness.native_check_error,
         "process_count": request.process_count,
         "server_count": request.server_count,
         "hz": request.hz,
@@ -340,9 +351,14 @@ def print_profile_summary(result: FieldProfileServiceResult) -> None:
 
     warnings = ",".join(result.warnings) if result.warnings else "-"
     report_path = "-" if result.artifacts.report_path is None else str(result.artifacts.report_path)
+    readiness = describe_protocol_runtime_readiness(
+        result.protocol,
+        "streaming" if result.access_mode == "subscribe" else result.access_mode,
+    )
     print(
         f"access_mode={result.access_mode} status={result.status} reason={result.reason or '-'} "
-        f"warnings={warnings} report_path={report_path}",
+        f"warnings={warnings} runtime={readiness.actual_runtime_availability} "
+        f"actual_level={readiness.actual_implementation_level} report_path={report_path}",
         flush=True,
     )
 
@@ -365,7 +381,7 @@ def run_field_profile(
         profile_result: PollingProfileResult | SubscribeProfileResult = run_polling_profile(
             polling_config,
             provider=provider,
-            runner=build_capacity_runner(request.protocol),
+            runner=build_capacity_runner(request.protocol).runner,
             pyinstrument=request.pyinstrument,
             max_lines=request.profile_max_lines,
         )

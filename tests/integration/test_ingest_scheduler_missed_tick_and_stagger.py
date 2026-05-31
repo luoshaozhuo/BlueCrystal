@@ -6,7 +6,6 @@ import time
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy.orm import Session, sessionmaker
 
 from whale.ingest.framework.persistence import (
     create_runtime_engine,

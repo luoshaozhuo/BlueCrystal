@@ -1,7 +1,8 @@
-"""Modbus TCP source acquisition adapter.
+"""协议采集适配器。
 
-Converts ingest DTOs to shared/source modbus native runner calls
-and converts ``RawModbusReadResult`` to ``AcquiredNodeStateBatch``.
+实现 SourceAcquisitionPort / SourceWritePort，
+封装特定协议（工业协议）的采集或写入逻辑。
+外部依赖边界：libmodbus C 库（ctypes）。
 """
 from __future__ import annotations
 
@@ -32,13 +33,15 @@ from whale.shared.utils.time import ensure_utc
 
 
 class ModbusSourceAcquisitionAdapter(SourceAcquisitionPort):
-    """Execute Modbus TCP reads via native runner (FC03)."""
+    """通过 native runner 执行 Modbus TCP 读取（FC03 保持寄存器）。"""
 
     def supports_subscription(
         self,
         execution: AcquisitionExecutionOptions,
+        
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         del execution, connection
         return False
 
@@ -48,16 +51,13 @@ class ModbusSourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
-        """Execute one Modbus TCP batch read (FC03).
-
+        """执行一次 Modbus TCP 批量读取（功能码 03）。对批量 holding register 地址发送读取请求并聚合返回值。
         Args:
             execution: Acquisition execution options.
             connection: Target source connection.
             items: Points to read, each with ``relative_path`` as register address string.
-
         Returns:
             A batch object for ingest state cache.
-
         Raises:
             SourceReadTimeoutError: When underlying read times out.
             SourceBatchMismatchError: When value count != item count.
@@ -95,11 +95,13 @@ class ModbusSourceAcquisitionAdapter(SourceAcquisitionPort):
     async def start_subscription(
         self,
         execution: AcquisitionExecutionOptions,
+        
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         del execution, connection, items, state_received
         raise SourceSubscriptionUnsupportedError(
             "subscription acquisition is not supported by Modbus TCP adapter"
@@ -110,7 +112,7 @@ class ModbusSourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> list[int]:
-        """Convert business ``relative_path`` to integer register addresses."""
+        """将业务 relative_path 转换为整数寄存器地址。"""
         del connection
         reg_addrs: list[int] = []
         for item in items:
@@ -134,7 +136,7 @@ class ModbusSourceAcquisitionAdapter(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> ModbusSourceReader:
-        """Construct shared/source Modbus reader."""
+        """构造 shared/source Modbus 读取器。"""
         host = connection.host.strip()
         if not host:
             raise ValueError("connection.host is required")

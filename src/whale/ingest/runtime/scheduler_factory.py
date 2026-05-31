@@ -1,4 +1,8 @@
-"""Factory helpers for building APScheduler instances."""
+"""调度器工厂。
+
+根据配置创建和配置 APScheduler 实例，
+包括线程池大小、任务存储、时区等设置。
+"""
 
 from __future__ import annotations
 
@@ -22,7 +26,7 @@ from whale.ingest.runtime.scheduler_settings import SchedulerSettings
 
 
 def build_scheduler(settings: SchedulerSettings) -> BaseScheduler:
-    """Build one APScheduler instance from runtime settings."""
+    """根据运行时设置构造 APScheduler 实例。"""
     scheduler_type = settings.scheduler_type.lower()
     scheduler_cls: type[BaseScheduler]
 
@@ -50,7 +54,7 @@ def build_scheduler(settings: SchedulerSettings) -> BaseScheduler:
 
 
 def _build_jobstore(settings: SchedulerSettings) -> MemoryJobStore | SQLAlchemyJobStore:
-    """Build the default APScheduler job store."""
+    """构造默认的 APScheduler 任务存储。"""
     jobstore_type = settings.jobstore.type.lower()
 
     if jobstore_type == "memory":
@@ -67,7 +71,7 @@ def _build_jobstore(settings: SchedulerSettings) -> MemoryJobStore | SQLAlchemyJ
 def _build_executors(
     settings: SchedulerSettings,
 ) -> dict[str, ThreadPoolExecutor | ProcessPoolExecutor]:
-    """Build APScheduler executors."""
+    """构建 APScheduler 执行器配置字典。返回线程池和进程池的执行器参数。"""
     executors: dict[str, ThreadPoolExecutor | ProcessPoolExecutor] = {
         "default": ThreadPoolExecutor(settings.executors.threadpool_max_workers),
     }

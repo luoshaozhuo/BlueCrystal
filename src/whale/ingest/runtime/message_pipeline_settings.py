@@ -1,4 +1,7 @@
-"""Compatibility exports for ingest message pipeline settings."""
+"""消息管道配置。
+
+定义消息管道（缓存到消息中间件）的可配置参数。
+"""
 
 from __future__ import annotations
 
@@ -18,10 +21,10 @@ KafkaMessageSettings = KafkaMessageConfig
 
 
 class _LazyMessagePipelineSettingsProxy:
-    """Lazy proxy that resolves message settings only when accessed."""
+    """仅在访问时才解析消息设置的延迟代理。"""
 
     def __getattr__(self, name: str) -> object:
-        """Delegate attribute access to the current runtime message settings."""
+        """属性访问委托给当前运行时消息设置。"""
         return getattr(CONFIG.message, name)
 
 

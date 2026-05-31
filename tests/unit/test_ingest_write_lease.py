@@ -26,4 +26,5 @@ def test_write_lease_conflict_and_reuse(tmp_path) -> None:
 
     assert first.allowed is True
     assert second.allowed is False
-    assert second.result == "CONFLICT"
+    # 不传 requested_fencing_token 时有其他 holder 活跃租约 → FENCED (QA-3 修复)
+    assert second.result == "FENCED"

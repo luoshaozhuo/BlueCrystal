@@ -41,34 +41,34 @@ from whale.shared.utils.time import ensure_utc, max_datetime
 
 
 class RedisPipeline(Protocol):
-    """Minimal Redis pipeline contract used by the Redis state cache."""
+    """Redis 状态缓存使用的最小 Redis pipeline 契约。"""
 
     def hset(self, name: str, key: str, value: str) -> object:
-        """Set one hash field in pipeline."""
+        """在 pipeline 中设置单个 hash 字段。"""
 
     def execute(self) -> object:
-        """Execute queued Redis commands."""
+        """执行排队的 Redis 命令。"""
 
 
 class RedisHashClient(Protocol):
-    """Minimal Redis hash client contract used by the Redis state cache."""
+    """Redis 状态缓存使用的最小 Redis hash 客户端契约。"""
 
     def hset(self, name: str, key: str, value: str) -> int:
-        """Set one hash field."""
+        """设置单个 hash 字段。"""
 
     def hget(self, name: str, key: str) -> str | bytes | None:
-        """Get one hash field."""
+        """获取单个 hash 字段。"""
 
     def hgetall(self, name: str) -> Mapping[str, str] | Mapping[bytes, bytes]:
-        """Return all hash fields and values."""
+        """返回所有 hash 字段和值。"""
 
     def pipeline(self, transaction: bool = True) -> RedisPipeline:
-        """Return a Redis pipeline for batch operations."""
+        """返回用于批量操作的 Redis pipeline。"""
 
 
 @dataclass(frozen=True, slots=True)
 class RedisSourceStateCacheSettings:
-    """Connection and key settings for the Redis latest-state cache."""
+    """Redis 最新状态缓存的连接和键设置。"""
 
     host: str
     port: int
@@ -86,7 +86,7 @@ class RedisSourceStateCacheSettings:
         cls,
         config: RedisStateCacheConfig,
     ) -> RedisSourceStateCacheSettings:
-        """Build adapter settings from the ingest module config."""
+        """从 ingest 模块配置构造适配器设置。"""
 
         missing_names = [
             name
@@ -121,14 +121,14 @@ class RedisSourceStateCacheSettings:
 
 
 class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort):
-    """Use one Redis hash as the production latest-state cache."""
+    """使用 Redis hash 作为生产级最新状态缓存。"""
 
     def __init__(
         self,
         settings: RedisSourceStateCacheSettings | None = None,
         client: RedisHashClient | None = None,
     ) -> None:
-        """Create the Redis-backed state cache."""
+        """创建基于 Redis 的状态缓存实例。"""
 
         if settings is None:
             if not isinstance(CONFIG.state_cache, RedisStateCacheConfig):
@@ -487,7 +487,7 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
         operation: str,
         ld_name: str,
     ) -> None:
-        """Execute one Redis pipeline and raise a stable cache error on failure."""
+        """执行单个 Redis pipeline，失败时抛出稳定的缓存错误。"""
 
         try:
             pipe.execute()
@@ -505,7 +505,7 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
         ld_name: str,
         exc: Exception,
     ) -> SourceStateCacheWriteError:
-        """Convert one Redis client failure into a stable cache write error."""
+        """将 Redis 客户端失败转换为稳定的缓存写入错误。"""
 
         classified = _classify_redis_error(exc)
         message = f"{operation} failed for {ld_name}: {classified.message}"
@@ -553,7 +553,7 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
 
     @staticmethod
     def _build_client(settings: RedisSourceStateCacheSettings) -> RedisHashClient:
-        """Build one real Redis client lazily so tests can inject a fake client."""
+        """延迟构造真实 Redis 客户端，以便测试注入 fake。"""
 
         try:
             from redis import Redis
@@ -562,10 +562,6 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
                 "Redis support requires the `redis` package to be installed."
             ) from exc
 
-        kwargs = {
-            "decode_responses": settings.decode_responses,
-            "socket_connect_timeout": settings.socket_connect_timeout_seconds,
-        }
         if settings.redis_url:
             return cast(
                 RedisHashClient,
@@ -574,7 +570,8 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
                     db=settings.db,
                     username=settings.username,
                     password=settings.password,
-                    **kwargs,
+                    decode_responses=settings.decode_responses,
+                    socket_connect_timeout=settings.socket_connect_timeout_seconds,
                 ),
             )
         return cast(
@@ -585,13 +582,14 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
                 db=settings.db,
                 username=settings.username,
                 password=settings.password,
-                **kwargs,
+                decode_responses=settings.decode_responses,
+                socket_connect_timeout=settings.socket_connect_timeout_seconds,
             ),
         )
 
     @staticmethod
     def _decode_value(value: object) -> str:
-        """Decode one Redis field name or value into text."""
+        """将 Redis 字段名或值解码为文本。"""
 
         if isinstance(value, bytes):
             return value.decode("utf-8")
@@ -599,7 +597,7 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
 
     @staticmethod
     def _dump_payload(payload: dict[str, Any]) -> str:
-        """Serialize one payload as compact JSON."""
+        """将单个 payload 序列化为紧凑 JSON。"""
 
         return json.dumps(
             payload,
@@ -610,7 +608,7 @@ class RedisSourceStateCache(SourceStateCachePort, SourceStateSnapshotReaderPort)
 
     @staticmethod
     def _optional_str(value: object) -> str | None:
-        """Return one optional string value."""
+        """返回一个可选的字符串值。"""
 
         if value is None:
             return None
@@ -640,7 +638,7 @@ def _should_update_value(
 
 
 def _classify_redis_error(exc: Exception) -> ClassifiedError:
-    """Classify one Redis client failure into a stable cache error shape."""
+    """将 Redis 客户端失败分类为稳定的缓存错误形态。"""
 
     message = str(exc).strip() or type(exc).__name__
     normalized = message.upper()
@@ -710,7 +708,7 @@ def _classify_redis_error(exc: Exception) -> ClassifiedError:
 
 
 def _parse_datetime(value: object) -> datetime | None:
-    """Parse one ISO datetime value if present."""
+    """解析 ISO 日期时间值（如果存在）。"""
 
     if value is None:
         return None
@@ -720,7 +718,7 @@ def _parse_datetime(value: object) -> datetime | None:
 
 
 def _datetime_to_iso(value: datetime | None) -> str | None:
-    """Serialize optional datetime."""
+    """序列化可选 datetime 为 ISO 8601 字符串，None 转为 null。"""
 
     if value is None:
         return None
@@ -729,7 +727,7 @@ def _datetime_to_iso(value: datetime | None) -> str | None:
 
 
 def _optional_int(value: object) -> int | None:
-    """Parse optional integer value."""
+    """序列化可选 datetime 为 ISO 8601 字符串，None 转为 null。"""
 
     if value is None:
         return None

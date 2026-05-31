@@ -1,12 +1,21 @@
-"""Runtime-config CRUD routes for sources, connections, points, and profiles."""
+"""管理 运行时配置 资源的 API 路由。
+
+每个 handler 在请求入口做权限检查（access_evaluator），
+变更操作支持 dry_run 模式和乐观并发控制（expected_version），
+所有操作通过 audit_sink 记录审计事件，
+事务在 try/finally 中管理 Session 生命周期。
+
+不负责：资源的业务逻辑编排（由 use case 层负责）。
+"""
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import TypeVar, cast
 
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.sql import Select
 
 from whale.ingest.api.audit_middleware import build_audit_event
 from whale.ingest.api.errors import conflict, denied, not_found
@@ -37,8 +46,16 @@ from whale.shared.persistence.orm import (
 
 router = APIRouter(prefix="/api/v1", tags=["runtime-config"])
 
+TRuntimeConfigOrm = TypeVar(
+    "TRuntimeConfigOrm",
+    IED,
+    CommunicationEndpoint,
+    SignalProfile,
+    SignalProfileItem,
+)
 
-def _open_session(factory: sessionmaker[Session] | Callable[[], Session]) -> Session:
+
+def _open_session(factory: sessionmaker[Session]) -> Session:
     return factory() if callable(factory) else factory()
 
 
@@ -76,9 +93,17 @@ def _emit_success(
     )
 
 
-def _paginate(session: Session, stmt, model, *, limit: int, offset: int) -> tuple[int, list[object]]:
+def _paginate(
+    session: Session,
+    stmt: Select[tuple[TRuntimeConfigOrm]],
+    model: type[TRuntimeConfigOrm],
+    *,
+    limit: int,
+    offset: int,
+) -> tuple[int, list[TRuntimeConfigOrm]]:
     total = session.scalar(select(func.count()).select_from(model)) or 0
-    return total, list(session.scalars(stmt.limit(limit).offset(offset)))
+    rows = list(session.scalars(stmt.limit(limit).offset(offset)))
+    return total, cast(list[TRuntimeConfigOrm], rows)
 
 
 def _ensure_source_asset(session: Session, *, asset_code: str, asset_name: str) -> AssetInstance:
@@ -178,9 +203,11 @@ def _point_response(row: SignalProfileItem, data_type: ScadaDataType | None) -> 
 @router.post("/sources", response_model=SourceResponse, status_code=201)
 def create_source(
     request: Request,
+    
     payload: SourceCreate,
     dry_run: bool = Query(False),
 ) -> SourceResponse:
+    """创建新数据源。dry_run 为 True 时返回预期结果不实际创建。权限检查、审计记录和乐观并发控制。"""
     _authorize(request, "source.create", "source")
     session = _open_session(request.app.state.session_factory)
     try:
@@ -217,6 +244,7 @@ def create_source(
 
 @router.get("/sources/{source_id}", response_model=SourceResponse)
 def get_source(source_id: int, request: Request) -> SourceResponse:
+    """获取指定的资源记录。"""
     _authorize(request, "source.read", "source", str(source_id))
     session = _open_session(request.app.state.session_factory)
     try:
@@ -232,9 +260,12 @@ def get_source(source_id: int, request: Request) -> SourceResponse:
 
 @router.get("/sources", response_model=PaginatedResponse[SourceResponse])
 def list_sources(request: Request, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)) -> PaginatedResponse[SourceResponse]:
+    """list_sources 方法。"""
+    
     _authorize(request, "source.list", "source")
     session = _open_session(request.app.state.session_factory)
     try:
+        """获取数据源的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
         total, rows = _paginate(session, select(IED).order_by(IED.ied_id), IED, limit=limit, offset=offset)
         items = [_source_response(row, session.get(AssetInstance, row.asset_instance_id)) for row in rows]
         _emit_success(request, action="source.list", resource_type="source", resource_id=None, http_status=200, attributes={"count": len(items), "total": total, "limit": limit, "offset": offset})
@@ -245,9 +276,12 @@ def list_sources(request: Request, limit: int = Query(50, ge=1, le=200), offset:
 
 @router.patch("/sources/{source_id}", response_model=SourceResponse)
 def patch_source(source_id: int, request: Request, payload: SourcePatch, dry_run: bool = Query(False)) -> SourceResponse:
+    """patch_source 方法。"""
+    
     _authorize(request, "source.update", "source", str(source_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """部分更新数据源。支持乐观并发控制（版本字段）。权限检查和审计记录。"""
         row = session.get(IED, source_id)
         if row is None:
             raise not_found(action="source.update", resource_type="source", resource_id=str(source_id))
@@ -278,9 +312,12 @@ def patch_source(source_id: int, request: Request, payload: SourcePatch, dry_run
 
 @router.delete("/sources/{source_id}", status_code=204)
 def delete_source(source_id: int, request: Request, expected_version: int = Query(...), dry_run: bool = Query(False)) -> None:
+    """delete_source 方法。"""
+    
     _authorize(request, "source.delete", "source", str(source_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """删除数据源。权限检查并记录审计事件。"""
         row = session.get(IED, source_id)
         if row is None:
             raise not_found(action="source.delete", resource_type="source", resource_id=str(source_id))
@@ -299,9 +336,11 @@ def delete_source(source_id: int, request: Request, expected_version: int = Quer
 @router.post("/connections", response_model=ConnectionResponse, status_code=201)
 def create_connection(
     request: Request,
+    
     payload: ConnectionCreate,
     dry_run: bool = Query(False),
 ) -> ConnectionResponse:
+    """创建新连接配置。dry_run 为 True 时返回预期结果不实际创建。权限检查、审计记录和乐观并发控制。"""
     _authorize(request, "connection.create", "connection")
     session = _open_session(request.app.state.session_factory)
     try:
@@ -345,31 +384,38 @@ def create_connection(
         _emit_success(request, action="connection.create", resource_type="connection", resource_id=str(row.endpoint_id), http_status=201, after_version=row.record_version, changed_fields=list(payload.model_dump().keys()))
         return _connection_response(row)
     finally:
+        
         session.close()
 
 
 @router.get("/connections/{connection_id}", response_model=ConnectionResponse)
 def get_connection(connection_id: int, request: Request) -> ConnectionResponse:
+    """get_connection 方法。"""
     _authorize(request, "connection.read", "connection", str(connection_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """获取指定的连接配置记录。权限检查并记录审计事件。"""
         row = session.get(CommunicationEndpoint, connection_id)
         if row is None:
             raise not_found(action="connection.read", resource_type="connection", resource_id=str(connection_id))
         _emit_success(request, action="connection.read", resource_type="connection", resource_id=str(connection_id), http_status=200, after_version=row.record_version)
         return _connection_response(row)
     finally:
+        
         session.close()
 
 
 @router.get("/connections", response_model=PaginatedResponse[ConnectionResponse])
 def list_connections(request: Request, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)) -> PaginatedResponse[ConnectionResponse]:
+    """list_connections 方法。"""
     _authorize(request, "connection.list", "connection")
     session = _open_session(request.app.state.session_factory)
     try:
+        """获取连接配置的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
         total, rows = _paginate(session, select(CommunicationEndpoint).order_by(CommunicationEndpoint.endpoint_id), CommunicationEndpoint, limit=limit, offset=offset)
         items = [_connection_response(row) for row in rows]
         _emit_success(request, action="connection.list", resource_type="connection", resource_id=None, http_status=200, attributes={"count": len(items), "total": total, "limit": limit, "offset": offset})
+        
         return PaginatedResponse(items=items, total=total, limit=limit, offset=offset)
     finally:
         session.close()
@@ -377,9 +423,11 @@ def list_connections(request: Request, limit: int = Query(50, ge=1, le=200), off
 
 @router.patch("/connections/{connection_id}", response_model=ConnectionResponse)
 def patch_connection(connection_id: int, request: Request, payload: ConnectionPatch, dry_run: bool = Query(False)) -> ConnectionResponse:
+    """patch_connection 方法。"""
     _authorize(request, "connection.update", "connection", str(connection_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """部分更新连接配置。支持乐观并发控制（版本字段）。权限检查和审计记录。"""
         row = session.get(CommunicationEndpoint, connection_id)
         if row is None:
             raise not_found(action="connection.update", resource_type="connection", resource_id=str(connection_id))
@@ -400,14 +448,17 @@ def patch_connection(connection_id: int, request: Request, payload: ConnectionPa
         _emit_success(request, action="connection.update", resource_type="connection", resource_id=str(connection_id), http_status=200, before_version=before_version, after_version=row.record_version, changed_fields=changed_fields)
         return _connection_response(row)
     finally:
+        
         session.close()
 
 
 @router.delete("/connections/{connection_id}", status_code=204)
 def delete_connection(connection_id: int, request: Request, expected_version: int = Query(...), dry_run: bool = Query(False)) -> None:
+    """delete_connection 方法。"""
     _authorize(request, "connection.delete", "connection", str(connection_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """删除连接配置。权限检查并记录审计事件。"""
         row = session.get(CommunicationEndpoint, connection_id)
         if row is None:
             raise not_found(action="connection.delete", resource_type="connection", resource_id=str(connection_id))
@@ -420,6 +471,7 @@ def delete_connection(connection_id: int, request: Request, expected_version: in
         session.commit()
         _emit_success(request, action="connection.delete", resource_type="connection", resource_id=str(connection_id), http_status=204, before_version=before_version)
     finally:
+        
         session.close()
 
 
@@ -429,6 +481,7 @@ def create_signal_profile(
     payload: SignalProfileCreate,
     dry_run: bool = Query(False),
 ) -> SignalProfileResponse:
+    """创建新信号模板。dry_run 为 True 时返回预期结果不实际创建。权限检查、审计记录和乐观并发控制。"""
     _authorize(request, "signal_profile.create", "signal_profile")
     session = _open_session(request.app.state.session_factory)
     try:
@@ -460,14 +513,18 @@ def create_signal_profile(
         _emit_success(request, action="signal_profile.create", resource_type="signal_profile", resource_id=str(row.signal_profile_id), http_status=201, after_version=row.record_version, changed_fields=list(payload.model_dump().keys()))
         return _signal_profile_response(row)
     finally:
+        
         session.close()
 
 
 @router.get("/signal-profiles/{signal_profile_id}", response_model=SignalProfileResponse)
 def get_signal_profile(signal_profile_id: int, request: Request) -> SignalProfileResponse:
+    """get_signal_profile 方法。"""
     _authorize(request, "signal_profile.read", "signal_profile", str(signal_profile_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """获取指定的信号模板记录。权限检查并记录审计事件。"""
+        
         row = session.get(SignalProfile, signal_profile_id)
         if row is None:
             raise not_found(action="signal_profile.read", resource_type="signal_profile", resource_id=str(signal_profile_id))
@@ -479,9 +536,12 @@ def get_signal_profile(signal_profile_id: int, request: Request) -> SignalProfil
 
 @router.get("/signal-profiles", response_model=PaginatedResponse[SignalProfileResponse])
 def list_signal_profiles(request: Request, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)) -> PaginatedResponse[SignalProfileResponse]:
+    """list_signal_profiles 方法。"""
     _authorize(request, "signal_profile.list", "signal_profile")
     session = _open_session(request.app.state.session_factory)
     try:
+        """获取信号模板的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
+        
         total, rows = _paginate(session, select(SignalProfile).order_by(SignalProfile.signal_profile_id), SignalProfile, limit=limit, offset=offset)
         items = [_signal_profile_response(row) for row in rows]
         _emit_success(request, action="signal_profile.list", resource_type="signal_profile", resource_id=None, http_status=200, attributes={"count": len(items), "total": total, "limit": limit, "offset": offset})
@@ -492,9 +552,11 @@ def list_signal_profiles(request: Request, limit: int = Query(50, ge=1, le=200),
 
 @router.patch("/signal-profiles/{signal_profile_id}", response_model=SignalProfileResponse)
 def patch_signal_profile(signal_profile_id: int, request: Request, payload: SignalProfilePatch, dry_run: bool = Query(False)) -> SignalProfileResponse:
+    """patch_signal_profile 方法。"""
     _authorize(request, "signal_profile.update", "signal_profile", str(signal_profile_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """部分更新信号模板。支持乐观并发控制（版本字段）。权限检查和审计记录。"""
         row = session.get(SignalProfile, signal_profile_id)
         if row is None:
             raise not_found(action="signal_profile.update", resource_type="signal_profile", resource_id=str(signal_profile_id))
@@ -518,18 +580,22 @@ def patch_signal_profile(signal_profile_id: int, request: Request, payload: Sign
         _emit_success(request, action="signal_profile.update", resource_type="signal_profile", resource_id=str(signal_profile_id), http_status=200, before_version=before_version, after_version=row.record_version, changed_fields=changed_fields)
         return _signal_profile_response(row)
     finally:
+        
         session.close()
 
 
 @router.delete("/signal-profiles/{signal_profile_id}", status_code=204)
 def delete_signal_profile(signal_profile_id: int, request: Request, expected_version: int = Query(...), dry_run: bool = Query(False)) -> None:
+    """delete_signal_profile 方法。"""
     _authorize(request, "signal_profile.delete", "signal_profile", str(signal_profile_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """删除信号模板。权限检查并记录审计事件。"""
         row = session.get(SignalProfile, signal_profile_id)
         if row is None:
             raise not_found(action="signal_profile.delete", resource_type="signal_profile", resource_id=str(signal_profile_id))
         if row.record_version != expected_version:
+            
             raise conflict(action="signal_profile.delete", resource_type="signal_profile", resource_id=str(signal_profile_id), message="Signal profile version conflict.")
         if dry_run:
             return None
@@ -547,6 +613,7 @@ def create_point(
     payload: PointCreate,
     dry_run: bool = Query(False),
 ) -> PointResponse:
+    """创建新采集点。dry_run 为 True 时返回预期结果不实际创建。权限检查、审计记录和乐观并发控制。"""
     _authorize(request, "point.create", "point")
     session = _open_session(request.app.state.session_factory)
     try:
@@ -593,14 +660,18 @@ def create_point(
         _emit_success(request, action="point.create", resource_type="point", resource_id=str(row.profile_item_id), http_status=201, after_version=row.record_version, changed_fields=list(payload.model_dump().keys()))
         return _point_response(row, data_type)
     finally:
+        
         session.close()
 
 
 @router.get("/points/{point_id}", response_model=PointResponse)
 def get_point(point_id: int, request: Request) -> PointResponse:
+    """get_point 方法。"""
+    
     _authorize(request, "point.read", "point", str(point_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """获取指定的采集点记录。权限检查并记录审计事件。"""
         row = session.get(SignalProfileItem, point_id)
         if row is None:
             raise not_found(action="point.read", resource_type="point", resource_id=str(point_id))
@@ -613,9 +684,12 @@ def get_point(point_id: int, request: Request) -> PointResponse:
 
 @router.get("/points", response_model=PaginatedResponse[PointResponse])
 def list_points(request: Request, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)) -> PaginatedResponse[PointResponse]:
+    """list_points 方法。"""
+    
     _authorize(request, "point.list", "point")
     session = _open_session(request.app.state.session_factory)
     try:
+        """获取采集点的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
         total, rows = _paginate(session, select(SignalProfileItem).order_by(SignalProfileItem.profile_item_id), SignalProfileItem, limit=limit, offset=offset)
         items = [_point_response(row, session.get(ScadaDataType, row.data_type_id)) for row in rows]
         _emit_success(request, action="point.list", resource_type="point", resource_id=None, http_status=200, attributes={"count": len(items), "total": total, "limit": limit, "offset": offset})
@@ -626,9 +700,11 @@ def list_points(request: Request, limit: int = Query(50, ge=1, le=200), offset: 
 
 @router.patch("/points/{point_id}", response_model=PointResponse)
 def patch_point(point_id: int, request: Request, payload: PointPatch, dry_run: bool = Query(False)) -> PointResponse:
+    """patch_point 方法。"""
     _authorize(request, "point.update", "point", str(point_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """部分更新采集点。支持乐观并发控制（版本字段）。权限检查和审计记录。"""
         row = session.get(SignalProfileItem, point_id)
         if row is None:
             raise not_found(action="point.update", resource_type="point", resource_id=str(point_id))
@@ -642,6 +718,7 @@ def patch_point(point_id: int, request: Request, payload: PointPatch, dry_run: b
             if field_name == "expected_version":
                 continue
             if field_name == "data_type_name":
+                
                 data_type = _ensure_data_type(session, value)
                 row.data_type_id = data_type.data_type_id
             else:
@@ -660,9 +737,11 @@ def patch_point(point_id: int, request: Request, payload: PointPatch, dry_run: b
 
 @router.delete("/points/{point_id}", status_code=204)
 def delete_point(point_id: int, request: Request, expected_version: int = Query(...), dry_run: bool = Query(False)) -> None:
+    """delete_point 方法。"""
     _authorize(request, "point.delete", "point", str(point_id))
     session = _open_session(request.app.state.session_factory)
     try:
+        """删除采集点。权限检查并记录审计事件。"""
         row = session.get(SignalProfileItem, point_id)
         if row is None:
             raise not_found(action="point.delete", resource_type="point", resource_id=str(point_id))

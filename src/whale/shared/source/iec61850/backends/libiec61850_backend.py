@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from whale.shared.source.runner_resolution import (
+    ResolvedRunnerPath,
+    build_runner_unavailable_message,
+    is_source_lab_dev_runner_path,
+    resolve_native_runner_path,
+)
 from whale.shared.source.iec61850.backends.base import (
     RawMmsReadResult,
     RawWriteItemResult,
@@ -21,13 +26,10 @@ _WRITE_RESULT_RESPONSE_PREFIX: str = "WRITE_RESULT"
 
 def resolve_client_runner_path() -> Path:
     """Resolve the IEC 61850 MMS client runner executable path."""
-    env_path = os.environ.get("WHALE_IEC61850_MMS_CLIENT_RUNNER_PATH")
-    if env_path:
-        return Path(env_path).expanduser().resolve()
-
-    source_lab_root = Path(__file__).resolve().parents[6] / "tools" / "source_lab"
-    suffix = ".exe" if os.name == "nt" else ""
-    return source_lab_root / "native" / "build" / f"iec61850_mms_client_runner{suffix}"
+    return resolve_native_runner_path(
+        executable_stem="iec61850_mms_client_runner",
+        specific_env_var="WHALE_IEC61850_MMS_CLIENT_RUNNER_PATH",
+    ).path
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,9 +60,24 @@ class LibIec61850MmsClientBackend:
 
         runner_path = resolve_client_runner_path()
         if not runner_path.exists():
+            resolution = resolve_native_runner_path(
+                executable_stem="iec61850_mms_client_runner",
+                specific_env_var="WHALE_IEC61850_MMS_CLIENT_RUNNER_PATH",
+            )
+            if runner_path != resolution.path:
+                resolution = ResolvedRunnerPath(
+                    executable_name=runner_path.name,
+                    path=runner_path,
+                    source="custom_override",
+                    evidence_level="unknown",
+                    used_dev_fallback=is_source_lab_dev_runner_path(runner_path),
+                )
             raise RuntimeError(
-                "IEC 61850 MMS client runner executable does not exist: "
-                f"{runner_path}. Build `iec61850_mms_client_runner` first with CMake."
+                build_runner_unavailable_message(
+                    runner_label="IEC 61850 MMS client runner",
+                    specific_env_var="WHALE_IEC61850_MMS_CLIENT_RUNNER_PATH",
+                    resolution=resolution,
+                )
             )
 
         self._runner = await asyncio.create_subprocess_exec(

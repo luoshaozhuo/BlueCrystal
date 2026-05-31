@@ -1,4 +1,7 @@
-"""Decorator objects for SourceAcquisitionPort crosscutting concerns."""
+"""装饰器模块。
+
+为采集、写入、缓存等横切关注点提供装饰器封装。
+"""
 
 from __future__ import annotations
 
@@ -30,7 +33,7 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class LoggingSourceAcquisitionPort(SourceAcquisitionPort):
-    """Emit structured logs around source acquisition operations."""
+    """在采集操作前后发送结构化日志。"""
 
     inner: SourceAcquisitionPort
     logger: logging.Logger = LOGGER
@@ -41,6 +44,7 @@ class LoggingSourceAcquisitionPort(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         supported = self.inner.supports_subscription(execution, connection)
         self.logger.info(
             "supports_subscription resolved",
@@ -58,6 +62,7 @@ class LoggingSourceAcquisitionPort(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
+        """带日志的读取操作。记录读取调用点、地址和结果数量。"""
         started_at = time.monotonic()
         try:
             batch = await self.inner.read(execution, connection, items)
@@ -92,6 +97,7 @@ class LoggingSourceAcquisitionPort(SourceAcquisitionPort):
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         try:
             handle = await self.inner.start_subscription(
                 execution,
@@ -114,7 +120,7 @@ class LoggingSourceAcquisitionPort(SourceAcquisitionPort):
 
 @dataclass(frozen=True, slots=True)
 class AuditedSourceAcquisitionPort(SourceAcquisitionPort):
-    """Emit audit events around acquisition operations."""
+    """在采集操作前后发送审计事件。"""
 
     inner: SourceAcquisitionPort
     audit_sink: AuditEventSinkPort
@@ -124,6 +130,7 @@ class AuditedSourceAcquisitionPort(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         return self.inner.supports_subscription(execution, connection)
 
     async def read(
@@ -132,6 +139,7 @@ class AuditedSourceAcquisitionPort(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
+        """带审计的读取操作。记录读取操作到审计日志后委托底层 port 执行。"""
         try:
             batch = await self.inner.read(execution, connection, items)
             _emit_audit_best_effort(
@@ -173,6 +181,7 @@ class AuditedSourceAcquisitionPort(SourceAcquisitionPort):
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         try:
             handle = await self.inner.start_subscription(
                 execution,
@@ -214,7 +223,9 @@ class AuditedSourceAcquisitionPort(SourceAcquisitionPort):
 
 @dataclass(frozen=True, slots=True)
 class RetryingSourceAcquisitionPort(SourceAcquisitionPort):
-    """Retry acquisition operations according to shared retry policies."""
+    """按共享重试策略重试采集操作。
+
+采集失败时有上限退避重试。"""
 
     inner: SourceAcquisitionPort
     retry_policy: RetryPolicy
@@ -226,6 +237,7 @@ class RetryingSourceAcquisitionPort(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         return self.inner.supports_subscription(execution, connection)
 
     async def read(
@@ -234,6 +246,7 @@ class RetryingSourceAcquisitionPort(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
+        """带重试的读取操作。失败时按配置重试，超限后抛出。"""
         attempt = 0
         while True:
             attempt += 1
@@ -253,6 +266,7 @@ class RetryingSourceAcquisitionPort(SourceAcquisitionPort):
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         attempt = 0
         while True:
             attempt += 1
@@ -278,7 +292,9 @@ class RetryingSourceAcquisitionPort(SourceAcquisitionPort):
 
 @dataclass(frozen=True, slots=True)
 class AuthorizedSourceAcquisitionPort(SourceAcquisitionPort):
-    """Enforce access-policy decisions before acquisition operations."""
+    """在采集操作前强制执行访问策略检查。
+
+包装内部 SourceAcquisitionPort，委托前先做授权检查。"""
 
     inner: SourceAcquisitionPort
     principal: Principal
@@ -289,6 +305,7 @@ class AuthorizedSourceAcquisitionPort(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         self._require_allowed(connection.ld_name, "supports_subscription")
         return self.inner.supports_subscription(execution, connection)
 
@@ -298,6 +315,7 @@ class AuthorizedSourceAcquisitionPort(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
+        """带授权的读取操作。先校验访问权限，通过后委托底层 port 执行。"""
         self._require_allowed(connection.ld_name, "read")
         return await self.inner.read(execution, connection, items)
 
@@ -309,6 +327,7 @@ class AuthorizedSourceAcquisitionPort(SourceAcquisitionPort):
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         self._require_allowed(connection.ld_name, "subscribe")
         return await self.inner.start_subscription(
             execution,
@@ -328,7 +347,7 @@ class AuthorizedSourceAcquisitionPort(SourceAcquisitionPort):
 
 @dataclass(frozen=True, slots=True)
 class DebugSourceAcquisitionPort(SourceAcquisitionPort):
-    """Emit best-effort debug traces around acquisition operations."""
+    """在采集操作前后尽力发送调试追踪事件。"""
 
     inner: SourceAcquisitionPort
     trace_context: DebugTraceContext
@@ -339,6 +358,7 @@ class DebugSourceAcquisitionPort(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         supported = self.inner.supports_subscription(execution, connection)
         if self.trace_context.enabled:
             self.trace_sink.emit(
@@ -355,6 +375,7 @@ class DebugSourceAcquisitionPort(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
+        """调试模式读取操作。详细记录输入参数和返回内容用于诊断。"""
         if self.trace_context.enabled:
             self.trace_sink.emit(
                 "source.read.start",
@@ -390,6 +411,7 @@ class DebugSourceAcquisitionPort(SourceAcquisitionPort):
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         if self.trace_context.enabled:
             self.trace_sink.emit(
                 "source.subscription.start",
@@ -419,7 +441,7 @@ def _emit_audit_best_effort(
     operation: str,
     resource_id: str,
 ) -> None:
-    """Emit one audit event without interrupting the main flow."""
+    """发送审计事件，不中断主流程。"""
 
     try:
         audit_sink.emit(event)

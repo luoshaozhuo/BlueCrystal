@@ -6,7 +6,6 @@ integration with the API audit sink.
 
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 
@@ -33,8 +32,7 @@ from whale.ingest.decorators.source_write import AuthorizedSourceWritePort
 from whale.ingest.domain.write_security_profile import ProtocolWriteProfile, WriteSecurityProfile
 from whale.ingest.ports.source.source_write_port import SourceWritePort
 from whale.ingest.usecases.dtos.source_write_result import SourceWriteResult
-from whale.ingest.domain.audit_event import IngestAuditEvent
-from whale.shared.crosscutting.auth import AccessDecision, Permission, Principal
+from whale.shared.crosscutting.auth import Permission, Principal
 
 
 @pytest.fixture

@@ -1,9 +1,6 @@
-"""Ingest ORM models — fully consolidated into whale.shared.persistence.orm.
+"""框架基础设施。
 
-All former ingest ORM models have been replaced by shared-ORM equivalents:
-  - whale.shared.persistence.orm.AcquisitionTask     (table acq_task)
-  - whale.shared.persistence.orm.DOState             (table acq_do_state)
-  - whale.shared.persistence.orm.StateSnapshotOutbox (table acq_outbox)
+提供持久化、数据库初始化等底层能力。
 """
 
 __all__: list[str] = []

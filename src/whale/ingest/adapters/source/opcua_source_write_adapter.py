@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from whale.ingest.ports.source.source_write_port import SourceWritePort
@@ -26,7 +25,7 @@ from whale.ingest.usecases.dtos.source_write_result import (
     SourceWriteResult,
 )
 from whale.shared.source.models import SourceConnectionProfile
-from whale.shared.source.opcua.backends import RawOpcUaReadResult, RawWriteItemResult
+from whale.shared.source.opcua.backends import RawDataValue, RawOpcUaReadResult, RawWriteItemResult
 from whale.shared.source.opcua.reader import OpcUaSourceReader
 
 
@@ -123,18 +122,15 @@ class OpcUaSourceWriteAdapter(SourceWritePort):
         items: list[SourceWriteItemData],
         write_result: SourceWriteResult,
     ) -> dict[str, str]:
-        """Read back values after a write to confirm them.
-
+        """写入后回读确认。写入完成后重新读取目标点位值，验证写入操作是否生效。
         Connects to the OPC UA server and reads the current value of each
         written node, returning a ``{node_id: value_str}`` mapping for use
         by ``SourceCommandUseCase`` readback verification.
-
         Args:
             execution: The original write execution options.
             connection: Target source connection (same as write).
             items: The items that were written.
             write_result: The write result (used for metadata).
-
         Returns:
             Mapping of ``node_id`` → ``str(value)`` for each written node.
         """
@@ -159,7 +155,12 @@ class OpcUaSourceWriteAdapter(SourceWritePort):
                 return {}
             result: dict[str, str] = {}
             for node_id, dv in zip(node_ids, raw.data_values, strict=False):
-                result[node_id] = str(dv.value) if dv is not None else ""
+                if isinstance(dv, RawDataValue):
+                    result[node_id] = str(dv.value)
+                elif dv is None:
+                    result[node_id] = ""
+                else:
+                    result[node_id] = str(dv)
             return result
 
     @staticmethod

@@ -43,7 +43,7 @@ class TestProtocolDirectoriesExist:
 
     @pytest.fixture(params=REQUIRED_PROTOCOL_DIRS)
     def protocol_dir(self, request: pytest.FixtureRequest) -> Path:
-        return PROTOCOLS_DIR / request.param
+        return PROTOCOLS_DIR / request.param  # type: ignore[no-any-return]
 
     def test_protocol_directory_exists(self, protocol_dir: Path) -> None:
         assert protocol_dir.is_dir(), f"Required protocol directory {protocol_dir} does not exist"
@@ -70,7 +70,7 @@ class TestSimulatorFileExists:
 
     @pytest.fixture(params=REQUIRED_SIMULATOR_DIRS)
     def protocol_dir(self, request: pytest.FixtureRequest) -> Path:
-        return PROTOCOLS_DIR / request.param
+        return PROTOCOLS_DIR / request.param  # type: ignore[no-any-return]
 
     def test_simulator_file_exists(self, protocol_dir: Path) -> None:
         sim_file = protocol_dir / "simulator.py"
@@ -104,7 +104,6 @@ class TestRegistryModule:
     """registry.py 存在且包含新工厂函数。"""
 
     def test_registry_has_factory_functions(self) -> None:
-        import inspect
         from tools.source_lab.protocols import registry
 
         assert hasattr(registry, "create_server_simulator")

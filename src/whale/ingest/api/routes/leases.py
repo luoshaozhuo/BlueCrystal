@@ -1,8 +1,16 @@
-"""Lease query routes for ingest runtime API."""
+"""管理 租约 资源的 API 路由。
+
+每个 handler 在请求入口做权限检查（access_evaluator），
+变更操作支持 dry_run 模式和乐观并发控制（expected_version），
+所有操作通过 audit_sink 记录审计事件，
+事务在 try/finally 中管理 Session 生命周期。
+
+不负责：资源的业务逻辑编排（由 use case 层负责）。
+"""
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
@@ -16,16 +24,16 @@ from whale.shared.persistence.orm import IngestJobLease
 router = APIRouter(prefix="/api/v1/leases", tags=["leases"])
 
 
-def _open_session(factory):
+def _open_session(factory: sessionmaker[Session] | Callable[[], Session]) -> Session:
     return factory() if callable(factory) else factory()
 
 
-def _authorize(request, action, resource_id=None):
+def _authorize(request: Request, action: str, resource_id: str | None = None) -> None:
     if not request.app.state.access_evaluator(request, action, "lease", resource_id):
         raise denied(action=action, resource_type="lease", resource_id=resource_id)
 
 
-def _response(row) -> LeaseResponse:
+def _response(row: IngestJobLease) -> LeaseResponse:
     return LeaseResponse(
         lease_id=row.lease_id,
         lease_name=row.lease_name,
@@ -44,6 +52,7 @@ def _response(row) -> LeaseResponse:
 
 @router.get("/{lease_id}", response_model=LeaseResponse)
 def get_lease(lease_id: int, request: Request) -> LeaseResponse:
+    """获取指定的资源记录。"""
     _authorize(request, "lease.read", str(lease_id))
     session = _open_session(request.app.state.session_factory)
     try:
@@ -61,11 +70,13 @@ def get_lease(lease_id: int, request: Request) -> LeaseResponse:
 @router.get("", response_model=PaginatedResponse[LeaseResponse])
 def list_leases(
     request: Request,
+    
     scope: str | None = Query(None),
     status: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> PaginatedResponse[LeaseResponse]:
+    """获取租约的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
     _authorize(request, "lease.list")
     session = _open_session(request.app.state.session_factory)
     try:

@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from tools.source_lab.access.runners.native_cmd import NativeCmdCapacityRunner
 from tools.source_lab.access.runners.native_runner_map import NATIVE_CAPACITY_RUNNERS
 
 _NATIVE_DIR = Path(__file__).resolve().parents[2] / "native" / "build"

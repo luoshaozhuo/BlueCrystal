@@ -175,7 +175,7 @@ def test_dry_run_create_does_not_persist(tmp_path):
 
 def test_dry_run_create_still_validates_auth(tmp_path):
     """dry_run=true still checks authorization."""
-    client = _client(tmp_path)
+    _client_inst = _client(tmp_path)
 
     # No x-actor header, but access_evaluator defaults to allowing all
     # So this should still succeed. We test with an explicit deny evaluator

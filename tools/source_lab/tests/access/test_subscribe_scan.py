@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 
 import pytest
 
@@ -10,11 +10,15 @@ from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 
 from tools.source_lab.access.polling.model import CapacityMode, CapacityStatus
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
+from tools.source_lab.access.common.access_model import AccessMode, AccessRunSummary
+from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
 from tools.source_lab.access.subscribe.model import (
     SubscribeLevelMetrics,
     SubscribeScanConfig,
+    SubscribeWorkerRawStats,
 )
 from tools.source_lab.access.subscribe.scan import scan_source_subscriptions
+from tools.source_lab.access.polling.model import CapacityScanConfig
 
 
 class _Provider:
@@ -22,7 +26,7 @@ class _Provider:
 
     def build_sources(
         self,
-        config: SubscribeScanConfig,
+        config: CapacityScanConfig | SubscribeScanConfig,
         *,
         server_count: int,
     ) -> tuple[SourceRuntimeSpec, ...]:
@@ -37,7 +41,10 @@ class _Provider:
         point = SourcePointSpec(address="IED.LD.LN.DO")
         return tuple(SourceRuntimeSpec(endpoint=endpoint, points=(point,)) for _ in range(server_count))
 
-    def started(self, sources: tuple[SourceRuntimeSpec, ...]):
+    def started(
+        self,
+        sources: tuple[SourceRuntimeSpec, ...],
+    ) -> AbstractContextManager[None]:
         """Provide a no-op lifecycle context."""
 
         return nullcontext()
@@ -47,6 +54,44 @@ class _Runner:
     """Minimal runner stub for scan entrypoint wiring."""
 
     name = "fake_subscribe_runner"
+
+    def run_worker(
+        self,
+        worker_index: int,
+        specs: tuple[RunnerEndpointPlan, ...],
+        config: SubscribeScanConfig,
+    ) -> SubscribeWorkerRawStats:
+        """返回最小订阅 worker 统计，满足 SubscriptionRunner 协议。"""
+
+        _ = config
+        return SubscribeWorkerRawStats(
+            worker_index=worker_index,
+            endpoint_count=len(specs),
+            expected_monitored_items=1,
+            monitored_created=1,
+            monitored_failed=0,
+            batches=(),
+            notification_count=1,
+            value_count=1,
+            bad_count=0,
+            missing_ts_count=0,
+            reserved_sequence_gap_count=0,
+            reserved_queue_overflow_count=0,
+            keepalive_count=0,
+            publish_timeout_count=0,
+            reconnect_count=0,
+            summary=AccessRunSummary(
+                access_mode=AccessMode.SUBSCRIBE,
+                worker_index=worker_index,
+                endpoint_count=len(specs),
+                expected_point_count=1,
+                batch_count=1,
+                value_count=1,
+                bad_count=0,
+                missing_timestamp_count=0,
+                error_count=0,
+            ),
+        )
 
 
 def _config() -> SubscribeScanConfig:

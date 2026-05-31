@@ -213,6 +213,8 @@ def test_stop_process_terminates_then_kills_after_timeouts() -> None:
             return None
 
     class _FakeProcess:
+        returncode: int | None
+
         def __init__(self) -> None:
             self.stdin = _FakeStdin()
             self.returncode = None
@@ -235,7 +237,9 @@ def test_stop_process_terminates_then_kills_after_timeouts() -> None:
 
     process = _FakeProcess()
 
-    _stop_process(process)
+    # _FakeProcess 模拟 subprocess.Popen，但无法真正继承 Popen，
+    # 仅用于验证 _stop_process 的 terminate/kill 调用顺序。
+    _stop_process(process)  # type: ignore[arg-type]
 
     assert process.terminate_called is True
     assert process.kill_called is True

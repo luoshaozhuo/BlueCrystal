@@ -1,7 +1,14 @@
+"""dynamic CLI accepted_state 子命令测试。
+
+验证 endpoint 的 accepted state 查询/修改 CLI 行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import json
 from pathlib import Path
+
+import pytest
 
 from tools.source_lab.access.runtime.dynamic_cli import main
 from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
@@ -11,7 +18,7 @@ from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
 )
 
 
-def test_dynamic_cli_export_import_accepted_state_roundtrip(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_export_import_accepted_state_roundtrip(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     registry, _monitor = build_registry(tmp_path)
     source = build_http_source(1, 60201)
     assert registry.add_endpoint(polling_config(source)).result == "SUCCESS"
@@ -39,7 +46,7 @@ def test_dynamic_cli_export_import_accepted_state_roundtrip(tmp_path: Path, caps
     assert "\"valid\": true" in out
 
 
-def test_dynamic_cli_validate_accepted_state_rejects_invalid_schema(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_validate_accepted_state_rejects_invalid_schema(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     invalid_path = tmp_path / "invalid.json"
     invalid_path.write_text(json.dumps({"schema_version": "1.0", "endpoints": []}), encoding="utf-8")
     exit_code = main(["validate-accepted-state", "--file", str(invalid_path)])
@@ -48,7 +55,7 @@ def test_dynamic_cli_validate_accepted_state_rejects_invalid_schema(tmp_path: Pa
     assert payload["valid"] is False
 
 
-def test_dynamic_cli_import_failure_does_not_mutate_existing_state(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_import_failure_does_not_mutate_existing_state(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     registry, _monitor = build_registry(tmp_path)
     source = build_http_source(2, 60202)
     assert registry.add_endpoint(polling_config(source)).result == "SUCCESS"
@@ -66,7 +73,7 @@ def test_dynamic_cli_import_failure_does_not_mutate_existing_state(tmp_path: Pat
     assert after == before
 
 
-def test_dynamic_cli_schema_outputs_stable_json(capsys) -> None:
+def test_dynamic_cli_schema_outputs_stable_json(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["schema", "--type", "accepted-state"])
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 0
@@ -87,7 +94,7 @@ def test_dynamic_cli_dump_continuity_and_journal(tmp_path: Path) -> None:
     assert journal_path.exists()
 
 
-def test_dynamic_cli_redacts_sensitive_values(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_redacts_sensitive_values(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     registry, _monitor = build_registry(tmp_path)
     source = build_http_source(4, 60204)
     config = polling_config(source, params={"password": "secret", "token": "abc", "username": "alice"})
@@ -103,7 +110,7 @@ def test_dynamic_cli_redacts_sensitive_values(tmp_path: Path, capsys) -> None:
     assert "abc" not in text
 
 
-def test_dynamic_cli_validate_accepted_state_rejects_duplicate_deleted_and_bad_checksum(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_validate_accepted_state_rejects_duplicate_deleted_and_bad_checksum(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     invalid_bundle = {
         "schema_version": "1.0",
         "bundle_version": "bundle-1",
@@ -144,7 +151,7 @@ def test_dynamic_cli_validate_accepted_state_rejects_duplicate_deleted_and_bad_c
     assert any("deleted_endpoint_in_active_restore_set" in item for item in payload["errors"])
 
 
-def test_dynamic_cli_import_rejects_redacted_bundle(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_import_rejects_redacted_bundle(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     registry, _monitor = build_registry(tmp_path)
     source = build_http_source(5, 60205)
     config = polling_config(source, params={"password": "secret"})

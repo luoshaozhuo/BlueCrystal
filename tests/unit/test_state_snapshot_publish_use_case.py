@@ -6,14 +6,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 
-import pytest
 
 from whale.ingest.ports.message.message_publisher_port import (
     MessagePublishResult,
     MessagePublisherPort,
-    StateSnapshotItem,
     StateSnapshotMessage,
 )
 from whale.ingest.ports.state.source_state_snapshot_reader_port import (

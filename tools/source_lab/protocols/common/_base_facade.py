@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 
 from tools.source_lab.protocols.common.simulator_models import (
     ReadSimulatorResult,

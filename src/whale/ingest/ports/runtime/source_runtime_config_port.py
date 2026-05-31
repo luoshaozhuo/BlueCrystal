@@ -1,4 +1,8 @@
-"""Source runtime-configuration port for ingest."""
+"""ingest 运行时 source runtime config port。
+
+负责 相关功能，包含并发模型、租约、fencing token、
+异常传播和资源释放语义。
+"""
 
 from __future__ import annotations
 
@@ -9,7 +13,7 @@ from typing import Protocol
 
 @dataclass(slots=True)
 class SourceRuntimeConfigData:
-    """Scheduler-facing runtime configuration for one source."""
+    """调度器使用的单源运行时配置。"""
 
     runtime_config_id: int
     source_id: str
@@ -21,7 +25,7 @@ class SourceRuntimeConfigData:
 
 @dataclass(slots=True)
 class ServerRuntimeConfigData:
-    """Describe one simulated server entry resolved from runtime configuration."""
+    """描述从运行时配置解析的单个仿真服务器条目。"""
 
     endpoint_id: int
     ied_name: str
@@ -38,7 +42,7 @@ class ServerRuntimeConfigData:
 
 @dataclass(slots=True)
 class SignalProfileItemRuntimeData:
-    """Describe one signal item resolved directly from one shared signal profile."""
+    """描述从共享信号 profile 直接解析的单个信号条目。"""
 
     signal_profile_id: int
     ln_name: str | None
@@ -49,10 +53,10 @@ class SignalProfileItemRuntimeData:
 
 
 class SourceRuntimeConfigPort(Protocol):
-    """Load runtime scheduling configuration for ingest sources."""
+    """加载 ingest 源的运行时调度配置。"""
 
     def list_enabled(self) -> list[SourceRuntimeConfigData]:
-        """Return enabled runtime configurations."""
+        """返回已启用的运行时配置。"""
 
     def list_servers(
         self,
@@ -60,10 +64,10 @@ class SourceRuntimeConfigPort(Protocol):
         group_by: Sequence[str] = (),
         first_group_only: bool = False,
     ) -> list[ServerRuntimeConfigData]:
-        """Return server-level runtime configuration rows for source simulation."""
+        """返回源仿真的服务器级运行时配置行。"""
 
     def list_profile_items(
         self,
         signal_profile_id: int,
     ) -> list[SignalProfileItemRuntimeData]:
-        """Return one signal profile's ordered item definitions."""
+        """返回单个信号 profile 的有序条目定义。"""

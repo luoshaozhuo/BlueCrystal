@@ -1,7 +1,8 @@
-"""IEC 61850 MMS source acquisition adapter.
+"""协议采集适配器。
 
-Converts ingest DTOs to shared/source libiec61850 MMS calls
-and converts ``RawMmsReadResult`` to ``AcquiredNodeStateBatch``.
+实现 SourceAcquisitionPort / SourceWritePort，
+封装特定协议（工业协议）的采集或写入逻辑。
+外部依赖边界：libiec61850 C 库（ctypes）。
 """
 
 from __future__ import annotations
@@ -33,13 +34,15 @@ from whale.shared.utils.time import ensure_utc
 
 
 class Iec61850MmsSourceAcquisitionAdapter(SourceAcquisitionPort):
-    """Execute IEC 61850 MMS reads via libiec61850 native runner."""
+    """通过 libiec61850 native runner 执行 IEC 61850 MMS 读取。"""
 
     def supports_subscription(
         self,
         execution: AcquisitionExecutionOptions,
+        
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         del execution, connection
         return False
 
@@ -49,20 +52,16 @@ class Iec61850MmsSourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
-        """Execute one IEC 61850 MMS batch read.
-
+        """执行一次 IEC 61850 MMS 批量读取。对批量点位集合逐一发送 MMS Read 请求并聚合返回值。
         Each item's ``relative_path`` is the MMS object reference.
         The functional constraint is read from ``connection.params["fc"]``
         or defaults to "NONE".
-
         Args:
             execution: Acquisition execution options.
             connection: Target source connection.
             items: Points to read, each with relative_path = obj_ref.
-
         Returns:
             A batch object for ingest state cache.
-
         Raises:
             SourceReadTimeoutError: When underlying read times out.
             SourceBatchMismatchError: When value count != item count.
@@ -107,11 +106,13 @@ class Iec61850MmsSourceAcquisitionAdapter(SourceAcquisitionPort):
     async def start_subscription(
         self,
         execution: AcquisitionExecutionOptions,
+        
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         del execution, connection, items, state_received
         raise SourceSubscriptionUnsupportedError(
             "subscription acquisition is not supported by IEC 61850 MMS adapter"
@@ -122,7 +123,7 @@ class Iec61850MmsSourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> list[str]:
-        """Convert business relative_path to MMS object references."""
+        """将业务 relative_path 转换为 MMS 对象引用。"""
         del connection
         obj_refs: list[str] = []
         for item in items:
@@ -138,7 +139,7 @@ class Iec61850MmsSourceAcquisitionAdapter(SourceAcquisitionPort):
 
     @staticmethod
     def _resolve_fc(connection: SourceConnectionData) -> str:
-        """Resolve the functional constraint from connection params."""
+        """从连接参数解析功能约束。"""
         fc = connection.params.get("fc", "NONE")
         if isinstance(fc, str):
             return fc.strip().upper()
@@ -150,7 +151,7 @@ class Iec61850MmsSourceAcquisitionAdapter(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> Iec61850MmsSourceReader:
-        """Construct shared/source IEC 61850 MMS reader."""
+        """构造 shared/source IEC 61850 MMS 读取器。"""
         host = connection.host.strip()
         if not host:
             raise ValueError("connection.host is required")
@@ -173,7 +174,7 @@ class Iec61850MmsSourceAcquisitionAdapter(SourceAcquisitionPort):
         client_received_at: datetime,
         client_processed_at: datetime,
     ) -> AcquiredNodeStateBatch:
-        """Convert raw MMS read results to ingest batch."""
+        """将原始 MMS 读取结果转换为 ingest 批次。"""
         if len(raw_results) != len(items):
             raise SourceBatchMismatchError(
                 f"raw result count {len(raw_results)} does not match item count {len(items)}"

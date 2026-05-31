@@ -1,4 +1,7 @@
-"""Source acquisition port registry for ingest."""
+"""端口接口定义。
+
+定义调用方契约和实现方责任，相关功能。
+"""
 
 from __future__ import annotations
 
@@ -8,7 +11,7 @@ from whale.ingest.ports.source.source_acquisition_port import SourceAcquisitionP
 
 
 class SourceAcquisitionPortRegistry(Protocol):
-    """Resolve one acquisition port implementation for a protocol."""
+    """根据协议解析采集端口实现。"""
 
     def get(self, protocol: str) -> SourceAcquisitionPort:
-        """Return the acquisition port registered for the given protocol."""
+        """返回给定协议注册的采集端口。"""

@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 from collections.abc import Callable
 
-from tools.source_lab.access.polling.model import CapacityStatus
 from tools.source_lab.access.common.progress import CapacityProgressBar
 from tools.source_lab.access.providers.base import SourceProvider
 from tools.source_lab.access.runners.base import SubscriptionRunner

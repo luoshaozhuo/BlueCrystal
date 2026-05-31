@@ -1,4 +1,7 @@
-"""Bundle import/export service for ingest runtime."""
+"""Bundle 服务。
+
+提供 bundle 的导入、导出、验证等业务操作。
+"""
 
 from __future__ import annotations
 
@@ -24,7 +27,7 @@ from whale.shared.persistence.orm import (
 
 @dataclass(frozen=True, slots=True)
 class BundleImportResult:
-    """Result returned by bundle import."""
+    """bundle 导入返回的结果。"""
 
     imported_count: int
     dry_run: bool
@@ -32,7 +35,7 @@ class BundleImportResult:
 
 
 class BundleService:
-    """Import/export runtime acquisition-task bundles."""
+    """导入/导出运行时采集任务 bundle。"""
 
     def __init__(
         self,
@@ -40,6 +43,7 @@ class BundleService:
         audit_sink: IngestAuditSinkPort | None = None,
         node_id: str | None = None,
     ) -> None:
+        """初始化 BundleService。Args: session_factory: 数据库会话工厂。checksum_calculator: 校验和计算器。redaction_strategy: 脱敏策略。"""
         self._session_factory = session_factory
         self._audit_sink = audit_sink
         self._node_id = node_id
@@ -52,7 +56,7 @@ class BundleService:
         redacted: bool,
         bundle_version: str | None = None,
     ) -> IngestBundle:
-        """Export the current acquisition-task configuration."""
+        """导出当前采集任务配置。"""
 
         session = self._session_factory()
         try:
@@ -114,7 +118,7 @@ class BundleService:
         actor: str | None,
         dry_run: bool,
     ) -> BundleImportResult:
-        """Validate and import one bundle."""
+        """验证并导入一个 bundle。"""
 
         if not bundle.bundle_version.strip():
             raise ValueError("Bundle version is required.")

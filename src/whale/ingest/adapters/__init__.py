@@ -1,4 +1,7 @@
-"""Adapters for the ingest module."""
+"""适配器实现。
+
+连接外部系统与领域层，隔离外部依赖差异。
+"""
 
 from whale.ingest.adapters.config import (
     OpcUaSourceAcquisitionDefinitionRepository,

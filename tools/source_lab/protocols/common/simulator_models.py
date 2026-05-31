@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
 
 
 class SimulatorStatus(str, Enum):
@@ -35,11 +34,33 @@ class SimulatorResult:
 
 @dataclass(frozen=True)
 class ReadSimulatorResult:
-    """Read 操作结果。"""
+    """Read 操作结果。
+
+    values 接受 dict 映射（正常读取结果）或 str 字符串
+    （用于 NOT_IMPLEMENTED 或错误场景）。构造时自动将 str 迁移到
+    message 字段并将 values 置为空 dict，保证下游调用方始终获取
+    dict 类型。Simulator 工具不进入生产路径。
+    """
 
     status: SimulatorStatus
-    values: dict[str, str | int | float | bool | None] = field(default_factory=dict)
+    values: dict[str, str | int | float | bool | None] | str = field(default_factory=dict)
     message: str = ""
+
+    def __post_init__(self) -> None:
+        """将 str 类型的 values 规范化为 message 字段。
+
+        多个协议 Simulator 在 NOT_IMPLEMENTED / BAD_REQUEST 场景中
+        将错误描述直接传入 values 字段。此处通过 frozen dataclass
+        的 object.__setattr__ 将字符串移到 message 字段，values
+        重置为空 dict，保证下游（含测试）始终对 values 做 dict 访问。
+        """
+        if isinstance(self.values, str):
+            # 如果调用方同时传了 message 和 string values，拼接两者
+            combined = self.values
+            if self.message:
+                combined = f"{self.message}: {self.values}"
+            object.__setattr__(self, 'message', combined)
+            object.__setattr__(self, 'values', {})
 
 
 @dataclass(frozen=True)

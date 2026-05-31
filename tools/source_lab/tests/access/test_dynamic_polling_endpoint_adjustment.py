@@ -1,3 +1,8 @@
+"""polling endpoint 动态调整测试。
+
+验证 polling endpoint 在 runtime 的创建、修改和移除行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import random
@@ -89,7 +94,7 @@ def _runtime_spec(source: SimulatedSource) -> SourceRuntimeSpec:
             port=source.connection.port,
             protocol=source.connection.protocol,
             transport=source.connection.transport,
-            params=params,
+            params=params,  # type: ignore[arg-type]
         ),
         points=tuple(
             SourcePointSpec(

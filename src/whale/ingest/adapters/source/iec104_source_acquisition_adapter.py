@@ -1,7 +1,8 @@
-"""IEC 104 source acquisition adapter.
+"""协议采集适配器。
 
-Converts ingest DTOs to shared/source IEC 104 native runner calls
-and converts ``RawIec104ReadResult`` to ``AcquiredNodeStateBatch``.
+实现 SourceAcquisitionPort / SourceWritePort，
+封装特定协议（工业协议）的采集或写入逻辑。
+外部依赖边界：lib60870 C 库（ctypes）。
 """
 from __future__ import annotations
 
@@ -10,7 +11,6 @@ from datetime import UTC, datetime
 
 from whale.ingest.ports.source.source_acquisition_port import (
     SourceAcquisitionPort,
-    SourceBatchMismatchError,
     SourceReadError,
     SourceReadTimeoutError,
     SourceSubscriptionHandle,
@@ -32,13 +32,15 @@ from whale.shared.utils.time import ensure_utc
 
 
 class Iec104SourceAcquisitionAdapter(SourceAcquisitionPort):
-    """Execute IEC 104 reads via native runner (interrogation)."""
+    """通过 native runner 执行 IEC 104 读取（总召唤/interrogation）。"""
 
     def supports_subscription(
         self,
         execution: AcquisitionExecutionOptions,
+        
         connection: SourceConnectionData,
     ) -> bool:
+        """查询当前适配器是否支持订阅模式。返回布尔值。"""
         del execution, connection
         return False
 
@@ -48,16 +50,13 @@ class Iec104SourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> AcquiredNodeStateBatch:
-        """Execute one IEC 104 batch read (interrogation).
-
+        """执行一次 IEC 104 批量读取（总召唤 interrogate）。发送 C_IC_NA_1 激活命令，收集返回数据后停止。
         Args:
             execution: Acquisition execution options.
             connection: Target source connection.
             items: Points to read, each with ``relative_path`` as IOA string.
-
         Returns:
             A batch object for ingest state cache.
-
         Raises:
             SourceReadTimeoutError: When underlying read times out.
             SourceBatchMismatchError: When value count != item count.
@@ -94,11 +93,13 @@ class Iec104SourceAcquisitionAdapter(SourceAcquisitionPort):
     async def start_subscription(
         self,
         execution: AcquisitionExecutionOptions,
+        
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
         *,
         state_received: SubscriptionStateHandler,
     ) -> SourceSubscriptionHandle:
+        """启动订阅。建立与数据源的订阅连接并注册回调。"""
         del execution, connection, items, state_received
         raise SourceSubscriptionUnsupportedError(
             "subscription acquisition is not supported by IEC 104 adapter"
@@ -109,7 +110,7 @@ class Iec104SourceAcquisitionAdapter(SourceAcquisitionPort):
         connection: SourceConnectionData,
         items: list[AcquisitionItemData],
     ) -> list[int]:
-        """Convert business ``relative_path`` to integer IOA values."""
+        """将业务 relative_path 转换为整数 IOA 值。"""
         del connection
         ioa_list: list[int] = []
         for item in items:
@@ -130,7 +131,7 @@ class Iec104SourceAcquisitionAdapter(SourceAcquisitionPort):
         execution: AcquisitionExecutionOptions,
         connection: SourceConnectionData,
     ) -> Iec104SourceReader:
-        """Construct shared/source IEC 104 reader."""
+        """构造 shared/source IEC 104 读取器。"""
         host = connection.host.strip()
         if not host:
             raise ValueError("connection.host is required")

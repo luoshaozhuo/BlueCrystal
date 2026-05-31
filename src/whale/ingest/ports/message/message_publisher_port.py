@@ -1,4 +1,7 @@
-"""Publisher ports for ingest snapshot messages."""
+"""端口接口定义。
+
+定义调用方契约和实现方责任，相关功能。
+"""
 
 from __future__ import annotations
 
@@ -10,7 +13,7 @@ from typing import Protocol
 
 @dataclass(slots=True)
 class StateSnapshotItem:
-    """Represent one variable row inside a published state snapshot."""
+    """代表已发布状态快照中的一行变量数据。"""
 
     station_id: str | None
     device_id: str | None
@@ -25,7 +28,7 @@ class StateSnapshotItem:
     updated_at: datetime | None
 
     def to_dict(self) -> dict[str, object | None]:
-        """Serialize one snapshot item into a JSON-friendly mapping."""
+        """将单个快照条目序列化为 JSON 友好的映射。"""
         return {
             "station_id": self.station_id,
             "device_id": self.device_id,
@@ -43,7 +46,7 @@ class StateSnapshotItem:
 
 @dataclass(slots=True)
 class StateSnapshotMessage:
-    """Represent one full snapshot message emitted by ingest."""
+    """代表 ingest 发出的一条完整快照消息。"""
 
     message_id: str
     schema_version: str
@@ -57,7 +60,7 @@ class StateSnapshotMessage:
     attributes: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize the full snapshot message into a JSON-friendly mapping."""
+        """将完整快照消息序列化为 JSON 友好的映射。"""
         return {
             "message_id": self.message_id,
             "schema_version": self.schema_version,
@@ -72,7 +75,7 @@ class StateSnapshotMessage:
         }
 
     def to_json(self) -> str:
-        """Serialize the full snapshot message into one stable JSON string."""
+        """将完整快照消息序列化为稳定的 JSON 字符串。"""
         return json.dumps(
             self.to_dict(),
             ensure_ascii=False,
@@ -82,7 +85,7 @@ class StateSnapshotMessage:
 
 @dataclass(slots=True)
 class MessagePublishResult:
-    """Represent the outcome of publishing one snapshot message."""
+    """代表发布一条快照消息的结果。"""
 
     pipeline_name: str
     success: bool
@@ -93,14 +96,14 @@ class MessagePublishResult:
 
 
 class MessagePublisherPort(Protocol):
-    """Publish one assembled state snapshot message to one pipeline."""
+    """将一条组装好的状态快照消息发布到管道。"""
 
     def publish_snapshot(self, message: StateSnapshotMessage) -> MessagePublishResult:
-        """Publish one state snapshot message."""
+        """发布一条状态快照消息。"""
 
 
 def _serialize_datetime(value: datetime | None) -> str | None:
-    """Serialize one optional datetime as ISO text."""
+    """将单个审计事件转换为安全的 JSON 可序列化字典。"""
     if value is None:
         return None
     return value.isoformat()

@@ -5,6 +5,7 @@
 2. 二进制缺失 → NativeRunnerUnavailableError
 3. 错误消息包含 protocol/runner_name/expected_path/build_hint
 4. 真实 runner（modbus_tcp/iec61850_mms）预检正常通过
+5. RunnerInfo 包装正确，actual_implementation_level 反映运行时真实能力
 """
 
 from __future__ import annotations
@@ -101,17 +102,27 @@ def test_preflight_iec61850_mms_available() -> None:
 
 def test_build_capacity_runner_native_uses_preflight() -> None:
     """build_capacity_runner 对原生 runner 执行预检。"""
-    from tools.source_lab.access.runners.registry import build_capacity_runner
+    from tools.source_lab.access.runners.registry import (
+        RunnerInfo,
+        build_capacity_runner,
+    )
 
-    # iec61850_mms: 应当返回原生 runner（不是 Python fallback）
-    runner = build_capacity_runner("iec61850_mms")
+    # iec61850_mms: 应当返回原生 runner 的 RunnerInfo（不是 Python fallback）
+    info = build_capacity_runner("iec61850_mms")
+    assert isinstance(info, RunnerInfo)
     from tools.source_lab.access.runners.native_cmd import NativeCmdCapacityRunner
-    assert isinstance(runner, NativeCmdCapacityRunner)
+    assert isinstance(info.runner, NativeCmdCapacityRunner)
+    assert info.actual_implementation_level == "real_native_runner"
+    assert info.is_native_ready is True
+    assert info.fallback_reason is None
 
 
 def test_build_capacity_runner_fallback_on_missing() -> None:
     """原生二进制缺失时 build_capacity_runner 回退到 Python lightweight runner。"""
-    from tools.source_lab.access.runners.registry import build_capacity_runner
+    from tools.source_lab.access.runners.registry import (
+        RunnerInfo,
+        build_capacity_runner,
+    )
 
     # mock 让所有 _find_executable 返回 None → 原生 runner 预检失败 → fallback
     with patch(
@@ -119,6 +130,10 @@ def test_build_capacity_runner_fallback_on_missing() -> None:
         return_value=None,
     ):
         # iec61850_mms 有 Python fallback (Iec61850MmsPollingRunner)
-        runner = build_capacity_runner("iec61850_mms")
+        info = build_capacity_runner("iec61850_mms")
+        assert isinstance(info, RunnerInfo)
         from tools.source_lab.access.runners.native_cmd import NativeCmdCapacityRunner
-        assert not isinstance(runner, NativeCmdCapacityRunner)
+        assert not isinstance(info.runner, NativeCmdCapacityRunner)
+        assert info.actual_implementation_level != "real_native_runner"
+        assert info.is_native_ready is False
+        assert info.fallback_reason is not None

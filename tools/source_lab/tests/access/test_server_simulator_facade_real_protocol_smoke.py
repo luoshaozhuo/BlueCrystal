@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import random
 import socket
-from dataclasses import replace
+import struct
 
 import pytest
 
@@ -103,8 +103,9 @@ def _build_source(protocol: str, port: int) -> SimulatedSource:
         base_kwargs["ied_name"] = ""
         base_kwargs["ld_name"] = ""
 
+    # 动态构建的 dict 类型为 dict[str, object]，mypy 无法推断 ** 展开匹配 SourceConnection 构造函数
     return SimulatedSource(
-        connection=SourceConnection(**base_kwargs),
+        connection=SourceConnection(**base_kwargs),  # type: ignore[arg-type]
         points=_SMOKE_POINTS,
     )
 
@@ -356,6 +357,7 @@ async def test_iec61850_mms_facade_read_write() -> None:
         assert read_result.status.name in ("OK", "PARTIAL_SUCCESS"), (
             f"MMS read failed: {read_result.message}"
         )
+        assert isinstance(read_result.values, dict)
         val = read_result.values.get("GGIO1.Ind1.stVal")
         assert val is not None, f"MMS read returned no value for Ind1: {read_result.values}"
         assert isinstance(val, bool), f"Ind1 should be bool, got {type(val)}"
@@ -371,6 +373,7 @@ async def test_iec61850_mms_facade_read_write() -> None:
         assert readback.status.name in ("OK", "PARTIAL_SUCCESS"), (
             f"MMS readback failed: {readback.message}"
         )
+        assert isinstance(readback.values, dict)
         rb_val = readback.values.get("GGIO1.SPCtrl1.setVal")
         assert rb_val is True, (
             f"MMS write-then-readback expected True, got {rb_val!r}"
@@ -382,8 +385,6 @@ async def test_iec61850_mms_facade_read_write() -> None:
 
 
 # ── Modbus TCP 真实读写 Smoke ────────────────────────────────────────────
-
-import struct
 
 
 def _modbus_read_registers(

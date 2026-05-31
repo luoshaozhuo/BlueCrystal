@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import socket
 import struct
-from typing import Any
 
 from tools.source_lab.model import SimulatedSource
 from tools.source_lab.protocols.common._base_facade import BaseSimulatorFacade
@@ -311,7 +310,7 @@ class ModbusTcpSimulatorFacade(_BaseModbusFacade):
                     return ReadSimulatorResult(
                         SimulatorStatus.ERROR, message=f"unexpected FC: 0x{fc:02x}"
                     )
-                byte_count = resp[8]
+                _byte_count = resp[8]
                 raw_vals: list[int] = []
                 for i in range(count):
                     off = 9 + i * 2
@@ -413,7 +412,7 @@ class ModbusRtuSimulatorFacade(_BaseModbusFacade):
                         SimulatorStatus.ERROR, f"unexpected FC: 0x{resp[1]:02x}",
                     )
 
-                byte_count = resp[2]
+                _byte_count = resp[2]
                 values: dict[str, str | int | float | bool | None] = {}
                 for key, addr in key_to_addr.items():
                     idx = addr - min_addr

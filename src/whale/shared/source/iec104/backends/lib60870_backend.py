@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from whale.shared.source.runner_resolution import (
+    ResolvedRunnerPath,
+    build_runner_unavailable_message,
+    is_source_lab_dev_runner_path,
+    resolve_native_runner_path,
+)
 from whale.shared.source.iec104.backends.base import (
     RawIec104ReadResult,
     RawWriteItemResult,
@@ -21,13 +26,10 @@ _PROCESS_STOP_TIMEOUT_S: float = 2.0
 
 def resolve_client_runner_path() -> Path:
     """Resolve the IEC 104 client runner executable path."""
-    env_path = os.environ.get("WHALE_IEC104_CLIENT_RUNNER_PATH")
-    if env_path:
-        return Path(env_path).expanduser().resolve()
-
-    source_lab_root = Path(__file__).resolve().parents[6] / "tools" / "source_lab"
-    suffix = ".exe" if os.name == "nt" else ""
-    return source_lab_root / "native" / "build" / f"iec104_client_runner{suffix}"
+    return resolve_native_runner_path(
+        executable_stem="iec104_client_runner",
+        specific_env_var="WHALE_IEC104_CLIENT_RUNNER_PATH",
+    ).path
 
 
 class Iec104Lib60870Backend:
@@ -46,9 +48,24 @@ class Iec104Lib60870Backend:
 
         runner_path = resolve_client_runner_path()
         if not runner_path.exists():
+            resolution = resolve_native_runner_path(
+                executable_stem="iec104_client_runner",
+                specific_env_var="WHALE_IEC104_CLIENT_RUNNER_PATH",
+            )
+            if runner_path != resolution.path:
+                resolution = ResolvedRunnerPath(
+                    executable_name=runner_path.name,
+                    path=runner_path,
+                    source="custom_override",
+                    evidence_level="unknown",
+                    used_dev_fallback=is_source_lab_dev_runner_path(runner_path),
+                )
             raise RuntimeError(
-                "IEC 104 client runner executable does not exist: "
-                f"{runner_path}. Build `iec104_client_runner` first with CMake."
+                build_runner_unavailable_message(
+                    runner_label="IEC 104 client runner",
+                    specific_env_var="WHALE_IEC104_CLIENT_RUNNER_PATH",
+                    resolution=resolution,
+                )
             )
 
         self._runner = await asyncio.create_subprocess_exec(

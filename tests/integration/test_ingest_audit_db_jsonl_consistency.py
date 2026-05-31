@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from whale.ingest.adapters.audit.db_audit_sink import DbIngestAuditSink
 from whale.ingest.adapters.observability.file_sinks import JsonlIngestAuditSink

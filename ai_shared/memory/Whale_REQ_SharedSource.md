@@ -122,7 +122,67 @@
 - 不得依赖 source_lab。
 - 不得把 native runner 直接暴露给 use case。
 
-## 八、需求跟踪表
+
+## 八、模块级生产部署准入
+
+### SS-READY-001 shared_source 独立部署与被装配准入
+
+- 类型：模块级生产部署准入
+- 优先级：高
+- 需求描述：
+  - shared_source 作为 production source client 层，必须能被 ingest、测试工具或其他业务模块通过稳定端口装配使用。
+  - shared_source 不承担 ingest 的采集编排、调度、缓存、消息发布、审计写入和运行时管理职责。
+- 验收要点：
+  - production client 能独立完成协议连接、read/write/subscription/report 能力调用。
+  - backend 能被 ingest adapter 装配，但不 import ingest。
+  - 不 import tools.source_lab。
+  - close/cleanup 幂等。
+  - timeout、错误分类、unsupported operation 语义稳定。
+  - 与 source_lab simulator 的 E2E 只能证明协议 client 能力，不等同于 ingest 生产部署完成。
+
+### SS-READY-002 shared_source 协议能力准入
+
+- 类型：模块级生产部署准入
+- 优先级：高
+- 需求描述：
+  - shared_source 对每个声明支持的协议，必须区分 declared capability、actual runtime availability 和 validated evidence。
+- 验收要点：
+  - 每个协议的 read/write/subscription/report 能力必须有 capability matrix。
+  - 不支持能力必须返回 NOT_IMPLEMENTED 或等价稳定错误。
+  - 声明支持 write 的协议必须具备 readback 或状态确认路径。
+  - 真实设备、source_lab simulator、contract/mock 证据必须分级记录。
+  - L1/L2 contract 不得写成 production protocol ready。
+  - native binary、第三方库或证书依赖缺失时必须返回明确 unavailable。
+
+### SS-READY-003 shared_source 安全与资源准入
+
+- 类型：模块级生产部署准入
+- 优先级：高
+- 需求描述：
+  - shared_source 必须正确处理协议连接、认证、凭据、证书、子进程、socket、文件描述符和后台任务资源。
+- 验收要点：
+  - 支持协议所需认证配置，例如证书、token、用户名密码或等价认证方式。
+  - 凭据不得输出到 stdout/stderr/log/trace/debug dump。
+  - 网络连接、subprocess、subscription/report handle 必须可关闭。
+  - timeout、deadline、cancel、cleanup 语义明确。
+  - runner crash、协议异常、认证失败和连接失败必须分类。
+  - 不得把 native runner 直接暴露给 ingest use case。
+
+### SS-READY-004 shared_source 质量门禁
+
+- 类型：模块级生产部署准入
+- 优先级：高
+- 需求描述：
+  - shared_source 作为生产协议访问层，必须通过模块级工程质量门禁。
+- 验收要点：
+  - compileall 或等价语法检查通过。
+  - ruff 或等价 lint 检查通过。
+  - mypy 或等价类型检查通过；未通过不得写质量门禁收口。
+  - 每个 production backend 至少具备 unit、integration 或 simulator E2E 证据。
+  - skipped 不得作为完成证据。
+  - fake/mock/contract 证据不得冒充真实协议或真实设备验证。
+
+## 九、需求跟踪表
 
 | 编号 | 上承需求 | 标题 | 类型 | 优先级 | 责任模块 | 验证等级 | 实现状态 | 实现证据 | 验收测试 | 差距 | 下一步 | 更新时间 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -131,5 +191,9 @@
 | SS-FR-003 | P-FR-001 | read/write/subscription/report 能力 | FR | 高 | shared_source | 待核实 | 待代码核实 | 待读取源码/测试/报告 | 待补充 | 待核实 | 回填实现状态与证据 | 待更新 |
 | SS-NFR-001 | P-NFR-001 | 协议真实性与性能 | NFR | 高 | shared_source | 待核实 | 待代码核实 | 待读取源码/测试/报告 | 待补充 | 待核实 | 回填实现状态与证据 | 待更新 |
 | SS-NFR-002 | P-NFR-002/P-NFR-005 | 资源管理与安全 | NFR | 高 | shared_source | 待核实 | 待代码核实 | 待读取源码/测试/报告 | 待补充 | 待核实 | 回填实现状态与证据 | 待更新 |
-| SS-AR-001 | P-AR-001/P-AR-002 | shared_source 不依赖 ingest/source_lab | AR | 高 | shared_source | 待核实 | 待代码核实 | 待读取源码/测试/报告 | 待补充 | 待核实 | 回填实现状态与证据 | 待更新 |
+| SS-AR-001 | P-AR-001/P-AR-002 | shared_source 不依赖 ingest/source_lab | AR | 高 | shared_source | L2/L3 | 部分实现 | `src/whale/shared/source/runner_resolution.py`; `tests/unit/test_shared_source_runner_resolution.py`; `tests/unit/test_ingest_no_source_lab_imports.py`; `ai_shared/adr/ADR-20260530-010-shared-source-production-runner-artifact-boundary.md` | `pytest tests/unit/test_shared_source_runner_resolution.py -q` -> 5 passed；`pytest tests/unit/test_ingest_no_source_lab_imports.py -q` -> 1 passed | Python import 边界成立，且默认 runner 路径已不再指向 `tools/source_lab/native/build`；但生产 runner artifact 交付/安装证据仍待补齐 | 补独立 production runner artifact 安装与现场验证证据 | 2026-05-30 |
 | SS-TEST-001 | P-NFR-004 | production client 测试准入 | TEST | 高 | shared_source | 待核实 | 待代码核实 | 待读取源码/测试/报告 | 待补充 | 待核实 | 回填实现状态与证据 | 待更新 |
+| SS-READY-001 | P-AR-001/P-AR-002 | shared_source 独立部署与被装配准入 | READY | 高 | shared_source | L2/L3 | 部分实现 | `src/whale/shared/source/runner_resolution.py`; 各协议 backend；source adapter tests；Round 11 ADR/report | 已补 production runner path / dev fallback 边界；ingest/shared_source 仍无 `tools.source_lab` import | 仍缺独立 production runner artifact 的交付与部署 runbook，因此不能写 fully production-ready | 回填 artifact 安装、PATH/环境变量发布流程和现场验收 | 2026-05-30 |
+| SS-READY-002 | P-FR-001/P-NFR-001 | shared_source 协议能力准入 | READY | 高 | shared_source | 待核实 | 待代码核实 | 待读取源码/测试/报告 | 待补充 | 需核实每个协议 declared/runtime/evidence 是否分离，readback 是否真实可用 | 回填 capability matrix、readback、unsupported 和真实协议证据 | 待更新 |
+| SS-READY-003 | P-NFR-002/P-NFR-005 | shared_source 安全与资源准入 | READY | 高 | shared_source | L2/L3 | 部分实现 | timeout/cleanup/backend tests；`tests/unit/test_iec61850_mms_backend.py`; `tests/unit/test_iec61850_report_backend.py`; `tests/unit/test_shared_source_runner_resolution.py` | runner 缺失、timeout、cleanup、report reconnect 等已有单测；本轮新增 runner unavailable/build hint 边界测试 | 凭据保护、认证配置和独立 artifact 交付仍需进一步归档 | 回填生产配置与现场故障分类证据 | 2026-05-30 |
+| SS-READY-004 | P-NFR-004 | shared_source 质量门禁 | READY | 高 | shared_source | L3 | 部分实现 | Round 8 / Round 10 / Round 11 质量报告；shared_source unit/integration tests | `compileall` PASS；`ruff check` PASS；`mypy src/whale/ingest src/whale/shared/source` PASS；Round 11 针对性 shared_source tests PASS | shared_source 质量门禁通过不等于 field/readback/runner artifact 生产收口 | 保持 shared_source 质量门禁与独立准入边界分开追踪 | 2026-05-30 |

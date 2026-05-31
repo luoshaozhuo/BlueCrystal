@@ -1,3 +1,8 @@
+"""Fleet 局部生命周期测试。
+
+验证设备群（fleet）的部分设备启动、停止和状态转换。
+证据等级：L1-L2。
+"""
 from __future__ import annotations
 
 import random

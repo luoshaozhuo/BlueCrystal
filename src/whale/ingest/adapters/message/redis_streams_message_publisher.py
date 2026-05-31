@@ -1,4 +1,9 @@
-"""Redis Streams publisher for ingest state snapshot messages."""
+"""消息发布适配器。
+
+实现 MessagePublisherPort，将状态快照发布到消息中间件。
+外部依赖：Kafka / Redis。
+失败处理：失败不传播到调用方，记录 error 后继续。
+"""
 
 from __future__ import annotations
 
@@ -14,30 +19,30 @@ from whale.ingest.runtime.message_pipeline_settings import RedisStreamsMessageSe
 
 
 class RedisStreamsClient(Protocol):
-    """Minimal Redis Streams client contract used by the publisher."""
+    """发布器使用的最小 Redis Streams 客户端契约。"""
 
     def xadd(
         self,
         name: str,
         fields: dict[str, str],
     ) -> str | bytes:
-        """Append one entry into a Redis stream."""
+        """向 Redis stream 追加一条记录。"""
 
 
 class RedisStreamsMessagePublisher(MessagePublisherPort):
-    """Publish snapshot messages into a Redis stream with XADD."""
+    """通过 XADD 将快照消息发布到 Redis stream。"""
 
     def __init__(
         self,
         settings: RedisStreamsMessageSettings,
         client: RedisStreamsClient | None = None,
     ) -> None:
-        """Store settings and an optional injected Redis client."""
+        """保存配置和可选的注入 Redis 客户端实例。"""
         self._settings = settings
         self._client = client or self._build_client(settings)
 
     def publish_snapshot(self, message: StateSnapshotMessage) -> MessagePublishResult:
-        """Publish one snapshot message into Redis Streams."""
+        """将单个快照消息发布到 Redis Streams。"""
         record_id = self._client.xadd(
             self._settings.stream_key,
             {
@@ -58,7 +63,7 @@ class RedisStreamsMessagePublisher(MessagePublisherPort):
 
     @staticmethod
     def _build_client(settings: RedisStreamsMessageSettings) -> RedisStreamsClient:
-        """Build one real redis-py client lazily."""
+        """延迟构造真实的 redis-py 客户端实例。"""
         try:
             from redis import Redis
         except ImportError as exc:

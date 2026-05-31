@@ -14,6 +14,7 @@ from tools.source_lab.access.polling.model import CapacityMode, CapacityScanConf
 from tools.source_lab.access.providers.expanded_field import ExpandedFieldSourceProvider
 from tools.source_lab.access.providers.file_field import FieldFileSourceProvider, build_field_source_provider
 from tools.source_lab.access.subscribe.model import SubscribeScanConfig
+from tools.source_lab.model import SimulatedSource
 from tools.source_lab.sources import PortAllocator
 
 
@@ -533,7 +534,9 @@ def test_expanded_field_provider_started_passes_effective_source_update_rate(tmp
         pass
 
     fleet_sources = cast(tuple[object, ...], fleet_args["sources"])
-    params = fleet_sources[0].connection.params
+    # fleet_sources[0] 实际为 SimulatedSource，显式 cast 以访问 .connection.params。
+    first_source = cast("SimulatedSource", fleet_sources[0])
+    params = first_source.connection.params
     assert params["source_update_hz"] == 20.0
     assert params["open62541_internal_update_enabled"] is True
     assert params["open62541_internal_update_interval_ms"] == 50
@@ -566,11 +569,14 @@ def test_expanded_field_provider_started_cleans_up_on_exception(tmp_path: Path) 
         def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
             events.append(("exit", exc_type))
 
-    fleet_factory: Any = lambda **kwargs: _FakeFleet()
+    def _fleet_factory(**kwargs: object) -> _FakeFleet:
+        return _FakeFleet()
+    # _fleet_factory 返回 _FakeFleet 而非 SourceSimulatorFleet（测试用 stub），
+    # 仅用于验证 started() 异常清理路径，不参与真实 fleet 操作。
     provider = ExpandedFieldSourceProvider(
         build_field_runtime_sources(servers, items),
         port_start=52000,
-        fleet_factory=fleet_factory,
+        fleet_factory=_fleet_factory,  # type: ignore[arg-type]
     )
     built = provider.build_sources(_config(), server_count=1)
 

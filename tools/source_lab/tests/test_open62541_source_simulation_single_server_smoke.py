@@ -15,22 +15,23 @@ for _path in (str(_PROJECT_ROOT), str(_SRC_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-import pytest
+# sys.path 必须在导入前修改，以保证测试隔离和可重现性
+import pytest  # noqa: E402
 
-from whale.shared.source.access import SourceEndpointSpec, SourcePointSpec, build_source_access_adapter
-from whale.shared.source.access.model import TickResult
-from tools.source_lab.protocols.opcua.address_space import logical_path
-from tools.source_lab.protocols.opcua.open62541_source_simulator import (
+from whale.shared.source.access import SourceEndpointSpec, SourcePointSpec, build_source_access_adapter  # noqa: E402
+from whale.shared.source.access.model import TickResult  # noqa: E402
+from tools.source_lab.protocols.opcua.address_space import logical_path  # noqa: E402
+from tools.source_lab.protocols.opcua.open62541_source_simulator import (  # noqa: E402
     Open62541SourceSimulator,
     resolve_runner_path,
 )
-from tools.source_lab.model import (
+from tools.source_lab.model import (  # noqa: E402
     SimulatedPoint,
     SimulatedSource,
     SourceConnection,
     UpdateConfig,
 )
-from tools.source_lab.fleet import SourceSimulatorFleet
+from tools.source_lab.fleet import SourceSimulatorFleet  # noqa: E402
 
 
 def _choose_available_port(

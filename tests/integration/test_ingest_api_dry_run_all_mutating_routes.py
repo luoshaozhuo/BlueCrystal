@@ -245,7 +245,7 @@ def test_dry_run_connection_create_does_not_persist(tmp_path):
     src_id = _seed_source(client)
 
     resp = client.post(
-        f"/api/v1/connections?dry_run=true",
+        "/api/v1/connections?dry_run=true",
         json={
             "source_id": src_id,
             "access_point_name": "AP1",
@@ -389,7 +389,7 @@ def test_dry_run_point_create_does_not_persist(tmp_path):
     sp_id = _seed_signal_profile(client)
 
     resp = client.post(
-        f"/api/v1/points?dry_run=true",
+        "/api/v1/points?dry_run=true",
         json={
             "signal_profile_id": sp_id,
             "relative_path": "dry/pt",

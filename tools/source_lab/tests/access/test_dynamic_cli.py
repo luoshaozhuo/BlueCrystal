@@ -1,6 +1,13 @@
+"""dynamic CLI 功能测试。
+
+验证 dynamic endpoint runtime 的 CLI 命令行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import json
+
+import pytest
 
 from tools.source_lab.access.runtime.dynamic_cli import main
 
@@ -14,7 +21,7 @@ class _FakeRuntime:
 
 
 class _FakeResult:
-    def __init__(self, result: str, decision: str = "ALLOW", reason_code: str = "ok", runtime=None) -> None:
+    def __init__(self, result: str, decision: str = "ALLOW", reason_code: str = "ok", runtime: object | None = None) -> None:
         self.operation_id = "op-1"
         self.result = result
         self.decision = decision
@@ -69,7 +76,7 @@ class _FakeRegistry:
         return [_FakeRuntime("ep-1")]
 
 
-def test_dynamic_cli_list_status(monkeypatch, capsys) -> None:
+def test_dynamic_cli_list_status(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     registry = _FakeRegistry()
     monkeypatch.setattr("tools.source_lab.access.runtime.dynamic_cli.build_registry", lambda state_dir=None: registry)
     exit_code = main(["list-status"])
@@ -80,7 +87,7 @@ def test_dynamic_cli_list_status(monkeypatch, capsys) -> None:
     assert [runtime["endpoint_id"] for runtime in captured["runtimes"]] == ["ep-1", "ep-2"]
 
 
-def test_dynamic_cli_add_update_pause_resume_stop_delete_endpoint(monkeypatch, capsys) -> None:
+def test_dynamic_cli_add_update_pause_resume_stop_delete_endpoint(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     registry = _FakeRegistry()
     monkeypatch.setattr("tools.source_lab.access.runtime.dynamic_cli.build_registry", lambda state_dir=None: registry)
     config_json = json.dumps(
@@ -113,7 +120,7 @@ def test_dynamic_cli_add_update_pause_resume_stop_delete_endpoint(monkeypatch, c
     assert "secret" not in out
 
 
-def test_dynamic_cli_replace_points_expected_version_conflict(monkeypatch, capsys) -> None:
+def test_dynamic_cli_replace_points_expected_version_conflict(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     registry = _FakeRegistry()
     monkeypatch.setattr("tools.source_lab.access.runtime.dynamic_cli.build_registry", lambda state_dir=None: registry)
     exit_code = main(
@@ -130,7 +137,7 @@ def test_dynamic_cli_replace_points_expected_version_conflict(monkeypatch, capsy
     assert captured["result"] == "CONFLICT"
 
 
-def test_dynamic_cli_recover_writes_journal(monkeypatch, capsys) -> None:
+def test_dynamic_cli_recover_writes_journal(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     registry = _FakeRegistry()
     monkeypatch.setattr("tools.source_lab.access.runtime.dynamic_cli.build_registry", lambda state_dir=None: registry)
     exit_code = main(["recover", "--print-runtime"])

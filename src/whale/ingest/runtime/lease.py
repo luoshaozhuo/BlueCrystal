@@ -1,4 +1,14 @@
-"""DB-backed lease helpers for scheduler jobs and write control."""
+"""分布式租约管理。
+
+提供节点和写入操作的租约获取、续期和释放。
+与 fencing 协作确保资源独占访问。
+
+并发语义：
+- fencing token 递增通过 FencingTokenRepository 的原子 UPSERT 保证无竞态条件。
+- 租约表 INSERT 在并发场景下可能触发 IntegrityError（双节点同时创建同名租约），
+  acquire 中将 IntegrityError 转换为 LEASE_CONFLICT 并回滚，避免未处理异常。
+- 租约到期自动释放，防止死节点占用资源。
+"""
 
 from __future__ import annotations
 
@@ -7,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Callable
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from whale.shared.persistence.orm import IngestJobLease
@@ -16,7 +27,7 @@ from whale.ingest.runtime.fencing import FencingTokenRepository
 
 @dataclass(frozen=True, slots=True)
 class LeaseAcquireResult:
-    """Result of one lease acquisition attempt."""
+    """单次租约获取尝试的结果。"""
 
     acquired: bool
     lease_name: str
@@ -28,7 +39,7 @@ class LeaseAcquireResult:
 
 @dataclass(frozen=True, slots=True)
 class JobLease:
-    """Runtime lease snapshot returned by the lease service."""
+    """租约服务返回的运行时租约快照。"""
 
     lease_name: str
     lease_scope: str
@@ -42,19 +53,21 @@ class JobLease:
 
     @property
     def is_expired(self) -> bool:
-        """Return whether the lease is already expired."""
+        """返回租约是否已过期。"""
 
         return self.expires_at <= datetime.now(tz=UTC)
 
 
 class LeaseRepository:
-    """Persist leases into the runtime DB."""
+    """将租约持久化到运行时数据库。"""
 
     def __init__(self, session_factory: sessionmaker[Session] | Callable[[], Session]) -> None:
+        """初始化租约仓库。Args: session_factory: 数据库会话工厂。"""
         self._session_factory = session_factory
 
     def get(self, lease_name: str) -> IngestJobLease | None:
-        """Return one lease row by name."""
+        """初始化租约仓库。Args: session_factory: 数据库会话工厂。"""
+        """按名称返回单行租约记录。"""
 
         session = self._session_factory()
         try:
@@ -65,7 +78,7 @@ class LeaseRepository:
             session.close()
 
     def list_active(self) -> list[IngestJobLease]:
-        """Return all active leases."""
+        """返回所有活跃租约。"""
 
         session = self._session_factory()
         try:
@@ -79,13 +92,27 @@ class LeaseRepository:
 
 
 class LeaseService:
-    """Acquire, renew, release, and expire runtime leases."""
+    """运行时租约的获取、续期、释放和过期管理。
+
+    并发安全：
+    - fencing token 递增由 FencingTokenRepository.next_value 的原子 UPSERT 保证。
+    - 租约 INSERT 在双节点并发时可能触发 IntegrityError（唯一约束冲突），
+      acquire 捕获该异常并回滚，转换为 LEASE_CONFLICT 返回。
+    - renew / release / expire_due_leases 使用显式寻址（lease_name），更新非 INSERT，
+      不触发唯一约束冲突。
+    """
 
     def __init__(
         self,
         session_factory: sessionmaker[Session] | Callable[[], Session],
         fencing_tokens: FencingTokenRepository,
     ) -> None:
+        """初始化租约服务。
+
+        Args:
+            session_factory: 数据库会话工厂，每次调用返回独立 Session。
+            fencing_tokens: 防脑裂 fencing token 仓库。
+        """
         self._session_factory = session_factory
         self._fencing_tokens = fencing_tokens
 
@@ -99,8 +126,24 @@ class LeaseService:
         ttl_seconds: int,
         now: datetime | None = None,
     ) -> LeaseAcquireResult:
-        """Acquire one lease when absent or expired."""
+        """在租约不存在或已过期时获取租约。
 
+        并发场景：双节点同时首次获取同一 lease_name 时，
+        fencing token 递增由原子 UPSERT 保证无竞态条件；
+        租约行 INSERT 若触发 IntegrityError（另一节点已抢占），
+        则回滚并返回 LEASE_CONFLICT。
+
+        Args:
+            lease_name: 租约名称（如 write:resource-1）。
+            lease_scope: 租约作用域（job / write）。
+            resource_id: 资源标识。
+            holder_key: 持有者标识（如节点 ID 或写入主键）。
+            ttl_seconds: 租约 TTL，单位为秒。
+            now: 当前时间，None 时使用 UTC 当前时间。
+
+        Returns:
+            LeaseAcquireResult，包含 acquired 状态、fencing_token、reason 等信息。
+        """
         resolved_now = now or datetime.now(tz=UTC)
         session = self._session_factory()
         try:
@@ -116,6 +159,7 @@ class LeaseService:
                         fencing_token=row.fencing_token,
                         reason="LEASE_CONFLICT",
                     )
+                # 同一持有者重复 acquire 等同于 renew
                 row.renewed_at = resolved_now
                 row.expires_at = resolved_now + timedelta(seconds=ttl_seconds)
                 row.version += 1
@@ -130,6 +174,8 @@ class LeaseService:
 
             token = self._fencing_tokens.next_value(lease_name)
             if row is None:
+                # 全新租约：INSERT。并发场景下另一节点可能已抢占此 lease_name，
+                # 触发 IntegrityError，转换为 LEASE_CONFLICT。
                 row = IngestJobLease(
                     lease_name=lease_name,
                     lease_scope=lease_scope,
@@ -143,6 +189,7 @@ class LeaseService:
                 )
                 session.add(row)
             else:
+                # 过期的旧租约：UPDATE 复用现有行。此路径不会触发唯一约束冲突。
                 row.lease_scope = lease_scope
                 row.resource_id = resource_id
                 row.holder_key = holder_key
@@ -153,7 +200,17 @@ class LeaseService:
                 row.expires_at = resolved_now + timedelta(seconds=ttl_seconds)
                 row.released_at = None
                 row.version += 1
-            session.commit()
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                return LeaseAcquireResult(
+                    acquired=False,
+                    lease_name=lease_name,
+                    holder_key=holder_key,
+                    fencing_token=token.value,
+                    reason="LEASE_CONFLICT",
+                )
             return LeaseAcquireResult(
                 acquired=True,
                 lease_name=lease_name,
@@ -172,7 +229,7 @@ class LeaseService:
         ttl_seconds: int,
         now: datetime | None = None,
     ) -> JobLease:
-        """Renew one active lease held by the current holder."""
+        """续期当前持有者的一个活跃租约。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         session = self._session_factory()
@@ -204,7 +261,7 @@ class LeaseService:
         holder_key: str,
         now: datetime | None = None,
     ) -> JobLease:
-        """Release one active lease held by the given holder."""
+        """释放指定持有者的一个活跃租约。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         session = self._session_factory()
@@ -227,7 +284,7 @@ class LeaseService:
             session.close()
 
     def expire_due_leases(self, *, now: datetime | None = None) -> int:
-        """Mark all overdue active leases as expired."""
+        """将所有超期的活跃租约标记为已过期。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         session = self._session_factory()
@@ -249,7 +306,7 @@ class LeaseService:
             session.close()
 
     def force_expire(self, *, lease_name: str, now: datetime | None = None) -> JobLease:
-        """Force one lease into the expired state for failover paths."""
+        """强制将一个租约置为过期状态，用于故障切换路径。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         session = self._session_factory()
@@ -270,7 +327,7 @@ class LeaseService:
             session.close()
 
     def get_snapshot(self, *, lease_name: str) -> JobLease | None:
-        """Return one normalized lease snapshot."""
+        """返回规范化后的租约快照。"""
 
         row = LeaseRepository(self._session_factory).get(lease_name)
         return None if row is None else _row_to_job_lease(row)
@@ -283,7 +340,7 @@ class LeaseService:
         fencing_token: int,
         now: datetime | None = None,
     ) -> bool:
-        """Return whether a holder may execute under the given fencing token."""
+        """返回持有者是否可在给定 fencing token 下执行。"""
 
         resolved_now = now or datetime.now(tz=UTC)
         lease = self.get_snapshot(lease_name=lease_name)
@@ -315,7 +372,7 @@ def _row_to_job_lease(row: IngestJobLease) -> JobLease:
 
 
 def _as_utc(value: datetime) -> datetime:
-    """Normalize SQLAlchemy/SQLite datetimes into aware UTC timestamps."""
+    """将 SQLAlchemy/SQLite 日期时间规范化为 aware UTC 时间戳。"""
 
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)

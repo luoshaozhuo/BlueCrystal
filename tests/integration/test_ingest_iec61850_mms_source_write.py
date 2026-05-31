@@ -37,7 +37,6 @@ from whale.ingest.usecases.source_command_use_case import SourceCommandUseCase
 from whale.ingest.usecases.dtos.source_acquisition_request import (
     AcquisitionExecutionOptions,
     AcquisitionItemData,
-    SourceAcquisitionRequest,
 )
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
 from whale.ingest.usecases.dtos.source_write_request import (
@@ -103,6 +102,11 @@ class TestIec61850MmsSourceWrite:
             pytest.skip("iec61850_simulator_server not compiled")
         if _CLIENT_RUNNER_PATH is None:
             pytest.skip("iec61850_mms_client_runner not compiled")
+        os.environ["WHALE_IEC61850_MMS_CLIENT_RUNNER_PATH"] = str(_CLIENT_RUNNER_PATH)
+
+    @classmethod
+    def teardown_class(cls) -> None:
+        os.environ.pop("WHALE_IEC61850_MMS_CLIENT_RUNNER_PATH", None)
 
     def _start_simulator(self, port: int) -> subprocess.Popen[str]:
         """启动 iec61850_simulator_server 并等待 READY。"""
@@ -129,7 +133,7 @@ class TestIec61850MmsSourceWrite:
         if ready_line != "READY":
             proc.terminate()
             proc.wait(timeout=5)
-            pytest.fail(f"Simulator did not output READY")
+            pytest.fail("Simulator did not output READY")
 
         _wait_for_port("127.0.0.1", port)
         return proc

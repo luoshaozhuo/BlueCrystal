@@ -1,7 +1,6 @@
-"""Public exports for ingest persistence helpers.
+"""框架基础设施。
 
-Keep this module light so importing runtime helpers does not eagerly bind one
-global engine from stale environment variables.
+提供持久化、数据库初始化等底层能力。
 """
 
 from __future__ import annotations
@@ -13,6 +12,13 @@ from whale.ingest.framework.persistence.runtime_db import (
     migrate_runtime_database,
     probe_runtime_readiness,
 )
+from whale.ingest.framework.persistence.session import (
+    SessionLocal,
+    engine,
+    get_session,
+    session_scope,
+)
+from whale.shared.persistence import Base
 
 __all__ = [
     "create_runtime_engine",
@@ -26,19 +32,3 @@ __all__ = [
     "get_session",
     "session_scope",
 ]
-
-
-def __getattr__(name: str):
-    """Lazily resolve legacy session exports when callers still need them."""
-
-    if name == "Base":
-        from whale.ingest.framework.persistence.base import Base
-
-        return Base
-
-    if name in {"SessionLocal", "engine", "get_session", "session_scope"}:
-        from whale.ingest.framework.persistence import session as session_module
-
-        return getattr(session_module, name)
-
-    raise AttributeError(name)

@@ -1,4 +1,7 @@
-"""Decorator objects for SourceStateCachePort crosscutting concerns."""
+"""装饰器模块。
+
+为采集、写入、缓存等横切关注点提供装饰器封装。
+"""
 
 from __future__ import annotations
 
@@ -18,14 +21,16 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class LoggingStateCachePort(SourceStateCachePort):
-    """Emit logs around state-cache writes."""
+    """在状态缓存写入时发送日志。"""
 
     inner: SourceStateCachePort
     logger: logging.Logger = LOGGER
 
     def update(self, *, ld_name: str, batch: AcquiredNodeStateBatch) -> int:
+        """update 方法。"""
         started_at = time.monotonic()
         try:
+            """带日志的状态更新。记录更新操作并委托底层 port 执行。"""
             updated = self.inner.update(ld_name=ld_name, batch=batch)
             self.logger.info(
                 "state cache update succeeded",
@@ -45,6 +50,7 @@ class LoggingStateCachePort(SourceStateCachePort):
             raise
 
     def mark_alive(self, *, ld_name: str, observed_at: datetime) -> None:
+        """mark_alive 方法。"""
         self.inner.mark_alive(ld_name=ld_name, observed_at=observed_at)
 
     def mark_unavailable(
@@ -55,6 +61,8 @@ class LoggingStateCachePort(SourceStateCachePort):
         observed_at: datetime,
         reason: str | None = None,
     ) -> None:
+        """带日志的存活标记。记录源上线事件。"""
+        """带日志的不可用标记。记录源离线事件。"""
         self.inner.mark_unavailable(
             ld_name=ld_name,
             status=status,
@@ -65,13 +73,15 @@ class LoggingStateCachePort(SourceStateCachePort):
 
 @dataclass(frozen=True, slots=True)
 class AuditedStateCachePort(SourceStateCachePort):
-    """Emit audit events for state-cache writes."""
+    """在状态缓存写入时发送审计事件。"""
 
     inner: SourceStateCachePort
     audit_sink: AuditEventSinkPort
 
     def update(self, *, ld_name: str, batch: AcquiredNodeStateBatch) -> int:
+        """update 方法。"""
         try:
+            """带审计的状态更新。记录审计事件后委托底层 port 执行。"""
             updated = self.inner.update(ld_name=ld_name, batch=batch)
         except Exception as exc:
             _emit_audit_best_effort(
@@ -105,6 +115,7 @@ class AuditedStateCachePort(SourceStateCachePort):
         return updated
 
     def mark_alive(self, *, ld_name: str, observed_at: datetime) -> None:
+        """mark_alive 方法。"""
         self.inner.mark_alive(ld_name=ld_name, observed_at=observed_at)
 
     def mark_unavailable(
@@ -115,6 +126,8 @@ class AuditedStateCachePort(SourceStateCachePort):
         observed_at: datetime,
         reason: str | None = None,
     ) -> None:
+        """带审计的存活标记。记录审计事件后标记源为在线。"""
+        """带审计的不可用标记。记录审计事件后标记源为离线。"""
         self.inner.mark_unavailable(
             ld_name=ld_name,
             status=status,
@@ -139,14 +152,16 @@ class AuditedStateCachePort(SourceStateCachePort):
 
 @dataclass(frozen=True, slots=True)
 class MetricsStateCachePort(SourceStateCachePort):
-    """Record counters and latency for cache write operations."""
+    """记录缓存写入操作的计数器和延迟。"""
 
     inner: SourceStateCachePort
     metrics_sink: MetricsSinkPort
 
     def update(self, *, ld_name: str, batch: AcquiredNodeStateBatch) -> int:
+        """update 方法。"""
         started_at = time.monotonic()
         try:
+            """带指标的状态更新。记录更新耗时和结果计数。"""
             updated = self.inner.update(ld_name=ld_name, batch=batch)
             self.metrics_sink.increment("ingest_state_cache_update_total", ld_name=ld_name)
             self.metrics_sink.observe_duration(
@@ -163,6 +178,7 @@ class MetricsStateCachePort(SourceStateCachePort):
             raise
 
     def mark_alive(self, *, ld_name: str, observed_at: datetime) -> None:
+        """mark_alive 方法。"""
         self.inner.mark_alive(ld_name=ld_name, observed_at=observed_at)
 
     def mark_unavailable(
@@ -173,6 +189,8 @@ class MetricsStateCachePort(SourceStateCachePort):
         observed_at: datetime,
         reason: str | None = None,
     ) -> None:
+        """带指标的存活标记。记录上线事件计数器。"""
+        """带指标的不可用标记。记录离线事件计数器。"""
         self.inner.mark_unavailable(
             ld_name=ld_name,
             status=status,
@@ -189,15 +207,17 @@ class MetricsStateCachePort(SourceStateCachePort):
 
 @dataclass(frozen=True, slots=True)
 class DebugStateCachePort(SourceStateCachePort):
-    """Emit best-effort debug trace events for cache operations."""
+    """对缓存操作尽力发送调试追踪事件。"""
 
     inner: SourceStateCachePort
     trace_context: DebugTraceContext
     trace_sink: DebugTraceSinkPort
 
     def update(self, *, ld_name: str, batch: AcquiredNodeStateBatch) -> int:
+        """update 方法。"""
         updated = self.inner.update(ld_name=ld_name, batch=batch)
         if self.trace_context.enabled:
+            """调试模式状态更新。详细记录输入参数和缓存内容。"""
             self.trace_sink.emit(
                 "state_cache.update",
                 self.trace_context,
@@ -207,8 +227,10 @@ class DebugStateCachePort(SourceStateCachePort):
         return updated
 
     def mark_alive(self, *, ld_name: str, observed_at: datetime) -> None:
+        """mark_alive 方法。"""
         self.inner.mark_alive(ld_name=ld_name, observed_at=observed_at)
         if self.trace_context.enabled:
+            """调试模式存活标记。详细记录源标识符和上线时间。"""
             self.trace_sink.emit(
                 "state_cache.mark_alive",
                 self.trace_context,
@@ -224,6 +246,7 @@ class DebugStateCachePort(SourceStateCachePort):
         observed_at: datetime,
         reason: str | None = None,
     ) -> None:
+        """调试模式不可用标记。详细记录源标识符和离线原因。"""
         self.inner.mark_unavailable(
             ld_name=ld_name,
             status=status,
@@ -248,7 +271,7 @@ def _emit_audit_best_effort(
     operation: str,
     resource_id: str,
 ) -> None:
-    """Emit one audit event without interrupting cache writes."""
+    """发送审计事件，不中断缓存写入。"""
 
     try:
         audit_sink.emit(event)

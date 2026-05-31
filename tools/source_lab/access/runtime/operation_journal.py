@@ -9,6 +9,14 @@ from tools.source_lab.access.runtime.endpoint_runtime import utc_now_iso
 
 @dataclass(frozen=True, slots=True)
 class OperationJournalEntry:
+    """Endpoint 运行时操作日志条目。
+
+    记录每次 registry 操作（ADD/UPDATE/PAUSE/RESUME/STOP/DELETE/RECOVER）的完整上下文，
+    包括操作标识、决策结果、配置版本变更和影响范围。
+    不可变（frozen），通过 create 工厂方法构造并自动注入时间戳。
+
+    不负责：日志的持久化（由 RuntimeStateStore 负责）。
+    """
     operation_id: str
     action: str
     endpoint_id: str

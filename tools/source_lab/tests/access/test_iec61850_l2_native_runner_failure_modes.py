@@ -1,3 +1,8 @@
+"""IEC 61850 L2 native runner 故障模式测试。
+
+验证 L2 native runner（GOOSE/SV）的各种故障模式和行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import subprocess

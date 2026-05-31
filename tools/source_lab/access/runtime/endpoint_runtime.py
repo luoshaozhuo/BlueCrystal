@@ -24,6 +24,60 @@ SENSITIVE_PARAM_KEYS = {
 }
 
 
+def _as_int(value: object, default: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _as_float(value: object, default: float) -> float:
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _as_object_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): item for key, item in value.items()}
+
+
+def _as_object_dicts(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    return [_as_object_dict(item) for item in value]
+
+
+def _as_optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _as_scalar_params(value: object) -> dict[str, str | int | float | bool]:
+    params: dict[str, str | int | float | bool] = {}
+    for key, item in _as_object_dict(value).items():
+        if isinstance(item, str | int | float | bool):
+            params[key] = item
+    return params
+
+
 class EndpointMode(str, Enum):
     POLLING = "polling"
     SUBSCRIBE = "subscribe"
@@ -32,6 +86,13 @@ class EndpointMode(str, Enum):
 
 
 class EndpointRuntimeState(str, Enum):
+    """Endpoint 运行时生命周期状态枚举。
+
+    表示 endpoint session 在其完整生命周期中所处的位置。
+    状态转换由 EndpointRuntimeRegistry 和 EndpointSessionManager 协作驱动。
+    不负责：业务逻辑决策（由 registry 判断前置条件后调用 manager 执行转换）。
+    """
+
     CREATED = "created"
     STARTING = "starting"
     RUNNING = "running"
@@ -121,29 +182,29 @@ class EndpointRuntimeConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "EndpointRuntimeConfig":
-        source_data = dict(data["source"])
-        endpoint_data = dict(source_data["endpoint"])
-        points_data = list(source_data["points"])
+        source_data = _as_object_dict(data.get("source"))
+        endpoint_data = _as_object_dict(source_data.get("endpoint"))
+        points_data = _as_object_dicts(source_data.get("points"))
         source = SourceRuntimeSpec(
             endpoint=SourceEndpointSpec(
                 name=str(endpoint_data["name"]),
                 host=str(endpoint_data["host"]),
-                port=int(endpoint_data["port"]),
+                port=_as_int(endpoint_data.get("port"), 0),
                 protocol=str(endpoint_data["protocol"]),
                 transport=str(endpoint_data.get("transport", "tcp")),
-                namespace_uri=endpoint_data.get("namespace_uri"),
+                namespace_uri=_as_optional_str(endpoint_data.get("namespace_uri")),
                 ied_name=str(endpoint_data.get("ied_name", "")),
                 ld_name=str(endpoint_data.get("ld_name", "")),
-                params=dict(endpoint_data.get("params", {})),
+                params=_as_scalar_params(endpoint_data.get("params")),
             ),
             points=tuple(
                 SourcePointSpec(
                     address=str(point["address"]),
-                    name=point.get("name"),
-                    data_type=point.get("data_type"),
-                    ln_name=point.get("ln_name"),
-                    do_name=point.get("do_name"),
-                    unit=point.get("unit"),
+                    name=_as_optional_str(point.get("name")),
+                    data_type=_as_optional_str(point.get("data_type")),
+                    ln_name=_as_optional_str(point.get("ln_name")),
+                    do_name=_as_optional_str(point.get("do_name")),
+                    unit=_as_optional_str(point.get("unit")),
                 )
                 for point in points_data
             ),
@@ -154,14 +215,14 @@ class EndpointRuntimeConfig:
             protocol=str(data["protocol"]),
             mode=EndpointMode(str(data["mode"])),
             source=source,
-            target_hz=float(data["target_hz"]) if data.get("target_hz") is not None else None,
+            target_hz=_as_float(data["target_hz"], 0.0) if data.get("target_hz") is not None else None,
             publishing_interval_ms=(
-                float(data["publishing_interval_ms"])
+                _as_float(data["publishing_interval_ms"], 0.0)
                 if data.get("publishing_interval_ms") is not None
                 else None
             ),
-            read_timeout_s=float(data.get("read_timeout_s", 5.0)),
-            config_version=int(data.get("config_version", 1)),
+            read_timeout_s=_as_float(data.get("read_timeout_s", 5.0), 5.0),
+            config_version=_as_int(data.get("config_version", 1), 1),
         )
 
 
@@ -201,9 +262,9 @@ class EndpointRuntime:
             endpoint_id=str(data["endpoint_id"]),
             protocol=str(data["protocol"]),
             mode=str(data["mode"]),
-            config_version=int(data["config_version"]),
+            config_version=_as_int(data["config_version"], 1),
             state=EndpointRuntimeState(str(data["state"])),
-            stagger_offset_ns=int(data.get("stagger_offset_ns", 0)),
+            stagger_offset_ns=_as_int(data.get("stagger_offset_ns", 0), 0),
             created_at=str(data.get("created_at", utc_now_iso())),
             updated_at=str(data.get("updated_at", utc_now_iso())),
             last_started_at=(

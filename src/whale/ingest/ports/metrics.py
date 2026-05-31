@@ -1,4 +1,4 @@
-"""Ingest metrics port."""
+"""Ingest 指标 port 接口。声明计数器、直方图等指标契约，由具体 sink 实现。"""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Protocol
 
 @dataclass(slots=True)
 class IngestMetricEvent:
+    """IngestMetricEvent 方法。"""
     operation: str
     source_id: str | None
     protocol: str | None
@@ -19,5 +20,6 @@ class IngestMetricEvent:
 
 
 class IngestMetricsPort(Protocol):
+    """IngestMetricsPort 方法。"""
     def emit(self, event: IngestMetricEvent) -> None:
-        """Emit one metrics event."""
+        """发送一条指标事件到配置的 sink。"""

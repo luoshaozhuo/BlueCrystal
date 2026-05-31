@@ -1,7 +1,8 @@
-"""IEC 104 source write adapter.
+"""协议采集适配器。
 
-Converts ingest DTOs to shared/source IEC 104 native runner calls
-(C_SC_NA_1 single command).
+实现 SourceAcquisitionPort / SourceWritePort，
+封装特定协议（工业协议）的采集或写入逻辑。
+外部依赖边界：lib60870 C 库（ctypes）。
 """
 from __future__ import annotations
 
@@ -19,7 +20,7 @@ from whale.shared.source.iec104.reader import Iec104SourceReader
 
 
 class Iec104SourceWriteAdapter(SourceWritePort):
-    """Execute IEC 104 writes via native runner (C_SC_NA_1)."""
+    """通过 native runner 执行 IEC 104 写入（C_SC_NA_1 命令）。"""
 
     async def write(
         self,
@@ -27,13 +28,11 @@ class Iec104SourceWriteAdapter(SourceWritePort):
         connection: SourceConnectionData,
         items: list[SourceWriteItemData],
     ) -> SourceWriteResult:
-        """Execute one IEC 104 batch write.
-
+        """执行一次 IEC 104 批量写入。解析点位列表并依次发送 select/operate 命令。
         Args:
             execution: Write execution options.
             connection: Target source connection.
             items: Items to write, each with ``node_id`` as IOA string.
-
         Returns:
             Structured write result.
         """
@@ -120,7 +119,7 @@ class Iec104SourceWriteAdapter(SourceWritePort):
 
     @staticmethod
     def _resolve_ioa(item: SourceWriteItemData) -> int | None:
-        """Convert ``node_id`` (IOA string) to integer."""
+        """将 node_id（IOA 字符串）转换为整数。"""
         node_id = item.node_id.strip()
         if node_id.isdigit() or (node_id.startswith("-") and node_id[1:].isdigit()):
             return int(node_id)
@@ -128,11 +127,7 @@ class Iec104SourceWriteAdapter(SourceWritePort):
 
     @staticmethod
     def _resolve_command_type(item: SourceWriteItemData) -> str | None:
-        """Map value_type to IEC 104 command type.
-
-        Defaults to C_SC_NA_1 for bool-like values and C_SE_NC_1 for float values.
-        Callers can override by setting value_type to a known command type string.
-        """
+        """将 value_type 映射到 IEC 104 命令类型。按点位类型选择对应的 ASDU 类型标识。"""
         vt = item.value_type.strip().upper()
         # Direct command type specification
         if vt in ("C_SC_NA_1", "C_SE_NC_1"):

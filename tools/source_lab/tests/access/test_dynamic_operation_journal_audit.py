@@ -1,3 +1,8 @@
+"""operation journal 审计测试。
+
+验证 dynamic runtime 操作日志的审计记录完整性和不可篡改性。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,6 +21,13 @@ from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
 
 
 class _FailOnReplaceSessionManager:
+    """测试用 EndpointSessionManager stub。
+
+    仅实现测试所需方法，replace_endpoint 故意抛出异常以模拟替换失败。
+    不继承 EndpointSessionManager（构造函数签名不同且含线程管理），
+    传入 EndpointRuntimeRegistry 时需 type: ignore。
+    """
+
     def __init__(self) -> None:
         self.started: list[str] = []
 
@@ -102,8 +114,10 @@ def test_dynamic_invalid_patch_validation_error_is_journaled(tmp_path: Path) -> 
 def test_dynamic_replacement_failure_rolls_back_or_marks_failed_and_is_journaled(tmp_path: Path) -> None:
     source = build_http_source(4, 58014)
     session_manager = _FailOnReplaceSessionManager()
+    # _FailOnReplaceSessionManager 为测试 stub，仅实现必要方法，
+    # 不继承 EndpointSessionManager（其构造函数含线程管理，不应在测试中初始化）。
     registry = EndpointRuntimeRegistry(
-        session_manager=session_manager,
+        session_manager=session_manager,  # type: ignore[arg-type]
         continuity_monitor=ContinuityMonitor(),
         stagger_coordinator=StaggerCoordinator(),
         state_store=RuntimeStateStore(str(tmp_path / "runtime")),
@@ -136,7 +150,10 @@ def test_dynamic_journal_contains_affected_and_unaffected_endpoints(tmp_path: Pa
     assert update_entries
     entry = update_entries[-1]
     assert entry["affected_endpoints"] == [sources[0].connection.name]
-    assert set(entry["unaffected_endpoints"]) == {
+    # journal entries 返回 dict[str, object]，unaffected_endpoints 实际为 list[str]，
+    # 需显式 cast 以满足 mypy 类型收窄。
+    unaffected: list[str] = entry["unaffected_endpoints"]  # type: ignore[assignment]
+    assert set(unaffected) == {
         sources[1].connection.name,
         sources[2].connection.name,
     }

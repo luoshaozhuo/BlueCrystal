@@ -20,7 +20,6 @@ from tools.source_lab.access.polling.metrics import (
     record_tick,
 )
 from tools.source_lab.access.polling.model import CapacityScanConfig, TickResult
-from tools.source_lab.access.runners.base import CapacityRunner
 from tools.source_lab.access.runners.protocol import (
     ProtocolDiagnostics,
     read_protocol_line,

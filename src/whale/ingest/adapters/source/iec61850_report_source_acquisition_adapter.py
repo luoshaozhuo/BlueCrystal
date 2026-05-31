@@ -8,7 +8,6 @@ Report 通过 RCB 订阅 data set 的数据变化，由 server 主动推送。
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -17,7 +16,6 @@ from whale.ingest.ports.source.source_acquisition_port import (
     SourceAcquisitionPort,
     SourceReadError,
     SourceSubscriptionHandle,
-    SourceSubscriptionUnsupportedError,
     SubscriptionStateHandler,
 )
 from whale.ingest.usecases.dtos.acquired_node_state import (
@@ -32,7 +30,6 @@ from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionDa
 from whale.shared.source.iec61850.report_reader import (
     Iec61850ReportSourceReader,
     RawReportEvent,
-    ReportErrorHandler,
 )
 from whale.shared.utils.time import ensure_utc
 
@@ -166,6 +163,7 @@ class _ReportSubscriptionHandle(SourceSubscriptionHandle):
     """Report 订阅句柄，追踪错误和关闭状态。"""
 
     def __init__(self, *, reader: Iec61850ReportSourceReader) -> None:
+        """初始化报告订阅句柄。Args: report_id: 报告标识符。rpt_enabled: 是否启用。cancel_fn: 取消回调。"""
         self._reader = reader
         self._closed = False
         self._error: str | None = None

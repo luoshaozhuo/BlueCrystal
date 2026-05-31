@@ -1,4 +1,7 @@
-"""Runtime job status enumeration for ingest scheduler."""
+"""任务状态管理。
+
+定义和追踪调度任务的执行状态（pending/running/success/failed）。
+"""
 
 from __future__ import annotations
 
@@ -6,7 +9,7 @@ from enum import StrEnum
 
 
 class JobStatus(StrEnum):
-    """Lifecycle status for one scheduled source job."""
+    """单个调度源任务的生命周期状态。"""
 
     SCHEDULED = "SCHEDULED"
     RUNNING = "RUNNING"

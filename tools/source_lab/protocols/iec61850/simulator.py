@@ -14,8 +14,6 @@ import os
 import socket
 import subprocess
 import threading
-from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from tools.source_lab.model import SimulatedPoint, SimulatedSource

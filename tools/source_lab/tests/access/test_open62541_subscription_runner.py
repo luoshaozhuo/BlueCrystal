@@ -12,13 +12,13 @@ from tools.source_lab.access.polling.model import CapacityMode
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
 from tools.source_lab.access.runners.open62541_subscription import (
     OpcUaOpen62541SubscribeRunner,
-    _RUNNER_PROTOCOL_NOISE_LIMIT,
     _stop_process,
     parse_endpoint_diag_line,
     parse_notify_line,
     parse_summary_line,
     run_open62541_subscribe_worker,
 )
+from tools.source_lab.access.runners.protocol import RUNNER_PROTOCOL_NOISE_LIMIT
 from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
 from tools.source_lab.access.subscribe.model import SubscribeScanConfig
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
@@ -329,7 +329,7 @@ def test_run_worker_records_small_protocol_noise(monkeypatch: pytest.MonkeyPatch
 
 
 def test_run_worker_fails_when_protocol_noise_exceeds_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    noise = [f"noise-{index}" for index in range(_RUNNER_PROTOCOL_NOISE_LIMIT + 1)]
+    noise = [f"noise-{index}" for index in range(RUNNER_PROTOCOL_NOISE_LIMIT + 1)]
     protocol = "\n".join(["READY", *noise])
 
     class _FakeProcess:
@@ -374,6 +374,8 @@ def test_stop_process_terminates_then_kills_after_timeouts() -> None:
             return None
 
     class _FakeProcess:
+        returncode: int | None
+
         def __init__(self) -> None:
             self.stdin = _FakeStdin()
             self.stderr = None
@@ -396,6 +398,8 @@ def test_stop_process_terminates_then_kills_after_timeouts() -> None:
             self.kill_called = True
 
     process = _FakeProcess()
-    _stop_process(process)
+    # _FakeProcess 模拟 subprocess.Popen，但无法真正继承 Popen，
+    # 仅用于验证 _stop_process 的 terminate/kill 调用顺序。
+    _stop_process(process)  # type: ignore[arg-type]
     assert process.terminate_called is True
     assert process.kill_called is True

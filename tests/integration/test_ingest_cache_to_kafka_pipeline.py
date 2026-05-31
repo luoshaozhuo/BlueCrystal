@@ -15,7 +15,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from whale.ingest.adapters.message.kafka_message_publisher import KafkaMessagePublisher
-from whale.ingest.ports.message.message_publisher_port import StateSnapshotMessage
 from whale.ingest.ports.state.source_state_snapshot_reader_port import (
     CachedNodeValue,
     CachedSourceState,
@@ -250,7 +249,7 @@ def test_cache_to_kafka_multi_message_split() -> None:
     # First msg: 3 items, second: 3, third: 1
     for i, call in enumerate(producer.calls):
         payload = call[2].decode("utf-8")
-        assert f'"source_module":"ingest"' in payload
+        assert '"source_module":"ingest"' in payload
     assert b'"item_count":3' in producer.calls[0][2]
     assert b'"item_count":3' in producer.calls[1][2]
     assert b'"item_count":1' in producer.calls[2][2]

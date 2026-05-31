@@ -1,13 +1,8 @@
-"""IEC 61850 MMS source write adapter.
+"""协议采集适配器。
 
-Converts ingest DTOs to shared/source libiec61850 MMS write calls
-and converts ``RawWriteItemResult`` to ``SourceWriteResult``.
-
-Design conventions:
-- Implements SourceWritePort, does not depend on source_lab.
-- Uses Iec61850MmsSourceReader for MMS direct write.
-- Each write creates a short-lived reader connection.
-- Supports only mms_direct_write (writes to SP/CF FC data attributes).
+实现 SourceAcquisitionPort / SourceWritePort，
+封装特定协议（工业协议）的采集或写入逻辑。
+外部依赖边界：libiec61850 C 库（ctypes）。
 """
 
 from __future__ import annotations
@@ -26,7 +21,7 @@ from whale.shared.source.iec61850.reader import Iec61850MmsSourceReader
 
 
 class Iec61850MmsSourceWriteAdapter(SourceWritePort):
-    """Execute IEC 61850 MMS direct write via libiec61850 native runner."""
+    """通过 libiec61850 native runner 执行 IEC 61850 MMS 直接写入。"""
 
     async def write(
         self,
@@ -34,20 +29,16 @@ class Iec61850MmsSourceWriteAdapter(SourceWritePort):
         connection: SourceConnectionData,
         items: list[SourceWriteItemData],
     ) -> SourceWriteResult:
-        """Execute one IEC 61850 MMS direct write batch.
-
+        """执行一次 IEC 61850 MMS 批量写入。对批量点位集合逐一发送 MMS Write 请求并按安全策略校验返回值。
         Each item's ``node_id`` is the MMS object reference,
         ``value_type`` is the MMS type (BOOLEAN, INT32, UINT32,
         FLOAT32, FLOAT64, VISIBLE_STRING).
-
         The functional constraint is read from
         ``execution.params["fc"]`` or defaults to "SP".
-
         Args:
             execution: Write execution options.
             connection: Target source connection.
             items: Items to write.
-
         Returns:
             Structured write result.
         """
@@ -115,11 +106,58 @@ class Iec61850MmsSourceWriteAdapter(SourceWritePort):
 
     @staticmethod
     def _resolve_fc(execution: SourceWriteExecutionOptions) -> str:
-        """Resolve functional constraint from execution params."""
+        """从执行选项中解析 functional constraint (FC)。"""
         fc = execution.params.get("fc", "SP")
         if isinstance(fc, str):
             return fc.strip().upper()
         return "SP"
+
+    async def readback(
+        self,
+        execution: SourceWriteExecutionOptions,
+        connection: SourceConnectionData,
+        items: list[SourceWriteItemData],
+        write_result: SourceWriteResult,
+    ) -> dict[str, str]:
+        """写入后回读 MMS 变量值以确认写入生效。
+
+        连接到 IEC 61850 MMS 服务器，读取每个已写入 MMS 对象引用的
+        当前值，返回 ``{obj_ref: value_str}`` 映射供
+        ``SourceCommandUseCase`` readback 验证使用。
+
+        每次写入后分别执行一次 MMS read 操作，读取同一 FC 下的当前值。
+
+        Args:
+            execution: 原始写入执行选项。
+            connection: 目标连接（与写入相同）。
+            items: 已写入的点位列表。
+            write_result: 写入结果（用于元数据）。
+
+        Returns:
+            每个已写入 node_id 到 str(value) 的映射。
+            如果连接失败或 host/port 无效，返回空字典。
+        """
+        fc = self._resolve_fc(execution)
+        host = connection.host.strip()
+        if not host or connection.port <= 0:
+            return {}
+        timeout_s = max(execution.request_timeout_ms / 1000, 2.0)
+
+        result: dict[str, str] = {}
+        async with Iec61850MmsSourceReader(host, connection.port, timeout_seconds=timeout_s) as reader:
+            for item in items:
+                try:
+                    raw = await reader.read(
+                        obj_ref=item.node_id,
+                        fc=fc,
+                        request_id=f"{execution.protocol}_readback_{item.key}",
+                    )
+                    if raw.ok:
+                        result[item.node_id] = str(raw.value) if raw.value is not None else ""
+                except Exception:
+                    # 单个点的回读失败不影响其他点
+                    pass
+        return result
 
     @staticmethod
     def _dry_run_result(

@@ -5,19 +5,12 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 import inspect
-from typing import get_type_hints
 
 import pytest
 
-from tools.source_lab.protocols.common.simulator_facade import ServerSimulatorFacade
 from tools.source_lab.protocols.common.simulator_models import (
-    ReadSimulatorResult,
     SimulatorCapabilities,
-    SimulatorHealth,
-    SimulatorPoint,
-    SimulatorResult,
     SimulatorStatus,
 )
 from tools.source_lab.protocols.registry import list_server_simulator_protocols
@@ -44,7 +37,9 @@ def _get_all_facade_classes() -> list[type]:
     from tools.source_lab.protocols.registry import _SIMULATOR_FACADE_REGISTRY
     # 触发注册
     list_server_simulator_protocols()
-    return list(_SIMULATOR_FACADE_REGISTRY.values())
+    # registry values 为 facade 类（Callable 形式），实际均为 type，
+    # 但 mypy 无法从 dict_values[Callable[..., ServerSimulatorFacade]] 推断为 Iterable[type]。
+    return list(_SIMULATOR_FACADE_REGISTRY.values())  # type: ignore[arg-type,return-value]
 
 
 class TestFacadeContract:
@@ -52,7 +47,8 @@ class TestFacadeContract:
 
     @pytest.fixture(params=_get_all_facade_classes(), ids=lambda cls: cls.__name__)
     def facade_cls(self, request: pytest.FixtureRequest) -> type:
-        return request.param
+        # pytest FixtureRequest.param 推断为 Any，对已知 fixtures 做显式 cast。
+        return request.param  # type: ignore[no-any-return]
 
     def test_facade_has_protocol_property(self, facade_cls: type) -> None:
         instance = facade_cls(source=None)

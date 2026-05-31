@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from whale.shared.source.runner_resolution import (
+    ResolvedRunnerPath,
+    build_runner_unavailable_message,
+    is_source_lab_dev_runner_path,
+    resolve_native_runner_path,
+)
 from whale.shared.source.modbus.backends.base import (
-    ModbusClientBackend,
     ModbusPreparedReadPlan,
     RawModbusReadResult,
     RawWriteItemResult,
@@ -20,13 +24,10 @@ _PROCESS_STOP_TIMEOUT_S: float = 2.0
 
 def resolve_client_runner_path() -> Path:
     """Resolve the modbus TCP client runner executable path."""
-    env_path = os.environ.get("WHALE_MODBUS_CLIENT_RUNNER_PATH")
-    if env_path:
-        return Path(env_path).expanduser().resolve()
-
-    source_lab_root = Path(__file__).resolve().parents[6] / "tools" / "source_lab"
-    suffix = ".exe" if os.name == "nt" else ""
-    return source_lab_root / "native" / "build" / f"modbus_tcp_polling_runner{suffix}"
+    return resolve_native_runner_path(
+        executable_stem="modbus_tcp_polling_runner",
+        specific_env_var="WHALE_MODBUS_CLIENT_RUNNER_PATH",
+    ).path
 
 
 class ModbusTcpClientBackend:
@@ -45,9 +46,24 @@ class ModbusTcpClientBackend:
 
         runner_path = resolve_client_runner_path()
         if not runner_path.exists():
+            resolution = resolve_native_runner_path(
+                executable_stem="modbus_tcp_polling_runner",
+                specific_env_var="WHALE_MODBUS_CLIENT_RUNNER_PATH",
+            )
+            if runner_path != resolution.path:
+                resolution = ResolvedRunnerPath(
+                    executable_name=runner_path.name,
+                    path=runner_path,
+                    source="custom_override",
+                    evidence_level="unknown",
+                    used_dev_fallback=is_source_lab_dev_runner_path(runner_path),
+                )
             raise RuntimeError(
-                "Modbus client runner executable does not exist: "
-                f"{runner_path}. Build `modbus_tcp_polling_runner` first with CMake."
+                build_runner_unavailable_message(
+                    runner_label="Modbus client runner",
+                    specific_env_var="WHALE_MODBUS_CLIENT_RUNNER_PATH",
+                    resolution=resolution,
+                )
             )
 
         self._runner = await asyncio.create_subprocess_exec(

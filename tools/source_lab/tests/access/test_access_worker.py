@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+
 from whale.shared.source.access.model import SourceEndpointSpec, SourcePointSpec
 
 from tools.source_lab.access.polling import worker
 from tools.source_lab.access.polling.metrics import WorkerRawStats
 from tools.source_lab.access.polling.model import CapacityMode, CapacityScanConfig
 from tools.source_lab.access.providers.base import SourceRuntimeSpec
-from tools.source_lab.access.runners.base import CapacityRunner
 from tools.source_lab.access.common.scheduling import RunnerEndpointPlan
 from tools.source_lab.access.polling.worker import run_level_once, run_worker_level
 
@@ -35,7 +36,7 @@ class _FakeRunner:
             batch_mismatches=0,
             read_errors=0,
             missing_response_timestamps=0,
-            response_timestamps_by_reader=tuple(((1.0, 1.1),) for _ in specs),
+            response_timestamps_by_reader=tuple((1.0, 1.1) for _ in specs),
             max_observed_concurrent_reads=max(1, len(specs)),
         )
 
@@ -80,7 +81,7 @@ def test_worker_depends_on_runner_protocol_not_open62541_module() -> None:
 
 
 def test_run_level_once_process_count_one_uses_injected_runner(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = _FakeRunner()
     diagnostics_calls: list[int] = []
@@ -125,7 +126,7 @@ def test_run_worker_level_forwards_arguments_to_runner() -> None:
     assert call[2] == 10.0
 
 
-def test_run_level_once_partitions_sources_across_workers(monkeypatch) -> None:
+def test_run_level_once_partitions_sources_across_workers(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _FakeRunner()
     submitted: list[tuple[int, int]] = []
 
@@ -137,13 +138,13 @@ def test_run_level_once_partitions_sources_across_workers(monkeypatch) -> None:
             return self._value
 
     class _Executor:
-        def __init__(self, *args, **kwargs) -> None:
+        def __init__(self, *args: object, **kwargs: object) -> None:
             return None
 
-        def __enter__(self) -> "_Executor":
+        def __enter__(self) -> _Executor:
             return self
 
-        def __exit__(self, exc_type, exc, tb) -> None:
+        def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: object) -> None:
             return None
 
         def submit(self, func, index, bucket, target_hz, config, runner_arg):

@@ -1,9 +1,1 @@
-"""SQLAlchemy base model."""
-
-from __future__ import annotations
-
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Base(DeclarativeBase):
-    """Shared SQLAlchemy declarative base."""
+"""SQLAlchemy 基础模型。定义 ingest 持久化层共用的 declarative base。"""

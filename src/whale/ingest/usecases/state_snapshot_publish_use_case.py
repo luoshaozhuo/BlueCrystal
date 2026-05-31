@@ -1,4 +1,4 @@
-"""Use case: publish a full state-snapshot from cache to message queue."""
+"""用例：将全量状态快照从缓存发布到消息队列。包含过滤、组装和发布全流程编排。"""
 
 from __future__ import annotations
 
@@ -30,15 +30,7 @@ _DEFAULT_SOURCE_MODULE = "ingest"
 
 
 class StateSnapshotPublishUseCase:
-    """Read the current latest-state snapshot from cache and publish to MQ.
-
-    This use case is independent from the acquisition and write use cases.
-    It depends only on:
-      - SourceStateSnapshotReaderPort (reading from the latest-state cache)
-      - MessagePublisherPort (publishing to Kafka / Redis Streams / outbox)
-
-    Dependencies are injected at construction time (no service locator).
-    """
+    """从缓存读取当前最新状态快照并发布到消息队列。是整个发布流程的顶层协调类。"""
 
     def __init__(
         self,
@@ -47,36 +39,14 @@ class StateSnapshotPublishUseCase:
         station_id: str,
         metrics_port: IngestMetricsPort | None = None,
     ) -> None:
-        """Store injected ports and the local station identifier.
-
-        Args:
-            reader: Port for reading the full latest-state snapshot from cache.
-            publisher: Port for publishing assembled snapshot messages.
-            station_id: Local station identifier, used as the default
-                station_id in published snapshot items.
-        """
+        """存储注入的 port 和本地站标识符。保存消息发布器、缓存读取器等依赖。"""
         self._reader = reader
         self._publisher = publisher
         self._station_id = station_id
         self._metrics_port = metrics_port
 
     def execute(self, request: StateSnapshotPublishRequest) -> StateSnapshotPublishResult:
-        """Execute one state-snapshot publish cycle.
-
-        Steps:
-          1. Read the full snapshot from cache via SourceStateSnapshotReaderPort.
-          2. Apply optional source_id / ld_name filters.
-          3. Map CachedSourceState list into one or more StateSnapshotMessage(s).
-          4. When dry_run=True, return DRY_RUN without publishing.
-          5. Publish each message via MessagePublisherPort.
-          6. Collect and return publish results.
-
-        Args:
-            request: Filtering, dry-run, and splitting parameters.
-
-        Returns:
-            Aggregated publish result with per-source/item/message counters.
-        """
+        """执行一次状态快照发布周期。读取缓存、应用过滤、组装消息并发布。"""
         trace_id = request.trace_id
         snapshot_at = datetime.now(tz=UTC)
         started_at = time.monotonic()
@@ -185,7 +155,7 @@ class StateSnapshotPublishUseCase:
         sources: list[CachedSourceState],
         request: StateSnapshotPublishRequest,
     ) -> list[CachedSourceState]:
-        """Apply optional source_id / ld_name filters."""
+        """应用可选的 source_id 和 ld_name 过滤条件。按请求参数筛选缓存条目。"""
 
         result = sources
         if request.station_id:
@@ -205,7 +175,7 @@ class StateSnapshotPublishUseCase:
         snapshot_at: datetime,
         request: StateSnapshotPublishRequest,
     ) -> list[StateSnapshotMessage]:
-        """Map filtered cached sources into one or more snapshot messages."""
+        """将过滤后的缓存源映射为一条或多条快照消息。按 source 分组构建消息。"""
 
         snapshot_id = _generate_snapshot_id(station_id, snapshot_at)
         trace_id = request.trace_id
@@ -264,14 +234,7 @@ class StateSnapshotPublishUseCase:
         device_id: str,
         device_code: str,
     ) -> StateSnapshotItem:
-        """Map one CachedNodeValue + its parent CachedSourceState into one StateSnapshotItem.
-
-        Phase 1 transitional mapping:
-          - device_id / device_code / model_id use fallback rules defined in
-            ADR-20260524-005 section 3.
-          - These are NOT yet backed by an authoritative asset master.
-          - station_id is derived from use case config, not from cached state.
-        """
+        """将一个缓存节点值及其所属源状态映射为一条 StateSnapshotItem。"""
 
         attributes = _extract_attributes(node_value)
         model_id = attributes.get("model_id", device_code)
@@ -307,7 +270,7 @@ class StateSnapshotPublishUseCase:
         message_seq: int,
         trace_id: str | None,
     ) -> StateSnapshotMessage:
-        """Wrap a list of snapshot items into one StateSnapshotMessage."""
+        """将一组快照条目包装为一条 StateSnapshotMessage。设置元数据和条目列表。"""
 
         seq_suffix = f"-{message_seq:04d}" if message_seq > 0 else ""
         message_id = f"{snapshot_id}{seq_suffix}"
@@ -333,7 +296,7 @@ class StateSnapshotPublishUseCase:
         source_count: int,
         total_items: int,
     ) -> StateSnapshotPublishResult:
-        """Publish all assembled messages and aggregate results."""
+        """发布所有组装后的消息并聚合结果。逐条发布并收集成功/失败的计数。"""
 
         aggregated = StateSnapshotPublishResult(
             status=PublishStatus.SUCCESS,
@@ -415,13 +378,13 @@ class StateSnapshotPublishUseCase:
 
 
 def _generate_snapshot_id(station_id: str, snapshot_at: datetime) -> str:
-    """Generate a unique snapshot id."""
+    """生成唯一快照 ID。用于标识一次发布周期。"""
     suffix = uuid.uuid4().hex[:8]
     return f"{station_id}-{snapshot_at.strftime('%Y%m%dT%H%M%S')}-{suffix}"
 
 
 def _extract_attributes(obj: Any) -> dict[str, str]:
-    """Extract string-keyed attributes from an object that may have an attributes field."""
+    """从可能具有 attributes 字段的对象中提取字符串键属性字典。"""
     attrs = getattr(obj, "attributes", None) or {}
     if not isinstance(attrs, dict):
         return {}

@@ -1,10 +1,18 @@
 """ModbusSourceWriteAdapter 单元测试。
 
 使用 mock reader 绕过真实的 native runner 子进程。
+
+覆盖：
+- write() 正常路径、dry_run、部分失败、异常处理、hex node_id 解析。
+- readback() 契约验证（write-then-readback 闭合路径）。
+
+证据等级：L2 (contract/stub)。
+真实 Modbus TCP E2E readback 需要运行中的 Modbus TCP simulator。
 """
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import MagicMock
 
 from whale.ingest.adapters.source.modbus_source_write_adapter import (
     ModbusSourceWriteAdapter,
@@ -14,7 +22,8 @@ from whale.ingest.usecases.dtos.source_write_request import (
     SourceWriteItemData,
 )
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
-from whale.shared.source.modbus.backends import RawWriteItemResult
+from whale.ingest.usecases.dtos.source_write_result import SourceWriteResult
+from whale.shared.source.modbus.backends import RawModbusReadResult, RawWriteItemResult
 
 
 class _MockModbusReader:
@@ -208,4 +217,143 @@ class TestModbusSourceWriteAdapter:
             assert result.success_count == 0
             assert result.failure_count == 1
             assert "cannot parse" in (result.results[0].error_message or "").lower()
+        asyncio.run(_run())
+
+
+# ── Readback (write-then-readback) contract tests ──────────────────────
+
+
+class _MockModbusReadbackReader:
+    """模拟 ModbusSourceReader，用于 write-then-readback contract 测试。
+
+    同时实现 write 和 read_prepared 方法，支持完整的 write+readback 闭合路径。
+    """
+
+    def __init__(self, readback_values: dict[int, int] | None = None) -> None:
+        self._readback_values = readback_values or {}
+        self.write_calls: list[dict] = []
+        self.prepare_read_calls: list[list[int]] = []
+        self.entered = False
+        self.exited = False
+
+    async def __aenter__(self) -> _MockModbusReadbackReader:
+        self.entered = True
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        self.exited = True
+
+    async def write(
+        self, reg_addr: int, value_type: str, value: str, *, request_id: str = "",
+    ) -> RawWriteItemResult:
+        self.write_calls.append({"reg_addr": reg_addr, "value_type": value_type, "value": value})
+        return RawWriteItemResult(
+            reg_addr=reg_addr, ok=True, status_code="OK", error_message=None,
+        )
+
+    def prepare_read(self, reg_addrs: list[int]) -> object:
+        self.prepare_read_calls.append(reg_addrs)
+        return MagicMock()
+
+    async def read_prepared(self, plan: object) -> RawModbusReadResult:
+        values = [self._readback_values.get(a, 0) for a in self.prepare_read_calls[-1]]
+        return RawModbusReadResult(ok=True, values=values)
+
+
+class TestModbusSourceWriteAdapterReadback:
+    """ModbusSourceWriteAdapter.readback() contract 验证。
+
+    使用 mock reader 验证 write-then-readback 闭合路径，
+    不依赖真实 Modbus TCP 设备或 native runner。
+
+    证据等级：L2 (contract/stub)。
+    真实 Modbus TCP E2E readback 需要运行中的 Modbus simulator。
+    """
+
+    def setup_method(self) -> None:
+        self._adapter = ModbusSourceWriteAdapter()
+
+    def _make_execution(self, *, dry_run: bool = False) -> SourceWriteExecutionOptions:
+        return SourceWriteExecutionOptions(
+            protocol="modbus_tcp", transport="tcp",
+            request_timeout_ms=5000, dry_run=dry_run,
+        )
+
+    def _make_connection(self) -> SourceConnectionData:
+        return SourceConnectionData(
+            host="127.0.0.1", port=502,
+            ied_name="IED1", ld_name="LD1", namespace_uri="",
+        )
+
+    def test_readback_returns_written_values(self, monkeypatch) -> None:
+        """write 后 readback 应返回写入值（寄存器地址对应）。"""
+        # register 0 -> 42, register 1 -> 100
+        readback_vals = {0: 42, 1: 100}
+        mock_reader = _MockModbusReadbackReader(readback_values=readback_vals)
+        monkeypatch.setattr(
+            "whale.ingest.adapters.source.modbus_source_write_adapter.ModbusSourceReader",
+            lambda **_: mock_reader,
+        )
+
+        async def _run():
+            execution = self._make_execution()
+            connection = self._make_connection()
+            items = [
+                SourceWriteItemData(key="i1", node_id="0", value_type="uint16", value="42"),
+                SourceWriteItemData(key="i2", node_id="1", value_type="uint16", value="100"),
+            ]
+            write_result = await self._adapter.write(
+                execution=execution, connection=connection, items=items,
+            )
+            readback = await self._adapter.readback(
+                execution=execution, connection=connection,
+                items=items, write_result=write_result,
+            )
+            assert readback["0"] == "42"
+            assert readback["1"] == "100"
+        asyncio.run(_run())
+
+    def test_readback_empty_on_invalid_host(self) -> None:
+        """无效 host/port 时 readback 返回空字典。"""
+        async def _run():
+            execution = self._make_execution()
+            connection = SourceConnectionData(
+                host="", port=0, ied_name="", ld_name="", namespace_uri="",
+            )
+            items = [
+                SourceWriteItemData(key="i1", node_id="0", value_type="uint16", value="42"),
+            ]
+            fake_result = SourceWriteResult(
+                request_id="fake", dry_run=False, success_count=0, failure_count=0,
+                results=[],
+            )
+            readback = await self._adapter.readback(
+                execution=execution, connection=connection,
+                items=items, write_result=fake_result,
+            )
+            assert readback == {}
+        asyncio.run(_run())
+
+    def test_readback_empty_on_invalid_node_ids(self, monkeypatch) -> None:
+        """所有 node_id 无法解析时 readback 返回空字典。"""
+        mock_reader = _MockModbusReadbackReader(readback_values={0: 42})
+        monkeypatch.setattr(
+            "whale.ingest.adapters.source.modbus_source_write_adapter.ModbusSourceReader",
+            lambda **_: mock_reader,
+        )
+
+        async def _run():
+            execution = self._make_execution()
+            connection = self._make_connection()
+            items = [
+                SourceWriteItemData(key="bad", node_id="not_a_number", value_type="uint16", value="42"),
+            ]
+            write_result = await self._adapter.write(
+                execution=execution, connection=connection, items=items,
+            )
+            readback = await self._adapter.readback(
+                execution=execution, connection=connection,
+                items=items, write_result=write_result,
+            )
+            assert readback == {}
         asyncio.run(_run())

@@ -1,4 +1,7 @@
-"""Structured audit port for source write/control commands."""
+"""端口接口定义。
+
+定义调用方契约和实现方责任，相关功能。
+"""
 
 from __future__ import annotations
 
@@ -9,7 +12,7 @@ from typing import Protocol
 
 @dataclass(slots=True)
 class SourceCommandAuditEvent:
-    """One structured audit event emitted by SourceCommandUseCase."""
+    """SourceCommandUseCase 发出的一条结构化审计事件。"""
 
     request_id: str
     command_id: str | None
@@ -27,7 +30,7 @@ class SourceCommandAuditEvent:
 
 
 class SourceCommandAuditPort(Protocol):
-    """Sink for structured source-command audit events."""
+    """结构化源命令审计事件的 sink。"""
 
     def emit(self, event: SourceCommandAuditEvent) -> None:
-        """Emit one audit event."""
+        """发送一条审计事件。"""

@@ -1,4 +1,7 @@
-"""File-based access policy adapters for ingest API and write authorization."""
+"""安全策略适配器。
+
+实现访问控制和安全分区策略。
+"""
 
 from __future__ import annotations
 
@@ -18,13 +21,16 @@ from whale.shared.crosscutting.auth import (
 
 
 class FileAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
-    """Access policy backed by one YAML allow-list file with deny fallback."""
+    """基于 YAML 文件白名单的访问策略，默认拒绝。"""
 
     def __init__(self, path: str | Path) -> None:
+        """初始化 FileAccessPolicy 实例。"""
         self._path = Path(path)
         self._rules = self._load(self._path)
 
     def evaluate(self, principal: Principal, permission: Permission) -> AccessDecision:
+        """初始化基于文件的访问策略。Args: path: YAML 策略文件路径。"""
+        """评估访问权限，返回 AccessDecision。"""
         if self._match(principal, permission):
             return AccessDecision(allowed=True)
         return AccessDecision(
@@ -38,10 +44,12 @@ class FileAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
     def authorize(
         self,
         request: Request,
+        
         action: str,
         resource_type: str,
         resource_id: str | None = None,
     ) -> bool:
+        """检查请求是否对给定操作和资源授权。返回布尔值表示允许或拒绝。"""
         decision = self.evaluate(
             _principal_from_request(request),
             Permission(
@@ -86,27 +94,34 @@ class FileAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
 
 
 class AllowAllAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
-    """Allow-all policy for dev/test defaults."""
+    """开发/测试默认的 allow-all 策略。"""
 
     def evaluate(self, principal: Principal, permission: Permission) -> AccessDecision:
+        """评估访问权限。返回 AccessDecision 含允许/拒绝决定。"""
+        
         del principal, permission
         return AccessDecision(allowed=True)
 
     def authorize(
         self,
         request: Request,
+        
         action: str,
         resource_type: str,
         resource_id: str | None = None,
     ) -> bool:
+        """评估主体的访问权限。返回 AccessDecision 包含允许/拒绝决定和拒绝原因。"""
+        """检查请求是否对给定操作和资源授权。返回布尔值表示允许或拒绝。"""
         del request, action, resource_type, resource_id
         return True
 
 
 class DenyAllAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
-    """Deny-all policy for safety tests and lockdown mode."""
+    
+    """安全测试和锁定模式使用的 deny-all 策略。"""
 
     def evaluate(self, principal: Principal, permission: Permission) -> AccessDecision:
+        """评估访问权限。返回 AccessDecision 含允许/拒绝决定。"""
         del principal, permission
         return AccessDecision(
             allowed=False,
@@ -116,16 +131,19 @@ class DenyAllAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
     def authorize(
         self,
         request: Request,
+        
         action: str,
         resource_type: str,
         resource_id: str | None = None,
     ) -> bool:
+        """评估主体的访问权限。返回 AccessDecision 包含允许/拒绝决定和拒绝原因。"""
+        """检查请求是否对给定操作和资源授权。返回布尔值表示允许或拒绝。"""
         del request, action, resource_type, resource_id
         return False
 
 
 def _principal_from_request(request: Request) -> Principal:
-    """Build one shared authorization principal from request headers."""
+    """从请求头构造共享授权主体。"""
 
     actor = (request.headers.get("x-actor") or "anonymous").strip() or "anonymous"
     raw_roles = request.headers.get("x-roles", "")

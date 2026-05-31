@@ -1,7 +1,11 @@
+"""open62541 OPC UA 客户端后端实现。
+
+通过 open62541 C native binary 子进程提供 OPC UA 读写能力。
+使用 stdin/stdout 协议与 native runner 通信。
+"""
 from __future__ import annotations
 
 import asyncio
-import os
 import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -9,6 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final
 
+from whale.shared.source.runner_resolution import (
+    ResolvedRunnerPath,
+    build_runner_unavailable_message,
+    is_source_lab_dev_runner_path,
+    resolve_native_runner_path,
+)
 from whale.shared.source.models import SourceConnectionProfile
 from whale.shared.source.opcua.backends.base import (
     Open62541PreparedReadPlan,
@@ -66,14 +76,10 @@ class _CachedPlanRuntime:
 
 def resolve_client_runner_path() -> Path:
     """Resolve the open62541 client runner executable path."""
-
-    env_path = os.environ.get("WHALE_OPEN62541_CLIENT_RUNNER_PATH")
-    if env_path:
-        return Path(env_path).expanduser().resolve()
-
-    source_lab_root = Path(__file__).resolve().parents[6] / "tools" / "source_lab"
-    suffix = ".exe" if os.name == "nt" else ""
-    return source_lab_root / "native" / "build" / f"open62541_client_runner{suffix}"
+    return resolve_native_runner_path(
+        executable_stem="open62541_client_runner",
+        specific_env_var="WHALE_OPEN62541_CLIENT_RUNNER_PATH",
+    ).path
 
 
 def _normalize_open62541_node_id(address: str) -> str:
@@ -118,9 +124,24 @@ class Open62541OpcUaClientBackend:
 
         runner_path = resolve_client_runner_path()
         if not runner_path.exists():
+            resolution = resolve_native_runner_path(
+                executable_stem="open62541_client_runner",
+                specific_env_var="WHALE_OPEN62541_CLIENT_RUNNER_PATH",
+            )
+            if runner_path != resolution.path:
+                resolution = ResolvedRunnerPath(
+                    executable_name=runner_path.name,
+                    path=runner_path,
+                    source="custom_override",
+                    evidence_level="unknown",
+                    used_dev_fallback=is_source_lab_dev_runner_path(runner_path),
+                )
             raise RuntimeError(
-                "open62541 client runner executable does not exist: "
-                f"{runner_path}. Build `open62541_client_runner` first with CMake."
+                build_runner_unavailable_message(
+                    runner_label="open62541 client runner",
+                    specific_env_var="WHALE_OPEN62541_CLIENT_RUNNER_PATH",
+                    resolution=resolution,
+                )
             )
 
         self._temp_dir = tempfile.TemporaryDirectory(prefix="open62541_client_runner_")

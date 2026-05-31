@@ -1,4 +1,7 @@
-"""Role exports for the active source acquisition flow."""
+"""采集角色实现。
+
+定义轮询和订阅等不同采集模式的具体执行逻辑。
+"""
 
 from whale.ingest.usecases.roles.polling_acquisition_role import (
     PollingAcquisitionRole,

@@ -7,13 +7,11 @@ from collections.abc import Callable, Sequence
 import math
 
 from tools.source_lab.access.common.access_model import AccessBatch
-from tools.source_lab.access.polling.model import CapacityStatus
 from tools.source_lab.access.subscribe.model import (
     SubscribeEndpointDispatchTrace,
     SubscribeFlushLagTrace,
     SubscribeLevelMetrics,
     SubscribePeriodGapTrace,
-    SubscribeRunnerTrace,
     SubscribeScanConfig,
     SubscribeWorkerRawStats,
 )

@@ -1,4 +1,8 @@
-"""Database-backed runtime-configuration repository for ingest."""
+"""配置适配器。
+
+实现配置相关 port，从数据库加载运行时配置。
+外部依赖：SQLAlchemy ORM。
+"""
 
 from __future__ import annotations
 
@@ -27,16 +31,17 @@ from whale.shared.persistence.orm import (
 
 
 class SourceRuntimeConfigRepository(SourceRuntimeConfigPort):
-    """Load runtime config rows from the ingest database."""
+    """从 ingest 数据库加载运行时配置行。"""
 
     def __init__(
         self,
         session_factory: Callable[[], AbstractContextManager[Session]] = session_scope,
     ) -> None:
+        """初始化源运行时配置仓库。Args: session_factory: 数据库会话工厂。"""
         self._session_factory = session_factory
 
     def list_enabled(self) -> list[SourceRuntimeConfigData]:
-        """Return enabled runtime configurations ordered by task id."""
+        """返回按 task_id 排序的已启用运行时配置列表。"""
         with self._session_factory() as session:
             tasks = list(
                 session.scalars(
@@ -53,7 +58,7 @@ class SourceRuntimeConfigRepository(SourceRuntimeConfigPort):
         group_by: Sequence[str] = (),
         first_group_only: bool = False,
     ) -> list[ServerRuntimeConfigData]:
-        """Return server entries ordered for deterministic profile grouping."""
+        """返回按顺序排列的服务器条目，用于确定性的 profile 分组。"""
         with self._session_factory() as session:
             rows = session.execute(
                 select(
@@ -128,7 +133,7 @@ class SourceRuntimeConfigRepository(SourceRuntimeConfigPort):
         self,
         signal_profile_id: int,
     ) -> list[SignalProfileItemRuntimeData]:
-        """Return one signal profile's items ordered by profile item id."""
+        """返回单个信号 profile 的条目，按 profile_item_id 排序。"""
         with self._session_factory() as session:
             rows = session.execute(
                 select(

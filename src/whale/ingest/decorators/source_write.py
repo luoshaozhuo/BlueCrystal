@@ -1,4 +1,7 @@
-"""Decorator objects for SourceWritePort crosscutting concerns."""
+"""装饰器模块。
+
+为采集、写入、缓存等横切关注点提供装饰器封装。
+"""
 
 from __future__ import annotations
 
@@ -20,21 +23,7 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class AuthorizedSourceWritePort(SourceWritePort):
-    """Enforce access-policy and security-profile decisions before write.
-
-    Wraps an inner ``SourceWritePort`` and rejects write operations when:
-    - The protocol is not allowed by the ``WriteSecurityProfile``.
-    - The ``AccessPolicyPort`` denies the principal's permission.
-
-    Usage in composition root::
-
-        port = AuthorizedSourceWritePort(
-            inner=OpcUaSourceWriteAdapter(),
-            principal=resolved_principal,
-            access_policy=resolved_access_policy,
-            security_profile=profile,
-        )
-    """
+    """写入前强制检查访问策略和安全策略。拦截未经授权或不满足安全配置的写入请求。"""
 
     inner: SourceWritePort
     principal: Principal
@@ -44,9 +33,11 @@ class AuthorizedSourceWritePort(SourceWritePort):
     async def write(
         self,
         execution: SourceWriteExecutionOptions,
+        
         connection: SourceConnectionData,
         items: list[SourceWriteItemData],
     ) -> SourceWriteResult:
+        """带授权的写入操作。先校验访问权限和安全策略，通过后委托底层 port 执行。"""
         protocol = execution.protocol.strip().lower()
         resource_id = connection.ied_name or connection.ld_name or "unknown"
         self._require_write_allowed(protocol, resource_id)

@@ -19,6 +19,7 @@ import os
 import socket
 from contextlib import closing
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -44,11 +45,6 @@ from whale.ingest.usecases.dtos.source_write_request import (
     SourceWriteItemData,
     SourceWriteRequest,
 )
-from whale.ingest.usecases.dtos.source_acquisition_request import (
-    AcquisitionExecutionOptions,
-    AcquisitionItemData,
-    SourceAcquisitionRequest,
-)
 
 _MODEL_MODULE = import_source_lab_module("tools.source_lab.model")
 _ADDRESS_SPACE_MODULE = import_source_lab_module("tools.source_lab.protocols.opcua.address_space")
@@ -62,8 +58,19 @@ Open62541SourceSimulator = _SIMULATOR_MODULE.Open62541SourceSimulator
 resolve_runner_path = _SIMULATOR_MODULE.resolve_runner_path
 
 
+def _resolve_client_runner_path() -> Path | None:
+    build_dir = Path(__file__).resolve().parents[2] / "tools" / "source_lab" / "native" / "build"
+    for candidate in (
+        build_dir / "open62541_client_runner",
+        build_dir / "open62541_client_runner.exe",
+    ):
+        if candidate.exists():
+            return candidate.resolve()
+    return None
+
+
 def _require_runner() -> None:
-    if not resolve_runner_path().exists():
+    if not resolve_runner_path().exists() or _resolve_client_runner_path() is None:
         pytest.skip("open62541 runner executable does not exist")
 
 
@@ -118,6 +125,9 @@ def test_opcua_write_then_read_verify_value_changed() -> None:
     registry = StaticSourceWritePortRegistry(ports_by_protocol={"opcua": write_port})
     use_case = SourceCommandUseCase(write_port_registry=registry)
     os.environ["WHALE_INGEST_SOURCE_WRITE_ENABLED"] = "true"
+    client_runner_path = _resolve_client_runner_path()
+    assert client_runner_path is not None
+    os.environ["WHALE_OPEN62541_CLIENT_RUNNER_PATH"] = str(client_runner_path)
 
     node_path = _get_node_id(source, "WPPD1.TotW")
     connection_data = SourceConnectionData(
@@ -208,6 +218,8 @@ def test_opcua_write_then_read_verify_value_changed() -> None:
     finally:
         if "WHALE_INGEST_SOURCE_WRITE_ENABLED" in os.environ:
             del os.environ["WHALE_INGEST_SOURCE_WRITE_ENABLED"]
+        if "WHALE_OPEN62541_CLIENT_RUNNER_PATH" in os.environ:
+            del os.environ["WHALE_OPEN62541_CLIENT_RUNNER_PATH"]
 
 
 @pytest.mark.integration
@@ -221,6 +233,9 @@ def test_opcua_write_dry_run_does_not_change_value() -> None:
     write_port = OpcUaSourceWriteAdapter()
     registry = StaticSourceWritePortRegistry(ports_by_protocol={"opcua": write_port})
     use_case = SourceCommandUseCase(write_port_registry=registry)
+    client_runner_path = _resolve_client_runner_path()
+    assert client_runner_path is not None
+    os.environ["WHALE_OPEN62541_CLIENT_RUNNER_PATH"] = str(client_runner_path)
 
     connection_data = SourceConnectionData(
         host=source.connection.host,
@@ -305,6 +320,8 @@ def test_opcua_write_dry_run_does_not_change_value() -> None:
     finally:
         if "WHALE_INGEST_SOURCE_WRITE_ENABLED" in os.environ:
             del os.environ["WHALE_INGEST_SOURCE_WRITE_ENABLED"]
+        if "WHALE_OPEN62541_CLIENT_RUNNER_PATH" in os.environ:
+            del os.environ["WHALE_OPEN62541_CLIENT_RUNNER_PATH"]
 
 
 @pytest.mark.integration
@@ -317,6 +334,9 @@ def test_opcua_write_disabled_refuses_real_write() -> None:
     write_port = OpcUaSourceWriteAdapter()
     registry = StaticSourceWritePortRegistry(ports_by_protocol={"opcua": write_port})
     use_case = SourceCommandUseCase(write_port_registry=registry)
+    client_runner_path = _resolve_client_runner_path()
+    assert client_runner_path is not None
+    os.environ["WHALE_OPEN62541_CLIENT_RUNNER_PATH"] = str(client_runner_path)
 
     # 确保未设置启用标记
     if "WHALE_INGEST_SOURCE_WRITE_ENABLED" in os.environ:
@@ -350,5 +370,9 @@ def test_opcua_write_disabled_refuses_real_write() -> None:
         ],
     )
 
-    with pytest.raises(RuntimeError, match="Real device write is disabled"):
-        asyncio.run(use_case.execute(write_request))
+    try:
+        with pytest.raises(RuntimeError, match="Real device write is disabled"):
+            asyncio.run(use_case.execute(write_request))
+    finally:
+        if "WHALE_OPEN62541_CLIENT_RUNNER_PATH" in os.environ:
+            del os.environ["WHALE_OPEN62541_CLIENT_RUNNER_PATH"]

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from tools.source_lab.access.polling.model import CapacityMode
 from tools.source_lab.access.subscribe.model import SubscribeScanConfig

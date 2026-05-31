@@ -1,6 +1,8 @@
-"""Relational outbox publisher for ingest state snapshot messages.
+"""消息发布适配器。
 
-Deprecated: StateSnapshotOutbox has been removed. This publisher is a no-op.
+实现 MessagePublisherPort，将状态快照发布到消息中间件。
+外部依赖：Kafka / Redis。
+失败处理：失败不传播到调用方，记录 error 后继续。
 """
 
 from __future__ import annotations
@@ -15,9 +17,10 @@ from whale.ingest.ports.message.message_publisher_port import (
 
 
 class RelationalOutboxMessagePublisher(MessagePublisherPort):
-    """No-op outbox publisher (table removed in schema rewrite)."""
+    """No-op outbox 发布器（schema 重写后表已移除）。"""
 
     def publish_snapshot(self, message: StateSnapshotMessage) -> MessagePublishResult:
+        """返回当前快照。"""
         return MessagePublishResult(
             pipeline_name="relational_outbox",
             success=True,

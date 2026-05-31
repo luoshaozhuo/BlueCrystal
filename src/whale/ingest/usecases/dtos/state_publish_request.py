@@ -1,4 +1,4 @@
-"""DTO for state snapshot publish requests."""
+"""状态快照发布请求 DTO。承载一次发布操作所需的源标识、时间戳等参数。"""
 
 from __future__ import annotations
 
@@ -7,17 +7,7 @@ from dataclasses import dataclass, field
 
 @dataclass(slots=True)
 class StateSnapshotPublishRequest:
-    """Request to publish one full state snapshot from cache to message queue.
-
-    Fields:
-        trace_id: Correlation trace id for observability.
-        station_id: Optional filter — only publish sources matching this station.
-        source_id: Optional filter — only publish the given source_id.
-        ld_name: Optional filter — only publish the given ld_name.
-        dry_run: When true, read snapshot but do not publish.
-        max_items_per_message: Split snapshot into multiple messages when
-            item count exceeds this threshold. 0 means no splitting.
-    """
+    """请求将一次全量状态快照从缓存发布到消息队列。包含源 ID 和时间范围过滤。"""
 
     trace_id: str | None = None
     station_id: str | None = None

@@ -14,7 +14,7 @@ import json
 import os
 from pathlib import Path
 import sys
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import Protocol, cast
 
 from tools.source_lab.access.common.cpu import CpuSampler
 from tools.source_lab.access.common.io import build_field_runtime_sources
@@ -37,10 +37,6 @@ from tools.source_lab.access.subscribe.capacity_model import (
     SubscribeCapacityResult,
 )
 from tools.source_lab.access.subscribe.model import SubscribeScanConfig
-
-if TYPE_CHECKING:
-    from tools.source_lab.access.subscribe.capacity_rows import sample_hz_to_interval_ms
-
 
 @dataclass(frozen=True, slots=True)
 class FieldCapacityRow:
@@ -432,7 +428,7 @@ def _run_polling_field_capacity(
 ) -> tuple[FieldCapacityRow, ...]:
     from tools.source_lab.access.polling.capacity_rows import polling_row
 
-    runner = build_capacity_runner(request.protocol)
+    runner = build_capacity_runner(request.protocol).runner
     rows: list[FieldCapacityRow] = []
     progress = CapacityProgressBar(
         "polling",

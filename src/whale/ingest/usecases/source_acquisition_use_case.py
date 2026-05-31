@@ -42,6 +42,7 @@ class SourceAcquisitionUseCase:
         polling_role: PollingAcquisitionRole,
         subscription_role: SubscriptionAcquisitionRole,
     ) -> None:
+        """初始化采集用例。Args: role: 采集角色（轮询或订阅）。"""
         self._polling_role = polling_role
         self._subscription_role = subscription_role
 

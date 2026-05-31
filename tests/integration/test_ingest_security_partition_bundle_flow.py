@@ -19,7 +19,6 @@ from whale.ingest.domain.audit_event import IngestAuditEvent
 from whale.ingest.ports.audit import IngestAuditSinkPort
 from sqlalchemy import create_engine
 from whale.shared.persistence import Base
-from whale.shared.persistence.orm import IngestBundleMetadata
 
 
 class _MemoryAuditSink(IngestAuditSinkPort):
@@ -34,7 +33,6 @@ class _MemoryAuditSink(IngestAuditSinkPort):
 def session_factory():
     engine = create_engine("sqlite://", echo=False)
     Base.metadata.create_all(bind=engine)
-    from whale.ingest.framework.persistence import create_runtime_session_factory
     return create_runtime_session_factory(engine)
 
 

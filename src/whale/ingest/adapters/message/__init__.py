@@ -1,4 +1,9 @@
-"""Message publishing adapters for ingest."""
+"""消息发布适配器。
+
+实现 MessagePublisherPort，将状态快照发布到消息中间件。
+外部依赖：Kafka / Redis。
+失败处理：失败不传播到调用方，记录 error 后继续。
+"""
 
 from __future__ import annotations
 
@@ -12,7 +17,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> object:
-    """Lazily expose message publishers to avoid importing unrelated backends."""
+    """延迟暴露消息发布器，避免导入无关后端依赖。"""
 
     module_by_name = {
         "KafkaMessagePublisher": "whale.ingest.adapters.message.kafka_message_publisher",

@@ -24,12 +24,9 @@ from whale.ingest.ports.command.source_command_audit_port import (
 )
 from whale.ingest.ports.metrics import IngestMetricEvent, IngestMetricsPort
 from whale.ingest.ports.runtime.write_lease_port import WriteLeasePort
-from whale.ingest.ports.source.source_write_port import SourceWritePort
 from whale.ingest.ports.source.source_write_port_registry import SourceWritePortRegistry
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
 from whale.ingest.usecases.dtos.source_write_request import (
-    SourceWriteExecutionOptions,
-    SourceWriteItemData,
     SourceWriteRequest,
 )
 from whale.ingest.usecases.dtos.source_write_result import SourceWriteItemResult, SourceWriteResult
@@ -52,6 +49,7 @@ class SourceCommandUseCase:
         metrics_port: IngestMetricsPort | None = None,
         write_lease_port: WriteLeasePort | None = None,
     ) -> None:
+        """初始化命令用例。Args: write_port_registry: 写入 port 注册表。command_audit_sink: 命令审计 sink。write_lease_service: 写入租约服务。security_profile: 安全策略。"""
         self._write_port_registry = write_port_registry
         self._audit_port = audit_port
         self._metrics_port = metrics_port
@@ -59,6 +57,14 @@ class SourceCommandUseCase:
 
     async def execute(self, request: SourceWriteRequest) -> SourceWriteResult:
         """校验并执行一次设备写入请求。
+
+        流程顺序：
+        1. 校验请求参数。
+        2. dry_run 或 write_disabled 短路返回/抛出。
+        3. 获取 write port 和 connection，尝试 acquire write lease。
+        4. 在 try 块内执行 precheck、write、readback。
+        5. SUCCESS audit/metric 仅在 readback 验证通过后发出。
+        6. finally 块确保 write lease 在所有异常路径释放。
 
         Args:
             request: 写入请求。
@@ -68,6 +74,7 @@ class SourceCommandUseCase:
 
         Raises:
             ValueError: 请求参数非法时抛出。
+            RuntimeError: write_disabled、lease 冲突、precheck 失败、readback 不匹配时抛出。
         """
         self._validate(request)
         write_enabled = self._is_write_enabled()
@@ -108,7 +115,9 @@ class SourceCommandUseCase:
         )
         lease_resource_id = connection.ld_name or connection.ied_name or "unknown"
         fencing_token: int | None = None
+        lease_acquired: bool = False
 
+        # 尝试 acquire write lease（可选）
         if self._write_lease_port is not None:
             try:
                 lease_decision = self._write_lease_port.acquire(
@@ -141,20 +150,49 @@ class SourceCommandUseCase:
                 raise RuntimeError(
                     f"Write lease denied: {lease_decision.reason_code or lease_decision.result}"
                 )
+            lease_acquired = True
 
-        precheck = getattr(port, "precheck", None)
-        if callable(precheck):
-            precheck_result = precheck(execution=execution, connection=connection, items=request.items)
-            if isawaitable(precheck_result):
-                precheck_result = await precheck_result
-            if precheck_result not in (True, None):
-                reason = str(precheck_result)
+        # 主执行体：precheck / write / readback 全部在 try 块内，
+        # 确保任何异常路径都通过 finally 释放 lease。
+        try:
+            precheck = getattr(port, "precheck", None)
+            if callable(precheck):
+                precheck_result = precheck(execution=execution, connection=connection, items=request.items)
+                if isawaitable(precheck_result):
+                    precheck_result = await precheck_result
+                if precheck_result not in (True, None):
+                    reason = str(precheck_result)
+                    self._emit_audit(
+                        request=request,
+                        result="FAILED",
+                        failure_reason=reason,
+                        decision="ALLOW",
+                        reason_code="PRECHECK_FAILED",
+                        fencing_token=fencing_token,
+                    )
+                    self._emit_metric(
+                        request=request,
+                        operation="source_command",
+                        status="FAILED",
+                        started_at=started_at,
+                        error_code="PRECHECK_FAILED",
+                    )
+                    raise RuntimeError(reason)
+
+            # 调用 port 写入
+            try:
+                result = await port.write(
+                    execution=execution,
+                    connection=connection,
+                    items=request.items,
+                )
+            except Exception as exc:
                 self._emit_audit(
                     request=request,
                     result="FAILED",
-                    failure_reason=reason,
+                    failure_reason=str(exc) or type(exc).__name__,
                     decision="ALLOW",
-                    reason_code="PRECHECK_FAILED",
+                    reason_code=type(exc).__name__,
                     fencing_token=fencing_token,
                 )
                 self._emit_metric(
@@ -162,102 +200,76 @@ class SourceCommandUseCase:
                     operation="source_command",
                     status="FAILED",
                     started_at=started_at,
-                    error_code="PRECHECK_FAILED",
+                    error_code=type(exc).__name__,
                 )
-                raise RuntimeError(reason)
+                raise
 
-        # 调用 port 写入
-        try:
-            result = await port.write(
-                execution=execution,
-                connection=connection,
-                items=request.items,
-            )
-        except Exception as exc:
+            # 填充 result 元数据
+            if result.trace_id is None:
+                result.trace_id = request.trace_id
+            result.command_id = request.command_id
+
+            # readback 验证（在 SUCCESS 之前执行）
+            readback = getattr(port, "readback", None)
+            if execution.params.get("require_readback") and callable(readback):
+                readback_values = readback(
+                    execution=execution,
+                    connection=connection,
+                    items=request.items,
+                    write_result=result,
+                )
+                if isawaitable(readback_values):
+                    readback_values = await readback_values
+                readback_map = dict(readback_values or {})
+                mismatches = [
+                    item.node_id
+                    for item in request.items
+                    if str(readback_map.get(item.node_id)) != str(item.value)
+                ]
+                if mismatches:
+                    self._emit_audit(
+                        request=request,
+                        result="FAILED",
+                        failure_reason="readback_mismatch",
+                        decision="ALLOW",
+                        reason_code="READBACK_MISMATCH",
+                        fencing_token=fencing_token,
+                    )
+                    self._emit_metric(
+                        request=request,
+                        operation="source_command",
+                        status="FAILED",
+                        started_at=started_at,
+                        error_code="READBACK_MISMATCH",
+                    )
+                    raise RuntimeError("Write readback mismatch.")
+                result.attributes["readback"] = "confirmed"
+
+            # readback 通过后才 emit SUCCESS
             self._emit_audit(
                 request=request,
-                result="FAILED",
-                failure_reason=str(exc) or type(exc).__name__,
+                result="SUCCESS",
+                failure_reason=None,
                 decision="ALLOW",
-                reason_code=type(exc).__name__,
+                reason_code=None,
                 fencing_token=fencing_token,
             )
             self._emit_metric(
                 request=request,
                 operation="source_command",
-                status="FAILED",
+                status="SUCCESS",
                 started_at=started_at,
-                error_code=type(exc).__name__,
+                error_code=None,
             )
-            if self._write_lease_port is not None:
+            return result
+
+        finally:
+            # 确保所有异常路径都释放 write lease
+            if lease_acquired and self._write_lease_port is not None:
                 self._write_lease_port.release(
                     resource_id=lease_resource_id,
                     holder_key=execution.actor or "ingest",
                 )
-            raise
-        if result.trace_id is None:
-            result.trace_id = request.trace_id
-        result.command_id = request.command_id
-        self._emit_audit(
-            request=request,
-            result="SUCCESS",
-            failure_reason=None,
-            decision="ALLOW",
-            reason_code=None,
-            fencing_token=fencing_token,
-        )
-        self._emit_metric(
-            request=request,
-            operation="source_command",
-            status="SUCCESS",
-            started_at=started_at,
-            error_code=None,
-        )
-        readback = getattr(port, "readback", None)
-        if execution.params.get("require_readback") and callable(readback):
-            readback_values = readback(
-                execution=execution,
-                connection=connection,
-                items=request.items,
-                write_result=result,
-            )
-            if isawaitable(readback_values):
-                readback_values = await readback_values
-            readback_map = dict(readback_values or {})
-            mismatches = [
-                item.node_id
-                for item in request.items
-                if str(readback_map.get(item.node_id)) != str(item.value)
-            ]
-            if mismatches:
-                self._emit_audit(
-                    request=request,
-                    result="FAILED",
-                    failure_reason="readback_mismatch",
-                    decision="ALLOW",
-                    reason_code="READBACK_MISMATCH",
-                    fencing_token=fencing_token,
-                )
-                self._emit_metric(
-                    request=request,
-                    operation="source_command",
-                    status="FAILED",
-                    started_at=started_at,
-                    error_code="READBACK_MISMATCH",
-                )
-                if self._write_lease_port is not None:
-                    self._write_lease_port.release(
-                        resource_id=lease_resource_id,
-                        holder_key=execution.actor or "ingest",
-                    )
-                raise RuntimeError("Write readback mismatch.")
-            result.attributes["readback"] = "confirmed"
-        if self._write_lease_port is not None:
-            self._write_lease_port.release(
-                resource_id=lease_resource_id,
-                holder_key=execution.actor or "ingest",
-            )
-        return result
 
     @staticmethod
     def _validate(request: SourceWriteRequest) -> None:
@@ -385,7 +397,15 @@ class SourceCommandUseCase:
 def _int_param(value: object) -> int | None:
     if value is None:
         return None
-    try:
+    if isinstance(value, bool):
         return int(value)
-    except (TypeError, ValueError):
-        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None

@@ -202,7 +202,7 @@ class SimulatorSourceProvider(SourceProvider):
 
         # 根据协议构建更新参数
         protocol = normalize_protocol(self._active_config.protocol)
-        update_params: dict[str, object] = {
+        update_params: dict[str, str | int | float | bool] = {
             "source_update_enabled": self._active_config.source_update_enabled,
             "source_update_hz": self._active_config.source_update_hz,
         }

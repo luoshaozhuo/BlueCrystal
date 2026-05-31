@@ -1,3 +1,8 @@
+"""subscription endpoint 动态调整测试。
+
+验证 subscription endpoint 在 runtime 的创建、修改和移除行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import random
@@ -167,6 +172,13 @@ def test_dynamic_mqtt_replace_one_topic_keeps_others_receiving(tmp_path: Path) -
 
 
 class _FailingSessionManager:
+    """测试用 EndpointSessionManager stub。
+
+    start_endpoint 故意抛出异常以模拟启动失败。
+    不继承 EndpointSessionManager（构造函数签名不同），
+    传入 EndpointRuntimeRegistry 时需 type: ignore。
+    """
+
     def start_endpoint(self, runtime: object, config: object) -> None:
         raise RuntimeError("intentional failure")
 
@@ -193,8 +205,10 @@ def test_dynamic_subscription_journal_records_allow_deny_success_failed(tmp_path
         assert registry.pause_endpoint(source.connection.name).result == "SUCCESS"
         assert registry.pause_endpoint(source.connection.name).result == "DENY"
 
+        # _FailingSessionManager 为测试 stub，仅用于模拟启动失败，
+        # 不继承 EndpointSessionManager。
         failing_registry = EndpointRuntimeRegistry(
-            session_manager=_FailingSessionManager(),
+            session_manager=_FailingSessionManager(),  # type: ignore[arg-type]
             continuity_monitor=ContinuityMonitor(),
             stagger_coordinator=StaggerCoordinator(),
             state_store=RuntimeStateStore(str(tmp_path / "failed-runtime")),

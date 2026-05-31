@@ -1,13 +1,20 @@
+"""state store repair CLI 测试。
+
+验证 state store 修复命令的功能和行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+import pytest
+
 from tools.source_lab.access.runtime import RuntimeStateStore
 from tools.source_lab.access.runtime.dynamic_cli import main
 
 
-def test_dynamic_cli_inspect_state_store_outputs_snapshot_summary(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_inspect_state_store_outputs_snapshot_summary(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     store = RuntimeStateStore(str(tmp_path / "runtime"))
     store.save_registry({"ep-1": {"state": "running"}})
     output = tmp_path / "inspect.json"
@@ -19,7 +26,7 @@ def test_dynamic_cli_inspect_state_store_outputs_snapshot_summary(tmp_path: Path
     assert output.exists()
 
 
-def test_dynamic_cli_repair_state_store_restores_from_backup_and_journals(tmp_path: Path, capsys) -> None:
+def test_dynamic_cli_repair_state_store_restores_from_backup_and_journals(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     store = RuntimeStateStore(str(tmp_path / "runtime"))
     store.save_registry({"ep-1": {"state": "running"}})
     store.save_registry({"ep-1": {"state": "paused"}})
@@ -33,7 +40,7 @@ def test_dynamic_cli_repair_state_store_restores_from_backup_and_journals(tmp_pa
     assert any(entry.get("action") == "REPAIR_STATE_STORE" for entry in entries)
 
 
-def test_dynamic_cli_repair_state_store_requires_from_backup_flag(capsys) -> None:
+def test_dynamic_cli_repair_state_store_requires_from_backup_flag(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["repair-state-store"])
     payload = json.loads(capsys.readouterr().out)
     assert exit_code == 1

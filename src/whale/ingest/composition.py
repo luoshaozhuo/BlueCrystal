@@ -1,4 +1,15 @@
-"""Explicit ingest composition root for acquisition, latest-state caching, and source write/control."""
+"""依赖注入装配（composition root）。
+
+负责组装 ingest 模块的所有依赖：
+- adapter 实现绑定到 port 接口；
+- 安全策略（access_evaluator、write_lease）；
+- 审计 sink（audit_sink）；
+- 消息发布（message_publisher）；
+- 数据库 session 工厂。
+
+当前为最小装配，部分安全组件使用 no-op/allow-all 默认值，
+生产部署需替换为真实实现。
+"""
 
 from __future__ import annotations
 
@@ -50,14 +61,13 @@ from whale.ingest.decorators import (
     RetryingSourceAcquisitionPort,
 )
 from whale.ingest.domain.write_security_profile import (
-    ProtocolWriteProfile,
-    ReadbackStrategy,
     WriteSecurityProfile,
 )
 from whale.ingest.ports.source.source_acquisition_port import (
     SourceAcquisitionError,
     SourceAcquisitionPort,
 )
+from whale.ingest.ports.runtime.write_lease_port import WriteLeasePort
 from whale.ingest.ports.source.source_write_port import SourceWritePort
 from whale.ingest.ports.source.source_acquisition_port_registry import (
     SourceAcquisitionPortRegistry,
@@ -94,7 +104,7 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class IngestAcquisitionComposition:
-    """Resolved ingest acquisition object graph."""
+    """已解析的 ingest 采集对象图。"""
 
     use_case: SourceAcquisitionUseCase
     acquisition_port: SourceAcquisitionPort
@@ -104,7 +114,7 @@ class IngestAcquisitionComposition:
 
 @dataclass(frozen=True, slots=True)
 class IngestWriteComposition:
-    """Resolved ingest write/control object graph."""
+    """已解析的 ingest 写入/控制对象图。"""
 
     command_use_case: SourceCommandUseCase
     write_port: SourceWritePort
@@ -124,8 +134,7 @@ def build_source_acquisition_composition(
     principal: Principal | None = None,
     logger: logging.Logger | None = None,
 ) -> IngestAcquisitionComposition:
-    """Build the ingest acquisition chain with explicit wrappers.
-
+    """构建采集链。按日志、审计、重试、授权、调试的顺序装饰采集 port，组装完整采集调用链。
     Notes:
         - Local/test composition defaults to an allow-all access policy.
         - Production deployments should inject an explicit policy implementation.
@@ -211,9 +220,10 @@ def build_source_acquisition_composition(
 
 
 class _DefaultSourceErrorClassifier(ErrorClassifier):
-    """Classify source acquisition exceptions into stable codes."""
+    """将源采集异常分类为稳定错误码。"""
 
     def classify(self, error: Exception) -> ClassifiedError:
+        """将异常分类为稳定错误码。"""
         if isinstance(error, SourceAcquisitionError):
             return ClassifiedError(
                 error_code=_normalize_error_code(str(error)),
@@ -230,44 +240,58 @@ class _DefaultSourceErrorClassifier(ErrorClassifier):
 
 
 class _AllowAllAccessPolicy(AccessPolicyPort):
-    """Default access policy used by the composition root."""
+    """composition root 使用的默认访问策略。"""
 
     def evaluate(self, principal: Principal, permission: Permission) -> AccessDecision:
+        """评估访问权限。返回 AccessDecision 含允许/拒绝决定。"""
+        
         del principal, permission
         return AccessDecision(allowed=True)
 
 
 class _NullAuditEventSink(AuditEventSinkPort):
-    """Default no-op audit sink."""
+    """评估主体的访问权限。返回 AccessDecision 包含允许/拒绝决定和拒绝原因。"""
+    """默认 no-op 审计 sink（不执行实际持久化）。"""
 
     def emit(self, event: AuditEvent) -> None:
+        """空操作 emit，不实际发送事件。"""
+        
         del event
 
 
 class _NullMetricsSink(MetricsSinkPort):
-    """Default no-op metrics sink."""
+    """空操作 emit。用于开发/测试场景，不实际发送事件。"""
+    """默认 no-op 指标 sink（不执行实际记录）。"""
 
     def increment(self, metric_name: str, value: int = 1, **labels: str) -> None:
+        """递增计数器。"""
+        
         del metric_name, value, labels
 
     def observe_duration(
         self,
         metric_name: str,
+        
         duration_seconds: float,
         **labels: str,
     ) -> None:
+        """空操作 increment。不实际记录指标计数器。"""
+        """空操作 observe_duration。不实际记录持续时间观测。"""
         del metric_name, duration_seconds, labels
 
 
 class _NullDebugTraceSink(DebugTraceSinkPort):
-    """Default no-op debug trace sink."""
+    
+    """默认 no-op 调试追踪 sink。"""
 
     def emit(self, event_name: str, context: DebugTraceContext, **payload: str) -> None:
+        """发送事件。"""
         del event_name, context, payload
 
 
 def _normalize_error_code(value: str) -> str:
-    """Normalize one free-form error string into a stable code shape."""
+    """空操作 emit。用于开发/测试场景，不实际发送事件。"""
+    """将自由格式错误字符串规范化为稳定错误码。"""
 
     lowered = value.strip().lower()
     if "timeout" in lowered:
@@ -291,10 +315,12 @@ def build_source_write_composition(
     access_policy: AccessPolicyPort | None = None,
     principal: Principal | None = None,
     write_security_profile: WriteSecurityProfile | None = None,
+    audit_sink: AuditEventSinkPort | None = None,
+    metrics_sink: MetricsSinkPort | None = None,
+    write_lease_port: WriteLeasePort | None = None,
     logger: logging.Logger | None = None,
 ) -> IngestWriteComposition:
-    """Build the ingest write/control composition.
-
+    """构建写入/控制装配。组装写入 port 的装饰链（授权、审计、调试）并返回完整写入入口。
     Args:
         write_port_registry: Optional custom write port registry.
             Defaults to a static registry with OPC UA support only.
@@ -304,16 +330,24 @@ def build_source_write_composition(
             Defaults to a service principal named "ingest".
         write_security_profile: Optional security profile controlling
             which protocols may write. Defaults to a deny-all profile.
+        audit_sink: Optional audit event sink for write/control commands.
+            Defaults to a no-op sink.
+        metrics_sink: Optional metrics sink for write/control commands.
+            Defaults to a no-op sink.
+        write_lease_port: Optional write lease guard for write/control
+            concurrency protection. When None, write leases are disabled.
         logger: Optional logger instance.
-
     Returns:
         Resolved write object graph.
-
     Notes:
         - Default composition only supports OPC UA.
         - Write is DISABLED by default (WHALE_INGEST_SOURCE_WRITE_ENABLED must be set).
         - Authorization is allow-all by default (for backwards compatibility).
           Production deployments should inject a restricted access policy.
+        - audit_sink/metrics_sink/write_lease_port default to None for
+          backward compatibility; production deployments should inject
+          real implementations to ensure auditability and write conflict
+          protection.
     """
     resolved_logger = logger or LOGGER
     resolved_access_policy = access_policy or _AllowAllAccessPolicy()
@@ -372,6 +406,9 @@ def build_source_write_composition(
 
     command_use_case = SourceCommandUseCase(
         write_port_registry=resolved_write_port_registry,
+        audit_port=audit_sink,  # type: ignore[arg-type]  # AuditEventSinkPort vs SourceCommandAuditPort 结构兼容
+        metrics_port=metrics_sink,  # type: ignore[arg-type]  # MetricsSinkPort vs IngestMetricsPort 结构兼容
+        write_lease_port=write_lease_port,
     )
 
     resolved_logger.info(
@@ -390,8 +427,7 @@ def build_source_write_composition(
 def build_default_write_composition(
     logger: logging.Logger | None = None,
 ) -> IngestWriteComposition:
-    """Build a default write composition with OPC UA support.
-
+    """构建包含 OPC UA 支持的默认写入装配。当前仅注册 OPC UA 适配器作为写入实现。
     Convenience wrapper for tests and simple deployments.
     """
     return build_source_write_composition(logger=logger)
@@ -399,7 +435,7 @@ def build_default_write_composition(
 
 @dataclass(frozen=True, slots=True)
 class IngestPublishComposition:
-    """Resolved state-snapshot publish object graph."""
+    """已解析的状态快照发布对象图。"""
 
     use_case: StateSnapshotPublishUseCase
     reader: SourceStateSnapshotReaderPort
@@ -415,8 +451,7 @@ def build_state_snapshot_publish_composition(
     redis_client: RedisHashClient | None = None,
     logger: logging.Logger | None = None,
 ) -> IngestPublishComposition:
-    """Build the state-snapshot publish object graph.
-
+    """构建状态快照发布对象图。组装状态缓存读取、消息发布和审计的完整依赖链。
     Args:
         reader: Optional snapshot reader. Defaults to a new RedisSourceStateCache.
         publisher: Optional message publisher. Must be injected by the caller
@@ -426,7 +461,6 @@ def build_state_snapshot_publish_composition(
         redis_settings: Redis settings used when creating a default reader.
         redis_client: Optional shared Redis client.
         logger: Optional logger instance.
-
     Returns:
         Resolved publish object graph.
     """
@@ -449,7 +483,7 @@ def build_state_snapshot_publish_composition(
 
     # Resolve station_id from settings or argument
     if station_id is None and redis_settings is not None:
-        station_id = redis_settings.station_id  # type: ignore[union-attr]
+        station_id = redis_settings.station_id  # type: ignore[union-attr]  # RedisStateCacheConfig 确定存在 station_id 字段，union 分支已在上文排除 None
     resolved_station_id = station_id or "unknown-station"
 
     use_case = StateSnapshotPublishUseCase(

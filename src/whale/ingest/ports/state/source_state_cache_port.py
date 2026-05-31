@@ -20,17 +20,11 @@ from whale.ingest.usecases.dtos.acquired_node_state import AcquiredNodeStateBatc
 
 
 class SourceStateCacheError(RuntimeError):
-    """Base error raised by latest-state cache adapters."""
+    """状态缓存适配器抛出的基础异常。作为所有缓存相关异常的父类。"""
 
 
 class SourceStateCacheWriteError(SourceStateCacheError):
-    """Raised when a latest-state cache write cannot be completed safely.
-
-    Args:
-        error_code: Stable machine-readable error code.
-        message: Optional human-readable detail for logs and diagnostics.
-        retryable: Whether callers may retry the failed operation later.
-    """
+    """状态缓存写入异常。当最新状态缓存写入无法安全完成时抛出的具体异常类。"""
 
     def __init__(
         self,
@@ -39,6 +33,7 @@ class SourceStateCacheWriteError(SourceStateCacheError):
         *,
         retryable: bool = True,
     ) -> None:
+        """初始化缓存写入异常。Args: source_id: 源标识符。message: 异常消息。"""
         detail = message or error_code
         super().__init__(detail)
         self.error_code = error_code

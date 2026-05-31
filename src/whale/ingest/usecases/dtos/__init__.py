@@ -1,4 +1,7 @@
-"""DTOs for ingest use cases."""
+"""数据传输对象。
+
+定义 use case 层输入输出数据结构，与 ORM 模型解耦。
+"""
 
 from whale.ingest.usecases.dtos.acquired_node_state import (
     AcquiredNodeStateBatch,

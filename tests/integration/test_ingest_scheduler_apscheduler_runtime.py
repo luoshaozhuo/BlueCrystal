@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from whale.ingest.framework.persistence import (
@@ -153,7 +152,7 @@ def test_worker_runtime_does_not_execute_without_lease(tmp_path, settings, repos
     )
     assert not decision.allowed
 
-    snap = metrics.snapshot()
+    _snap = metrics.snapshot()
     # If we call _execute_one with bad token, it'll skip
     worker._execute_one(job_id="test-job-1", fencing_token=999999, now=now)
     snap2 = metrics.snapshot()

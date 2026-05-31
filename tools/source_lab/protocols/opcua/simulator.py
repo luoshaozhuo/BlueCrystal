@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import socket
-from typing import Any
 
 from tools.source_lab.model import SimulatedSource
 from tools.source_lab.protocols.common._base_facade import BaseSimulatorFacade
@@ -19,6 +18,16 @@ from tools.source_lab.protocols.common.simulator_models import (
 from tools.source_lab.protocols.opcua.open62541_source_simulator import (
     Open62541SourceSimulator,
 )
+
+
+class _NoopHandler:
+    """占位 OPC UA 订阅 handler，用于验证 create_subscription 可用性。
+
+    不处理实际数据变更通知，仅满足 asyncua 类型签名要求。
+    """
+
+    async def datachange_notification(self, node: object, val: object, data: object) -> None:
+        pass
 
 
 class OpcUaSimulatorFacade(BaseSimulatorFacade):
@@ -169,7 +178,9 @@ class OpcUaSimulatorFacade(BaseSimulatorFacade):
             await client.connect()
 
             try:
-                sub = await client.create_subscription(500, None)
+                # asyncua create_subscription 第二个参数不接受 None，
+                # 使用占位 _NoopHandler 创建初始订阅以验证功能可用
+                sub = await client.create_subscription(500, _NoopHandler())
                 if sub is None:
                     return SimulatorResult(SimulatorStatus.ERROR, "failed to create subscription")
 

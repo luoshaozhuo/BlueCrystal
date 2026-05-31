@@ -1,4 +1,7 @@
-"""Runtime mode parsing for ingest nodes and schedulers."""
+"""运行模式定义。
+
+定义 ingest 运行时的操作模式。
+"""
 
 from __future__ import annotations
 
@@ -6,7 +9,7 @@ from enum import StrEnum
 
 
 class RuntimeMode(StrEnum):
-    """Supported ingest runtime modes."""
+    """支持的 ingest 运行时模式。"""
 
     STANDALONE = "standalone"
     ACTIVE_STANDBY = "active_standby"
@@ -15,7 +18,7 @@ class RuntimeMode(StrEnum):
 
     @classmethod
     def parse(cls, value: str) -> "RuntimeMode":
-        """Parse one user/config supplied runtime mode."""
+        """解析用户/配置提供的运行时模式。"""
 
         normalized = value.strip().lower()
         try:

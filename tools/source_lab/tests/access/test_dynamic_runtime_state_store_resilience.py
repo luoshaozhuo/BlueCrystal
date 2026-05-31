@@ -1,7 +1,15 @@
+"""dynamic runtime state store 韧性测试。
+
+验证 state store 在异常场景（磁盘满、并发写入、文件损坏）下的行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
+
+import pytest
 
 from tools.source_lab.access.runtime import RuntimeStateStore
 from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
@@ -11,7 +19,7 @@ from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
 )
 
 
-def test_runtime_state_store_uses_atomic_write_for_snapshots(tmp_path: Path, monkeypatch) -> None:
+def test_runtime_state_store_uses_atomic_write_for_snapshots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     store = RuntimeStateStore(str(tmp_path / "runtime"))
     seen: list[tuple[str, str]] = []
     original_replace = os.replace
@@ -43,7 +51,7 @@ def test_runtime_state_recovery_handles_corrupt_continuity_snapshot(tmp_path: Pa
     assert any(
         entry["action"] == "RECOVER"
         and entry["result"] == "FAILED"
-        and any("continuity_snapshot.json" in error for error in entry.get("recovery_errors", []))
+        and any("continuity_snapshot.json" in error for error in cast(list[str], entry.get("recovery_errors", [])))
         for entry in entries
     )
 
@@ -61,7 +69,7 @@ def test_runtime_state_recovery_handles_corrupt_registry_snapshot(tmp_path: Path
     entries = recovered_registry._state_store.load_journal_entries()
     assert any(
         entry["action"] == "RECOVER"
-        and any("endpoint_registry.json" in error for error in entry.get("recovery_errors", []))
+        and any("endpoint_registry.json" in error for error in cast(list[str], entry.get("recovery_errors", [])))
         for entry in entries
     )
 
@@ -81,7 +89,7 @@ def test_runtime_state_recovery_journals_partial_recovery_failure(tmp_path: Path
         and entry["result"] == "FAILED"
         and any(
             "accepted_endpoints.json" in error or "invalid_endpoint" in error
-            for error in entry.get("recovery_errors", [])
+            for error in cast(list[str], entry.get("recovery_errors", []))
         )
         for entry in entries
     )

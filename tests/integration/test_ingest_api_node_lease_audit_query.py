@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 from whale.ingest.api import create_app
 from whale.ingest.framework.persistence import (

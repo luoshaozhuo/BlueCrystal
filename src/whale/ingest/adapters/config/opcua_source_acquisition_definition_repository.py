@@ -1,4 +1,8 @@
-"""Database-backed OPC UA acquisition-definition repository."""
+"""配置适配器。
+
+实现配置相关 port，从数据库加载运行时配置。
+外部依赖：SQLAlchemy ORM。
+"""
 
 from __future__ import annotations
 
@@ -33,6 +37,7 @@ class OpcUaSourceAcquisitionDefinitionRepository(SourceAcquisitionDefinitionPort
         self,
         session_factory: Callable[[], AbstractContextManager[Session]] = session_scope,
     ) -> None:
+        """初始化 OPC UA 采集定义仓库。Args: session_factory: 数据库会话工厂。"""
         self._session_factory = session_factory
 
     def get_config(

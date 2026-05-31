@@ -1,4 +1,7 @@
-"""Node heartbeat models and persistence helpers."""
+"""节点运行时管理。
+
+管理 ingest 节点的生命周期、心跳和状态上报。
+"""
 
 from __future__ import annotations
 
@@ -16,7 +19,7 @@ from whale.ingest.runtime.modes import RuntimeMode
 
 @dataclass(slots=True)
 class NodeHeartbeat:
-    """One runtime node heartbeat snapshot."""
+    """单个运行时节点心跳快照。"""
 
     node_key: str
     runtime_mode: RuntimeMode
@@ -26,16 +29,17 @@ class NodeHeartbeat:
 
 
 class NodeRuntimeRepository:
-    """Persist node heartbeat state into the runtime DB."""
+    """持久化节点心跳状态到运行时数据库。"""
 
     def __init__(
         self,
         session_factory: sessionmaker[Session] | Callable[[], Session],
     ) -> None:
+        """初始化节点运行时仓库。Args: session_factory: 数据库会话工厂。"""
         self._session_factory = session_factory
 
     def upsert_heartbeat(self, heartbeat: NodeHeartbeat) -> IngestRuntimeNode:
-        """Insert or update one node heartbeat row."""
+        """插入或更新一条节点心跳记录。"""
 
         session = self._session_factory()
         try:
@@ -63,7 +67,7 @@ class NodeRuntimeRepository:
             session.close()
 
     def get(self, node_key: str) -> IngestRuntimeNode | None:
-        """Return one node row by key."""
+        """按键返回单行节点记录。"""
 
         session = self._session_factory()
         try:
@@ -72,7 +76,7 @@ class NodeRuntimeRepository:
             session.close()
 
     def list_nodes(self) -> list[IngestRuntimeNode]:
-        """Return all known runtime nodes."""
+        """返回所有已知的运行时节点。"""
 
         session = self._session_factory()
         try:
@@ -90,7 +94,7 @@ class NodeRuntimeRepository:
         now: datetime,
         heartbeat_timeout_seconds: int,
     ) -> list[IngestRuntimeNode]:
-        """Return nodes that are still considered alive."""
+        """返回仍视为存活的节点列表。"""
 
         threshold = now.timestamp() - heartbeat_timeout_seconds
         alive: list[IngestRuntimeNode] = []

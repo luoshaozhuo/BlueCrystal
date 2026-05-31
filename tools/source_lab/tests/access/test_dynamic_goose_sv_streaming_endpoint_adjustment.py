@@ -1,14 +1,20 @@
+"""GOOSE/SV streaming endpoint 动态调整测试。
+
+验证 GOOSE/SV endpoint 在 runtime 的创建、修改和移除行为。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import os
 import subprocess
 import time
 from pathlib import Path
+from typing import cast
 
 import pytest
-
+from tools.source_lab.access.runtime import ContinuityMonitor, EndpointRuntimeRegistry
 from tools.source_lab.fleet import SourceSimulatorFleet
-from tools.source_lab.model import UpdateConfig
+from tools.source_lab.model import SimulatedSource, UpdateConfig
 from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
     build_goose_source,
     build_native_registry,
@@ -75,7 +81,9 @@ def _require_l2_runtime(protocol: str) -> None:
         pytest.skip(reason or "SKIPPED_ENV_PERMISSION: raw_socket_permission_missing")
 
 
-def _run_streaming_isolation_test(tmp_path: Path, protocol: str) -> tuple[object, object, object, tuple[object, ...]]:
+def _run_streaming_isolation_test(
+    tmp_path: Path, protocol: str
+) -> tuple[EndpointRuntimeRegistry, ContinuityMonitor, SourceSimulatorFleet, tuple[SimulatedSource, ...]]:
     if protocol == "iec61850_goose":
         sources = tuple(build_goose_source(index, 1000 + index) for index in range(3))
     else:
@@ -85,7 +93,7 @@ def _run_streaming_isolation_test(tmp_path: Path, protocol: str) -> tuple[object
     return registry, monitor, fleet, sources
 
 
-def _wait_for_event_growth(monitor, endpoint_id: str, *, baseline_events: int, timeout_s: float = 6.0) -> None:
+def _wait_for_event_growth(monitor: ContinuityMonitor, endpoint_id: str, *, baseline_events: int, timeout_s: float = 6.0) -> None:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         current = monitor.snapshot()[endpoint_id]
@@ -123,8 +131,8 @@ def test_dynamic_goose_stop_one_app_id_keeps_other_app_id_receiving_when_raw_soc
         journal = registry._state_store.load_journal_entries()
         assert any(
             entry.get("action") == "STOP_ENDPOINT"
-            and sources[0].connection.name in entry.get("affected_endpoints", [])
-            and sources[1].connection.name in entry.get("unaffected_endpoints", [])
+            and sources[0].connection.name in cast(list[str], entry.get("affected_endpoints", []))
+            and sources[1].connection.name in cast(list[str], entry.get("unaffected_endpoints", []))
             for entry in journal
         )
     finally:
@@ -167,7 +175,9 @@ def test_dynamic_goose_replace_params_keeps_unaffected_app_id_receiving_when_raw
         time.sleep(3.0)
         before = monitor.snapshot()
         target = sources[0].connection.name
-        expected_version = registry.get_config(target).config_version
+        config = registry.get_config(target)
+        assert config is not None, f"config not found for {target}"
+        expected_version = config.config_version
         assert registry.update_endpoint(
             target,
             {"params": {"publish_interval_ms": 1200}},
@@ -256,7 +266,9 @@ def test_dynamic_sv_replace_params_keeps_unaffected_app_id_receiving_when_raw_so
         time.sleep(3.0)
         before = monitor.snapshot()
         target = sources[0].connection.name
-        expected_version = registry.get_config(target).config_version
+        config = registry.get_config(target)
+        assert config is not None, f"config not found for {target}"
+        expected_version = config.config_version
         assert registry.update_endpoint(
             target,
             {"params": {"sample_rate_hz": 2}},

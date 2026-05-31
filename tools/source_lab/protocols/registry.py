@@ -20,7 +20,7 @@ from tools.source_lab.protocols.common.simulators import build_simulator_for_pro
 
 # ── ServerSimulatorFacade 映射表 ──────────────────────────────────────
 
-_SIMULATOR_FACADE_REGISTRY: dict[str, type] = {}
+_SIMULATOR_FACADE_REGISTRY: dict[str, Callable[..., ServerSimulatorFacade]] = {}
 
 
 def _register_facade(protocol: str, facade_cls: type) -> None:

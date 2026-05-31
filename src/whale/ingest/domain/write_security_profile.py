@@ -1,7 +1,7 @@
-"""Write security profile domain model.
+"""写入安全配置文件。
 
-Controls which protocols are allowed to perform write/control operations,
-what readback strategy is used, and what authorization is required.
+定义设备写入操作的安全策略配置，
+包括允许的写入范围、速率限制和审批要求。
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from enum import Enum
 
 
 class ReadbackStrategy(Enum):
-    """How write readback verification is performed."""
+    """写入 readback 校验的执行方式。"""
 
     DISABLED = "disabled"
     IMMEDIATE_READBACK = "immediate_readback"
@@ -20,7 +20,7 @@ class ReadbackStrategy(Enum):
 
 @dataclass(frozen=True, slots=True)
 class ProtocolWriteProfile:
-    """Security configuration for write operations on one protocol."""
+    """单个协议的写入操作安全配置。"""
 
     allowed: bool = False
     readback_strategy: ReadbackStrategy = ReadbackStrategy.DISABLED
@@ -30,27 +30,7 @@ class ProtocolWriteProfile:
 
 @dataclass(frozen=True, slots=True)
 class WriteSecurityProfile:
-    """Security profile for write/control operations.
-
-    Controls which protocols may write, what readback strategy to use,
-    and what authorization level is required.
-
-    The default profile denies all protocols. Each protocol must be
-    explicitly enabled in ``protocols``.
-
-    Example::
-
-        profile = WriteSecurityProfile(protocols={
-            "opcua": ProtocolWriteProfile(
-                allowed=True,
-                readback_strategy=ReadbackStrategy.IMMEDIATE_READBACK,
-            ),
-            "modbus_tcp": ProtocolWriteProfile(
-                allowed=True,
-                readback_strategy=ReadbackStrategy.DISABLED,
-            ),
-        })
-    """
+    """写/控制操作安全策略。定义各协议写入的安全级别、确认模式和校验规则。"""
 
     default_readback_strategy: ReadbackStrategy = ReadbackStrategy.DISABLED
     default_required_roles: tuple[str, ...] = field(default_factory=lambda: ("admin",))
@@ -58,16 +38,15 @@ class WriteSecurityProfile:
     protocols: dict[str, ProtocolWriteProfile] = field(default_factory=dict)
 
     def profile_for(self, protocol: str) -> ProtocolWriteProfile:
-        """Get the resolved profile for *protocol*.
-
-        Returns a protocol-specific entry if one is configured, otherwise
-        the implicit default (deny-all).
-        """
+        """获取指定协议的解析后安全策略。按协议名查找配置并返回合并的策略对象。"""
         normalized = protocol.strip().lower()
         if normalized in self.protocols:
             return self.protocols[normalized]
         return ProtocolWriteProfile()
 
     def is_write_allowed(self, protocol: str) -> bool:
-        """Return whether write is allowed for *protocol*."""
+        """获取指定协议的解析后安全策略。按协议类型查找对应配置并返回合并后的安全策略。
+
+Returns a protocol-specific entry if one is configured, otherwise
+the implicit default (deny-all)."""
         return self.profile_for(protocol).allowed

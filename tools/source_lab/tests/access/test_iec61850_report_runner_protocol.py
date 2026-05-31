@@ -6,7 +6,6 @@ Tests the stdin/stdout protocol of the iec61850_report_runner C executable.
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest

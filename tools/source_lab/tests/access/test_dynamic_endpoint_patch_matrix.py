@@ -1,8 +1,15 @@
+"""dynamic endpoint PATCH 操作矩阵测试。
+
+验证 endpoint 各属性组合的 PATCH 请求结果。
+证据等级：L2（contract）。
+"""
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
+from tools.source_lab.access.runtime.continuity_model import EndpointContinuityMetrics
 from tools.source_lab.fleet import SourceSimulatorFleet
 from tools.source_lab.model import UpdateConfig
 from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
@@ -18,7 +25,11 @@ from tools.source_lab.tests.access._dynamic_runtime_test_utils import (
 )
 
 
-def _assert_unaffected_stable(before: dict[str, object], after: dict[str, object], endpoint_id: str) -> None:
+def _assert_unaffected_stable(
+    before: Mapping[str, EndpointContinuityMetrics],
+    after: Mapping[str, EndpointContinuityMetrics],
+    endpoint_id: str,
+) -> None:
     before_metrics = before[endpoint_id]
     after_metrics = after[endpoint_id]
     assert after_metrics.endpoint_restart_count == before_metrics.endpoint_restart_count

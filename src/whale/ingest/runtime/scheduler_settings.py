@@ -1,4 +1,7 @@
-"""Scheduler configuration models for ingest runtime."""
+"""调度器配置。
+
+定义调度器行为的可配置参数。
+"""
 
 from __future__ import annotations
 
@@ -9,7 +12,7 @@ from whale.ingest.runtime.modes import RuntimeMode
 
 @dataclass(slots=True)
 class JobStoreSettings:
-    """APScheduler job store settings."""
+    """APScheduler 任务存储设置。"""
 
     type: str = "memory"
     url: str | None = None
@@ -17,7 +20,7 @@ class JobStoreSettings:
 
 @dataclass(slots=True)
 class ExecutorSettings:
-    """APScheduler executor settings."""
+    """APScheduler 执行器配置。定义线程池/进程池的名称、类型和参数。"""
 
     threadpool_max_workers: int = 8
     processpool_max_workers: int | None = None
@@ -25,7 +28,7 @@ class ExecutorSettings:
 
 @dataclass(slots=True)
 class JobDefaultSettings:
-    """Default runtime behavior for APScheduler jobs."""
+    """APScheduler 执行器配置。定义线程池/进程池执行器参数。"""
 
     coalesce: bool = True
     max_instances: int = 1
@@ -34,7 +37,9 @@ class JobDefaultSettings:
 
 @dataclass(slots=True)
 class SchedulerSettings:
-    """Top-level scheduler settings."""
+    """调度器配置。
+
+定义调度器行为的可配置参数。"""
 
     scheduler_type: str = "blocking"
     timezone: str = "UTC"

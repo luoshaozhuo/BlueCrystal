@@ -14,14 +14,10 @@
 from __future__ import annotations
 
 import time
+import types
 from contextlib import closing
-from dataclasses import dataclass, field
-from itertools import count as iter_count
-from typing import Any
-
 import pytest
 
-from tools.source_lab.access.runners.base import CapacityRunner
 from tools.source_lab.access.runners.native_cmd import NativeCmdCapacityRunner
 from tools.source_lab.access.runners.registry import build_capacity_runner
 
@@ -35,7 +31,7 @@ def _find_free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _load_simulator() -> tuple[object, object]:
+def _load_simulator() -> tuple[types.ModuleType, types.ModuleType]:
     from tests.support.source_lab_runtime import import_source_lab_module
     sim_mod = import_source_lab_module("tools.source_lab.protocols.common.simulators")
     model_mod = import_source_lab_module("tools.source_lab.model")
@@ -44,14 +40,15 @@ def _load_simulator() -> tuple[object, object]:
 
 def _build_sim_source(host: str, port: int) -> object:
     sim_mod, model_mod = _load_simulator()
-    return model_mod.SimulatedSource(
-        connection=model_mod.SourceConnection(
+    # 通过动态导入模块访问属性，mypy 无法推断类型，忽略 attr-defined
+    return model_mod.SimulatedSource(  # type: ignore[attr-defined]
+        connection=model_mod.SourceConnection(  # type: ignore[attr-defined]
             name="modbus_gate", ied_name="IED", ld_name="LD",
             host=host, port=port, transport="tcp", protocol="modbus_tcp",
         ),
         points=(
-            model_mod.SimulatedPoint(ln_name="", do_name="0", unit="", data_type="UINT16", initial_value=10),
-            model_mod.SimulatedPoint(ln_name="", do_name="1", unit="", data_type="UINT16", initial_value=20),
+            model_mod.SimulatedPoint(ln_name="", do_name="0", unit="", data_type="UINT16", initial_value=10),  # type: ignore[attr-defined]
+            model_mod.SimulatedPoint(ln_name="", do_name="1", unit="", data_type="UINT16", initial_value=20),  # type: ignore[attr-defined]
         ),
     )
 
@@ -64,12 +61,16 @@ class TestModbusTcpCapacityProfileGate:
 
     def test_runner_construction(self) -> None:
         """build_capacity_runner('modbus_tcp') 必须成功返回 runner。"""
-        runner = build_capacity_runner("modbus_tcp")
-        assert runner is not None, "build_capacity_runner returned None"
+        from tools.source_lab.access.runners.registry import RunnerInfo
+        info = build_capacity_runner("modbus_tcp")
+        assert info is not None, "build_capacity_runner returned None"
+        assert isinstance(info, RunnerInfo)
+        assert info.runner is not None
 
     def test_native_runner_command_build(self) -> None:
         """Native runner 必须可构建命令（证明 native 编译可用）。"""
-        runner = build_capacity_runner("modbus_tcp")
+        info = build_capacity_runner("modbus_tcp")
+        runner = info.runner
         if not isinstance(runner, NativeCmdCapacityRunner):
             pytest.fail(
                 "modbus_tcp native runner is NOT compiled. "
@@ -82,9 +83,9 @@ class TestModbusTcpCapacityProfileGate:
 
     def test_runner_protocol_identity(self) -> None:
         """Runner 的 name 字段必须包含 modbus_tcp 标识。"""
-        runner = build_capacity_runner("modbus_tcp")
-        name = runner.name.lower()
-        assert "modbus" in name, f"expected modbus in runner name, got {runner.name}"
+        info = build_capacity_runner("modbus_tcp")
+        name = info.name.lower()
+        assert "modbus" in name, f"expected modbus in runner name, got {info.name}"
 
     def test_tcp_read_against_simulator(self) -> None:
         """使用 Python ModbusTcpPollingRunner 对真实 simulator 执行 read_once。"""
@@ -97,7 +98,7 @@ class TestModbusTcpCapacityProfileGate:
         sim_mod, model_mod = _load_simulator()
         port = _find_free_port()
         source = _build_sim_source("127.0.0.1", port)
-        ModbusTcpSimulator = sim_mod.ModbusTcpSimulator
+        ModbusTcpSimulator = sim_mod.ModbusTcpSimulator  # type: ignore[attr-defined]
 
         runner = ModbusTcpPollingRunner()
         config = CapacityScanConfig(
@@ -143,7 +144,7 @@ class TestModbusTcpCapacityProfileGate:
         sim_mod, model_mod = _load_simulator()
         port = _find_free_port()
         source = _build_sim_source("127.0.0.1", port)
-        ModbusTcpSimulator = sim_mod.ModbusTcpSimulator
+        ModbusTcpSimulator = sim_mod.ModbusTcpSimulator  # type: ignore[attr-defined]
 
         runner = ModbusTcpPollingRunner()
         config = CapacityScanConfig(

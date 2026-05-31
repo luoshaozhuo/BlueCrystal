@@ -1,15 +1,10 @@
-"""External HTTP-based access policy adapter for ingest runtime.
-
-Makes authorization decisions by calling a remote access policy service.
-Supports fail_closed (default) and fail_open modes.
-"""
+"""基于外部 HTTP 的 ingest 运行时访问策略适配器。将权限决策委托给远程授权服务。"""
 
 from __future__ import annotations
 
 import json
 import logging
 import time
-from typing import Any
 
 import urllib.request
 from urllib.error import URLError
@@ -29,15 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExternalAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
-    """Access policy backed by an external HTTP authorization service.
-
-    Args:
-        endpoint_url: URL of the external policy service.
-        timeout_seconds: HTTP request timeout.
-        fail_closed: If True (default), deny on connection errors.
-            If False (explicitly configured), allow with warning audit.
-        cache_ttl_seconds: How long to cache positive decisions (default 0 = no cache).
-    """
+    """基于外部 HTTP 授权服务的访问策略。将权限决策委托给远程端点，按 HTTP 响应码判断。"""
 
     def __init__(
         self,
@@ -47,6 +34,7 @@ class ExternalAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
         fail_closed: bool = True,
         cache_ttl_seconds: int = 0,
     ) -> None:
+        """初始化外部 HTTP 授权策略。Args: endpoint_url: 授权服务 URL。timeout_seconds: 请求超时。"""
         self._endpoint_url = endpoint_url.rstrip("/") + "/authorize"
         self._timeout = timeout_seconds
         self._opener = build_opener(ProxyHandler({}))
@@ -57,7 +45,7 @@ class ExternalAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
         self.last_status_code: int | None = None
 
     def evaluate(self, principal: Principal, permission: Permission) -> AccessDecision:
-        """Delegate to external service and map response to AccessDecision."""
+        """委托给外部服务并将响应映射为 AccessDecision 对象。处理超时和连接失败。"""
         cache_key = f"{principal.principal_id}:{permission.action}:{permission.resource_type}:{permission.resource_id or ''}"
         now = time.monotonic()
 
@@ -120,6 +108,7 @@ class ExternalAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
         resource_type: str,
         resource_id: str | None = None,
     ) -> bool:
+        """检查请求是否对指定操作和资源授权。返回布尔值。"""
         decision = self.evaluate(
             _principal_from_request(request),
             Permission(
@@ -132,7 +121,7 @@ class ExternalAccessPolicy(AccessPolicyPort, RuntimeAccessPolicyPort):
 
 
 def _principal_from_request(request: Request) -> Principal:
-    """Build one shared authorization principal from request headers."""
+    """从请求头构造一个共享授权主体。提取 x-actor 和 x-roles 信息。"""
     actor = (request.headers.get("x-actor") or "anonymous").strip() or "anonymous"
     raw_roles = request.headers.get("x-roles", "")
     roles = tuple(role.strip() for role in raw_roles.split(",") if role.strip())

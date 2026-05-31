@@ -1,4 +1,12 @@
-"""Scheduler-job CRUD routes for ingest runtime API."""
+"""管理 调度任务 资源的 API 路由。
+
+每个 handler 在请求入口做权限检查（access_evaluator），
+变更操作支持 dry_run 模式和乐观并发控制（expected_version），
+所有操作通过 audit_sink 记录审计事件，
+事务在 try/finally 中管理 Session 生命周期。
+
+不负责：资源的业务逻辑编排（由 use case 层负责）。
+"""
 
 from __future__ import annotations
 
@@ -9,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from whale.ingest.api.audit_middleware import build_audit_event
-from whale.ingest.api.errors import ApiError, conflict, denied, not_found
+from whale.ingest.api.errors import conflict, denied, not_found
 from whale.ingest.api.schemas import (
     PaginatedResponse,
     SchedulerJobCreate,
@@ -17,6 +25,7 @@ from whale.ingest.api.schemas import (
     SchedulerJobResponse,
 )
 from whale.ingest.runtime.job_assignment import RuntimeJob, RuntimeJobRepository
+from whale.shared.persistence.orm import IngestRuntimeJob
 
 router = APIRouter(prefix="/api/v1/scheduler-jobs", tags=["scheduler-jobs"])
 
@@ -31,17 +40,38 @@ def _authorize(request: Request, action: str, resource_id: str | None = None) ->
         raise denied(action=action, resource_type="scheduler_job", resource_id=resource_id)
 
 
-def _emit_success(request, *, action, resource_type, resource_id, http_status, **kw):
+def _emit_success(
+    request: Request,
+    *,
+    action: str,
+    resource_type: str,
+    resource_id: str | None,
+    http_status: int,
+    before_version: int | None = None,
+    after_version: int | None = None,
+    changed_fields: list[str] | None = None,
+    attributes: dict[str, object] | None = None,
+) -> None:
     request.app.state.audit_sink.emit(
         build_audit_event(
-            request, action=action, resource_type=resource_type,
-            resource_id=resource_id, decision="ALLOW", result="SUCCESS",
-            http_status=http_status, **kw,
+            request,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            decision="ALLOW",
+            result="SUCCESS",
+            http_status=http_status,
+            before_version=before_version,
+            after_version=after_version,
+            changed_fields=changed_fields,
+            attributes=attributes,
         )
     )
 
 
-def _job_response(row) -> SchedulerJobResponse:
+def _job_response(row: IngestRuntimeJob) -> SchedulerJobResponse:
+    config = dict(row.config_json)
+    stagger_offset_ms = config.pop("stagger_offset_ms", None)
     return SchedulerJobResponse(
         job_id=row.job_id,
         job_type=row.job_type,
@@ -52,17 +82,19 @@ def _job_response(row) -> SchedulerJobResponse:
         schedule_kind=row.schedule_kind,
         schedule_expr=row.schedule_expr,
         version=row.version,
-        config=dict(row.config_json),
-        stagger_offset_ms=getattr(row, "stagger_offset_ms", None),
+        config=config,
+        stagger_offset_ms=stagger_offset_ms,
     )
 
 
 @router.post("", response_model=SchedulerJobResponse, status_code=201)
 def create_scheduler_job(
     request: Request,
+    
     payload: SchedulerJobCreate,
     dry_run: bool = Query(False),
 ) -> SchedulerJobResponse:
+    """创建新scheduler job。dry_run 为 True 时返回预期结果不实际创建。权限检查、审计记录和乐观并发控制。"""
     _authorize(request, "scheduler_job.create")
     if dry_run:
         return SchedulerJobResponse(
@@ -80,6 +112,10 @@ def create_scheduler_job(
         )
     session = _open_session(request.app.state.session_factory)
     try:
+        # 将 stagger_offset_ms 合并到 config 中，通过 repo 内部 session 持久化
+        resolved_config = dict(payload.config)
+        if payload.stagger_offset_ms is not None:
+            resolved_config["stagger_offset_ms"] = payload.stagger_offset_ms
         repo = RuntimeJobRepository(request.app.state.session_factory)
         row = repo.upsert_job(
             RuntimeJob(
@@ -89,13 +125,9 @@ def create_scheduler_job(
                 partition_key=payload.partition_key,
                 enabled=payload.enabled,
                 priority=payload.priority,
-                config=dict(payload.config),
+                config=resolved_config,
             )
         )
-        # Update stagger_offset_ms if provided
-        if payload.stagger_offset_ms is not None:
-            row.stagger_offset_ms = payload.stagger_offset_ms
-            session.commit()
         _emit_success(request, action="scheduler_job.create", resource_type="scheduler_job", resource_id=row.job_id, http_status=201, after_version=row.version)
         return _job_response(row)
     finally:
@@ -104,6 +136,7 @@ def create_scheduler_job(
 
 @router.get("/{job_id}", response_model=SchedulerJobResponse)
 def get_scheduler_job(job_id: str, request: Request) -> SchedulerJobResponse:
+    """获取指定的资源记录。"""
     _authorize(request, "scheduler_job.read", job_id)
     session = _open_session(request.app.state.session_factory)
     try:
@@ -120,9 +153,11 @@ def get_scheduler_job(job_id: str, request: Request) -> SchedulerJobResponse:
 @router.get("", response_model=PaginatedResponse[SchedulerJobResponse])
 def list_scheduler_jobs(
     request: Request,
+    
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> PaginatedResponse[SchedulerJobResponse]:
+    """获取调度作业的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
     _authorize(request, "scheduler_job.list")
     session = _open_session(request.app.state.session_factory)
     try:
@@ -139,10 +174,12 @@ def list_scheduler_jobs(
 @router.patch("/{job_id}", response_model=SchedulerJobResponse)
 def patch_scheduler_job(
     job_id: str,
+    
     request: Request,
     payload: SchedulerJobPatch,
     dry_run: bool = Query(False),
 ) -> SchedulerJobResponse:
+    """部分更新scheduler job。支持乐观并发控制（版本字段）。权限检查和审计记录。"""
     _authorize(request, "scheduler_job.update", job_id)
     session = _open_session(request.app.state.session_factory)
     try:
@@ -163,7 +200,9 @@ def patch_scheduler_job(
             if field_name == "config":
                 row.config_json = dict(value)
             elif field_name == "stagger_offset_ms":
-                row.stagger_offset_ms = value
+                # 持久化到 config_json 而非独立列
+                row.config_json = dict(row.config_json)
+                row.config_json["stagger_offset_ms"] = value
             else:
                 setattr(row, field_name, value)
             changed_fields.append(field_name)
@@ -180,10 +219,12 @@ def patch_scheduler_job(
 @router.delete("/{job_id}", status_code=204)
 def delete_scheduler_job(
     job_id: str,
+    
     request: Request,
     expected_version: int = Query(...),
     dry_run: bool = Query(False),
 ) -> None:
+    """删除scheduler job。权限检查并记录审计事件。"""
     _authorize(request, "scheduler_job.delete", job_id)
     session = _open_session(request.app.state.session_factory)
     try:

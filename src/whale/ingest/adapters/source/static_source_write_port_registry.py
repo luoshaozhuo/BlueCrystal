@@ -15,11 +15,13 @@ class StaticSourceWritePortRegistry:
     """通过静态映射解析写端口。"""
 
     def __init__(self, ports_by_protocol: Mapping[str, SourceWritePort]) -> None:
+        """初始化静态写入 port 注册表。Args: ports: 协议到 port 的映射字典。"""
         self._ports_by_protocol: dict[str, SourceWritePort] = {}
         for protocol, port in ports_by_protocol.items():
             self._ports_by_protocol[self._normalize_protocol_key(protocol)] = port
 
     def get(self, protocol: str) -> SourceWritePort:
+        """按协议获取写入 port。"""
         normalized = self._normalize_protocol_key(protocol)
         try:
             return self._ports_by_protocol[normalized]

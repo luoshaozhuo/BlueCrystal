@@ -95,17 +95,54 @@ class SourceConnection:
     def from_protocol(cls, *, name: str, ied_name: str, ld_name: str,
                       host: str, port: int, protocol: str,
                       transport: str | None = None,
-                      **kwargs) -> "SourceConnection":
-        """Create SourceConnection from old-style protocol name, resolving the triple."""
+                      namespace_uri: str | None = None,
+                      security: SecurityConfig | None = None,
+                      auth: AuthConfig | None = None,
+                      heartbeat: HeartbeatConfig | None = None,
+                      timeouts: TimeoutConfig | None = None,
+                      params: dict[str, str | int | float | bool] | None = None) -> SourceConnection:
+        """从旧式 protocol 名称创建 SourceConnection，自动解析三元组。
+
+        Args:
+            name: 连接名称。
+            ied_name: IED 名称。
+            ld_name: 逻辑设备名称。
+            host: 主机地址。
+            port: 端口号。
+            protocol: 旧式协议别名（如 opcua / modbus_tcp）。
+            transport: 传输协议，默认从三元组推断。
+            namespace_uri: 可选的命名空间 URI。
+            security: 可选的安全配置。
+            auth: 可选的认证配置。
+            heartbeat: 可选的心跳配置。
+            timeouts: 可选的超时配置。
+            params: 可选的协议参数字典。
+
+        Returns:
+            填充了 application_protocol、service_type、transport 的 SourceConnection。
+
+        Raises:
+            无；resolve_service_triple 在无法解析时返回 None，自动使用空字符串填充。
+        """
         from tools.source_lab.access.runners.registry import resolve_service_triple
-        app_proto, svc_type, tport = resolve_service_triple(protocol)
+        triple = resolve_service_triple(protocol)
+        if triple is None:
+            # 无法解析时使用空三元组
+            app_proto, svc_type, tport = ("", "", "")
+        else:
+            app_proto, svc_type, tport = triple
         return cls(
             name=name, ied_name=ied_name, ld_name=ld_name,
             host=host, port=port, transport=transport or tport,
             protocol=protocol,
             application_protocol=app_proto,
             service_type=svc_type,
-            **kwargs,
+            namespace_uri=namespace_uri,
+            security=security or SecurityConfig(),
+            auth=auth or AuthConfig(),
+            heartbeat=heartbeat or HeartbeatConfig(),
+            timeouts=timeouts or TimeoutConfig(),
+            params=params or {},
         )
 
 

@@ -10,7 +10,6 @@ from typing import cast
 
 from whale.shared.source.iec61850.backends.base import (
     RawMmsReadResult,
-    RawWriteItemResult,
 )
 from whale.shared.source.iec61850.backends.libiec61850_backend import (
     LibIec61850MmsClientBackend,

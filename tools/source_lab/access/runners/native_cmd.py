@@ -7,6 +7,7 @@ lifecycle and parses the stdout protocol: READY / SAMPLE / BATCH / SUMMARY / DON
 from __future__ import annotations
 
 import os
+import select
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -79,11 +80,43 @@ def _read_output_lines(
     proc: subprocess.Popen[str],
     session: _NativeSession,
     diagnostics: ProtocolDiagnostics,
+    timeout_seconds: int = 60,
 ) -> None:
-    """Read and parse stdout lines from a native C runner process."""
+    """Read and parse stdout lines from a native C runner process with timeout.
+
+    Args:
+        proc: 已启动的 native runner 进程。
+        session: 累积结果会话。
+        diagnostics: 协议诊断收集器。
+        timeout_seconds: stdout 读取超时秒数。超时后抛出 TimeoutError。
+
+    Raises:
+        TimeoutError: 读取 stdout 超过 timeout_seconds 未完成。
+    """
     if proc.stdout is None:
         return
-    for raw_line in proc.stdout:
+    deadline = time.monotonic() + timeout_seconds
+
+    while True:
+        # 检查是否超时
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(
+                f"Native runner stdout read timed out after {timeout_seconds}s"
+            )
+
+        # 使用 select 非阻塞检查可读性
+        rlist, _, _ = select.select([proc.stdout], [], [], remaining)
+        if not rlist:
+            raise TimeoutError(
+                f"Native runner stdout read timed out after {timeout_seconds}s"
+            )
+
+        raw_line = proc.stdout.readline()
+        if raw_line == "":
+            # 进程已退出且无更多数据
+            break
+
         stripped = raw_line.rstrip("\n\r")
         if not stripped:
             continue
@@ -124,6 +157,8 @@ class NativeCmdCapacityRunner(CapacityRunner):
 
     name: str = "native_cmd_runner"
     executable_name: str = ""
+    # stdout 读取超时秒数，超时后抛出 TimeoutError
+    stdout_timeout_seconds: int = 60
 
     def check_available(self) -> None:
         """Check native executable is available (exists and executable).
@@ -181,7 +216,7 @@ class NativeCmdCapacityRunner(CapacityRunner):
         target_hz: float,
         config: CapacityScanConfig,
     ) -> WorkerRawStats:
-        exe_path = self._resolve_exe()
+        _exe_path = self._resolve_exe()
         cmd = self.build_command(worker_index, specs, target_hz, config)
         diagnostics = ProtocolDiagnostics()
 
@@ -198,15 +233,20 @@ class NativeCmdCapacityRunner(CapacityRunner):
         except Exception as exc:
             raise RuntimeError(f"failed to start {self.executable_name}: {exc}") from exc
 
-        stderr_thread = start_stderr_drain_thread(proc.stderr, diagnostics)
+        _stderr_thread = start_stderr_drain_thread(proc.stderr, diagnostics)
         session = _NativeSession()
         started_at = time.monotonic()
 
         try:
-            _read_output_lines(proc, session, diagnostics)
+            _read_output_lines(proc, session, diagnostics, self.stdout_timeout_seconds)
+        except TimeoutError:
+            diagnostics.record_stderr(
+                f"stdout timeout after {self.stdout_timeout_seconds}s"
+            )
+            raise
         finally:
             stop_native_process(proc)
-            elapsed = time.monotonic() - started_at
+            _elapsed = time.monotonic() - started_at
 
         return WorkerRawStats(
             worker_index=worker_index,

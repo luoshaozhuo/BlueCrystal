@@ -1,4 +1,7 @@
-"""Snapshot-reader port for the local latest-state cache."""
+"""端口接口定义。
+
+定义调用方契约和实现方责任，相关功能。
+"""
 
 from __future__ import annotations
 
@@ -9,7 +12,7 @@ from typing import Protocol
 
 @dataclass(slots=True)
 class CachedNodeValue:
-    """One cached node value within the LD/source latest-state view."""
+    """LD/源最新状态视图中的一个缓存节点值。"""
 
     node_key: str
     value: str
@@ -23,7 +26,7 @@ class CachedNodeValue:
 
 @dataclass(slots=True)
 class CachedSourceState:
-    """One LD/source latest-state snapshot."""
+    """单个 LD/源的最新状态快照。"""
 
     ld_name: str
     source_id: str
@@ -39,7 +42,7 @@ class CachedSourceState:
 
 
 class SourceStateSnapshotReaderPort(Protocol):
-    """Read the current full snapshot from the local latest-state cache."""
+    """从本地最新状态缓存读取当前完整快照。"""
 
     def read_snapshot(self) -> list[CachedSourceState]:
-        """Return the current full latest-state snapshot."""
+        """返回当前完整的最新状态快照。"""

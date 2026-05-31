@@ -1,4 +1,7 @@
-"""Source write result DTOs for the write/control use case."""
+"""数据传输对象。
+
+定义 use case 层输入输出数据结构，与 ORM 模型解耦。
+"""
 
 from __future__ import annotations
 

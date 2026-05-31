@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy.orm import Session, sessionmaker
 
 from whale.ingest.framework.persistence import (
     create_runtime_engine,
@@ -196,7 +195,8 @@ def test_worker_runtime_handler_exception_records_failure(settings, repos):
     snapshot = worker._scheduler.assign_jobs(now=now)
     assert "fail-job" in snapshot.assigned_jobs
 
-    worker._execute_one(job_id="fail-job", fencing_token=snapshot.fencing_tokens["fail-job"], now=now)
+    with pytest.raises(RuntimeError, match="simulated failure for fail-job"):
+        worker._execute_one(job_id="fail-job", fencing_token=snapshot.fencing_tokens["fail-job"], now=now)
 
     snap = metrics.snapshot()
     assert snap.get("job_failed", 0) >= 1

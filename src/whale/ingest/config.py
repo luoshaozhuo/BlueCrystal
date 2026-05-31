@@ -1,4 +1,8 @@
-"""Python-native configuration for the ingest module."""
+"""ingest 配置管理。
+
+从环境变量和配置文件加载 ingest 模块的运行时配置，
+包括数据库连接、消息中间件地址、审计策略等。
+"""
 
 from __future__ import annotations
 
@@ -22,7 +26,7 @@ SUPPORTED_MESSAGE_BACKENDS = frozenset({"relational_outbox", "redis_streams", "k
 
 @dataclass(frozen=True, slots=True)
 class SqliteDatabaseConfig:
-    """Configuration for the SQLite ingest database backend."""
+    """SQLite ingest 数据库后端的配置。"""
 
     database: str | Path
     backend: Literal["sqlite"] = "sqlite"
@@ -30,7 +34,7 @@ class SqliteDatabaseConfig:
 
 @dataclass(frozen=True, slots=True)
 class PostgresDatabaseConfig:
-    """Configuration for the PostgreSQL ingest database backend."""
+    """PostgreSQL ingest 数据库后端的配置。"""
 
     host: str
     port: int
@@ -46,7 +50,7 @@ DatabaseBackendConfig: TypeAlias = SqliteDatabaseConfig | PostgresDatabaseConfig
 
 @dataclass(frozen=True, slots=True)
 class DatabaseEngineConfig:
-    """SQLAlchemy engine and pool settings for the ingest database."""
+    """ingest 数据库的 SQLAlchemy 引擎和连接池设置。"""
 
     pool_size: int
     max_overflow: int
@@ -57,7 +61,7 @@ class DatabaseEngineConfig:
 
 @dataclass(frozen=True, slots=True)
 class RedisStateCacheConfig:
-    """Configuration for the Redis latest-state cache backend."""
+    """Redis 最新状态缓存后端的配置。"""
 
     host: str
     port: int
@@ -76,14 +80,14 @@ StateCacheConfig: TypeAlias = RedisStateCacheConfig
 
 @dataclass(frozen=True, slots=True)
 class RelationalOutboxMessageConfig:
-    """Configuration for relational outbox snapshot publishing."""
+    """关系数据库 outbox 快照发布的配置。"""
 
     backend: Literal["relational_outbox"] = "relational_outbox"
 
 
 @dataclass(frozen=True, slots=True)
 class RedisStreamsMessageConfig:
-    """Configuration for Redis Streams snapshot publishing."""
+    """Redis Streams 快照发布的配置。"""
 
     redis_url: str
     stream_key: str
@@ -92,7 +96,7 @@ class RedisStreamsMessageConfig:
 
 @dataclass(frozen=True, slots=True)
 class KafkaMessageConfig:
-    """Configuration for Kafka snapshot publishing."""
+    """Kafka 快照发布的配置。"""
 
     bootstrap_servers: tuple[str, ...]
     topic: str
@@ -111,7 +115,7 @@ MessageConfig: TypeAlias = (
 
 @dataclass(frozen=True, slots=True)
 class EnvironmentConfig:
-    """Top-level ingest configuration built from backend env var selections."""
+    """基于环境变量选择构造的 ingest 顶层配置。"""
 
     database: DatabaseBackendConfig
     database_engine: DatabaseEngineConfig
@@ -120,28 +124,24 @@ class EnvironmentConfig:
 
     @property
     def state_cache_backend(self) -> StateCacheBackend:
-        """Return the configured state-cache backend."""
+        """返回配置的状态缓存后端。"""
         return self.state_cache.backend
 
 
 def _resolve_database_backend(value: str | None) -> DatabaseBackend:
-    """Resolve the database backend from WHALE_INGEST_DATABASE_BACKEND.
-
-    Defaults to ``sqlite`` when unset.
-    """
+    """从 WHALE_INGEST_DATABASE_BACKEND 环境变量解析数据库后端标识符。"""
     backend = (value or "sqlite").strip().lower()
     if backend not in SUPPORTED_DATABASE_BACKENDS:
         raise RuntimeError(
             f"Unsupported WHALE_INGEST_DATABASE_BACKEND value: {value!r}. "
             f"Expected one of {sorted(SUPPORTED_DATABASE_BACKENDS)}."
         )
-    return backend  # type: ignore[return-value]
+    return backend  # type: ignore[return-value]  # 运行时校验保证 backend 在枚举范围内，mypy 无法追踪 Literal 收窄
 
 
 def _resolve_state_cache_backend(value: str | None) -> StateCacheBackend:
-    """Resolve the state-cache backend from WHALE_INGEST_STATE_CACHE_BACKEND.
-
-    Defaults to ``redis`` when unset.
+    """从 WHALE_INGEST_DATABASE_BACKEND 环境变量解析数据库后端。返回后端标识符字符串。
+    Defaults to ``sqlite`` when unset.
     """
     backend = (value or "redis").strip().lower()
     if backend not in SUPPORTED_STATE_CACHE_BACKENDS:
@@ -149,13 +149,12 @@ def _resolve_state_cache_backend(value: str | None) -> StateCacheBackend:
             f"Unsupported WHALE_INGEST_STATE_CACHE_BACKEND value: {value!r}. "
             f"Expected one of {sorted(SUPPORTED_STATE_CACHE_BACKENDS)}."
         )
-    return backend  # type: ignore[return-value]
+    return backend  # type: ignore[return-value]  # 运行时校验保证 backend 在枚举范围内，mypy 无法追踪 Literal 收窄
 
 
 def _resolve_message_backend(value: str | None) -> MessageBackend:
-    """Resolve the message backend from WHALE_INGEST_MESSAGE_BACKEND.
-
-    Defaults to ``relational_outbox`` when unset.
+    """从 WHALE_INGEST_STATE_CACHE_BACKEND 环境变量解析状态缓存后端。返回后端标识符字符串。
+    Defaults to ``redis`` when unset.
     """
     backend = (value or "relational_outbox").strip().lower()
     if backend not in SUPPORTED_MESSAGE_BACKENDS:
@@ -167,7 +166,9 @@ def _resolve_message_backend(value: str | None) -> MessageBackend:
 
 
 def _require_env_vars(names: tuple[str, ...], *, scope: str) -> None:
-    """Raise one clear error when required environment variables are missing."""
+    """从 WHALE_INGEST_MESSAGE_BACKEND 环境变量解析消息后端。返回后端标识符字符串。
+
+Defaults to ``relational_outbox`` when unset."""
     missing_names = [name for name in names if os.environ.get(name, "").strip() == ""]
     if missing_names:
         missing_list = ", ".join(missing_names)
@@ -175,7 +176,7 @@ def _require_env_vars(names: tuple[str, ...], *, scope: str) -> None:
 
 
 def _build_config() -> EnvironmentConfig:
-    """Build the ingest config by reading backend selections from env vars."""
+    """从环境变量读取后端选择构造 ingest 配置。"""
     database_backend = _resolve_database_backend(os.environ.get("WHALE_INGEST_DATABASE_BACKEND"))
     _resolve_state_cache_backend(os.environ.get("WHALE_INGEST_STATE_CACHE_BACKEND"))
     message_backend = _resolve_message_backend(os.environ.get("WHALE_INGEST_MESSAGE_BACKEND"))

@@ -1,30 +1,26 @@
-# OpenAI Codex 入口
+# Codex / Agent 执行入口
 
-本仓库 OpenAI Codex 与 Claude Code 共用根目录 `CLAUDE.md` 作为主入口规则。
+本文件是 Codex 自动读取入口。具体执行规则以 `CLAUDE.md` 和 `ai_shared/rules/` 为准。
 
-Codex 执行任务前必须读取：
+## 1. 必读
 
 ```text
 CLAUDE.md
 ai_shared/rules/routing.md
 ```
 
-然后按 `CLAUDE.md` 和 `routing.md` 执行，不要默认读取全部 docs / ADR / reports / project_tree。
+## 2. 执行原则
 
-当 `CLAUDE.md` 要求使用 Claude Code agent：
-
-```text
-@agent-code-implementer
-@agent-test-validator
-@agent-project-steward
-```
-
-Codex 应使用项目 custom agent 执行等价委派：
-
-```text
-spawn code-implementer
-spawn test-validator
-spawn project-steward
-```
-
-除此之外，不在本文件复制或改写规则。
+1. 默认中文反馈。
+2. 不复制维护第二套规则。
+3. 不默认读取全仓文档；按 handoff 和 routing 读取必要文件。
+4. `ai_shared/memory/project_tree.md` 只用于导航，不能替代读取真实源码、测试、配置和 schema。
+5. 编码任务必须使用固定三段式流程：
+   ```text
+   @agent-code-implementer -> @agent-test-validator -> @agent-project-steward -> 主会话收口
+   ```
+6. 任何验证结论必须来自真实命令、真实文件、真实测试或明确 evidence。
+7. 不把 skipped、mock、fake、health check、脚本存在、单文件 passed、environment-pending 写成真实通过。
+8. 不把工具/实验模块引入生产路径。
+9. 不自动执行 commit、push、reset、clean。
+10. 不默认运行重回归或长测。

@@ -1,6 +1,8 @@
-"""Modbus TCP source write adapter.
+"""协议采集适配器。
 
-Converts ingest DTOs to shared/source modbus native runner calls (FC06).
+实现 SourceAcquisitionPort / SourceWritePort，
+封装特定协议（工业协议）的采集或写入逻辑。
+外部依赖边界：libmodbus C 库（ctypes）。
 """
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ from whale.shared.source.modbus.reader import ModbusSourceReader
 
 
 class ModbusSourceWriteAdapter(SourceWritePort):
-    """Execute Modbus TCP writes via native runner (FC06)."""
+    """通过 native runner 执行 Modbus TCP 写入（FC06 写单个寄存器）。"""
 
     async def write(
         self,
@@ -26,13 +28,11 @@ class ModbusSourceWriteAdapter(SourceWritePort):
         connection: SourceConnectionData,
         items: list[SourceWriteItemData],
     ) -> SourceWriteResult:
-        """Execute one Modbus TCP batch write.
-
+        """执行一次 Modbus TCP 批量写入。按点位列表依次写入 holding register（功能码 06 或 16）。
         Args:
             execution: Write execution options.
             connection: Target source connection.
             items: Items to write, each with ``node_id`` as register address string.
-
         Returns:
             Structured write result.
         """
@@ -112,7 +112,7 @@ class ModbusSourceWriteAdapter(SourceWritePort):
 
     @staticmethod
     def _resolve_reg_addr(item: SourceWriteItemData) -> int | None:
-        """Convert ``node_id`` (register address string) to integer."""
+        """将 node_id（寄存器地址字符串）转换为整数。"""
         node_id = item.node_id.strip()
         if node_id.startswith("0x") or node_id.startswith("0X"):
             try:
@@ -122,6 +122,55 @@ class ModbusSourceWriteAdapter(SourceWritePort):
         if node_id.isdigit() or (node_id.startswith("-") and node_id[1:].isdigit()):
             return int(node_id)
         return None
+
+    async def readback(
+        self,
+        execution: SourceWriteExecutionOptions,
+        connection: SourceConnectionData,
+        items: list[SourceWriteItemData],
+        write_result: SourceWriteResult,
+    ) -> dict[str, str]:
+        """写入后回读寄存器值以确认写入生效。
+
+        连接到 Modbus TCP 设备，读取每个已写入寄存器的当前值，
+        返回 ``{node_id: value_str}`` 映射供 ``SourceCommandUseCase``
+        readback 验证使用。
+
+        回读使用 FC03（read holding registers），与 FC06（write single register）
+        对应。每个寄存器地址独立读取。
+
+        Args:
+            execution: 原始写入执行选项。
+            connection: 目标连接（与写入相同）。
+            items: 已写入的点位列表。
+            write_result: 写入结果（用于元数据）。
+
+        Returns:
+            每个已写入 node_id 到 str(value) 的映射。
+            如果连接失败或 host/port 无效，返回空字典。
+        """
+        host = connection.host.strip()
+        if not host or connection.port <= 0:
+            return {}
+        unit_id = int(connection.params.get("modbus_unit_id", 1))
+
+        async with ModbusSourceReader(host=host, port=connection.port, unit_id=unit_id) as reader:
+            reg_addrs: list[int] = []
+            for item in items:
+                addr = self._resolve_reg_addr(item)
+                if addr is not None:
+                    reg_addrs.append(addr)
+            if not reg_addrs:
+                return {}
+            plan = reader.prepare_read(reg_addrs)
+            raw = await reader.read_prepared(plan)
+            if not raw.ok:
+                return {}
+            result: dict[str, str] = {}
+            # 按写入顺序映射 node_id 到读取值
+            for item, reg_val in zip(items, raw.values, strict=False):
+                result[item.node_id] = str(reg_val)
+            return result
 
     @staticmethod
     def _dry_run_result(

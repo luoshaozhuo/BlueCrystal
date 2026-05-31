@@ -1,8 +1,19 @@
-"""Bundle-metadata query routes for ingest runtime API."""
+"""Bundle 元数据查询路由。
+
+提供 Bundle 元数据（IngestBundleMetadata）的只读查询接口：
+- 按 bundle_id 查询单个 bundle；
+- 分页查询 bundle 列表；
+- 每次查询通过 access_evaluator 做权限检查；
+- 查询操作本身也通过 audit_sink 记录审计事件；
+- 事务边界：每次请求在 try/finally 中管理 session 生命周期。
+
+管理资源：bundle，路由前缀 /api/v1/bundles。
+不负责：bundle 的导入/导出/签名/脱敏（由 bundle service 模块负责）。
+"""
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
@@ -16,16 +27,16 @@ from whale.shared.persistence.orm import IngestBundleMetadata
 router = APIRouter(prefix="/api/v1/bundles", tags=["bundles"])
 
 
-def _open_session(factory):
+def _open_session(factory: sessionmaker[Session] | Callable[[], Session]) -> Session:
     return factory() if callable(factory) else factory()
 
 
-def _authorize(request, action, resource_id=None):
+def _authorize(request: Request, action: str, resource_id: str | None = None) -> None:
     if not request.app.state.access_evaluator(request, action, "bundle", resource_id):
         raise denied(action=action, resource_type="bundle", resource_id=resource_id)
 
 
-def _response(row) -> BundleMetadataResponse:
+def _response(row: IngestBundleMetadata) -> BundleMetadataResponse:
     return BundleMetadataResponse(
         bundle_id=row.bundle_id,
         bundle_version=row.bundle_version,
@@ -42,6 +53,7 @@ def _response(row) -> BundleMetadataResponse:
 
 @router.get("/{bundle_id}", response_model=BundleMetadataResponse)
 def get_bundle(bundle_id: int, request: Request) -> BundleMetadataResponse:
+    """获取指定的资源记录。"""
     _authorize(request, "bundle.read", str(bundle_id))
     session = _open_session(request.app.state.session_factory)
     try:
@@ -59,9 +71,11 @@ def get_bundle(bundle_id: int, request: Request) -> BundleMetadataResponse:
 @router.get("", response_model=PaginatedResponse[BundleMetadataResponse])
 def list_bundles(
     request: Request,
+    
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> PaginatedResponse[BundleMetadataResponse]:
+    """获取bundle的分页列表。支持按字段过滤和分页参数。权限检查后查询。"""
     _authorize(request, "bundle.list")
     session = _open_session(request.app.state.session_factory)
     try:

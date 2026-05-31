@@ -8,11 +8,17 @@ old names to the canonical triple.
 
 Structure
 ---------
-- ``PROTOCOL_CAPABILITIES``
-    Per-protocol-name registry dict (backward-compat source of truth for
-    tests that read ``implementation_level``, ``backend``, access-mode flags).
-    Each entry now carries ``application_protocol``, ``transport``,
+- ``DECLARED_PROTOCOL_CAPABILITIES``
+    Per-protocol-name registry dict of **static declared capability metadata only**.
+    Each entry carries ``application_protocol``, ``transport``,
     ``service_types``, ``current_*`` / ``target_*`` fields.
+    **IMPORTANT**: This dict only describes *declared* capability — it does
+    NOT represent *actual runtime readiness*.  Callers must use
+    ``describe_protocol_runtime_readiness()`` (which checks native binary
+    availability at runtime) to gate production/readiness decisions.
+    Tests that read ``implementation_level``, ``backend``, access-mode flags
+    should still use this dict but must annotate their evidence level
+    appropriately (static/declared vs runtime/actual).
 
 - ``SERVICE_CAPABILITIES``
     New canonical dict keyed by ``(app_protocol, service_type, transport)``.
@@ -23,6 +29,12 @@ Structure
 - ``_PROTOCOL_ALIASES``
     Flat lookup that maps any CLI-visible protocol string (including
     deprecated forms like ``iec61850_goose``) to a canonical key.
+
+- ``PROTOCOL_CAPABILITIES``
+    Backward-compatibility alias for ``DECLARED_PROTOCOL_CAPABILITIES``.
+    **DEPRECATED**: new code should use ``DECLARED_PROTOCOL_CAPABILITIES``
+    for static metadata access and ``describe_protocol_runtime_readiness()``
+    for runtime readiness decisions.
 
 Level definitions
 -----------------
@@ -35,7 +47,8 @@ Level definitions
 
 from __future__ import annotations
 
-from typing import Final
+from dataclasses import dataclass
+from typing import Any, Final
 
 from tools.source_lab.access.runners.base import CapacityRunner, SubscriptionRunner
 from tools.source_lab.access.runners.open62541_serial_polling import OpcUaOpen62541CapacityRunner
@@ -58,7 +71,7 @@ _IMPLEMENTATION_LEVELS: Final[tuple[str, ...]] = (
 # The ``implementation_level`` key is kept as a backward-compat alias for
 # ``current_implementation_level``.
 
-PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
+DECLARED_PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
     # ── OPC UA ─────────────────────────────────────────────────────
     "opcua": {
         # Legacy access-mode flags
@@ -419,14 +432,20 @@ PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
     },
 }
 
-# ── Derived lists (computed from PROTOCOL_CAPABILITIES) ────────────────
+# ── Backward-compatibility alias ──────────────────────────────────────
+# DEPRECATED: 新代码应使用 DECLARED_PROTOCOL_CAPABILITIES 获取静态元数据，
+# 使用 describe_protocol_runtime_readiness() 判断运行时真实就绪状态。
+# 不要将静态 declared capability 误认为 actual runtime readiness。
+PROTOCOL_CAPABILITIES = DECLARED_PROTOCOL_CAPABILITIES
+
+# ── Derived lists (computed from DECLARED_PROTOCOL_CAPABILITIES) ────────────────
 
 _POLLING_PROTOCOLS: Final[tuple[str, ...]] = tuple(
-    name for name, cap in PROTOCOL_CAPABILITIES.items() if cap["polling"]
+    name for name, cap in DECLARED_PROTOCOL_CAPABILITIES.items() if cap["polling"]
 )
 
 _SUBSCRIBE_PROTOCOLS: Final[tuple[str, ...]] = tuple(
-    name for name, cap in PROTOCOL_CAPABILITIES.items() if cap["subscribe"]
+    name for name, cap in DECLARED_PROTOCOL_CAPABILITIES.items() if cap["subscribe"]
 )
 
 _POLLING_PROBE_PROTOCOLS: Final[tuple[str, ...]] = _POLLING_PROTOCOLS
@@ -737,7 +756,7 @@ def normalize_protocol(value: str) -> str:
         value: Raw protocol name from CLI or fixture.
 
     Returns:
-        Canonical key in ``PROTOCOL_CAPABILITIES``.
+        Canonical key in ``DECLARED_PROTOCOL_CAPABILITIES``.
 
     Raises:
         ValueError: Protocol string not recognised.
@@ -749,9 +768,12 @@ def normalize_protocol(value: str) -> str:
 
 
 def list_supported_protocols() -> tuple[str, ...]:
-    """Return the list of fully registered protocol names.
+    """返回所有已注册协议名的不可变元组。
+
+    Returns:
+        已注册协议名的元组，顺序与 DECLARED_PROTOCOL_CAPABILITIES 的键一致。
     """
-    return tuple(PROTOCOL_CAPABILITIES.keys())
+    return tuple(DECLARED_PROTOCOL_CAPABILITIES.keys())
 
 
 def get_protocol_capability(protocol: str) -> dict[str, object]:
@@ -767,7 +789,7 @@ def get_protocol_capability(protocol: str) -> dict[str, object]:
         ValueError: Protocol not in registry.
     """
     normalized = normalize_protocol(protocol)
-    cap = PROTOCOL_CAPABILITIES.get(normalized)
+    cap = DECLARED_PROTOCOL_CAPABILITIES.get(normalized)
     if cap is None:
         msg = (
             f"protocol {normalized!r} is defined as an alias but has no "
@@ -835,7 +857,7 @@ def get_target_implementation_level(protocol: str) -> str:
 def supports_access_mode(protocol: str, access_mode: str) -> bool:
     """Check whether a protocol supports a given access mode."""
     normalized = normalize_protocol(protocol)
-    cap = PROTOCOL_CAPABILITIES.get(normalized)
+    cap = DECLARED_PROTOCOL_CAPABILITIES.get(normalized)
     if cap is None:
         return False
     mode = access_mode.strip().lower()
@@ -847,7 +869,7 @@ def supports_access_mode(protocol: str, access_mode: str) -> bool:
 def probe_mode_for_protocol(protocol: str) -> str | None:
     """Return the probe mode (``polling`` or ``streaming``) for a protocol."""
     normalized = normalize_protocol(protocol)
-    cap = PROTOCOL_CAPABILITIES.get(normalized)
+    cap = DECLARED_PROTOCOL_CAPABILITIES.get(normalized)
     if cap is None:
         return None
     polling_val = cap.get("polling", False)
@@ -899,7 +921,7 @@ def resolve_service_triple(
     that have exactly one service type.
     """
     normalized = normalize_protocol(protocol)
-    cap = PROTOCOL_CAPABILITIES.get(normalized)
+    cap = DECLARED_PROTOCOL_CAPABILITIES.get(normalized)
     if cap is None:
         return None
     app_protocol = cap.get("application_protocol", "")
@@ -924,54 +946,375 @@ def resolve_service_triple(
     return None
 
 
+# ── RunnerInfo — runtime implementation-level metadata ────────────────
+
+
+class RunnerInfo:
+    """运行时 runner 构建结果，包含实际实现级别和声明的实现级别。
+
+    用于区分 ``declared_implementation_level``（来自 DECLARED_PROTOCOL_CAPABILITIES
+    静态注册表）与 ``actual_implementation_level``（当前运行时实际可用的实现级别）。
+    当 native binary 不存在或不可执行时，``actual_implementation_level`` 为
+    ``python_lightweight``，而 ``declared_implementation_level`` 仍保持
+    ``real_native_runner``。
+
+    readiness gate 必须使用 ``is_native_ready`` 和 ``actual_runtime_availability``
+    判断真实可用性，不得仅依赖 DECLARED_PROTOCOL_CAPABILITIES 静态值。
+
+    Args:
+        runner: 实际构建的 CapacityRunner 实例。
+        actual_implementation_level: 运行时实际实现级别。
+        declared_implementation_level: DECLARED_PROTOCOL_CAPABILITIES 声明的目标级别。
+        fallback_reason: 如果发生了 fallback，说明 fallback 原因；否则为 None。
+        native_check_error: native 不可用时的检测错误信息。无错误时为 None。
+            native 可用时此字段为 None。
+    """
+
+    def __init__(
+        self,
+        runner: CapacityRunner,
+        actual_implementation_level: str,
+        declared_implementation_level: str,
+        fallback_reason: str | None = None,
+        native_check_error: str | None = None,
+    ) -> None:
+        self._runner = runner
+        self.actual_implementation_level = actual_implementation_level
+        self.declared_implementation_level = declared_implementation_level
+        self.fallback_reason = fallback_reason
+        # native 检测失败的错误信息，用于 readiness gate 诊断
+        self.native_check_error: str | None = native_check_error
+
+    @property
+    def runner(self) -> CapacityRunner:
+        """返回底层 CapacityRunner 实例。"""
+        return self._runner
+
+    @property
+    def actual_runner(self) -> str:
+        """返回实际使用的 runner 名称（如 "opcua_open62541"、"python_lightweight"）。
+
+        供 readiness gate 诊断：能清楚区分当前实际使用哪个 runner，
+        而不是仅显示实现级别标签。
+        """
+        return getattr(self._runner, "name", self._runner.__class__.__name__)
+
+    @property
+    def actual_runtime_availability(self) -> str:
+        """返回运行时可用性标签。
+
+        Returns:
+            ``"available_native"`` — native runner 运行时可用。
+            ``"degraded_python_fallback"`` — native 不可用，已降级为 Python fallback。
+            ``"unavailable"`` — 无可用 runner（runner 为 None 的边界情况）。
+
+        readiness gate 必须检查此字段，不得仅依赖
+        DECLARED_PROTOCOL_CAPABILITIES 静态声明。
+        """
+        if self.actual_implementation_level == "real_native_runner":
+            return "available_native"
+        if self._runner is not None:
+            return "degraded_python_fallback"
+        return "unavailable"
+
+    def __getattr__(self, name: str) -> Any:
+        """将未定义属性访问委派给底层 runner，保持向后兼容。
+
+        使得调用方可以通过 RunnerInfo 实例直接访问 CapacityRunner
+        的属性和方法（如 .name、.run_worker() 等），无需显式拆包。
+        """
+        return getattr(self._runner, name)
+
+    @property
+    def is_native_ready(self) -> bool:
+        """返回 native runner 是否在运行时真实可用。
+
+        readiness gate 应使用此属性判断，而非直接读取
+        DECLARED_PROTOCOL_CAPABILITIES 中的静态 implementation_level。
+        """
+        return self.actual_implementation_level == "real_native_runner"
+
+    def __repr__(self) -> str:
+        return (
+            f"RunnerInfo("
+            f"actual={self.actual_implementation_level}, "
+            f"declared={self.declared_implementation_level}, "
+            f"runner={self.actual_runner}, "
+            f"availability={self.actual_runtime_availability}, "
+            f"fallback={self.fallback_reason!r}, "
+            f"native_error={self.native_check_error!r})"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeReadiness:
+    """Protocol runtime readiness snapshot for one access mode."""
+
+    protocol: str
+    access_mode: str
+    runner: CapacityRunner | SubscriptionRunner
+    declared_implementation_level: str
+    actual_implementation_level: str
+    actual_runtime_availability: str
+    runtime_constraint_tags: tuple[str, ...] = ()
+    fallback_reason: str | None = None
+    native_check_error: str | None = None
+
+    @property
+    def is_native_ready(self) -> bool:
+        """Whether the runtime is truly using a native runner right now."""
+        return self.actual_implementation_level == "real_native_runner"
+
+
+def _capacity_runtime_readiness(protocol: str) -> RuntimeReadiness:
+    info = build_capacity_runner(protocol)
+    return RuntimeReadiness(
+        protocol=normalize_protocol(protocol),
+        access_mode="polling",
+        runner=info.runner,
+        declared_implementation_level=info.declared_implementation_level,
+        actual_implementation_level=info.actual_implementation_level,
+        actual_runtime_availability=info.actual_runtime_availability,
+        fallback_reason=info.fallback_reason,
+        native_check_error=info.native_check_error,
+    )
+
+
+def _subscription_runtime_readiness(protocol: str) -> RuntimeReadiness:
+    normalized = normalize_protocol(protocol)
+    declared_level = get_current_implementation_level(normalized)
+    runner = build_subscription_runner(normalized)
+
+    if normalized == "opcua":
+        from tools.source_lab.access.runners.open62541_subscription import _resolve_runner_path
+
+        runner_path = _resolve_runner_path()
+        if runner_path.exists():
+            return RuntimeReadiness(
+                protocol=normalized,
+                access_mode="streaming",
+                runner=runner,
+                declared_implementation_level=declared_level,
+                actual_implementation_level="real_native_runner",
+                actual_runtime_availability="available_native",
+            )
+        return RuntimeReadiness(
+            protocol=normalized,
+            access_mode="streaming",
+            runner=runner,
+            declared_implementation_level=declared_level,
+            actual_implementation_level="unavailable",
+            actual_runtime_availability="unavailable",
+            fallback_reason="native binary not available",
+            native_check_error=f"open62541 subscription runner missing: {runner_path}",
+        )
+
+    if normalized == "iec61850_report":
+        from tools.source_lab.access.runners.iec61850_report import _resolve_runner_path
+
+        runner_path = _resolve_runner_path()
+        native_hint = (
+            "native report runner requires endpoint opt-in via use_native_report_runner=true"
+        )
+        if runner_path.exists():
+            return RuntimeReadiness(
+                protocol=normalized,
+                access_mode="streaming",
+                runner=runner,
+                declared_implementation_level=declared_level,
+                actual_implementation_level="python_lightweight_runner",
+                actual_runtime_availability="degraded_runtime",
+                runtime_constraint_tags=("native_optional", "endpoint_opt_in_required"),
+                fallback_reason=native_hint,
+            )
+        return RuntimeReadiness(
+            protocol=normalized,
+            access_mode="streaming",
+            runner=runner,
+            declared_implementation_level=declared_level,
+            actual_implementation_level="python_lightweight_runner",
+            actual_runtime_availability="degraded_runtime",
+            runtime_constraint_tags=("native_optional", "endpoint_opt_in_required"),
+            fallback_reason=native_hint,
+            native_check_error=f"iec61850_report_runner missing: {runner_path}",
+        )
+
+    if normalized in {"iec61850_goose", "iec61850_sv"}:
+        from tools.source_lab.access.runners.iec61850_l2_streaming import _find_executable
+
+        executable_name = getattr(runner, "executable_name", "")
+        native_path = _find_executable(executable_name) if executable_name else None
+        tags = ("controlled_l2_environment", "cap_net_raw_required")
+        if native_path is not None:
+            return RuntimeReadiness(
+                protocol=normalized,
+                access_mode="streaming",
+                runner=runner,
+                declared_implementation_level=declared_level,
+                actual_implementation_level="real_native_runner",
+                actual_runtime_availability="available_native",
+                runtime_constraint_tags=tags,
+            )
+        return RuntimeReadiness(
+            protocol=normalized,
+            access_mode="streaming",
+            runner=runner,
+            declared_implementation_level=declared_level,
+            actual_implementation_level="unavailable",
+            actual_runtime_availability="unavailable",
+            runtime_constraint_tags=tags,
+            fallback_reason="native L2 subscriber binary not available",
+            native_check_error=f"{executable_name or normalized} missing under native build",
+        )
+
+    if normalized in {"iec101", "iec104"}:
+        return RuntimeReadiness(
+            protocol=normalized,
+            access_mode="streaming",
+            runner=runner,
+            declared_implementation_level=declared_level,
+            actual_implementation_level="fake_or_simulated_runner",
+            actual_runtime_availability="degraded_runtime",
+            runtime_constraint_tags=("gateway_mode", "semantic_probe_only"),
+            fallback_reason=(
+                "streaming path is currently a lightweight semantic probe, "
+                "not a full native spontaneous event engine"
+            ),
+        )
+
+    if normalized == "mqtt":
+        return RuntimeReadiness(
+            protocol=normalized,
+            access_mode="streaming",
+            runner=runner,
+            declared_implementation_level=declared_level,
+            actual_implementation_level="python_lightweight_runner",
+            actual_runtime_availability="available_runtime",
+        )
+
+    return RuntimeReadiness(
+        protocol=normalized,
+        access_mode="streaming",
+        runner=runner,
+        declared_implementation_level=declared_level,
+        actual_implementation_level=declared_level,
+        actual_runtime_availability="available_runtime",
+    )
+
+
+def describe_protocol_runtime_readiness(protocol: str, access_mode: str) -> RuntimeReadiness:
+    """Describe declared vs actual runtime readiness for one protocol/access mode."""
+
+    normalized_mode = access_mode.strip().lower()
+    if normalized_mode == "polling":
+        return _capacity_runtime_readiness(protocol)
+    if normalized_mode in {"subscribe", "streaming"}:
+        return _subscription_runtime_readiness(protocol)
+    raise ValueError(f"unsupported access mode for runtime readiness: {access_mode}")
+
+
 # ── Runner factories ─────────────────────────────────────────────────
 
-def build_capacity_runner(protocol: str) -> CapacityRunner:
-    """Build a polling/capacity runner.
+def build_capacity_runner(protocol: str) -> RunnerInfo:
+    """构建一个轮询/capacity runner，返回 RunnerInfo。
 
-    Returns a native runner if the native executable is compiled and available;
-    otherwise falls back to the Python lightweight runner.
+    Returns:
+        RunnerInfo 包含实际构建的 runner、实际实现级别、声明实现级别。
+        调用方应使用 ``info.actual_implementation_level`` 判断真实能力，
+        而非仅依赖 DECLARED_PROTOCOL_CAPABILITIES 静态字典。
+
+    Note:
+        当 native runner 不可用时，返回 ``python_lightweight`` 的 fallback runner，
+        并在 ``fallback_reason`` 中给出原因。返回的 RunnerInfo 的
+        ``actual_implementation_level`` 不等于 ``real_native_runner``。
     """
+    import logging
+    _log = logging.getLogger(__name__)
     normalized = normalize_protocol(protocol)
+    declared_level = get_current_implementation_level(normalized)
 
     # ── Native runner lookup ────────────────────────────────────────────
     from tools.source_lab.access.runners.native_cmd import NativeRunnerUnavailableError
     from tools.source_lab.access.runners.native_runner_map import NATIVE_CAPACITY_RUNNERS
     native_cls = NATIVE_CAPACITY_RUNNERS.get(normalized)
+    native_check_error: str | None = None
     if native_cls is not None:
         try:
-            runner = native_cls()
-            runner.check_available()
-            return runner
-        except NativeRunnerUnavailableError:
-            pass  # fall through to Python lightweight
+            native_runner = native_cls()
+            native_runner.check_available()
+            return RunnerInfo(
+                runner=native_runner,
+                actual_implementation_level="real_native_runner",
+                declared_implementation_level=declared_level,
+                fallback_reason=None,
+                native_check_error=None,
+            )
+        except NativeRunnerUnavailableError as exc:
+            native_check_error = str(exc)
+            _log.warning(
+                "Native capacity runner for %s unavailable: %s. "
+                "Falling back to Python lightweight runner. "
+                "The returned runner does not provide real_native_runner capability.",
+                normalized,
+                exc,
+            )
+        except Exception as exc:
+            native_check_error = f"{type(exc).__name__}: {exc}"
+            _log.warning(
+                "Native capacity runner for %s failed check_available with "
+                "unexpected error: %s. "
+                "Falling back to Python lightweight runner.",
+                normalized,
+                exc,
+            )
 
     # ── Python lightweight fallback ─────────────────────────────────────
+    fallback_reason = "native binary not available"
+    runner: CapacityRunner
     if normalized == "opcua":
-        return OpcUaOpen62541CapacityRunner()
-    if normalized == "modbus_tcp":
+        runner = OpcUaOpen62541CapacityRunner()
+    elif normalized == "modbus_tcp":
         from tools.source_lab.access.runners.modbus_tcp_polling import ModbusTcpPollingRunner
-        return ModbusTcpPollingRunner()
-    if normalized == "modbus_rtu":
+        runner = ModbusTcpPollingRunner()
+    elif normalized == "modbus_rtu":
         from tools.source_lab.access.runners.modbus_rtu_polling import ModbusRtuPollingRunner
-        return ModbusRtuPollingRunner()
-    if normalized == "iec101":
+        runner = ModbusRtuPollingRunner()
+    elif normalized == "iec101":
         from tools.source_lab.access.runners.iec101_polling import Iec101PollingRunner
-        return Iec101PollingRunner()
-    if normalized == "iec104":
+        runner = Iec101PollingRunner()
+    elif normalized == "iec104":
         from tools.source_lab.access.runners.iec104_polling import Iec104PollingRunner
-        return Iec104PollingRunner()
-    if normalized == "iec61850_mms":
+        runner = Iec104PollingRunner()
+    elif normalized == "iec61850_mms":
         from tools.source_lab.access.runners.iec61850_mms_polling import Iec61850MmsPollingRunner
-        return Iec61850MmsPollingRunner()
-    if normalized == "http_rest":
+        runner = Iec61850MmsPollingRunner()
+    elif normalized == "http_rest":
         from tools.source_lab.access.runners.http_rest_polling import HttpRestPollingRunner
-        return HttpRestPollingRunner()
-    raise ValueError(f"protocol {normalized} does not support polling/capacity")
+        runner = HttpRestPollingRunner()
+    else:
+        raise ValueError(f"protocol {normalized} does not support polling/capacity")
+
+    return RunnerInfo(
+        runner=runner,
+        actual_implementation_level="python_lightweight_runner",
+        declared_implementation_level=declared_level,
+        fallback_reason=fallback_reason,
+        native_check_error=native_check_error,
+    )
 
 
 def build_subscription_runner(protocol: str) -> SubscriptionRunner:
-    """Build a subscribe runner."""
+    """按协议名称构建订阅 runner。
+
+    Args:
+        protocol: 归一化的协议名，如 "opcua"、"iec61850_goose"、"mqtt" 等。
+
+    Returns:
+        对应协议的 SubscriptionRunner 实例。
+
+    Raises:
+        ValueError: 协议不支持订阅模式。
+    """
     normalized = normalize_protocol(protocol)
     if normalized == "opcua":
         return OpcUaOpen62541SubscribeRunner()

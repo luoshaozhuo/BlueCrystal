@@ -1,7 +1,7 @@
 # Whale 项目目录树
 
 > 能源数据统一平台（风光储电场数据接入底座）
-> 最后更新: 2026-05-28 (Agent Framework & Config Governance — subagent 流程、共享 agent_config、规则治理)
+> 最后更新: 2026-05-31 (Round 16 — field readback L5 现场验证包固化/脚本 CLI 加固/evidence template/入口自检/需求表里程碑与 production-ready 判定)
 
 本文件维护完整文件级目录树，每个 item 附简短职责注释（不超过 40 中文字符）。
 只用于导航，不替代读取当前源码。
@@ -15,7 +15,7 @@
 ├── README.md                        — 项目简介与快速开始
 ├── Dockerfile                       — ingest统一runtime镜像
 ├── alembic.ini                      — Alembic 主配置
-├── pyproject.toml                   — 项目元数据、依赖与工具配置
+├── pyproject.toml                   — 项目元数据、依赖与 ruff/mypy 工具配置
 ├── requirements.txt                 — Python 依赖声明
 ├── alembic/                         — ingest运行库迁移
 ├── docker-compose.ingest-dev.yaml   — ingest 开发环境 Docker 编排
@@ -127,6 +127,7 @@ src/whale/
 │   │   ├── audit_middleware.py      — API审计中间件
 │   │   ├── errors.py                — 稳定错误模型
 │   │   ├── schemas.py               — API schema
+│   │   ├── readyz.py                — readyz 8组件聚合与degradation脱敏
 │   │   └── routes/
 │   │       ├── __init__.py          — API路由导出
 │   │       ├── acquisition_tasks.py — 采集任务CRUD路由
@@ -166,7 +167,8 @@ src/whale/
 │   │   ├── scheduler_job.py                 — 调度作业封装
 │   │   ├── scheduler_settings.py            — 调度器参数
 │   │   ├── write_lease.py                   — 写入租约服务
-│   │   └── worker_runtime.py                — APScheduler WorkerRuntime
+│   │   ├── worker_runtime.py                — APScheduler WorkerRuntime（含handler分发）
+│   │   └── handlers.py                      — WorkerRuntime 采集 job handler
 │   │
 │   ├── decorators/                   — 装饰器
 │   │   ├── source_acquisition.py     — 采集流程装饰器
@@ -234,6 +236,7 @@ src/whale/
 │   │   ├── __init__.py
 │   │   ├── models.py                 — 数据源模型定义
 │   │   ├── ports.py                  — 源访问端口接口
+│   │   ├── runner_resolution.py      — shared_source production runner 路径解析与 dev fallback
 │   │   ├── access/                   — 可复用接入适配器
 │   │   │   ├── __init__.py
 │   │   │   ├── adapter.py            — SourceAccessAdapter 基类
@@ -334,16 +337,25 @@ tests/
 │   ├── test_ingest_audit_event_schema.py — ingest审计事件单测
 │   ├── test_ingest_bundle_checksum.py — bundle摘要单测
 │   ├── test_ingest_bundle_redaction.py — bundle脱敏单测
+│   ├── test_ingest_composition_injection.py — 注入完整性单测
 │   ├── test_ingest_job_lease.py      — 作业租约语义单测
 │   ├── test_ingest_runtime_entrypoint.py — 运行入口单测
 │   ├── test_ingest_runtime_modes.py  — runtime模式单测
 │   ├── test_ingest_runtime_orm_models.py — runtime ORM单测
 │   ├── test_ingest_runtime_scheduler_import.py — scheduler导入门禁
 │   ├── test_ingest_write_lease.py    — 写入租约单测
+│   ├── test_ingest_write_lease_fencing.py — 写入租约fencing单测
+│   ├── test_ingest_readyz.py         — readyz 8组件聚合与degradation单测
+│   ├── test_scheduler_job_routes.py  — 调度任务持久化单测
+│   ├── test_worker_runtime_do_execute.py — WorkerRuntime dispatch 单测
+│   ├── test_acquisition_job_handler.py — AcquisitionJobHandler L1 单测
+│   ├── test_dual_node_write_lease_conflict.py — 双节点写入冲突 L2 单测
 │   ├── test_source_acquisition_port_registry.py  — 端口注册表测试
 │   ├── test_source_acquisition_use_case.py   — 采集用例测试
 │   ├── test_source_command_write_lease_guard.py — 写入租约守卫测试
 │   ├── test_source_command_use_case.py   — 命令写入用例测试
+│   ├── test_source_command_lease_release.py — 写入租约释放单测
+│   ├── test_shared_source_runner_resolution.py  — shared_source runner 路径解析单测
 │   ├── test_state_snapshot_publish_use_case.py  — 快照发布用例测试（17 cases）
 │   ├── test_source_runtime_config_repository.py  — 运行时配置仓库测试
 │   ├── test_source_scheduling.py       — 调度测试
@@ -376,6 +388,7 @@ tests/
 │   ├── test_ingest_prodlike_redis_fault_injection.py — Redis 故障注入恢复测试
 │   ├── test_ingest_prodlike_kafka_fault_injection.py — Kafka 故障注入恢复测试
 │   ├── test_ingest_prodlike_worker_failover.py — worker crash/failover 集成测试
+│   ├── test_ingest_dual_node_db_lease_e2e.py — 双节点 DB lease E2E 集成测试（L3）
 │   ├── test_ingest_prodlike_scheduler_backpressure.py — 调度背压与 missed tick 测试
 │   ├── test_ingest_prodlike_audit_metrics_resilience.py — 审计指标韧性测试
 │   ├── test_ingest_security_partition_bundle_flow.py — Bundle单向流5 tests
@@ -633,6 +646,7 @@ tools/source_lab/
         ├── test_field_provider.py      — 字段提供者测试
         ├── test_iec61850_lightweight_semantics.py  — IEC 61850 轻量语义
         ├── test_native_cmd_runner_preflight.py  — NativeCmdCapacityRunner 预检测试（7 tests）
+        ├── test_native_cmd_timeout.py  — Native 命令超时单测（3 tests）
         ├── test_native_process_protocol.py  — Native 进程协议测试
         ├── test_native_runners_availability.py  — Native 运行器可用性
         ├── test_opcua_access_adapter.py  — OPC UA 接入适配器测试
@@ -688,8 +702,8 @@ ai_shared/
 │   │   ├── block-dangerous-bash.py   — 危险命令拦截 hook
 │   │   ├── docstring-cn-gate.py      — 中文 docstring 门禁 hook
 │   │   └── no-source-lab-import-gate.sh — source_lab 导入门禁
-│   ├── skills/                        — 规范源 skill 定义（13 个 skill 规范）
-│   └── setup_shared_skills_link.sh    — 技能符号链接设置脚本
+│   │   ├── comment-doc-gate.py        — 注释文档门禁 hook
+│   ├── skills/                        — 规范源 skill 定义（10 个 skill 规范，SKILL.md 子目录格式）
 ├── templates/                         — 模板文件
 │   └── coding_agent_prompt_template.txt — Coding Agent prompt 模板
 ├── memory/                            — 长期记忆
@@ -709,6 +723,8 @@ ai_shared/
 │   └── Whale_REQ_Crosscutting.md     — 横切关注点需求说明
 ├── prompts/                           — prompt 模板（当前空）
 ├── reports/                           — agent 反馈与验收归档
+│   ├── ingest_source_lab_arch_security_audit_review_round1.md — 架构安全审计审查报告 Round 1
+│   ├── ingest_source_lab_arch_security_audit_review_round2_fix_closure.md — 架构安全审计修复收口报告 Round 2
 │   ├── four_rounds_engineering_baseline_closure_report.md — 四轮收口自查与工程基线固化报告
 │   ├── cache_to_message_queue_use_case_round4_report.md   — 缓存快照发布用例报告（Round 4）
 │   ├── source_protocol_readiness_gate_round3_report.md    — 协议准入矩阵治理报告（Round 3）
@@ -741,7 +757,36 @@ ai_shared/
 │   ├── ingest_runtime_scheduler_crud_multinode_round1_report.md — ingest第1轮骨架实施报告
 │   ├── source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_20260526.log — GOOSE/SV setcap后lo门禁日志
 │   ├── source_lab_goose_sv_dynamic_raw_socket_gate_after_setcap_20260526_eth0.log — GOOSE/SV setcap后eth0门禁日志
-│   └── requirements_trace_update_20260525_source_lab_ingest_round1.md — 需求核验 Round 1 报告
+	│   ├── ingest_source_lab_arch_security_audit_review_round1.md — 架构安全审计审查报告 Round 1
+	│   ├── ingest_source_lab_arch_security_audit_review_round2_fix_closure.md — 架构安全审计修复收口报告 Round 2
+	│   ├── ingest_source_lab_remaining_risks_quality_gate_round3.md — 剩余风险与质量门禁报告 Round 3
+	│   ├── ingest_source_lab_docstring_violation_inventory_round4.md — docstring 违规清单 Round 4
+	│   ├── ingest_source_lab_real_chain_docstring_quality_round4.md — 真实链路/docstring/质量门禁报告 Round 4
+	│   ├── ingest_source_lab_docstring_violation_inventory_round5.md — docstring 违规清单 Round 5
+	│   ├── ingest_source_lab_round5_docstring_and_remaining_risks.md — Round 5 docstring 治理与剩余风险收口报告
+	│   ├── ingest_source_lab_docstring_violation_inventory_round6.md — docstring 违规清单 Round 6
+	│   ├── ingest_source_lab_docstring_true_closure_round6.md — Round 6 docstring 治理与 remaining inventory 报告
+	│   ├── ingest_source_lab_type_docstring_lint_inventory_round7.md — Round 7 类型/docstring/lint 治理清单
+	│   ├── ingest_source_lab_mypy_inventory_round8.md — Round 8 mypy 基线与剩余类型债清单
+	│   ├── ingest_source_lab_mypy_closure_round8.md — Round 8 mypy 治理验证与未收口归档
+	│   ├── ingest_source_lab_module_ready_requirements_and_status_round10.md — Round 10 模块准入与需求边界核验报告
+	│   ├── ingest_external_dependency_readiness_matrix_round11.md — Round 11 ingest 外部依赖准入矩阵
+	│   ├── ingest_module_deployment_topology_port_matrix_round11.md — Round 11 ingest 部署拓扑/端口/通信矩阵
+	│   ├── ingest_source_lab_module_ready_blocker_closure_round11.md — Round 11 ingest/source_lab 阻塞项修复与状态同步
+	│   ├── ingest_write_readback_field_validation_plan_round11.md — Round 11 ingest 写入 readback 现场验证计划
+	│   ├── source_lab_mypy_debt_plan_round12.md — Round 12 source_lab mypy 分阶段治理计划
+	│   ├── shared_source_production_runner_artifact_validation_round12.md — Round 12 shared_source runner artifact 契约验证报告
+	│   ├── ingest_source_lab_production_ready_blocker_closure_round12.md — Round 12 ingest/source_lab 阻塞项收口与 production-ready 判定
+	│   ├── source_lab_mypy_phase1_closure_round13.md — Round 13 source_lab mypy 第一阶段治理收口报告
+	│   ├── ingest_crosscutting_integration_matrix_round13.md — Round 13 ingest 横切能力接入矩阵报告
+	│   ├── ingest_source_lab_round13_production_evidence_closure.md — Round 13 生产准入剩余证据闭环报告
+	│   ├── source_lab_mypy_phase2_closure_round14.md — Round 14 source_lab mypy 第二阶段治理收口报告
+	│   ├── ingest_source_lab_round14_pg_readyz_mypy_closure.md — Round 14 PG E2E/readyz/mypy 阻塞项收口报告
+	│   ├── ingest_source_lab_round15_pg_fencing_and_tests_mypy_closure.md — Round 15 PG fencing 修复与全量 mypy 收口报告
+	│   ├── ingest_source_lab_round16_field_readback_l5_readiness.md — Round 16 field readback L5 现场验证包固化与生产准入判定
+	│   ├── ingest_field_readback_l5_evidence_template.md — L5 现场验证证据收集模板（全字段）
+	│   ├── source_lab_tests_mypy_closure_round15.md — Round 15 source_lab tests mypy 0 errors 治理终点报告
+	│   └── requirements_trace_update_20260525_source_lab_ingest_round1.md — 需求核验 Round 1 报告
 ├── rules/                             — 公共规则
     ├── routing.md                     — 规则路由
     ├── coding.md                      — 编码规范
@@ -771,12 +816,17 @@ scripts/
 ├── cleanup_root_logs.sh               — 清理根目录日志文件
 ├── run_ingest_dev.sh                  — 启动 ingest 开发环境
 ├── run_ingest_runtime_compose_smoke.sh — ingest compose运行态烟测
+├── run_ingest_compose_readyz_e2e.sh   — compose readyz 8组件聚合 E2E 脚本
+├── run_ingest_write_readback_smoke.sh — 三协议 simulator/native write-readback smoke（L3，CLI 加固含--dry-run/--protocol/--confirm）
+├── run_ingest_pg_lease_fault_injection.sh — PostgreSQL/readyz prodlike fault injection 入口
 ├── run_pg_migration_matrix.sh        — PostgreSQL迁移矩阵自动化脚本
 ├── ci_ingest_runtime_gate.sh         — CI门禁脚本（7个门禁组）
 ├── run_ingest_bundle_one_way_flow_smoke.sh — Bundle单向流smoke
 ├── run_ingest_prodlike_performance_profile.sh — 性能profile smoke
 ├── run_source_lab_raw_socket_dynamic_gate.sh — raw socket动态门禁回归
 ├── run_source_lab_l2_standalone_gate.sh — GOOSE/SV standalone门禁
+├── validate_shared_source_production_runner.sh — shared_source runner 路径解析契约验证
+├── test_ingest_write_readback_smoke_contract.sh — write-readback smoke 入口 CLI 契约自检（L2）
 └── source_lab_l2_test_env.sh          — 可控L2 veth环境搭建
 ```
 
@@ -795,17 +845,30 @@ scripts/
     ├── changed-files-gate/SKILL.md    — 变更范围门禁
     ├── code-quality-gate/SKILL.md     — 代码质量门禁
     ├── commit-message/SKILL.md        — 提交信息生成
-    ├── feedback-archive/SKILL.md      — 反馈归档
     ├── heavy-regression/SKILL.md      — 重回归测试
-    ├── project-tree-read/SKILL.md     — 目录树读取
     ├── project-tree-reset/SKILL.md    — 目录树全量重建
     ├── project-tree-update/SKILL.md   — 目录树增量更新
-    ├── report-archive/SKILL.md        — 报告归档
     ├── requirement-trace/SKILL.md     — 需求跟踪表更新
     └── rule-update/SKILL.md           — 公共规则更新
 
 .agents/                               — Codex agent 配置（指向 .claude/skills）
 └── skills                             — Codex 技能路径指向 .claude/skills
+```
+
+## ADR `ai_shared/adr/`
+
+```text
+ai_shared/adr/
+├── ADR-20260523-001-source-lab-server-client-ingest-boundary.md — SourceLab / shared_source / ingest 边界
+├── ADR-20260523-002-source-lab-task-facade-boundary.md — tool task facade 边界
+├── ADR-20260523-003-source-production-client-and-write-port-boundary.md — production client / write port 边界
+├── ADR-20260524-004-source-protocol-production-readiness-gate.md — 协议 production readiness 门禁
+├── ADR-20260524-005-cache-to-message-queue-publish-use-case.md — cache->message 发布职责
+├── ADR-20260524-006-source-lab-protocol-directory-consolidation.md — source_lab 目录整理
+├── ADR-20260524-007-iec61850-mms-production-read-write-round1.md — IEC 61850 MMS 生产读写
+├── ADR-20260524-008-iec61850-report-subscription-boundary.md — IEC 61850 Report 订阅边界
+├── ADR-20260524-009-source-lab-server-simulator-facade.md — simulator facade 架构
+└── ADR-20260530-010-shared-source-production-runner-artifact-boundary.md — shared_source production runner artifact 与 source_lab build 边界
 ```
 
 ## 第三方库 `third_party/`

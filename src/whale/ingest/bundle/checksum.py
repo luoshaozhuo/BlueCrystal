@@ -1,4 +1,7 @@
-"""Checksum helpers for ingest bundle payloads."""
+"""Bundle 校验和。
+
+计算和验证配置 bundle 的完整性校验和。
+"""
 
 from __future__ import annotations
 
@@ -8,7 +11,7 @@ from typing import Any
 
 
 def canonicalize_bundle_payload(payload: dict[str, Any]) -> bytes:
-    """Return one canonical JSON encoding used for checksums."""
+    """返回用于校验和的规范 JSON 编码。"""
 
     cloned = dict(payload)
     cloned.pop("checksum", None)
@@ -22,6 +25,6 @@ def canonicalize_bundle_payload(payload: dict[str, Any]) -> bytes:
 
 
 def compute_bundle_checksum(payload: dict[str, Any]) -> str:
-    """Compute one SHA256 checksum for a bundle payload."""
+    """计算 bundle payload 的 SHA256 校验和。"""
 
     return hashlib.sha256(canonicalize_bundle_payload(payload)).hexdigest()
