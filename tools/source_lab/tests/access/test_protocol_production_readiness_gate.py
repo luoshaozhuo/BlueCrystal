@@ -59,6 +59,31 @@ _KNOWN_PRODUCTION_READ_PROTOCOLS: dict[str, dict[str, str]] = {
         "read_adapter": "src/whale/ingest/adapters/source/iec61850_report_source_acquisition_adapter.py",
         "write_adapter": "",
     },
+    "iec104": {
+        "shared_source": "src/whale/shared/source/iec104",
+        "read_adapter": "src/whale/ingest/adapters/source/iec104_source_acquisition_adapter.py",
+        "write_adapter": "src/whale/ingest/adapters/source/iec104_source_write_adapter.py",
+    },
+    "mqtt": {
+        "shared_source": "src/whale/shared/source/mqtt",
+        "read_adapter": "src/whale/ingest/adapters/source/mqtt_source_acquisition_adapter.py",
+        "write_adapter": "",
+    },
+    "http_rest": {
+        "shared_source": "src/whale/shared/source/http_rest",
+        "read_adapter": "src/whale/ingest/adapters/source/http_rest_source_acquisition_adapter.py",
+        "write_adapter": "",
+    },
+    "modbus_rtu": {
+        "shared_source": "src/whale/shared/source/modbus_rtu",
+        "read_adapter": "src/whale/ingest/adapters/source/modbus_rtu_source_acquisition_adapter.py",
+        "write_adapter": "",
+    },
+    "iec101": {
+        "shared_source": "src/whale/shared/source/iec101",
+        "read_adapter": "src/whale/ingest/adapters/source/iec101_source_acquisition_adapter.py",
+        "write_adapter": "",
+    },
 }
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -318,7 +343,10 @@ def test_subscription_runtime_readiness_reports_actual_non_native_level(
 ) -> None:
     """subscription readiness 不能只回显静态声明级别。"""
     readiness = describe_protocol_runtime_readiness(protocol, "streaming")
-    assert readiness.declared_implementation_level == "real_native_runner" or protocol == "mqtt"
+    if protocol == "iec101":
+        assert readiness.declared_implementation_level == "python_lightweight_runner"
+    elif protocol != "mqtt":
+        assert readiness.declared_implementation_level == "real_native_runner"
     assert readiness.actual_implementation_level == expected_level
     assert readiness.actual_runtime_availability == expected_availability
     assert readiness.is_native_ready is False

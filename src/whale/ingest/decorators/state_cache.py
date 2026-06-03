@@ -12,9 +12,9 @@ from datetime import datetime
 
 from whale.ingest.ports.state.source_state_cache_port import SourceStateCachePort
 from whale.ingest.usecases.dtos.acquired_node_state import AcquiredNodeStateBatch
-from whale.shared.crosscutting.compliance import AuditEvent, AuditEventSinkPort, DataClassification
-from whale.shared.crosscutting.debug import DebugTraceContext, DebugTraceSinkPort
-from whale.shared.crosscutting.observability import MetricsSinkPort
+from turtle.compliance import AuditEvent, AuditEventSinkPort, DataClassification
+from platform_shared.crosscutting.debug import DebugTraceContext, DebugTraceSinkPort
+from platform_shared.crosscutting.observability import MetricsSinkPort
 
 LOGGER = logging.getLogger(__name__)
 

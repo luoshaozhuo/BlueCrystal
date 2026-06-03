@@ -26,7 +26,7 @@ from whale.ingest.runtime.message_pipeline_settings import KafkaMessageSettings
 from whale.ingest.usecases.dtos.acquired_node_state import AcquiredNodeStateBatch, AcquiredNodeValue
 from whale.ingest.usecases.dtos.state_publish_request import StateSnapshotPublishRequest
 from whale.ingest.usecases.state_snapshot_publish_use_case import StateSnapshotPublishUseCase
-from whale.shared.crosscutting.compliance import AuditEvent, AuditEventSinkPort
+from turtle.compliance.audit_policy import AuditEvent, AuditEventSinkPort
 
 
 @dataclass

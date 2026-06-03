@@ -36,7 +36,7 @@ from whale.ingest.usecases.dtos.acquired_node_state import (
     AcquiredNodeStateBatch,
     AcquiredNodeValue,
 )
-from whale.shared.crosscutting.resilience.error_classifier import ClassifiedError
+from platform_shared.crosscutting.resilience.error_classifier import ClassifiedError
 from whale.shared.utils.time import ensure_utc, max_datetime
 
 

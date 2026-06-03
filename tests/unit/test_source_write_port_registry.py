@@ -58,3 +58,13 @@ class TestStaticSourceWritePortRegistry:
         assert StaticSourceWritePortRegistry._normalize_protocol_key("opc_ua") == "opcua"
         assert StaticSourceWritePortRegistry._normalize_protocol_key("modbus_tcp") == "modbustcp"
         assert StaticSourceWritePortRegistry._normalize_protocol_key(" IEC104 ") == "iec104"
+
+    def test_get_iec104_protocol(self) -> None:
+        """IEC 104 应能被注册和解析。"""
+        iec104_port = _FakeWritePort()
+        registry = StaticSourceWritePortRegistry(
+            ports_by_protocol={"iec104": iec104_port},
+        )
+        for alias in ("iec104", "IEC104", "iec-104", "IEC_104"):
+            port = registry.get(alias)
+            assert port is iec104_port, f"Failed for alias: {alias}"

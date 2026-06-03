@@ -27,11 +27,13 @@ from whale.shared.persistence import Base
 
 
 class ScadaProtocolParamDef(Base):
-    """协议端点参数定义 — 定义某个 (protocol, service_type, transport) 组合支持的参数.
+    """协议端点参数定义 — 定义某个端点可填写哪些正式参数.
 
-    例如 Modbus TCP 需要 unit_id、connect_timeout_ms；
-    GOOSE 需要 network_interface、vlan_id、app_id 等。
-    不在 param_name 中编码协议信息。
+    这一层专门描述 endpoint 粒度的参数模板和值表，例如 OPC UA 会话参数、
+    Modbus 超时、MQTT topic_filter、HTTP 基础路径、ADS AMS Net ID 等。
+    端点主表只保留跨协议公共骨架；凡是会随协议变化的正式参数，都应通过
+    `ScadaEndpointParamValue` 落库，而不是塞回 `scada_communication_endpoint`
+    主表，也不是长期放在 `metadata_json`。
     """
 
     __tablename__ = "scada_protocol_param_def"
@@ -47,15 +49,26 @@ class ScadaProtocolParamDef(Base):
         Integer, primary_key=True, autoincrement=True, comment="参数定义主键"
     )
     application_protocol: Mapped[str] = mapped_column(
-        String(64), nullable=False, comment="应用层协议：OPC_UA / MODBUS / IEC101 / IEC104 / IEC61850 / MQTT / HTTP_REST"
+        String(64), nullable=False,
+        comment=(
+            "应用层协议族：OPC_UA / MODBUS / IEC101 / IEC104 / IEC61850 / MQTT / "
+            "HTTP_REST / BECKHOFF_ADS。新增协议时继续扩此枚举，不为每个协议复制新表。"
+        ),
     )
     service_type: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True,
-        comment="服务类型：TCP_READ / GOOSE / SV / MMS_READ / REPORT 等；为 None 表示该参数适用于协议所有服务类型"
+        comment=(
+            "服务类型：READ / SUBSCRIBE / TCP_READ / RTU_READ / INTERROGATION / "
+            "SPONTANEOUS / MMS_READ / REPORT / GOOSE / SV / REQUEST / "
+            "ADS_READ_WRITE / ADS_NOTIFICATION 等；为 None 表示该参数适用于同协议全部服务。"
+        ),
     )
     transport: Mapped[Optional[str]] = mapped_column(
         String(32), nullable=True,
-        comment="传输层：TCP / SERIAL / ETHERNET_L2 / MQTT / HTTP；None 表示适用于所有传输"
+        comment=(
+            "传输层：TCP / SERIAL / ETHERNET_L2 / MQTT / HTTP / HTTPS；"
+            "None 表示适用于同协议全部传输，避免为每种 transport 复制参数定义表。"
+        ),
     )
     param_key: Mapped[str] = mapped_column(
         String(128), nullable=False, comment="参数键，如 network_interface / vlan_id / app_id / unit_id / baudrate"
@@ -76,13 +89,14 @@ class ScadaProtocolParamDef(Base):
         String(64), nullable=True, comment="单位，如 ms / bps / Hz"
     )
     allowed_values: Mapped[Optional[str]] = mapped_column(
-        String(1024), nullable=True, comment="允许值列表，逗号分隔"
+        String(1024), nullable=True, comment="允许值列表，逗号分隔；供 Navicat 下拉和值域核对"
     )
     constraint_expr: Mapped[Optional[str]] = mapped_column(
         String(512), nullable=True, comment="约束表达式，如 value > 0 / 0 <= value <= 100"
     )
     description: Mapped[Optional[str]] = mapped_column(
-        String(512), nullable=True, comment="参数说明"
+        String(512), nullable=True,
+        comment="参数说明；描述该定义在多协议矩阵中的语义和约束，不存具体 endpoint 值"
     )
     sort_order: Mapped[int] = mapped_column(
         Integer, default=0, comment="显示顺序"
@@ -96,9 +110,11 @@ class ScadaProtocolParamDef(Base):
 
 
 class ScadaEndpointParamValue(Base):
-    """协议端点参数值 — endpoint 粒度的参数值，第一范式.
+    """协议端点参数值 — endpoint 粒度的第一范式值表.
 
-    每个 endpoint 的每个参数值一行。
+    每个 endpoint 的每个正式参数单独占一行，方便按协议视图、SQL 和 Navicat
+    检索。该表承担正式参数主存储职责；`metadata_json` 只可放临时附注、
+    导入痕迹和非结构化说明。
     """
 
     __tablename__ = "scada_endpoint_param_value"
@@ -112,11 +128,13 @@ class ScadaEndpointParamValue(Base):
     )
     endpoint_id: Mapped[int] = mapped_column(
         ForeignKey("scada_communication_endpoint.endpoint_id", ondelete="CASCADE"),
-        nullable=False, index=True, comment="通信端点 ID"
+        nullable=False, index=True,
+        comment="通信端点 ID；同一 endpoint 可按多协议服务模板写入多行 key-value 参数值"
     )
     param_def_id: Mapped[int] = mapped_column(
         ForeignKey("scada_protocol_param_def.param_def_id", ondelete="CASCADE"),
-        nullable=False, comment="参数定义 ID"
+        nullable=False,
+        comment="参数定义 ID；通过定义表表达协议/服务/transport 扩展，不在主表加专用列"
     )
     value_text: Mapped[Optional[str]] = mapped_column(
         String(2048), nullable=True, comment="参数值（文本）"
@@ -139,10 +157,13 @@ class ScadaEndpointParamValue(Base):
 
 
 class ScadaSignalParamDef(Base):
-    """协议信号参发定义 — 某 (protocol, service_type) 下一个点位可配置的参数.
+    """协议信号参数定义 — 定义单个点位如何被具体协议定位和解析.
 
-    例如 Modbus 信号需要 function_code / register_address；
-    IEC104 信号需要 ioa / type_id。
+    这一层专门描述 signal/profile item 粒度的正式参数，例如 Modbus
+    寄存器地址、OPC UA NodeId、IEC104 IOA、MQTT payload_path、ADS
+    symbol_name。它允许同一套共享点表在不同协议/服务下复用，只把寻址、
+    订阅和解析差异放进参数定义和值表。禁止把这些协议地址字段塞回
+    `scada_signal_profile_item` 主表，也禁止长期放在 `metadata_json`。
     """
 
     __tablename__ = "scada_signal_param_def"
@@ -158,10 +179,18 @@ class ScadaSignalParamDef(Base):
         Integer, primary_key=True, autoincrement=True, comment="信号参数定义主键"
     )
     application_protocol: Mapped[str] = mapped_column(
-        String(64), nullable=False, comment="应用层协议"
+        String(64), nullable=False,
+        comment=(
+            "应用层协议族：与 endpoint 参数定义保持一致。通过协议+服务矩阵描述同一套共享点表"
+            "在不同协议下的寻址方式。"
+        ),
     )
     service_type: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True, comment="服务类型；None 表示适用于所有类型"
+        String(64), nullable=True,
+        comment=(
+            "服务类型；None 表示适用于同协议全部服务。可用来区分如 "
+            "ADS_READ_WRITE 与 ADS_NOTIFICATION 的寻址/订阅参数差异。"
+        ),
     )
     param_key: Mapped[str] = mapped_column(
         String(128), nullable=False, comment="参数键"
@@ -182,13 +211,14 @@ class ScadaSignalParamDef(Base):
         String(64), nullable=True, comment="单位"
     )
     allowed_values: Mapped[Optional[str]] = mapped_column(
-        String(1024), nullable=True, comment="允许值列表，逗号分隔"
+        String(1024), nullable=True, comment="允许值列表，逗号分隔；供 Navicat 查看可选枚举"
     )
     constraint_expr: Mapped[Optional[str]] = mapped_column(
         String(512), nullable=True, comment="约束表达式"
     )
     description: Mapped[Optional[str]] = mapped_column(
-        String(512), nullable=True, comment="参数说明"
+        String(512), nullable=True,
+        comment="参数说明；描述共享 signal_profile_item 在该协议/服务下如何被定位或订阅"
     )
     sort_order: Mapped[int] = mapped_column(
         Integer, default=0, comment="显示顺序"
@@ -202,9 +232,10 @@ class ScadaSignalParamDef(Base):
 
 
 class ScadaSignalProfileItemParamValue(Base):
-    """点位方案明细协议参数值 — signal profile item 粒度的参数值.
+    """点位方案明细协议参数值 — signal profile item 粒度的第一范式值表.
 
-    每个 profile_item 的每个参数值一行。
+    每个 profile_item 的每个协议参数单独占一行，这样同一套共享点表也能为
+    不同协议保存各自的寻址与解析参数，而不污染主表列。
     """
 
     __tablename__ = "scada_signal_profile_item_param_value"
@@ -218,11 +249,13 @@ class ScadaSignalProfileItemParamValue(Base):
     )
     profile_item_id: Mapped[int] = mapped_column(
         ForeignKey("scada_signal_profile_item.profile_item_id", ondelete="CASCADE"),
-        nullable=False, index=True, comment="点位方案明细 ID"
+        nullable=False, index=True,
+        comment="点位方案明细 ID；多个协议服务可复用同一 profile_item，并分别写参数值"
     )
     param_def_id: Mapped[int] = mapped_column(
         ForeignKey("scada_signal_param_def.param_def_id", ondelete="CASCADE"),
-        nullable=False, comment="信号参数定义 ID"
+        nullable=False,
+        comment="信号参数定义 ID；通过定义表区分协议/服务，不复制多套 signal_profile_item"
     )
     value_text: Mapped[Optional[str]] = mapped_column(
         String(2048), nullable=True, comment="参数值（文本）"

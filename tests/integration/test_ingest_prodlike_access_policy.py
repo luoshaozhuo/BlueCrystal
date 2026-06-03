@@ -32,7 +32,8 @@ from whale.ingest.decorators.source_write import AuthorizedSourceWritePort
 from whale.ingest.domain.write_security_profile import ProtocolWriteProfile, WriteSecurityProfile
 from whale.ingest.ports.source.source_write_port import SourceWritePort
 from whale.ingest.usecases.dtos.source_write_result import SourceWriteResult
-from whale.shared.crosscutting.auth import Permission, Principal
+from turtle.auth.identity import Principal
+from turtle.auth.policy import Permission
 
 
 @pytest.fixture

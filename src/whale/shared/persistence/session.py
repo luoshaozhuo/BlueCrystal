@@ -1,7 +1,9 @@
-"""SQLAlchemy engine and session helpers for the shared persistence layer.
+"""shared persistence 层的 SQLAlchemy engine 与 session 工具。
 
-支持 SQLite / PostgreSQL / MySQL 三种后端，通过环境变量选择:
+支持 SQLite / PostgreSQL / MySQL 三种后端，优先读取完整 URL，再回退到分散
+环境变量。当前支持的环境变量如下：
 
+    WHALE_SHARED_DB_URL        — 完整 SQLAlchemy URL，适合测试临时库
     WHALE_SHARED_DB_BACKEND    — sqlite (默认) / postgresql / mysql
     WHALE_SHARED_DB_PATH       — SQLite 数据库文件路径
     WHALE_SHARED_DB_HOST       — PostgreSQL / MySQL 主机
@@ -10,7 +12,7 @@
     WHALE_SHARED_DB_USERNAME   — 用户名
     WHALE_SHARED_DB_PASSWORD   — 密码
 
-环境变量可以写在项目根目录 .env 文件中，启动时自动加载.
+本模块只负责解析连接信息和创建 engine，不负责 destructive reset 安全护栏。
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from pathlib import Path
 from typing import Literal
 
 from sqlalchemy import URL, create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -53,6 +56,15 @@ def _build_sqlite_url() -> URL:
         db_path = PROJECT_ROOT / db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     return URL.create(drivername="sqlite", database=str(db_path))
+
+
+def _build_explicit_db_url() -> URL | None:
+    """读取显式 `WHALE_SHARED_DB_URL`，便于测试临时库注入。"""
+
+    raw_url = os.environ.get("WHALE_SHARED_DB_URL", "").strip()
+    if not raw_url:
+        return None
+    return make_url(raw_url)
 
 
 def _build_postgresql_url() -> URL:
@@ -94,6 +106,10 @@ def _fallback_to_sqlite(backend: str, missing: list[str]) -> URL:
 
 
 def _build_db_url() -> URL:
+    explicit_url = _build_explicit_db_url()
+    if explicit_url is not None:
+        return explicit_url
+
     backend = _resolve_backend()
     if backend == "sqlite":
         return _build_sqlite_url()

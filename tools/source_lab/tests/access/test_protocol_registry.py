@@ -40,6 +40,7 @@ def test_list_supported_protocols_contains_required_entries() -> None:
         "iec61850_sv",
         "mqtt",
         "http_rest",
+        "beckhoff_ads",
     )
 
 
@@ -98,11 +99,17 @@ def test_iec61850_is_real_native_runner() -> None:
     assert get_implementation_level("iec61850_report") == "real_native_runner"
 
 
-def test_iec101_iec104_are_real_native_runner() -> None:
-    """IEC101 和 IEC104 现已支持 real_native_runner。"""
+def test_iec104_is_real_native_runner() -> None:
+    """IEC104 是 real_native_runner（C lib60870 子进程）。"""
 
-    assert get_implementation_level("iec101") == "real_native_runner"
     assert get_implementation_level("iec104") == "real_native_runner"
+
+
+def test_modbus_rtu_iec101_are_python_lightweight_runner() -> None:
+    """Modbus RTU 和 IEC101 是 python_lightweight_runner（标准库 serial，非 C native）。"""
+
+    assert get_implementation_level("modbus_rtu") == "python_lightweight_runner"
+    assert get_implementation_level("iec101") == "python_lightweight_runner"
 
 
 def test_all_registered_protocols_have_implementation_level() -> None:
@@ -128,6 +135,6 @@ def test_no_protocol_falsely_claims_real_native_runner() -> None:
     real_native_protocols = {
         p for p in list_supported_protocols() if get_implementation_level(p) == "real_native_runner"
     }
-    assert real_native_protocols == {"opcua", "modbus_tcp", "modbus_rtu", "iec101", "iec104", "iec61850_mms", "iec61850_report", "iec61850_goose", "iec61850_sv"}, (
+    assert real_native_protocols == {"opcua", "modbus_tcp", "iec104", "iec61850_mms", "iec61850_report", "iec61850_goose", "iec61850_sv"}, (
         f"unexpected real_native_runner set: {real_native_protocols}"
     )

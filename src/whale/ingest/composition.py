@@ -16,20 +16,41 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from whale.ingest.adapters.source.dispatch_source_acquisition_adapter import (
+    DispatchSourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.http_rest_source_acquisition_adapter import (
+    HttpRestSourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.iec101_source_acquisition_adapter import (
+    Iec101SourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.iec104_source_acquisition_adapter import (
+    Iec104SourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.modbus_rtu_source_acquisition_adapter import (
+    ModbusRtuSourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.iec104_source_write_adapter import (
+    Iec104SourceWriteAdapter,
+)
+from whale.ingest.adapters.source.iec61850_report_source_acquisition_adapter import (
+    Iec61850ReportSourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.iec61850_source_acquisition_adapter import (
+    Iec61850MmsSourceAcquisitionAdapter,
+)
+from whale.ingest.adapters.source.iec61850_source_write_adapter import (
+    Iec61850MmsSourceWriteAdapter,
+)
 from whale.ingest.adapters.source.modbus_source_acquisition_adapter import (
     ModbusSourceAcquisitionAdapter,
 )
 from whale.ingest.adapters.source.modbus_source_write_adapter import (
     ModbusSourceWriteAdapter,
 )
-from whale.ingest.adapters.source.iec61850_source_acquisition_adapter import (
-    Iec61850MmsSourceAcquisitionAdapter,
-)
-from whale.ingest.adapters.source.iec61850_report_source_acquisition_adapter import (
-    Iec61850ReportSourceAcquisitionAdapter,
-)
-from whale.ingest.adapters.source.iec61850_source_write_adapter import (
-    Iec61850MmsSourceWriteAdapter,
+from whale.ingest.adapters.source.mqtt_source_acquisition_adapter import (
+    MqttSourceAcquisitionAdapter,
 )
 from whale.ingest.adapters.source.opcua_source_acquisition_adapter import (
     OpcUaSourceAcquisitionAdapter,
@@ -83,21 +104,22 @@ from whale.ingest.usecases.roles.subscription_acquisition_role import (
     SubscriptionAcquisitionRole,
 )
 from whale.ingest.usecases.source_command_use_case import SourceCommandUseCase
-from whale.shared.crosscutting.auth import (
+from turtle.auth import (
     AccessDecision,
     AccessPolicyPort,
     Permission,
     Principal,
 )
-from whale.shared.crosscutting.compliance import AuditEvent, AuditEventSinkPort
-from whale.shared.crosscutting.debug import DebugTraceContext, DebugTraceSinkPort
-from whale.shared.crosscutting.observability import MetricsSinkPort, SensitiveDataMasker
-from whale.shared.crosscutting.resilience import (
+from turtle.compliance import AuditEvent, AuditEventSinkPort
+from platform_shared.crosscutting.debug import DebugTraceContext, DebugTraceSinkPort
+from platform_shared.crosscutting.observability import MetricsSinkPort
+from platform_shared.crosscutting.resilience import (
     BackoffPolicy,
     ClassifiedError,
     ErrorClassifier,
     RetryPolicy,
 )
+from platform_shared.security_primitives.masking import SensitiveDataMasker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -133,14 +155,22 @@ def build_source_acquisition_composition(
     access_policy: AccessPolicyPort | None = None,
     principal: Principal | None = None,
     logger: logging.Logger | None = None,
+    acquisition_port_registry: SourceAcquisitionPortRegistry | None = None,
 ) -> IngestAcquisitionComposition:
     """构建采集链。按日志、审计、重试、授权、调试的顺序装饰采集 port，组装完整采集调用链。
+
+    使用 DispatchSourceAcquisitionAdapter 作为多协议采集调度入口，
+    根据 request.execution.protocol 动态选择对应的协议适配器（OPC UA / Modbus TCP /
+    IEC 61850 MMS / IEC 61850 Report / IEC 104 / MQTT / HTTP REST）。
+
     Notes:
         - Local/test composition defaults to an allow-all access policy.
         - Production deployments should inject an explicit policy implementation.
         - Audit is best-effort by default through a no-op sink.
         - Single-read retry is capped at one attempt to avoid retry storms on
           top of PollingAcquisitionRole's periodic retry loop.
+        - 采集 port registry 参数允许复用 build_source_write_composition 已构建的
+          ACQUISITION_REGISTRY，避免重复实例化所有适配器。
     """
 
     resolved_logger = logger or LOGGER
@@ -155,7 +185,28 @@ def build_source_acquisition_composition(
         roles=("ingest",),
     )
 
-    raw_acquisition = OpcUaSourceAcquisitionAdapter()
+    # 构建多协议采集端口注册表（所有 production-ready 及已实现协议适配器）
+    # 若调用方已提供注册表（例如来自 build_source_write_composition），则直接复用
+    resolved_acq_registry = acquisition_port_registry or StaticSourceAcquisitionPortRegistry(
+        ports_by_protocol={
+            "opcua": OpcUaSourceAcquisitionAdapter(),
+            "modbus_tcp": ModbusSourceAcquisitionAdapter(),
+            "modbustcp": ModbusSourceAcquisitionAdapter(),
+            "iec61850_mms": Iec61850MmsSourceAcquisitionAdapter(),
+            "iec61850mms": Iec61850MmsSourceAcquisitionAdapter(),
+            "iec61850_report": Iec61850ReportSourceAcquisitionAdapter(),
+            "iec61850report": Iec61850ReportSourceAcquisitionAdapter(),
+            "iec104": Iec104SourceAcquisitionAdapter(),
+            "iec101": Iec101SourceAcquisitionAdapter(),
+            "modbus_rtu": ModbusRtuSourceAcquisitionAdapter(),
+            "modbusrtu": ModbusRtuSourceAcquisitionAdapter(),
+            "mqtt": MqttSourceAcquisitionAdapter(),
+            "http_rest": HttpRestSourceAcquisitionAdapter(),
+            "httprest": HttpRestSourceAcquisitionAdapter(),
+        },
+    )
+
+    raw_acquisition = DispatchSourceAcquisitionAdapter(registry=resolved_acq_registry)
     acquisition_port: SourceAcquisitionPort = RetryingSourceAcquisitionPort(
         inner=raw_acquisition,
         retry_policy=RetryPolicy(
@@ -340,7 +391,8 @@ def build_source_write_composition(
     Returns:
         Resolved write object graph.
     Notes:
-        - Default composition only supports OPC UA.
+        - Default composition supports OPC UA, Modbus TCP, IEC 61850 MMS,
+          IEC 61850 Report (acquisition only), and IEC 104.
         - Write is DISABLED by default (WHALE_INGEST_SOURCE_WRITE_ENABLED must be set).
         - Authorization is allow-all by default (for backwards compatibility).
           Production deployments should inject a restricted access policy.
@@ -377,6 +429,12 @@ def build_source_write_composition(
         access_policy=resolved_access_policy,
         security_profile=resolved_write_security_profile,
     )
+    iec104_write_port: SourceWritePort = AuthorizedSourceWritePort(
+        inner=Iec104SourceWriteAdapter(),
+        principal=resolved_principal,
+        access_policy=resolved_access_policy,
+        security_profile=resolved_write_security_profile,
+    )
     resolved_write_port_registry = write_port_registry or StaticSourceWritePortRegistry(
         ports_by_protocol={
             "opcua": opcua_write_port,
@@ -384,6 +442,7 @@ def build_source_write_composition(
             "modbustcp": modbus_write_port,
             "iec61850_mms": iec61850_mms_write_port,
             "iec61850mms": iec61850_mms_write_port,
+            "iec104": iec104_write_port,
         },
     )
 
@@ -392,15 +451,27 @@ def build_source_write_composition(
     modbus_acquisition_port: SourceAcquisitionPort = ModbusSourceAcquisitionAdapter()
     iec61850_mms_acquisition_port: SourceAcquisitionPort = Iec61850MmsSourceAcquisitionAdapter()
     iec61850_report_acquisition_port: SourceAcquisitionPort = Iec61850ReportSourceAcquisitionAdapter()
+    iec104_acquisition_port: SourceAcquisitionPort = Iec104SourceAcquisitionAdapter()
+    iec101_acquisition_port: SourceAcquisitionPort = Iec101SourceAcquisitionAdapter()
+    modbus_rtu_acquisition_port: SourceAcquisitionPort = ModbusRtuSourceAcquisitionAdapter()
+    mqtt_acquisition_port: SourceAcquisitionPort = MqttSourceAcquisitionAdapter()
+    http_rest_acquisition_port: SourceAcquisitionPort = HttpRestSourceAcquisitionAdapter()
     resolved_acquisition_registry: SourceAcquisitionPortRegistry = StaticSourceAcquisitionPortRegistry(
         ports_by_protocol={
             "opcua": opcua_acquisition_port,
             "modbus_tcp": modbus_acquisition_port,
             "modbustcp": modbus_acquisition_port,
+            "modbus_rtu": modbus_rtu_acquisition_port,
+            "modbusrtu": modbus_rtu_acquisition_port,
             "iec61850_mms": iec61850_mms_acquisition_port,
             "iec61850mms": iec61850_mms_acquisition_port,
             "iec61850_report": iec61850_report_acquisition_port,
             "iec61850report": iec61850_report_acquisition_port,
+            "iec104": iec104_acquisition_port,
+            "iec101": iec101_acquisition_port,
+            "mqtt": mqtt_acquisition_port,
+            "http_rest": http_rest_acquisition_port,
+            "httprest": http_rest_acquisition_port,
         },
     )
 
@@ -413,7 +484,7 @@ def build_source_write_composition(
 
     resolved_logger.info(
         "Source write composition built: protocols=%s",
-        sorted(["opcua", "modbus_tcp", "iec61850_mms", "iec61850_report"]),
+        sorted(["opcua", "modbus_tcp", "iec61850_mms", "iec61850_report", "iec104"]),
     )
 
     return IngestWriteComposition(

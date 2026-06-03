@@ -1,13 +1,20 @@
-"""Data models for source lab simulators and profile tests."""
+"""source_lab 统一数据模型。
+
+本文件只定义 simulator、profile、capacity 共用的轻量模型，不负责数据库访问、
+协议驱动或生产 runtime 装配。新增字段需要保持对既有 simulator/facade 的
+最小侵入兼容。
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+ProtocolValue = str | int | float | bool
+
 
 @dataclass(frozen=True, slots=True)
 class UpdateConfig:
-    """Shared periodic update config used by the fleet scheduler."""
+    """Fleet 周期更新配置。"""
 
     enabled: bool = True
     interval_seconds: float = 5.0
@@ -25,7 +32,7 @@ class UpdateConfig:
 
 @dataclass(frozen=True, slots=True)
 class SecurityConfig:
-    """Security settings common across industrial communication protocols."""
+    """工业协议共用的安全配置摘要。"""
 
     enabled: bool = False
     policy: str | None = None
@@ -38,7 +45,7 @@ class SecurityConfig:
 
 @dataclass(frozen=True, slots=True)
 class AuthConfig:
-    """Authentication settings used by protocols that require credentials."""
+    """协议认证配置摘要。"""
 
     username: str | None = None
     password: str | None = None
@@ -48,7 +55,7 @@ class AuthConfig:
 
 @dataclass(frozen=True, slots=True)
 class HeartbeatConfig:
-    """Heartbeat and keepalive settings for persistent industrial sessions."""
+    """长连接协议使用的心跳与保活配置。"""
 
     enabled: bool = False
     interval_seconds: float | None = None
@@ -58,7 +65,7 @@ class HeartbeatConfig:
 
 @dataclass(frozen=True, slots=True)
 class TimeoutConfig:
-    """Timeout settings commonly used by field communication protocols."""
+    """工业协议常见超时配置。"""
 
     connect_timeout_seconds: float | None = None
     request_timeout_seconds: float | None = None
@@ -148,13 +155,19 @@ class SourceConnection:
 
 @dataclass(frozen=True, slots=True)
 class SimulatedPoint:
-    """Protocol-agnostic description of one simulated point."""
+    """协议无关的单点位描述。
+
+    `address` 用于承载协议层地址；`protocol_params` 用于最小侵入保留点位级
+    协议参数，避免把协议专用字段挤回公共主字段。
+    """
 
     ln_name: str
     do_name: str
     unit: str | None
     data_type: str
     initial_value: str | int | float | bool | None = None
+    address: str | None = None
+    protocol_params: dict[str, ProtocolValue] = field(default_factory=dict)
 
     @property
     def key(self) -> str:
@@ -164,11 +177,11 @@ class SimulatedPoint:
 
     @property
     def locator(self) -> str:
-        return self.key
+        return self.address or self.key
 
     @property
     def display_name(self) -> str:
-        return self.do_name
+        return self.do_name or self.address or self.key
 
     @property
     def point_kind(self) -> str:
@@ -177,7 +190,7 @@ class SimulatedPoint:
 
 @dataclass(frozen=True, slots=True)
 class SimulatedSource:
-    """One simulated source plus all connection and point metadata."""
+    """单个模拟源及其连接、点位元数据。"""
 
     connection: SourceConnection
     points: tuple[SimulatedPoint, ...]

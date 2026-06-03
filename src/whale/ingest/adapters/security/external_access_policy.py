@@ -13,7 +13,7 @@ from urllib.request import ProxyHandler, build_opener
 from starlette.requests import Request
 
 from whale.ingest.ports.runtime.access_policy_port import AccessPolicyPort as RuntimeAccessPolicyPort
-from whale.shared.crosscutting.auth import (
+from turtle.auth import (
     AccessDecision,
     AccessPolicyPort,
     Permission,

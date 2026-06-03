@@ -51,6 +51,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from tools.source_lab.access.runners.base import CapacityRunner, SubscriptionRunner
+from tools.source_lab.access.subscribe.model import SubscribeScanConfig, SubscribeWorkerRawStats
 from tools.source_lab.access.runners.open62541_serial_polling import OpcUaOpen62541CapacityRunner
 from tools.source_lab.access.runners.open62541_subscription import OpcUaOpen62541SubscribeRunner
 
@@ -144,22 +145,23 @@ DECLARED_PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "subscribe": False,
         "probe": True,
         "write": False,
+        "production_client_read": True,
         "production_client_write": False,
         "simulator_write_injection": True,
         "supported_write_operations": (),
         "unsupported_write_operations": ("FC05_single_coil_write", "FC06_single_register_write", "FC15_multi_coil_write", "FC16_multi_register_write"),
-        "write_limitation": "Modbus RTU write via simulator_write_injection only (TCP gateway mode, not FC05/06/15/16).",
-        "implementation_level": "real_native_runner",
-        "backend": "libmodbus executable runner",
-        "limitation": "",
+        "write_limitation": "Modbus RTU write NOT_IMPLEMENTED. Read-only acquisition via python_lightweight_runner serial backend (FC03). Serial port via Python os/termios, not C native runner.",
+        "implementation_level": "python_lightweight_runner",
+        "backend": "Python os/termios serial Modbus RTU (FC03)",
+        "limitation": "Python lightweight serial implementation; real RS-485 serial environment not validated.",
         "application_protocol": "MODBUS",
         "transport": "SERIAL",
         "service_types": ("RTU_READ",),
         "service_type_map": {"polling": "RTU_READ"},
         "access_modes": ("polling",),
-        "current_implementation_level": "real_native_runner",
-        "current_backend": "libmodbus executable runner",
-        "current_limitation": "",
+        "current_implementation_level": "python_lightweight_runner",
+        "current_backend": "Python os/termios serial Modbus RTU (FC03)",
+        "current_limitation": "Python lightweight serial implementation via standard library termios/os; no pyserial dependency. Real RS-485 serial port environment pending. Target is C native libmodbus runner.",
         "target_implementation_level": "real_native_runner",
         "target_backend": "libmodbus executable runner",
         "target_limitation": "",
@@ -173,14 +175,15 @@ DECLARED_PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "subscribe": True,
         "probe": True,
         "write": False,
+        "production_client_read": True,
         "production_client_write": False,
         "simulator_write_injection": True,
         "supported_write_operations": (),
         "unsupported_write_operations": ("C_SC", "C_SE", "C_BO"),
-        "write_limitation": "IEC101 write via simulator_write_injection only (TCP gateway mode, not C_SC/C_SE/C_BO).",
-        "implementation_level": "real_native_runner",
-        "backend": "lib60870-C executable runner",
-        "limitation": "",
+        "write_limitation": "IEC101 write NOT_IMPLEMENTED. Read-only interrogation via python_lightweight_runner serial backend. Serial port via Python os/termios, not C native runner.",
+        "implementation_level": "python_lightweight_runner",
+        "backend": "Python os/termios serial IEC 101 (FT1.2 + ASDU parsing)",
+        "limitation": "Python lightweight serial implementation; real RS-232 serial environment not validated.",
         "application_protocol": "IEC101",
         "transport": "SERIAL",
         "service_types": ("INTERROGATION", "SPONTANEOUS"),
@@ -189,9 +192,9 @@ DECLARED_PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
             "subscribe": "SPONTANEOUS",
         },
         "access_modes": ("polling", "streaming"),
-        "current_implementation_level": "real_native_runner",
-        "current_backend": "lib60870-C executable runner",
-        "current_limitation": "",
+        "current_implementation_level": "python_lightweight_runner",
+        "current_backend": "Python os/termios serial IEC 101 (FT1.2 + ASDU parsing)",
+        "current_limitation": "Python lightweight serial implementation via standard library termios/os; no pyserial dependency. Real RS-232 serial port environment pending. Spontaneous data path is framework-only, not full event engine. Target is C native lib60870 runner.",
         "target_implementation_level": "real_native_runner",
         "target_backend": "lib60870-C executable runner",
         "target_limitation": "",
@@ -204,12 +207,12 @@ DECLARED_PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "polling": True,
         "subscribe": True,
         "probe": True,
-        "write": False,
-        "production_client_write": False,
+        "write": True,
+        "production_client_write": True,
         "simulator_write_injection": False,
-        "supported_write_operations": (),
-        "unsupported_write_operations": ("C_SC", "C_SE", "C_BO"),
-        "write_limitation": "IEC 104 C_SC/C_SE/C_BO not implemented yet.",
+        "supported_write_operations": ("C_SC_NA_1", "C_SE_NC_1"),
+        "unsupported_write_operations": ("C_BO",),
+        "write_limitation": "IEC 104 C_SC_NA_1 (single command) and C_SE_NC_1 (set point command) via native runner WRITE command (2026-06-02). C_BO (bitstring command) not implemented yet.",
         "implementation_level": "real_native_runner",
         "backend": "lib60870-C executable runner",
         "limitation": "",
@@ -429,6 +432,35 @@ DECLARED_PROTOCOL_CAPABILITIES: Final[dict[str, _ProtoCap]] = {
         "native_required": False,
         "native_library": None,
         "cli_aliases": ("http_rest", "http", "httprest"),
+    },
+    # ── Beckhoff ADS ──────────────────────────────────────────────
+    "beckhoff_ads": {
+        "polling": True,
+        "subscribe": False,
+        "probe": True,
+        "write": False,
+        "production_client_write": False,
+        "simulator_write_injection": True,
+        "supported_write_operations": ("ads_direct_write",),
+        "unsupported_write_operations": ("ads_notification",),
+        "write_limitation": "source_lab Beckhoff ADS 当前仅提供工具层 simulator/readback 闭环，不代表 shared_source production ADS backend。",
+        "implementation_level": "python_lightweight_runner",
+        "backend": "Python in-memory ADS simulator/client with optional AdsLib native preflight",
+        "limitation": "ADS_NOTIFICATION remains NOT_IMPLEMENTED in source_lab runtime.",
+        "application_protocol": "BECKHOFF_ADS",
+        "transport": "TCP",
+        "service_types": ("ADS_READ_WRITE", "ADS_NOTIFICATION"),
+        "service_type_map": {"polling": "ADS_READ_WRITE", "subscribe": "ADS_NOTIFICATION"},
+        "access_modes": ("polling",),
+        "current_implementation_level": "python_lightweight_runner",
+        "current_backend": "Python in-memory ADS simulator/client with optional AdsLib native preflight",
+        "current_limitation": "ADS_READ_WRITE available in source_lab tool runtime; ADS_NOTIFICATION is NOT_IMPLEMENTED.",
+        "target_implementation_level": "real_native_runner",
+        "target_backend": "AdsLib executable runner",
+        "target_limitation": "Tool-layer only; must not be reused as shared_source production backend.",
+        "native_required": False,
+        "native_library": "AdsLib",
+        "cli_aliases": ("beckhoff_ads", "beckhoffads", "ads"),
     },
 }
 
@@ -670,6 +702,28 @@ SERVICE_CAPABILITIES: Final[dict[tuple[str, str, str], _ProtoCap]] = {
         "native_required": False,
         "native_library": None,
     },
+    ("BECKHOFF_ADS", "ADS_READ_WRITE", "TCP"): {
+        "access_mode": "polling",
+        "current_implementation_level": "python_lightweight_runner",
+        "current_backend": "Python in-memory ADS simulator/client with optional AdsLib native preflight",
+        "current_limitation": "source_lab tool runtime only; not a production ADS client.",
+        "target_implementation_level": "real_native_runner",
+        "target_backend": "AdsLib executable runner",
+        "target_limitation": "",
+        "native_required": False,
+        "native_library": "AdsLib",
+    },
+    ("BECKHOFF_ADS", "ADS_NOTIFICATION", "TCP"): {
+        "access_mode": "streaming",
+        "current_implementation_level": "planned_native_runner",
+        "current_backend": "notification runner not implemented",
+        "current_limitation": "ADS notification path is NOT_IMPLEMENTED in source_lab runtime.",
+        "target_implementation_level": "real_native_runner",
+        "target_backend": "AdsLib notification runner",
+        "target_limitation": "",
+        "native_required": True,
+        "native_library": "AdsLib",
+    },
 }
 
 # ── Canonical application protocol constants ──────────────────────────
@@ -682,6 +736,7 @@ APPLICATION_PROTOCOLS: Final[tuple[str, ...]] = (
     "IEC61850",
     "MQTT",
     "HTTP_REST",
+    "BECKHOFF_ADS",
 )
 
 SERVICE_TYPES: Final[tuple[str, ...]] = (
@@ -697,6 +752,8 @@ SERVICE_TYPES: Final[tuple[str, ...]] = (
     "GOOSE",
     "SV",
     "REQUEST",
+    "ADS_READ_WRITE",
+    "ADS_NOTIFICATION",
 )
 
 TRANSPORT_TYPES: Final[tuple[str, ...]] = (
@@ -734,6 +791,10 @@ _PROTOCOL_ALIASES: Final[dict[str, str]] = {
     "http": "http_rest",
     "httprest": "http_rest",
     "http_rest": "http_rest",
+    # Beckhoff ADS
+    "beckhoffads": "beckhoff_ads",
+    "beckhoff_ads": "beckhoff_ads",
+    "ads": "beckhoff_ads",
     # IEC 61850 L2 streaming aliases.
     "iec61850goose": "iec61850_goose",
     "iec61850_goose": "iec61850_goose",
@@ -1066,6 +1127,22 @@ class RuntimeReadiness:
         return self.actual_implementation_level == "real_native_runner"
 
 
+class _UnavailableSubscriptionRunner:
+    """用于显式表达未实现订阅路径的占位 runner。"""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def run_worker(
+        self,
+        worker_index: int,
+        specs: tuple,
+        config: SubscribeScanConfig,
+    ) -> SubscribeWorkerRawStats:
+        """占位 runner 不提供真实订阅，调用即显式失败。"""
+        raise RuntimeError(f"{self.name} is not implemented")
+
+
 def _capacity_runtime_readiness(protocol: str) -> RuntimeReadiness:
     info = build_capacity_runner(protocol)
     return RuntimeReadiness(
@@ -1192,6 +1269,19 @@ def _subscription_runtime_readiness(protocol: str) -> RuntimeReadiness:
             actual_runtime_availability="available_runtime",
         )
 
+    if normalized == "beckhoff_ads":
+        return RuntimeReadiness(
+            protocol=normalized,
+            access_mode="streaming",
+            runner=_UnavailableSubscriptionRunner("beckhoff_ads_notification_runner"),
+            declared_implementation_level=declared_level,
+            actual_implementation_level="unavailable",
+            actual_runtime_availability="unavailable",
+            runtime_constraint_tags=("notification_not_implemented",),
+            fallback_reason="ADS_NOTIFICATION is not implemented in source_lab runtime",
+            native_check_error="AdsLib notification runner is not available in this repository",
+        )
+
     return RuntimeReadiness(
         protocol=normalized,
         access_mode="streaming",
@@ -1291,6 +1381,9 @@ def build_capacity_runner(protocol: str) -> RunnerInfo:
     elif normalized == "http_rest":
         from tools.source_lab.access.runners.http_rest_polling import HttpRestPollingRunner
         runner = HttpRestPollingRunner()
+    elif normalized == "beckhoff_ads":
+        from tools.source_lab.access.runners.beckhoff_ads_polling import BeckhoffAdsPollingRunner
+        runner = BeckhoffAdsPollingRunner()
     else:
         raise ValueError(f"protocol {normalized} does not support polling/capacity")
 
@@ -1340,4 +1433,6 @@ def build_subscription_runner(protocol: str) -> SubscriptionRunner:
     if normalized == "mqtt":
         from tools.source_lab.access.runners.mqtt_subscription import MqttSubscriptionRunner
         return MqttSubscriptionRunner()
+    if normalized == "beckhoff_ads":
+        return _UnavailableSubscriptionRunner("beckhoff_ads_notification_runner")
     raise ValueError(f"protocol {normalized} does not support subscribe")

@@ -11,8 +11,8 @@ import logging
 
 from whale.ingest.composition import build_source_write_composition
 from whale.ingest.usecases.source_command_use_case import SourceCommandUseCase
-from whale.shared.crosscutting.compliance import AuditEvent, AuditEventSinkPort
-from whale.shared.crosscutting.observability import MetricsSinkPort
+from turtle.compliance import AuditEvent, AuditEventSinkPort
+from platform_shared.crosscutting.observability import MetricsSinkPort
 
 
 class _TrackingAuditSink(AuditEventSinkPort):
@@ -107,3 +107,43 @@ def test_composition_defaults_to_no_ports() -> None:
     assert use_case._audit_port is None
     assert use_case._metrics_port is None
     assert use_case._write_lease_port is None
+
+
+def test_composition_registers_iec104_write_port() -> None:
+    """IEC 104 write port 应注册到 write port registry 并可被解析。"""
+    composition = build_source_write_composition()
+    registry = composition.write_port_registry
+    iec104_port = registry.get("iec104")
+    assert iec104_port is not None
+    # 也验证别名解析
+    assert registry.get("IEC104") is iec104_port
+    assert registry.get("iec-104") is iec104_port
+
+
+def test_composition_registers_iec104_acquisition_port() -> None:
+    """IEC 104 acquisition port 应注册到 write composition 的 acquisition port registry。"""
+    composition = build_source_write_composition()
+    acq_registry = composition.acquisition_port_registry
+    iec104_acq_port = acq_registry.get("iec104")
+    assert iec104_acq_port is not None
+    assert acq_registry.get("IEC104") is iec104_acq_port
+
+
+def test_composition_default_protocols_include_iec104() -> None:
+    """默认 write composition 应包含 iec104 在内的写入协议。"""
+    composition = build_source_write_composition()
+    registry = composition.write_port_registry
+    # 仅写入协议（iec61850report 仅在 acquisition 注册，无 write 端口）
+    expected_writes = {"opcua", "modbustcp", "iec61850mms", "iec104"}
+    for proto in expected_writes:
+        registry.get(proto)  # 不应抛出 ValueError
+
+
+def test_composition_acquisition_registry_includes_iec104() -> None:
+    """acquisition port registry 应包含 iec104 采集端口。"""
+    composition = build_source_write_composition()
+    acq_registry = composition.acquisition_port_registry
+    # 采集协议集（含只采集协议 iec61850report）
+    expected_acq = {"opcua", "modbustcp", "iec61850mms", "iec61850report", "iec104"}
+    for proto in expected_acq:
+        acq_registry.get(proto)  # 不应抛出 ValueError

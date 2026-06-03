@@ -72,7 +72,7 @@ class Iec104SimulatorFacade(BaseSimulatorFacade):
 
     @property
     def capabilities(self) -> SimulatorCapabilities:
-        return SimulatorCapabilities(read=True, update_values=True)
+        return SimulatorCapabilities(read=True, write=True, update_values=True)
 
     async def start(self) -> SimulatorResult:
         if self._sim_proc is not None:

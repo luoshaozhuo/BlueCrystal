@@ -22,11 +22,11 @@ from whale.ingest.usecases.dtos.source_acquisition_request import (
     AcquisitionItemData,
 )
 from whale.ingest.usecases.dtos.source_connection_data import SourceConnectionData
-from whale.shared.crosscutting.auth import AccessPolicyPort, Permission, Principal
-from whale.shared.crosscutting.compliance import AuditEvent, AuditEventSinkPort, DataClassification
-from whale.shared.crosscutting.debug import DebugTraceContext, DebugTraceSinkPort
-from whale.shared.crosscutting.observability import SensitiveDataMasker
-from whale.shared.crosscutting.resilience import BackoffPolicy, ErrorClassifier, RetryPolicy
+from turtle.auth import AccessPolicyPort, Permission, Principal
+from turtle.compliance import AuditEvent, AuditEventSinkPort, DataClassification
+from platform_shared.crosscutting.debug import DebugTraceContext, DebugTraceSinkPort
+from platform_shared.crosscutting.resilience import BackoffPolicy, ErrorClassifier, RetryPolicy
+from platform_shared.security_primitives.masking import SensitiveDataMasker
 
 LOGGER = logging.getLogger(__name__)
 

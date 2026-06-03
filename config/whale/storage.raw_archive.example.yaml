@@ -1,0 +1,67 @@
+# Whale Storage - raw_archive 配置模板
+# 复制本文件并修改实际值:
+#   cp config/whale/storage.raw_archive.example.yaml config/whale/storage.raw_archive.yaml
+#
+# raw_archive 是 Whale 数据底座的最底层，保存 ingest 输出的原始消息的不可变副本。
+# 使用压缩文件格式（JSONL.gz / JSONL.zst），绝不使用 TDengine 替代。
+#
+# L5 验证状态: S3/MinIO L5 verified (Round 5), HDFS env-pending
+
+# ---- 归档后端选择 ----
+# backend: local | hdfs | s3
+raw_archive:
+  backend: "local"
+
+  # ---- 本地文件系统 ----
+  local:
+    base_path: "/data/whale/raw_archive"
+    compression: "gzip"               # gzip | zstd
+    # gzip 压缩等级 (1-9, 6 为平衡)
+    compression_level: 6
+    # zstd 压缩等级 (1-22, 3 为默认)
+    # zstd_compression_level: 3
+
+  # ---- HDFS (environment-pending) ----
+  # hdfs:
+  #   namenode_url: "${HDFS_NAMENODE_URL:-http://namenode:9870}"
+  #   base_path: "/whale/raw_archive"
+  #   user: "${HDFS_USER:-whale}"
+  #   compression: "gzip"
+
+  # ---- S3 / MinIO (L5 verified, Round 5) ----
+  s3:
+    endpoint_url: "${WHALE_S3_ENDPOINT:-http://localhost:9000}"
+    bucket: "${WHALE_S3_BUCKET:-whale-raw-archive}"
+    access_key: "${WHALE_S3_ACCESS_KEY:-minioadmin}"
+    secret_key: "${WHALE_S3_SECRET_KEY:-minioadmin}"
+    prefix: "raw_archive/"
+    compression: "gzip"
+    use_ssl: false
+
+# ---- 批量写入配置 ----
+batch:
+  # 每批归档的消息最大数量
+  size: 100
+  # 批次最大等待时间（秒），达到批量大小或时间后写入
+  max_wait_seconds: 10
+
+# ---- 保留策略 ----
+retention:
+  # 保留天数（0 表示无限期保留）
+  days: 0
+  # 最大存储容量 (GB, 0 表示不限制)
+  max_size_gb: 0
+  # 过期文件清理策略: delete | archive_to_cold
+  expiry_policy: "delete"
+
+# ---- Manifest 配置 ----
+manifest:
+  # manifest 存储后端: memory | file | postgres
+  backend: "file"
+  file_path: "/data/whale/raw_archive/manifest.jsonl"
+  # 每条 manifest 记录包含:
+  # - batch_id: 批次标识
+  # - file_path: 压缩文件路径
+  # - message_count: 消息数量
+  # - start_time / end_time: 时间范围
+  # - status: pending | committed | corrupted

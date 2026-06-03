@@ -1,12 +1,17 @@
-"""Database initialization entrypoint for the shared persistence layer."""
+"""shared persistence 数据库初始化入口。
+
+本模块负责建表、重建只读视图和重置样例库。对于 PostgreSQL 这类可能连接到
+常驻实例的后端，destructive reset 必须先通过安全库名护栏，避免误删默认库
+或生产风格库。
+"""
 
 from __future__ import annotations
 
 import argparse
 from importlib import import_module
 
-from sqlalchemy.engine import Engine
 from sqlalchemy import inspect, text
+from sqlalchemy.engine import Engine
 
 from whale.shared.persistence import Base
 from whale.shared.persistence.session import _db_url, engine
@@ -14,6 +19,7 @@ from whale.shared.persistence.session import _db_url, engine
 from whale.shared.persistence.template.protocol_view_defs import ensure_protocol_views
 
 _SCADA_SERVER_VIEW_NAME = "v_scada_server"
+_SAFE_RESET_MARKERS = ("test", "tmp", "ci", "local_dev_test")
 _SCADA_SERVER_VIEW_SQL = f"""
 CREATE VIEW {_SCADA_SERVER_VIEW_NAME} AS
 SELECT
@@ -74,6 +80,7 @@ def initialize_db() -> None:
 
 def reset_db() -> None:
     import_module("whale.shared.persistence.orm")
+    _assert_safe_reset_target()
 
     with engine.begin() as conn:
         if _db_url.get_dialect().name == "postgresql":
@@ -113,6 +120,24 @@ def _build_delete_confirmation_prompt() -> str:
         f"数据库 {_db_url} 已包含数据表。"
         "此操作会清除所有数据并重建。"
         '输入 "delete" 后才会继续删除并重建：'
+    )
+
+
+def _assert_safe_reset_target() -> None:
+    """阻止对不安全 PostgreSQL 目标执行 destructive reset。"""
+
+    if _db_url.get_backend_name() != "postgresql":
+        return
+
+    database_name = (_db_url.database or "").strip().lower()
+    rendered_url = _db_url.render_as_string(hide_password=True).lower()
+    if any(marker in database_name or marker in rendered_url for marker in _SAFE_RESET_MARKERS):
+        return
+
+    raise RuntimeError(
+        "拒绝对非测试 PostgreSQL 库执行 shared persistence reset。"
+        f" 当前目标 database={_db_url.database!r}，要求库名或 URL 至少包含 "
+        f"{_SAFE_RESET_MARKERS!r} 之一。请改用临时测试库。"
     )
 
 

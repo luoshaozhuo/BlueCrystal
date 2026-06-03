@@ -26,8 +26,8 @@ from whale.ingest.usecases.dtos.acquired_node_state import (
     AcquiredNodeStateBatch,
     AcquiredNodeValue,
 )
-from whale.shared.crosscutting.compliance import AuditEvent, AuditEventSinkPort
-from whale.shared.crosscutting.observability import MetricsSinkPort
+from turtle.compliance.audit_policy import AuditEvent, AuditEventSinkPort
+from platform_shared.crosscutting.observability import MetricsSinkPort
 
 
 def _settings() -> RedisSourceStateCacheSettings:

@@ -1,0 +1,52 @@
+# Whale Storage - serving_cache 配置模板
+# =============================================================================
+# L5 验证状态: Redis L5 verified (Round 5, SET/GET/TTL/stale/out-of-order 全部通过)
+# 说明: serving_cache 是 Whale 业务侧近实时 KV 缓存层，使用 Redis 作为后端。
+#       speed layer 实时更新 serving cache，保证数据新鲜度和乱序保护。
+# 复制本文件并修改实际值:
+#   cp config/whale/storage.serving_cache.example.yaml config/whale/storage.serving_cache.yaml
+# =============================================================================
+
+# ---- 缓存后端选择 ----
+# backend: redis | memory
+serving_cache:
+  backend: "redis"
+
+  # ---- Redis 配置 ----
+  redis:
+    # Redis 连接 URL (redis://host:port/db)
+    url: "${WHALE_REDIS_URL:-redis://localhost:16379/0}"
+
+    # 缓存键前缀，用于命名空间隔离
+    key_prefix: "${WHALE_REDIS_KEY_PREFIX:-whale:cache:}"
+
+    # 连接超时设置（秒）
+    socket_connect_timeout: 5
+    socket_timeout: 5
+
+    # 连接池大小
+    max_connections: 10
+
+  # ---- 内存缓存（backend=memory 时使用，仅开发/测试）----
+  memory:
+    # 内存缓存仅在 backend=memory 时生效
+    enabled: false
+
+  # ---- TTL 与 stale 配置 ----
+  ttl:
+    # 默认 TTL（秒），缓存条目在此时间后自动过期
+    default_ttl_seconds: 60
+    # stale 判定阈值（秒），observed_at 早于当前时间超过此值时认为数据已过期
+    stale_seconds: 300
+
+  # ---- 乱序保护 ----
+  out_of_order_protection:
+    # 是否启用乱序时间戳保护（仅当新值 observed_at >= 已有值时更新）
+    enabled: true
+
+# ---- 健康检查 ----
+health:
+  # 健康检查间隔（秒）
+  interval: 15
+  # PING 超时（秒）
+  ping_timeout: 3

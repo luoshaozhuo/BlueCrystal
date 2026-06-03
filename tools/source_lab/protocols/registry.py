@@ -33,6 +33,7 @@ def _lazy_register() -> None:
         return
     # pylint: disable=import-outside-toplevel
     from tools.source_lab.protocols.http_rest.simulator import HttpRestSimulatorFacade
+    from tools.source_lab.protocols.beckhoff_ads.simulator import BeckhoffAdsSimulatorFacade
     from tools.source_lab.protocols.iec101.simulator import Iec101SimulatorFacade
     from tools.source_lab.protocols.iec104.simulator import Iec104SimulatorFacade
     from tools.source_lab.protocols.iec61850.simulator import (
@@ -59,6 +60,7 @@ def _lazy_register() -> None:
     _register_facade("iec61850_sv", Iec61850SvSimulatorFacade)
     _register_facade("mqtt", MqttSimulatorFacade)
     _register_facade("http_rest", HttpRestSimulatorFacade)
+    _register_facade("beckhoff_ads", BeckhoffAdsSimulatorFacade)
 
 
 def create_server_simulator(

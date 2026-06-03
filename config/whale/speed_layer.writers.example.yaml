@@ -1,0 +1,101 @@
+# Whale Speed Layer - Writers 配置模板
+# 复制本文件并修改实际值:
+#   cp config/whale/speed_layer.writers.example.yaml config/whale/speed_layer.writers.yaml
+#
+# speed_layer 从 message_pipeline 消费消息，写入各存储层。
+
+# ---- Pipeline 运行器 ----
+pipeline:
+  # 运行模式: local | flink
+  mode: "local"
+  # asyncio runner 并发 writer 数
+  max_concurrent_writers: 4
+
+  # Flink 配置 (environment-pending)
+  # flink:
+  #   job_name: "whale-speed-layer"
+  #   parallelism: 1
+  #   checkpoint_interval_ms: 60000
+  #   enable_checkpointing: true
+  #   state_backend: "filesystem"
+  #   state_checkpoints_dir: "file:///data/whale/checkpoints/flink"
+
+# ---- checkpoint 配置 ----
+checkpoint:
+  # checkpoint 后端: file | redis | kafka
+  backend: "file"
+  # 文件 checkpoint 路径
+  file_path: "/data/whale/checkpoints"
+  # Redis checkpoint 配置 (仅在 backend=redis 时使用)
+  # redis_url: "redis://localhost:16379/1"
+  # Kafka checkpoint 配置 (仅在 backend=kafka 时使用，environment-pending)
+  # kafka_bootstrap_servers: "localhost:9092"
+  # kafka_topic: "whale.checkpoints"
+  # checkpoint 间隔 (ms)
+  interval_ms: 60000
+
+# ---- RawArchiveWriter ----
+raw_archive_writer:
+  # 是否启用
+  enabled: true
+  # 实例数
+  instances: 1
+  # 消费 topic
+  topic: "whale.ingest.state"
+  # consumer group
+  group_id: "whale-speed-layer-raw-archive"
+  # 批量归档大小
+  batch_size: 100
+  # DLQ 失败重试上限
+  max_retries: 3
+
+# ---- RawIndexWriter ----
+raw_index_writer:
+  enabled: true
+  instances: 1
+  topic: "whale.ingest.state"
+  group_id: "whale-speed-layer-raw-index"
+  max_retries: 3
+
+# ---- StandardizedWriter ----
+standardized_writer:
+  enabled: true
+  instances: 1
+  topic: "whale.ingest.state"
+  group_id: "whale-speed-layer-standardized"
+  max_retries: 3
+
+# ---- ServingCacheUpdater ----
+serving_cache_updater:
+  enabled: true
+  instances: 1
+  topic: "whale.ingest.state"
+  group_id: "whale-speed-layer-serving-cache"
+  default_ttl: 60
+
+# ---- DLQ 配置 ----
+dlq:
+  # DLQ 写入 topic
+  kafka_topic: "whale.ingest.state.dlq"
+  # DLQ 本地 fallback sink
+  local_sink_path: "/data/whale/dlq"
+  # 失败重试次数上限（超过后写入 DLQ）
+  max_retries: 3
+
+# ---- 指标收集 ----
+metrics:
+  # metrics collector 后端: memory | prometheus_pushgateway
+  backend: "memory"
+  # 指标收集间隔 (秒)
+  collection_interval: 10
+  # Prometheus pushgateway 配置 (environment-pending)
+  # pushgateway_url: "http://localhost:9091"
+  # job_name: "whale-speed-layer"
+
+# ---- 健康检查 ----
+health:
+  # 健康检查间隔 (秒)
+  interval: 15
+  # consumer lag 告警阈值
+  lag_warning_threshold: 1000
+  lag_critical_threshold: 5000

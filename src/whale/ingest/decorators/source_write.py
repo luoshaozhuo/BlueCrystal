@@ -16,7 +16,7 @@ from whale.ingest.usecases.dtos.source_write_request import (
     SourceWriteItemData,
 )
 from whale.ingest.usecases.dtos.source_write_result import SourceWriteResult
-from whale.shared.crosscutting.auth import AccessPolicyPort, Permission, Principal
+from turtle.auth import AccessPolicyPort, Permission, Principal
 
 LOGGER = logging.getLogger(__name__)
 

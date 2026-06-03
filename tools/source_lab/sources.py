@@ -1,4 +1,8 @@
-"""Shared source-building helpers for OPC UA load tests."""
+"""source_lab 源定义与端口分配辅助函数。
+
+本文件负责本地 simulator 所需的端口分配、多实例克隆和少量兼容 helper。
+shared persistence 数据库读取已收敛到 provider 层，这里只保留向后兼容入口。
+"""
 
 from __future__ import annotations
 
@@ -7,8 +11,7 @@ import socket
 from dataclasses import dataclass
 from dataclasses import replace
 
-from tools.source_lab.model import SimulatedPoint, SimulatedSource, SourceConnection
-from whale.ingest.adapters.config.source_runtime_config_repository import SourceRuntimeConfigRepository  # type: ignore[import-untyped]
+from tools.source_lab.model import SimulatedSource, SourceConnection
 
 _DEFAULT_PORT_START = 50000
 _DEFAULT_PORT_END = 65000
@@ -37,7 +40,7 @@ def _resolve_port_scan_range() -> tuple[int, int]:
 
 
 def _resolve_bind_host(host: str) -> str:
-    """Resolve runtime host into one concrete bind host for probing."""
+    """把运行时 host 归一化为可 bind 的具体地址。"""
 
     normalized = host.strip() if host.strip() else "127.0.0.1"
     if normalized.lower() == "localhost":
@@ -46,7 +49,7 @@ def _resolve_bind_host(host: str) -> str:
 
 
 def _is_tcp_port_available(host: str, port: int) -> bool:
-    """Return whether a TCP port is bindable on the given host."""
+    """判断给定 host/port 当前是否可绑定。"""
 
     bind_host = _resolve_bind_host(host)
     try:
@@ -83,14 +86,14 @@ class PortAllocator:
 
     @classmethod
     def from_env(cls) -> "PortAllocator":
-        """Build one test-run-scoped allocator from configured env range."""
+        """基于环境变量端口范围构造一次测试运行的分配器。"""
 
         start, end = _resolve_port_scan_range()
         return cls(start=start, end=end, next_port=start, used_ports=set())
 
     @classmethod
     def from_range(cls, *, start: int, end: int) -> "PortAllocator":
-        """Build allocator from explicit range with safe fallback bounds."""
+        """基于显式范围构造分配器，并处理非法边界回退。"""
 
         resolved_start = start if start > 0 else _DEFAULT_PORT_START
         resolved_end = end if end > 0 else _DEFAULT_PORT_END
@@ -99,7 +102,7 @@ class PortAllocator:
         return cls(start=resolved_start, end=resolved_end, next_port=resolved_start, used_ports=set())
 
     def allocate_many(self, count: int, host: str = "127.0.0.1") -> tuple[int, ...]:
-        """Allocate a batch of unique currently-bindable TCP ports."""
+        """批量分配一组当前可绑定且互不冲突的 TCP 端口。"""
 
         if count <= 0:
             return ()
@@ -147,7 +150,7 @@ def choose_available_port(
     maximum_port: int | None = None,
     used_ports: set[int] | None = None,
 ) -> int:
-    """Pick a currently-bindable TCP port in range."""
+    """在给定范围内选择一个当前可绑定的 TCP 端口。"""
     resolved_start, resolved_end = _resolve_port_scan_range()
     minimum = resolved_start if minimum_port is None else minimum_port
     maximum = resolved_end if maximum_port is None else maximum_port
@@ -174,7 +177,7 @@ def choose_available_port(
 
 
 def assign_dynamic_port(source: SimulatedSource) -> SimulatedSource:
-    """Clone source and assign a free high-range port."""
+    """复制 source 并分配一个空闲高位端口。"""
     assigned_port = choose_available_port(host=source.connection.host)
     return replace(
         source,
@@ -190,63 +193,20 @@ def build_opcua_source_from_repository(
     min_expected_point_count: int,
     max_expected_point_count: int,
 ) -> SimulatedSource:
-    """Load one representative OPC UA source and its profile points."""
-    runtime_repo = SourceRuntimeConfigRepository()
+    """兼容旧 helper：从 shared persistence SCADA sample DB 读取一个 OPC UA 源。"""
 
-    server_rows = runtime_repo.list_servers()
-    
-    assert server_rows, "Expected at least one server in repository"
-    server = server_rows[0]
+    from tools.source_lab.access.providers.scada_profile import ScadaProfileProvider
 
-    point_rows = runtime_repo.list_profile_items(server.signal_profile_id)
-    point_count = len(point_rows)
+    provider = ScadaProfileProvider()
+    source = provider.load_source(protocol="opcua", access_mode="polling")
+    point_count = len(source.points)
 
     if not min_expected_point_count <= point_count <= max_expected_point_count:
         raise AssertionError(
             f"Expected {min_expected_point_count}-{max_expected_point_count} "
             f"profile items per server, got {point_count}"
         )
-
-    points = tuple(
-        SimulatedPoint(
-            ln_name=(row.ln_name or "").strip(),
-            do_name=(row.do_name or "").strip(),
-            unit=row.unit.strip() if row.unit is not None else None,
-            data_type=(row.data_type or "FLOAT64").strip(),
-        )
-        for row in point_rows
-    )
-
-    host = (server.host or "").strip()
-    namespace_uri = (server.namespace_uri or "").strip() or None
-    transport = (server.transport or "").strip()
-    protocol = (server.application_protocol or "").strip()
-    port = int(server.port or 0)
-    if not host:
-        raise ValueError("Repository server host is required for OPC UA source simulation")
-    if port <= 0:
-        raise ValueError("Repository server port is required for OPC UA source simulation")
-    if not transport or not protocol:
-        raise ValueError("Repository transport and protocol are required for OPC UA source simulation")
-
-    return SimulatedSource(
-        connection=SourceConnection(
-            name=(
-                server.asset_code
-                or server.ld_name
-                or server.ied_name
-                or f"source_{server.endpoint_id}"
-            ).strip(),
-            ied_name=server.ied_name.strip(),
-            ld_name=server.ld_name.strip(),
-            host=host,
-            port=port,
-            transport=transport,
-            protocol=protocol,
-            namespace_uri=namespace_uri,
-        ),
-        points=points,
-    )
+    return source
 
 
 def build_multi_sources(
@@ -255,7 +215,7 @@ def build_multi_sources(
     server_count: int,
     ports: tuple[int, ...] | list[int] | None = None,
 ) -> tuple[SimulatedSource, ...]:
-    """Clone base source into multiple servers with unique ports/namespaces."""
+    """把一个 base source 克隆为多个端口/命名空间不同的实例。"""
     sources: list[SimulatedSource] = []
 
     base_namespace = str(base_source.connection.namespace_uri or "urn:source-simulation")
@@ -302,7 +262,7 @@ def build_multi_sources(
 
 
 def build_opcua_endpoint(connection: SourceConnection) -> str:
-    """Build OPC UA endpoint URL from source connection info."""
+    """根据连接信息构造 OPC UA endpoint URL。"""
     transport = connection.transport.strip().lower()
     scheme = "opc.tcp" if transport == "tcp" else f"opc.{transport}"
     return f"{scheme}://{connection.host}:{connection.port}"

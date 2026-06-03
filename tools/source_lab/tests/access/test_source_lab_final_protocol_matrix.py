@@ -92,8 +92,8 @@ def test_final_protocol_capability_matrix_no_overclaim() -> None:
     assert http_cap.subscribe is False
     assert PROTOCOL_CAPABILITIES["http_rest"]["production_client_write"] is False
 
-    assert "gateway" in str(PROTOCOL_CAPABILITIES["modbus_rtu"]["write_limitation"]).lower()
-    assert "gateway" in str(PROTOCOL_CAPABILITIES["iec101"]["write_limitation"]).lower()
+    assert "not_implemented" in str(PROTOCOL_CAPABILITIES["modbus_rtu"]["write_limitation"]).lower()
+    assert "not_implemented" in str(PROTOCOL_CAPABILITIES["iec101"]["write_limitation"]).lower()
 
 
 def test_supported_capabilities_have_tests() -> None:

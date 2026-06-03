@@ -1,0 +1,77 @@
+# Whale Message Pipeline - Kafka 配置模板
+# 复制本文件并修改实际值:
+#   cp config/whale/message_pipeline.kafka.example.yaml config/whale/message_pipeline.kafka.yaml
+#
+# 本文件定义 Kafka broker 连接、topic 配置和 consumer group 设定。
+# SASL/SSL 配置为可选，按现场环境决定是否启用。
+# L5 验证状态: Kafka L5 verified (Round 5, 4 E2E + 2 integration)
+
+# ---- Kafka broker 连接 ----
+kafka:
+  bootstrap_servers:
+    - "${WHALE_KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
+    # 多 broker 示例:
+    # - "${KAFKA_BROKER_2:-kafka-2:9092}"
+    # - "${KAFKA_BROKER_3:-kafka-3:9092}"
+
+  # ---- SASL 认证 (可选) ----
+  # security_protocol: PLAINTEXT  # PLAINTEXT | SASL_PLAINTEXT | SSL | SASL_SSL
+  # sasl_mechanism: PLAIN         # PLAIN | SCRAM-SHA-256 | SCRAM-SHA-512
+  # sasl_username: ""
+  # sasl_password: ""
+
+  # ---- SSL 加密 (可选) ----
+  # ssl_cafile: /etc/whale/certs/kafka-ca.crt
+  # ssl_certfile: /etc/whale/certs/kafka-client.crt
+  # ssl_keyfile: /etc/whale/certs/kafka-client.key
+
+# ---- topic 命名 ----
+topic:
+  prefix: "whale"
+  # ingest → message_pipeline
+  ingest_state: "whale.ingest.state"
+  # DLQ
+  dlq: "whale.ingest.state.dlq"
+  # speed_layer consumer topics (使用 ingest_state 同一 topic，不同 consumer group)
+  speed_raw_archive_topic: "whale.ingest.state"
+  speed_raw_index_topic: "whale.ingest.state"
+  speed_standardized_topic: "whale.ingest.state"
+  speed_serving_cache_topic: "whale.ingest.state"
+
+# ---- Consumer group 配置 ----
+consumer:
+  group_prefix: "whale-speed-layer"
+  groups:
+    raw_archive: "whale-speed-layer-raw-archive"
+    raw_index: "whale-speed-layer-raw-index"
+    standardized: "whale-speed-layer-standardized"
+    serving_cache: "whale-speed-layer-serving-cache"
+
+# ---- Producer 配置 ----
+producer:
+  acks: "all"                         # 0 | 1 | all
+  retries: 3                          # 发布重试次数
+  request_timeout_ms: 5000            # 请求超时 (ms)
+  max_in_flight_requests_per_connection: 1  # 保证顺序性
+  compression_type: "gzip"            # none | gzip | snappy | lz4 | zstd
+  linger_ms: 10                       # 批量等待 (ms)
+
+# ---- Consumer 配置 ----
+consumer_config:
+  auto_offset_reset: "earliest"       # earliest | latest
+  enable_auto_commit: false           # 手动管理 offset
+  max_poll_records: 500               # 单次 poll 最大消息数
+  session_timeout_ms: 30000           # session 超时 (ms)
+  heartbeat_interval_ms: 10000        # 心跳间隔 (ms)
+  max_poll_interval_ms: 300000        # poll 间隔超时 (ms)
+
+# ---- Topic 规格 ----
+topic_specs:
+  - name: "whale.ingest.state"
+    partitions: 3                     # 分区数
+    replication_factor: 2             # 副本因子
+    retention_ms: 604800000           # 保留 7 天 (ms)
+  - name: "whale.ingest.state.dlq"
+    partitions: 1
+    replication_factor: 2
+    retention_ms: 2592000000          # DLQ 保留 30 天 (ms)

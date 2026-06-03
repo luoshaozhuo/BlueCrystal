@@ -1,0 +1,72 @@
+# Whale Message Pipeline - Pulsar 配置模板 (environment-pending)
+# =============================================================================
+# 状态: environment-pending
+# 说明: Pulsar 作为 Kafka 的替代消息管道后端。Pulsar broker 和 pulsar-client
+#       Python 库均标记为 environment-pending。当前仅提供 contract adapter。
+# 退出条件:
+#   1. Pulsar broker 集群部署完成
+#   2. pulsar-client Python 库可用
+#   3. Pulsar connection/consumer/producer 验证通过
+# =============================================================================
+# 复制本文件并修改实际值:
+#   cp config/whale/message_pipeline.pulsar.example.yaml config/whale/message_pipeline.pulsar.yaml
+
+# ---- Pulsar broker 连接 ----
+pulsar:
+  service_url: "pulsar://localhost:6650"
+  # 多 broker 示例:
+  # service_url: "pulsar://pulsar-1:6650,pulsar-2:6650,pulsar-3:6650"
+
+  # ---- TLS 加密 (可选) ----
+  # tls_trust_certs_file_path: /etc/whale/certs/pulsar-ca.crt
+  # tls_allow_insecure_connection: false
+
+  # ---- Token 认证 (可选) ----
+  # auth_plugin: "org.apache.pulsar.client.impl.auth.AuthenticationToken"
+  # auth_params: "token:eyJh..."
+
+# ---- topic 命名 ----
+topic:
+  prefix: "whale"
+  # topic 路径 (Pulsar 使用 persistent://tenant/namespace/topic 格式)
+  tenant: "whale"
+  namespace: "default"
+  ingest_state: "persistent://whale/default/ingest-state"
+  dlq: "persistent://whale/default/ingest-state-dlq"
+
+# ---- 订阅配置 ----
+subscription:
+  name: "whale-speed-layer"
+  type: "Shared"                      # Exclusive | Shared | Failover | Key_Shared
+  initial_position: "Earliest"        # Earliest | Latest
+  enable_batch_index_ack: true        # 批量 ack 模式
+  negative_ack_redelivery_delay_ms: 60000  # nack 重发延迟
+
+# ---- Producer 配置 ----
+producer:
+  send_timeout_ms: 30000
+  compression_type: "LZ4"             # NONE | LZ4 | ZLIB | ZSTD | SNAPPY
+  batching_enabled: true
+  batching_max_messages: 1000
+  batching_max_publish_delay_ms: 10
+  max_pending_messages: 1000
+
+# ---- Consumer 配置 ----
+consumer_config:
+  receiver_queue_size: 1000
+  max_total_receiver_queue_size_across_partitions: 50000
+  negative_ack_redelivery_delay_ms: 60000
+  unacked_messages_timeout_ms: 300000
+
+# ---- Topic 规格 ----
+topic_specs:
+  - name: "persistent://whale/default/ingest-state"
+    partitions: 3
+    retention_policies:
+      retention_time_minutes: 10080   # 保留 7 天
+      retention_size_mb: 10240        # 保留 10 GB
+  - name: "persistent://whale/default/ingest-state-dlq"
+    partitions: 1
+    retention_policies:
+      retention_time_minutes: 43200   # DLQ 保留 30 天
+      retention_size_mb: 5120

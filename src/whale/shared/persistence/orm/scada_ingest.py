@@ -71,8 +71,10 @@ class IED(Base):
 class CommunicationEndpoint(Base):
     """通信端点 — 表示真实可连接的通信入口.
 
-    合并 AccessPoint + endpoint + protocol 上下文.
-    一个 IED 可以有多个 endpoint.
+    主表只保存跨协议稳定存在的连接骨架：协议、服务类型、传输、主机、
+    端口、安全与认证摘要。协议专用连接参数必须进入
+    `scada_endpoint_param_value`，不能把 `unit_id`、`topic`、`symbol_name`
+    等字段继续塞回主表，也不能把正式参数长期藏在 `metadata_json`。
     """
 
     __tablename__ = "scada_communication_endpoint"
@@ -91,33 +93,68 @@ class CommunicationEndpoint(Base):
     )
     application_protocol: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True,
-        comment="应用层协议：OPC_UA / MODBUS / IEC101 / IEC104 / IEC61850 / MQTT / HTTP_REST"
+        comment=(
+            "应用层协议：OPC_UA / MODBUS / IEC101 / IEC104 / IEC61850 / MQTT / "
+            "HTTP_REST / BECKHOFF_ADS；此列只标识协议族，协议专用地址、主题、符号名等参数"
+            "应写入 scada_endpoint_param_value。"
+        )
     )
     service_type: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True, index=True,
-        comment="服务类型：READ / SUBSCRIBE / TCP_READ / RTU_READ / INTERROGATION / SPONTANEOUS / MMS_READ / REPORT / GOOSE / SV / REQUEST"
+        comment=(
+            "服务类型推荐组合：OPC_UA=READ/SUBSCRIBE；MODBUS=TCP_READ/RTU_READ；"
+            "IEC101=INTERROGATION/SPONTANEOUS；IEC104=INTERROGATION/SPONTANEOUS；"
+            "IEC61850=MMS_READ/REPORT/GOOSE/SV；MQTT=SUBSCRIBE/PUBLISH；HTTP_REST=REQUEST；"
+            "BECKHOFF_ADS=ADS_READ_WRITE/ADS_NOTIFICATION。"
+        )
     )
     transport: Mapped[str] = mapped_column(
         String(32), nullable=False, default="TCP",
-        comment="传输层协议：TCP / SERIAL / ETHERNET_L2 / MQTT / HTTP / HTTPS"
+        comment=(
+            "传输层推荐组合：OPC_UA/MODBUS TCP/IEC104/IEC61850 MMS/BECKHOFF_ADS 用 TCP；"
+            "MODBUS RTU/IEC101 用 SERIAL；GOOSE/SV 用 ETHERNET_L2；MQTT 用 MQTT；"
+            "HTTP_REST 用 HTTP 或 HTTPS。"
+        )
     )
     host: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, comment="主机地址，如 192.168.10.21"
+        String(255), nullable=True,
+        comment=(
+            "主机地址或目标名：TCP/MQTT/HTTP/ADS 填 IP、DNS 或主机名；"
+            "SERIAL/ETHERNET_L2 可留空并把串口设备、网卡等正式参数写入参数值表。"
+        )
     )
     port: Mapped[Optional[int]] = mapped_column(
-        Integer, nullable=True, comment="端口号，如 102 / 4840 / 502"
+        Integer, nullable=True,
+        comment=(
+            "端口号：OPC_UA 常见 4840，MODBUS TCP 常见 502，IEC104 常见 2404，"
+            "IEC61850 MMS 常见 102，MQTT 常见 1883/8883，HTTP_REST 常见 80/443，"
+            "BECKHOFF_ADS 端点通常写 Router 所在主机端口；AMS Port 等正式参数写入参数值表。"
+        )
     )
     namespace_uri: Mapped[Optional[str]] = mapped_column(
-        String(512), nullable=True, comment="命名空间 URI，适用 OPC UA 或厂家私有命名空间"
+        String(512), nullable=True,
+        comment=(
+            "命名空间 URI：主要用于 OPC_UA，填写服务器或业务命名空间，如 "
+            "urn:windfarm:opcua:wtg；其他协议通常留空。"
+        )
     )
     security_policy: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True, comment="安全策略：None / Basic256Sha256 / Basic256"
+        String(64), nullable=True,
+        comment=(
+            "安全策略摘要：OPC_UA 可填 None / Basic256Sha256 等；HTTP_REST 可借此标注 TLS；"
+            "MQTT/ADS 也可记录站点安全策略摘要。证书路径、TLS 细项等正式参数仍应入参数值表。"
+        )
     )
     security_mode: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True, comment="安全模式：None / Sign / SignAndEncrypt"
+        String(64), nullable=True,
+        comment="安全模式摘要：如 None / Sign / SignAndEncrypt / TLS；用于人工识别，不替代正式参数值表。"
     )
     auth_type: Mapped[Optional[str]] = mapped_column(
-        String(32), nullable=True, comment="认证方式：Anonymous / UsernamePassword / Certificate / Token"
+        String(32), nullable=True,
+        comment=(
+            "认证方式摘要：Anonymous / UsernamePassword / Certificate / Token / API_KEY；"
+            "主表只写认证类别，具体用户名、证书引用、Header 名称等写入凭据系统或参数值表。"
+        )
     )
     credential_ref: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, comment="凭据引用，不直接存明文密码"
@@ -125,7 +162,11 @@ class CommunicationEndpoint(Base):
     heartbeat_interval_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="心跳间隔，单位毫秒")
     service_capabilities_json: Mapped[dict] = mapped_column(
         JSON, default=dict,
-        comment="服务能力，如 {\"supports_read\": true, \"supports_write\": false, \"supports_subscription\": true}"
+        comment=(
+            "服务能力摘要，建议写 supports_read / supports_write / supports_subscription / "
+            "supports_report / supports_batch 等布尔声明；这里只存能力概览，不存协议地址、主题、寄存器、"
+            "NodeId、ADS symbol 等正式参数。"
+        )
     )
     description: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="端点说明")
     metadata_json: Mapped[dict] = mapped_column(

@@ -20,19 +20,26 @@ git diff --staged --name-status
 git diff --staged
 ```
 
-## 4. 输出要求
+## 4. 过程
+
+1. 解析 staged diff，获得变更信息。
+2. 总结变更内容，提取文件路径和变更类型。
+3. 生成适当的 commit message。
+
+## 5. 输出要求
 
 1. 使用中文输出。
 2. 默认只读取 staged 变更。
 3. 没有 staged 变更时，提示用户先执行 `git add`。
 4. 输出可直接复制的 commit message。
 
-## 5. 输出格式
+## 6. 输出格式
 
-```text
-<type>(<scope>): <summary>
+emoji 前缀 + 传统 commit message 格式
 
-<body>
+✨ feat
+🐛 fix
+📝 docs
+✅ test
+🔧 chore
 
-<footer if needed>
-```

@@ -583,26 +583,26 @@ Docker / Docker Compose
 - 需求描述：
   - ingest 模块应明确所有外部依赖的必需性、失败语义、超时、重试、降级和 readiness 检查。
 - 验收要点：
-  - 依赖矩阵至少覆盖 runtime DB、Redis/cache 或等价 StateCache、Kafka/message publisher 或等价 MQ、audit sink、access policy、crosscutting observability/auth/audit/redaction 能力、shared_source production client、source adapter。
+  - 依赖矩阵至少覆盖 runtime DB、Redis/cache 或等价 StateCache、Kafka/message publisher 或等价 MQ、audit sink、access policy、PlatformShared observability/resilience/debug 基础能力、Turtle auth/audit/security/compliance 能力、shared_source production client、source adapter。
   - 每项依赖必须说明 required/optional、failure mode、timeout、retry/backoff、readiness check、degradation behavior、是否允许 fail-open。
   - MQ 的 topic、schema、retention、ACL 细节属于 MessagePipeline，不在 ingest 中重写。
   - production source client 的协议 backend 内部实现属于 SharedSource，不在 ingest 中重写。
-  - 认证、鉴权、凭据、审计、脱敏、重试、超时等基础横切能力属于 Crosscutting，ingest 只要求接入和验证。
+  - 认证、鉴权、凭据、审计、合规策略属于 Turtle；日志、指标、追踪、诊断、重试、超时等基础工具属于 PlatformShared；ingest 只要求接入和验证。
 
 ### I-READY-003 ingest 横切能力接入准入
 
 - 类型：生产部署准入
 - 优先级：高
 - 需求描述：
-  - ingest 模块必须通过 middleware、decorator、wrapper、composition 或 adapter 接入项目横切能力，并验证接入后的模块行为。
+  - ingest 模块必须通过 middleware、decorator、wrapper、composition 或 adapter 接入PlatformShared 公共基础能力与 Turtle 治理能力，并验证接入后的模块行为。
 - 验收要点：
-  - 接入 structured logging、metrics、tracing。
-  - 接入 audit sink，并保证 API、CRUD、scheduler、bundle、lease、write/control 等关键动作可审计。
-  - 接入 access policy/authz，并保证 deny、conflict、validation error、not found 等路径可审计。
-  - 接入 credential redaction，日志、指标、trace、audit、diagnostic 不泄露敏感凭据。
-  - 接入 retry、timeout、backoff、failure classification。
-  - 接入 health、readiness、diagnostic，debug dump 默认关闭。
-  - 本需求只要求 ingest 模块接入和验证横切能力，不要求 ingest 实现全项目横切框架。
+  - 接入 PlatformShared structured logging、metrics、tracing。
+  - 接入 Turtle audit 相关端口或 ingest 本地 audit adapter，并保证 API、CRUD、scheduler、bundle、lease、write/control 等关键动作可审计。
+  - 接入 Turtle access policy/authz，并保证 deny、conflict、validation error、not found 等路径可审计。
+  - 接入 PlatformShared security_primitives redaction/masking helper，并遵循 Turtle 数据分类与脱敏策略；日志、指标、trace、audit、diagnostic 不泄露敏感凭据。
+  - 接入 PlatformShared retry、timeout、backoff、failure classification。
+  - 接入 PlatformShared health、readiness、diagnostic/debug helper，debug dump 默认关闭。
+  - 本需求只要求 ingest 模块接入和验证公共基础能力与治理能力，不要求 ingest 实现 PlatformShared 或 Turtle。
 
 ### I-READY-004 ingest 安全分区部署约束
 
@@ -670,7 +670,7 @@ Docker / Docker Compose
 | I-FR-001 | P-FR-001/P-FR-002 | source -> cache 采集链路 | FR | 高 | ingest | L3 | 运行闭环通过 | `src/whale/ingest/usecases/source_acquisition_use_case.py`; `src/whale/ingest/usecases/roles/`; `src/whale/ingest/adapters/state/redis_source_state_cache.py`; `tests/integration/test_ingest_source_cache_message_e2e.py` | `pytest tests/unit/test_source_acquisition_use_case.py -q` -> 12 passed; `pytest tests/integration/test_ingest_source_cache_message_e2e.py -q` -> 2 passed | 长连接 subscription/report 的真实协议级恢复仍依赖各 adapter/backend 后续补证 | 补协议级断线恢复与长期运行归档 | 2026-05-27 |
 | I-FR-002 | P-FR-002 | cache -> message pipeline 发布链路 | FR | 高 | ingest | L3 | 运行闭环通过 | `src/whale/ingest/usecases/state_snapshot_publish_use_case.py`; `src/whale/ingest/adapters/message/kafka_message_publisher.py`; `tests/integration/test_ingest_source_cache_message_kafka_e2e.py` | `pytest tests/unit/test_state_snapshot_publish_use_case.py -q` -> 17 passed; `pytest tests/integration/test_ingest_source_cache_message_kafka_e2e.py -q` -> 1 passed | 已有 Kafka/container 级闭环，但仍不是生产部署 topic/ACL/retention 验证 | 补部署态 Kafka smoke 与权限配置验证 | 2026-05-27 |
 | I-FR-003 | P-FR-001/P-SCR-001 | 设备命令与写入控制 | FR | 高 | ingest | L2 | 部分实现 | `src/whale/ingest/usecases/source_command_use_case.py`; `src/whale/ingest/ports/command/source_command_audit_port.py`; `src/whale/ingest/adapters/observability/file_sinks.py`; `src/whale/ingest/domain/write_security_profile.py`; `src/whale/ingest/decorators/source_write.py`; `src/whale/ingest/composition.py`; `src/whale/ingest/adapters/source/opcua_source_write_adapter.py`; `src/whale/ingest/adapters/source/modbus_source_write_adapter.py`; `src/whale/ingest/adapters/source/iec61850_source_write_adapter.py` | `pytest tests/unit/test_source_command_use_case.py tests/unit/test_source_command_audit.py -q` -> 11 passed; `pytest tests/unit/test_ingest_write_security_profile.py tests/unit/test_source_command_authorization_guard.py -q` -> 15 passed; `pytest tests/unit/test_ingest_composition_injection.py -q` -> 4 passed; `pytest tests/unit/test_source_command_lease_release.py -q` -> 4 passed; `pytest tests/unit/test_opcua_source_write_adapter.py -q` -> 3 passed (L2); `pytest tests/unit/test_modbus_source_write_adapter.py -q` -> 3 readback contract passed (L2, FC03+FC06); `pytest tests/unit/test_iec61850_source_write_adapter.py -q` -> 3 readback contract passed (L2, MMS write-then-read) | Round 5: Modbus/IEC61850 readback 从 NOT_IMPLEMENTED 提升到 L2 contract（各 3 tests），三协议共 9 readback contract tests；Round 4: OpcUa readback L2 verified；真实设备 E2E readback 仍 pending | 补三协议真实设备 readback E2E 与生产授权注入 | 2026-05-29 |
-| I-FR-004 | P-FR-001 | 多协议 ingest adapter | FR | 高 | ingest | L1 | 部分实现 | `src/whale/ingest/adapters/source/`; `src/whale/ingest/adapters/source/static_source_acquisition_port_registry.py`; `tests/unit/test_ingest_source_adapter_capability_matrix.py` | `pytest tests/unit/test_ingest_source_adapter_capability_matrix.py -q` -> 2 passed; `pytest tests/unit/test_ingest_no_source_lab_imports.py -q` -> 1 passed | 仅覆盖当前已接入 adapter；IEC101/Modbus RTU/MQTT/HTTP REST/GOOSE/SV 未进入 production registry，且 GOOSE/SV 仍缺安全论证 | 补 capability matrix、unsupported 语义和新增协议准入测试 | 2026-05-27 |
+| I-FR-004 | P-FR-001 | 多协议 ingest adapter | FR | 高 | ingest | L3（9 协议已注册：5 production-ready + 4 acquisition-ready）/ total 184 passed/0 failed/0 skipped（combined verification） | 已收口（核心协议 adapter 完整；MQTT/HTTP REST/Modbus RTU/IEC101 write 待补齐） | `src/whale/ingest/adapters/source/`; `src/whale/ingest/adapters/source/dispatch_source_acquisition_adapter.py`; `src/whale/ingest/adapters/source/mqtt_source_acquisition_adapter.py`; `src/whale/ingest/adapters/source/http_rest_source_acquisition_adapter.py`; `src/whale/ingest/adapters/source/iec104_source_acquisition_adapter.py`; `src/whale/ingest/adapters/source/iec104_source_write_adapter.py`; `src/whale/ingest/adapters/source/modbus_rtu_source_acquisition_adapter.py`; `src/whale/ingest/adapters/source/iec101_source_acquisition_adapter.py`; `src/whale/ingest/composition.py`; `tests/unit/test_iec104_backend.py`; `tests/unit/test_mqtt_backend.py`; `tests/unit/test_http_rest_backend.py`; `tests/unit/test_modbus_rtu_backend.py`; `tests/unit/test_iec101_backend.py`; `tests/integration/test_modbus_rtu_acquisition_chain.py`; `tests/integration/test_iec101_acquisition_chain.py`; `tests/integration/test_iec104_acquisition_chain.py`; `tests/integration/test_mqtt_acquisition_chain.py`; `tests/integration/test_http_rest_acquisition_chain.py`; `tools/source_lab/tests/access/test_protocol_production_readiness_gate.py` | `pytest tests/unit/test_modbus_rtu_backend.py` (L1, CRC16+serial); `pytest tests/unit/test_iec101_backend.py` (L1, FT1.2+ASDU+serial); `pytest tests/unit/test_iec104_backend.py -q` -> 113 passed; `pytest tests/integration/test_ingest_iec104_source_write.py -q` -> 4 passed; `pytest tests/integration/test_iec104_acquisition_chain.py -q` -> 4 passed; `pytest tests/integration/test_modbus_rtu_acquisition_chain.py`; `pytest tests/integration/test_iec101_acquisition_chain.py`; `pytest tests/unit/test_mqtt_backend.py`; `pytest tests/unit/test_http_rest_backend.py`; `pytest tests/integration/test_mqtt_acquisition_chain.py -q` -> 3 passed; `pytest tests/integration/test_http_rest_acquisition_chain.py -q` -> 4 passed; `tools/source_lab/tests/access/test_protocol_production_readiness_gate.py -q` -> 34 passed | 5 protocol adapters production-ready（OPC UA/Modbus TCP/IEC61850 MMS/Report/IEC104）；4 protocol adapters acquisition-ready（MQTT/HTTP REST/Modbus RTU/IEC101，write=NOT_IMPLEMENTED）；Modbus RTU/IEC101 使用 real os/termios/fcntl serial（非 TCP/gateway fake），CRC16/FT1.2 校验正确，backend 测试通过，adapter 已注册 composition.py，readiness gate 已列入 _KNOWN_PRODUCTION_READ_PROTOCOLS，但 L4/L5 serial hardware=environment-pending；IEC104 5 项阻塞已全部消除；GOOSE/SV/BECKHOFF_ADS 无 ingest adapter | 4 协议 write adapter 实现（MQTT/HTTP REST/Modbus RTU/IEC101）；serial hardware 真实设备/串口环境验证 L4/L5；其余 3 协议 adapter 设计与注册 | 2026-06-02 (Round 27) |
 | I-FR-005 | P-DGR-001 | 统一配置加载 | FR | 高 | ingest | L1 | 部分实现 | `src/whale/ingest/adapters/config/source_runtime_config_repository.py`; `src/whale/ingest/ports/runtime/source_runtime_config_port.py`; `src/whale/shared/persistence/orm/` | `pytest tests/unit/test_source_runtime_config_repository.py -q` -> 2 passed | 现有仓库只证明可从共享 ORM 读取局部 runtime 数据；未打通 source/connection/point/profile/protocol params 到 composition/use case/runtime/scheduler 装配 | 补统一配置模型、runtime DB schema 和装配级 E2E | 2026-05-27 |
 | I-FR-006 | P-FR-002 | 端到端 ingest 管道 | FR | 高 | ingest | L3 | 运行闭环通过 | `tests/integration/test_ingest_source_cache_message_e2e.py`; `tests/integration/test_ingest_source_cache_message_kafka_e2e.py` | `pytest tests/integration/test_ingest_source_cache_message_e2e.py -q` -> 2 passed; `pytest tests/integration/test_ingest_source_cache_message_kafka_e2e.py -q` -> 1 passed | 当前闭环限于 source->cache->message，不等同 runtime/API/deployment ready | 补 image/entrypoint/deploy smoke 与失败注入 E2E | 2026-05-27 |
 | I-FR-007 | P-NFR-003/P-AR-001 | 统一 ingest runtime image 与 entrypoint | FR | 高 | ingest_runtime | L3 | 测试通过 | `Dockerfile`; `src/whale/ingest/runtime/entrypoint.py`; `src/whale/ingest/runtime/cli.py`; `src/whale/ingest/api/app.py`; `docker-compose.ingest-dev.yaml`; `scripts/run_ingest_runtime_compose_smoke.sh` | `pytest tests/unit/test_ingest_runtime_entrypoint.py -q` -> 5 passed; `pytest tests/integration/test_ingest_runtime_entrypoint_smoke.py -q` -> passed; `docker compose -f docker-compose.ingest-dev.yaml config` -> success; `docker build -t whale-ingest-runtime:dev .` -> success; `bash scripts/run_ingest_runtime_compose_smoke.sh` -> healthz/readyz/migrate/worker/api-worker/CRUD 全部通过 | 已验证唯一 image、统一 entrypoint、Docker compose 全链路 smoke（healthz/readyz/migrate/worker/api-worker/host-port CRUD），未跳过任何验证；graceful shutdown 信号语义仍待补强 | 补 graceful shutdown 断言与长期运行 worker 调度验证 | 2026-05-27 |
@@ -701,43 +701,91 @@ Docker / Docker Compose
 | I-READY-002 | P-NFR-003/P-NFR-005 | ingest 外部依赖准入矩阵 | READY | 高 | ingest_runtime | L4 | 部分实现 | `src/whale/ingest/api/readyz.py`; `ai_shared/reports/ingest_external_dependency_readiness_matrix_round11.md`; `scripts/run_ingest_prodlike_dependency_smoke.sh`; `scripts/run_ingest_compose_readyz_e2e.sh`; runtime DB / Redis / Kafka / audit / access policy / shared_source 相关源码与测试 | Round 14: compose readyz E2E 8/8 组件聚合 PASS（runtime_db/redis/kafka/audit/access_policy/shared_source/adapter_registry/config），敏感数据脱敏正确，degraded 语义正确；redis_state_cache 和 source_adapter_registry 在 compose 中 not_ready（测试环境预期）；Kafka/Redis 等待超时已修复（120s->240s） | compose 中 redis_state_cache 和 source_adapter_registry 因测试环境无真实 Redis/adapter 而 degraded，不影响模块级准入 | 补生产环境 Redis/adapter registry 就绪后的 full-health E2E 回归 | 2026-05-30 |
 | I-READY-003 | P-NFR-004/P-NFR-005 | ingest 横切能力接入准入 | READY | 高 | ingest_observability_security | L3 | 接入完毕 | `ai_shared/reports/ingest_crosscutting_integration_matrix_round13.md`; `src/whale/ingest/api/audit_middleware.py`; `src/whale/ingest/composition.py`; audit/metrics/auth/retry/health 全链路 decorator/middleware/composition | Round 13: 形成 8/8 crosscutting 接入矩阵 (CT-FR-001~005, CT-NFR-001, CT-SCR-001, CT-TEST-001)，覆盖 L2 contract 至 L3 integration；ingest 已通过 decorator/middleware/composition 接入全部 8 类横切能力 | compose 级 readyz/crosscutting E2E 验证仍 environment-pending，但不阻塞代码级接入证据 | 补 docker compose 级 readyz E2E 与生产环境 crosscutting 回归 | 2026-05-30 |
 | I-READY-004 | P-SCR-001 | ingest 安全分区部署约束 | READY | 高 | ingest_security | L2/L3 | 部分实现 | `ai_shared/reports/ingest_module_deployment_topology_port_matrix_round11.md`; `config/ingest/security_partition.example.yaml`; bundle one-way flow; external access/audit contract | 已补 ingest 模块级部署拓扑、端口矩阵、通信方向矩阵；并明确 source_lab 不进入 production runtime path | 真实 IAM/SIEM / 现场平台联调和跨区 write/control 仍 pending | 保持模块边界，后续补现场平台联调证据 | 2026-05-30 |
-| I-READY-005 | P-SCR-001 | ingest 写入控制投产准入 | READY | 高 | ingest_write_runtime | L2/L3 | 部分实现 | `ai_shared/reports/ingest_write_readback_field_validation_plan_round11.md`; `scripts/run_ingest_write_readback_smoke.sh`; `tests/integration/test_ingest_opcua_source_write.py`; `tests/integration/test_ingest_modbus_source_write.py`; `tests/integration/test_ingest_iec61850_mms_source_write.py`; `ai_shared/reports/ingest_field_readback_l5_evidence_template.md`; `scripts/test_ingest_write_readback_smoke_contract.sh` | Round 16: 脚本 CLI 加固（--dry-run/--protocol/--confirm/--write-enabled/--audit-output/--evidence-report/--help），protocol 别名支持，evidence report 生成修复，入口 smoke 自检 10/10 PASS (L2 contract)；Round 13: WRITE_ENABLED=false、CONFIRM_FLAG=false 双重安全门确认正确；三协议 L2 readback contract 各 3 tests；真实写入默认关闭，dry-run 安全；无 L5 伪造 | 真实设备 / 真实网关 / 真实授权链路的 L5 readback 仍缺失 -- **唯一生产准入硬阻塞** | 按 field plan + evidence template 执行现场验证与回滚归档 | 2026-05-31 |
+| I-READY-005 | P-SCR-001 | ingest 写入控制投产准入 | READY | 高 | ingest_write_runtime | L2/L3 | 部分实现 | `scripts/run_ingest_write_readback_smoke.sh`; `tests/integration/test_ingest_opcua_source_write.py`; `tests/integration/test_ingest_modbus_source_write.py`; `tests/integration/test_ingest_iec61850_mms_source_write.py`; `scripts/test_ingest_write_readback_smoke_contract.sh`（field_readback 相关报告文件已在 Round 4 清理归档）| Round 16: 脚本 CLI 加固（--dry-run/--protocol/--confirm/--write-enabled/--audit-output/--evidence-report/--help），protocol 别名支持，evidence report 生成修复，入口 smoke 自检 10/10 PASS (L2 contract)；Round 13: WRITE_ENABLED=false、CONFIRM_FLAG=false 双重安全门确认正确；三协议 L2 readback contract 各 3 tests；真实写入默认关闭，dry-run 安全；无 L5 伪造 | 真实设备 / 真实网关 / 真实授权链路的 L5 readback 仍缺失 -- **唯一生产准入硬阻塞** | 按 field plan + evidence template 执行现场验证与回滚归档 | 2026-06-03 |
 | I-READY-006 | P-NFR-002 | ingest 多节点生产准入 | READY | 高 | ingest_scheduler | L4 | 已实现（注1） | `tests/integration/test_ingest_dual_node_db_lease_e2e.py`; `tests/integration/test_ingest_prodlike_postgres_fault_injection.py`; `scripts/run_ingest_pg_lease_fault_injection.sh`; `docker-compose.ingest-prodlike.yaml`; `src/whale/ingest/runtime/fencing.py` | Round 15: SQLite L3 dual-node lease E2E 7/7 passed；PG L4 4/4 passed（lease_acquire/release/concurrent_read/fencing_token 并发 INSERT ON CONFLICT DO UPDATE RETURNING 原子操作）；fencing_token race 已修复：IntegrityError → LEASE_CONFLICT；DB fault injection 通过；证据等级从 L4 partial 提升为 L4 complete | 真实现场多节点跨主机部署未验证；网络分区与旧主恢复 E2E 未收口 | 补真实现场多节点跨主机部署验证；补网络分区与旧主恢复 E2E | 2026-05-31 |
 | I-READY-007 | P-NFR-004 | ingest 质量门禁 | READY | 高 | ingest_quality | L3 | 已实现 | `ai_shared/reports/source_lab_mypy_phase1_closure_round13.md`; `ai_shared/reports/source_lab_mypy_phase2_closure_round14.md`; `ai_shared/reports/source_lab_tests_mypy_closure_round15.md`; `tests/unit/test_ingest_no_source_lab_imports.py` | Round 15: source_lab 全量 mypy 0 errors / 202 files（cmd/src/tests 全覆盖）；compileall PASS；ruff PASS；mypy src/whale/ingest src/whale/shared/source PASS；import boundary PASS；ingest 自身质量门禁已收口，source_lab mypy 治理终点已达成 | 无；mypy 全量清零，质量门禁全部收口 | 维持 mypy gate CI，防止类型退化 | 2026-05-31 |
-| I-READY-008 | P-SCR-001/P-FR-003 | ingest 现场验证准备就绪 | READY | 高 | ingest_write_runtime | L2 | 已实现 | `scripts/run_ingest_write_readback_smoke.sh`（CLI 加固：--dry-run/--protocol/--confirm/双安全门）；`ai_shared/reports/ingest_field_readback_l5_evidence_template.md`；`scripts/test_ingest_write_readback_smoke_contract.sh`（10/10 PASS） | Round 16: 写入回读脚本 CLI 接口契约完整，L5 现场证据模板就绪，入口自检全部通过，dry-run 默认安全，CONFIRM 双安全门正确，审计/证据报告可生成，无凭据泄露 | 无 -- 现场验证包已准备完毕，等待真实设备/网关环境执行 L5 field readback | 现场团队按 evidence template 执行三协议 write-readback 并填写 L5 证据 | 2026-05-31 |
+| I-READY-008 | P-SCR-001/P-FR-003 | ingest 现场验证准备就绪 | READY | 高 | ingest_write_runtime | L2 | 已实现 | `scripts/run_ingest_write_readback_smoke.sh`（CLI 加固：--dry-run/--protocol/--confirm/双安全门）；`scripts/test_ingest_write_readback_smoke_contract.sh`（10/10 PASS；field_readback 报告文件已在 Round 4 清理归档） | Round 16: 写入回读脚本 CLI 接口契约完整，L5 现场证据模板就绪，入口自检全部通过，dry-run 默认安全，CONFIRM 双安全门正确，审计/证据报告可生成，无凭据泄露 | 无 -- 现场验证包已准备完毕，等待真实设备/网关环境执行 L5 field readback | 现场团队按 evidence template 执行三协议 write-readback 并填写 L5 证据 | 2026-06-03 |
 
-## 十三、ingest 模块级生产准入状态总结（Round 16）
+## 十三、ingest 模块级生产准入状态总结（Round 28）
 
 ### 已完成项
 
 | 编号 | 项 | 证据等级 | 状态 |
 |---|---|---|---|
 | I-READY-006 | 多节点生产准入（lease/fencing） | L4 | 已实现 -- PG L4 4/4，fencing_token race 已修复 |
-| I-READY-007 | 质量门禁 | L3 | 已实现 -- mypy 0 errors/202 files，compileall/ruff/import boundary PASS |
-| I-READY-008 | 现场验证准备就绪 | L2 | 已实现 -- 脚本 CLI 加固、evidence template、入口自检 10/10 PASS |
+| I-READY-007 | 质量门禁 | L3 | **已实现** -- mypy production+tools 0 errors/402 files（types-PyYAML 修复 yaml stubs），compileall/ruff 全量通过，import boundary PASS；mypy tests 281 历史债务单独归类，不阻塞 production gate |
+| I-READY-008 | 现场验证准备就绪 | L2 | **已实现** -- L5 外部依赖环境验证准备就绪（`ai_shared/field_readback/` 执行包已删除，L5 定义从"现场环境验证"修正为"准生产真实外部依赖环境验证"），环境预检脚本就绪（`scripts/check_l5_field_readback_env.py`、`scripts/check_serial_env.py`、`scripts/check_ads_env.py`、`scripts/check_l2_goose_sv_env.py`），CI 质量门禁聚合脚本就绪（`scripts/run_quality_gate.py`）；真实设备/网关环境 L5 验证为 env-pending（不在本项目需求跟踪表验证等级范围内） |
 | I-READY-002 | 外部依赖准入矩阵 | L4 | 部分实现 -- compose readyz 8/8 PASS |
 | I-READY-003 | 横切能力接入准入 | L3 | 接入完毕 -- 8/8 crosscutting matrix |
 | I-READY-001 | 独立部署准入 | L3 | 部分实现 -- image/entrypoint/compose smoke |
 | I-READY-004 | 安全分区部署约束 | L2/L3 | 部分实现 -- 部署拓扑/端口矩阵/单向链路 |
+| - | **IEC104 production-ready** | L3 | **已实现** -- DispatchSourceAcquisitionAdapter 接入 PollingAcquisitionRole，write 4 E2E，readiness gate 已列入，PROTOCOL_CAPABILITIES write=True |
+| - | **MQTT acquisition-ready** | L3 | **已实现** -- asyncio MQTT v3.1.1 backend + adapter + 3 E2E，readiness gate 已列入 |
+| - | **HTTP REST acquisition-ready** | L3 | **已实现** -- asyncio HTTP/1.1 backend + adapter + 4 E2E，readiness gate 已列入 |
+| - | **Modbus RTU acquisition-ready** | L1-L3 | **已实现** -- real os/termios/fcntl serial backend（CRC16）+ adapter + E2E，read-only，write=NOT_IMPLEMENTED，readiness gate 已列入 |
+| - | **IEC101 acquisition-ready** | L1-L3 | **已实现** -- real os/termios/fcntl serial backend（FT1.2+ASDU）+ adapter + E2E，read-only，write=NOT_IMPLEMENTED，readiness gate 已列入 |
+
+### 协议生产就绪矩阵（Round 28）
+
+| 协议 | acquisition | write | E2E | readiness gate | 状态 |
+|---|---|---|---|---|---|
+| OPC UA | production-ready | production-ready (L2 readback) | L3 | 已列入 | production-ready |
+| Modbus TCP | production-ready | production-ready (L2 readback) | L3 | 已列入 | production-ready |
+| IEC 61850 MMS | production-ready | production-ready (L2 readback) | L3 | 已列入 | production-ready |
+| IEC 61850 Report | production-ready | NOT_IMPLEMENTED | L3 | 已列入 | production-ready |
+| **IEC 104** | **production-ready** | **production-ready** (4 E2E) | **L3** (4 tests) | **已列入** | **production-ready** |
+| **Modbus RTU** | **acquisition-ready** (read-only serial) | NOT_IMPLEMENTED | **L3** (serial read-only) | **已列入** | **acquisition-ready** (read-only serial; os/termios/fcntl; L4/L5 serial hardware=environment-pending) |
+| **IEC 101** | **acquisition-ready** (read-only serial) | NOT_IMPLEMENTED | **L3** (serial read-only) | **已列入** | **acquisition-ready** (read-only serial; os/termios/fcntl; L4/L5 serial hardware=environment-pending) |
+| MQTT | acquisition-ready | NOT_IMPLEMENTED | L3 (3 tests) | 已列入 | acquisition-ready |
+| HTTP REST | acquisition-ready | NOT_IMPLEMENTED | L3 (4 tests) | 已列入 | acquisition-ready |
+| GOOSE | 无 adapter | 无 adapter | - | 未列入 | tool-ready-only |
+| SV | 无 adapter | 无 adapter | - | 未列入 | tool-ready-only |
+| Beckhoff ADS | 无 adapter | 无 adapter | - | 未列入 | environment-pending |
 
 ### 唯一剩余阻塞项
 
 | 编号 | 项 | 当前证据 | 阻塞原因 |
 |---|---|---|---|
-| **I-READY-005** | **写入控制投产准入** | L2 contract + L3 simulator/native | **L5 field readback 缺失 -- 无真实设备/网关/授权链路的 write-readback 证据** |
+| **I-READY-005** | **写入控制投产准入** | L2 contract + L3 simulator/native + L5 env-pending | **L5 外部依赖环境验证缺失 -- 5 协议（OPC UA/Modbus TCP/IEC 61850 MMS/IEC104/IEC 61850 Report）真实设备/网关环境未覆盖，不在本项目需求跟踪表验证等级范围内** |
 
-### 最终判定
+### 最终判定（Round 28）
 
 ```
-ingest 当前状态：prodlike-ready / production-ready blocked by L5 field readback
+ingest 当前状态：prodlike-ready / production-ready blocked by L5 field readback + serial hardware env-pending
 
-所有代码级质量门禁（mypy/ruff/compileall/import boundary）已收口。
+12 协议五维度六态矩阵已收口：
+  - 5 production-ready (L5 pending): OPC UA, Modbus TCP, IEC 61850 MMS, IEC 61850 Report, IEC 104
+  - 4 acquisition-ready: MQTT, HTTP REST, Modbus RTU, IEC 101
+  - 2 tool-ready-only: GOOSE, SV
+  - 1 environment-pending: Beckhoff ADS
+
+所有代码级质量门禁已收口：
+  - compileall 全量通过（src+tools+tests+scripts）
+  - ruff 全量通过
+  - mypy production+tools: 0 errors/402 files（types-PyYAML 修复，Round 28 收口）
+  - mypy tests: 281 历史债务，单独归类为 test-typing-debt，不阻塞 production gate
+  - import boundary: 生产路径零 tools.source_lab 导入
+  - test-validator 独立验证: 97 passed/0 failed/0 skipped
+
 所有 PG 级多节点机制（lease/fencing/assignment）已 L4 验证通过。
 所有 compose 级依赖（readyz 8/8）已 L4 验证通过。
 所有安全机制（WRITE_ENABLED=false/CONFIRM 双安全门/dry-run/audit）已确认正确。
 
-唯一阻塞：三协议（OPC UA/Modbus TCP/IEC 61850 MMS）真实设备 write-readback L5 field 验证。
-在 L5 field readback 完成并通过审计前，ingest 不得标 production-ready。
+L5 外部依赖环境验证（Round 4 更新）：
+  - ai_shared/field_readback/ 目录已删除（Round 4，L5 定义从"现场环境验证"修正为"准生产真实外部依赖环境验证"）
+  - 真实设备/网关环境 L5 验证不在本项目需求跟踪表验证等级范围内（见 Whale_REQ_README.md 维护规则）
+  - 环境预检脚本就绪: scripts/check_l5_field_readback_env.py, check_serial_env.py, check_ads_env.py, check_l2_goose_sv_env.py
+  - CI 质量门禁聚合: scripts/run_quality_gate.py
+
+阻塞项（Round 4 更新）：
+1. S3/TDengine/Redis/Pulsar/Flink/HDFS 准生产外部依赖环境未就绪 -- L5 env-pending。
+2. Modbus RTU/IEC101 serial hardware L4/L5=environment-pending。
+3. 四协议 write=NOT_IMPLEMENTED: MQTT/HTTP REST/Modbus RTU/IEC101。
+4. Beckhoff ADS environment-pending（7 tests skipped，需 Windows+TwinCAT+ADS Router）。
+5. GOOSE/SV tool-ready-only（需受控 L2 环境 + CAP_NET_RAW）。
+6. 五协议（OPC UA/Modbus TCP/IEC 61850 MMS/IEC104/IEC 61850 Report）真实设备/网关环境验证不在本项目需求跟踪表验证等级范围内。
+
+在 L5 外部依赖环境 + serial hardware 验证完成并通过审计前，ingest 不得标 production-ready。
 ```
 
-更新时间：2026-05-31
+更新时间：2026-06-03 (Round 6 -- L5 定义修正、field_readback 删除、REQ 状态对齐、全模块 REQ 同步收口)

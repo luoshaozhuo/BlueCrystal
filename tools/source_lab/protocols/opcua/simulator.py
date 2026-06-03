@@ -172,7 +172,7 @@ class OpcUaSimulatorFacade(BaseSimulatorFacade):
             if not node_ids:
                 node_ids.append("ns=2;s=WPPD1.TotW")
 
-            from asyncua import Client
+            from asyncua import Client  # type: ignore[import-untyped]
 
             client = Client(endpoint, timeout=10)
             await client.connect()

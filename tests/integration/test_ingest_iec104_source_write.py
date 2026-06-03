@@ -64,6 +64,11 @@ def _require_binaries() -> None:
         pytest.skip("iec104_simulator_server not compiled")
     if RUNNER_PATH is None:
         pytest.skip("iec104_client_runner not compiled")
+    os.environ["WHALE_IEC104_CLIENT_RUNNER_PATH"] = str(RUNNER_PATH)
+
+
+def _cleanup_env() -> None:
+    os.environ.pop("WHALE_IEC104_CLIENT_RUNNER_PATH", None)
 
 
 def _choose_available_port() -> int:

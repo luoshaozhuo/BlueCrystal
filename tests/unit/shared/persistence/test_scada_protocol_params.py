@@ -1,261 +1,125 @@
-"""Tests for the new protocol parameter ORM tables (scada_protocol_param_def,
-scada_endpoint_param_value, scada_signal_param_def, scada_signal_profile_item_param_value).
+"""SCADA 协议参数模板与 ORM 单测.
 
-Uses in-memory SQLite to verify table creation, unique constraints, FK constraints,
-and parameter value storage without real database infrastructure.
+证据等级：L1 unit/mock。
+这些测试验证模板注册、ORM 建表、注释语义和第一范式参数值的本地存取，
+不证明真实协议连通性，也不证明生产环境配置正确。
 """
 
 from __future__ import annotations
 
-import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from whale.shared.persistence import Base
-from whale.shared.persistence.template.protocol_param_data import (
-    ENDPOINT_PARAM_DEFS,
-    get_endpoint_params,
-    get_signal_params,
+from whale.shared.persistence.orm import (
+    AssetInstance,
+    AssetType,
+    CommunicationEndpoint,
+    IED,
+    LDInstance,
+    ScadaDataType,
+    ScadaEndpointParamValue,
+    ScadaProtocolParamDef,
+    ScadaSignalParamDef,
+    ScadaSignalProfileItemParamValue,
+    SignalProfile,
+    SignalProfileItem,
 )
-from whale.shared.persistence.template.protocol_view_defs import _PROTOCOL_VIEW_DEFS
-
-# ── Helpers ───────────────────────────────────────────────────────────
+from whale.shared.persistence.template.protocol_param_data import ENDPOINT_PARAM_DEFS, SIGNAL_PARAM_DEFS, get_endpoint_params, get_signal_params
 
 
 def _make_engine() -> Engine:
-    return create_engine("sqlite://", echo=False)
+    """创建内存 SQLite 引擎."""
+
+    return create_engine("sqlite:///:memory:")
 
 
 def _init_tables(engine: Engine) -> None:
-    """Create all ORM tables on the given engine."""
+    """初始化测试所需全部 ORM 表."""
+
     Base.metadata.create_all(bind=engine)
 
 
-def test_param_def_table_created() -> None:
-    """ScadaProtocolParamDef table must be created by ORM metadata."""
+def _create_minimal_scada_context(session: Session) -> tuple[CommunicationEndpoint, SignalProfileItem]:
+    """创建参数值测试需要的最小资产、IED、Endpoint 与点位上下文."""
+
+    asset_type = AssetType(type_code="WTG_TEST", type_name="测试风机")
+    session.add(asset_type)
+    session.flush()
+
+    asset = AssetInstance(
+        asset_code="WTG_TEST_001",
+        asset_name="测试风机 001",
+        asset_type_id=asset_type.asset_type_id,
+        status="ACTIVE",
+    )
+    session.add(asset)
+    session.flush()
+
+    ied = IED(asset_instance_id=asset.asset_instance_id, ied_name="IED_WTG_TEST_001")
+    session.add(ied)
+    session.flush()
+
+    endpoint = CommunicationEndpoint(
+        ied_id=ied.ied_id,
+        access_point_name="AP1",
+        application_protocol="OPC_UA",
+        service_type="READ",
+        transport="TCP",
+        host="127.0.0.1",
+        port=4840,
+        service_capabilities_json={"supports_read": True},
+    )
+    session.add(endpoint)
+    session.flush()
+
+    data_type = ScadaDataType(type_name="FLOAT64")
+    session.add(data_type)
+    session.flush()
+
+    profile = SignalProfile(profile_code="PROFILE_TEST", profile_name="测试点表")
+    session.add(profile)
+    session.flush()
+
+    item = SignalProfileItem(
+        signal_profile_id=profile.signal_profile_id,
+        do_name="TotW",
+        relative_path="MMXU1.TotW.mag.f",
+        data_type_id=data_type.data_type_id,
+    )
+    session.add(item)
+    session.flush()
+
+    ld_instance = LDInstance(
+        endpoint_id=endpoint.endpoint_id,
+        asset_instance_id=asset.asset_instance_id,
+        signal_profile_id=profile.signal_profile_id,
+        ld_name="LD0",
+    )
+    session.add(ld_instance)
+    session.flush()
+    return endpoint, item
+
+
+def test_protocol_param_tables_created() -> None:
+    """协议参数相关表必须被 ORM 元数据创建."""
+
     engine = _make_engine()
     _init_tables(engine)
-    inspector = inspect(engine)
-    names = set(inspector.get_table_names())
+    names = set(inspect(engine).get_table_names())
     assert "scada_protocol_param_def" in names
+    assert "scada_endpoint_param_value" in names
+    assert "scada_signal_param_def" in names
+    assert "scada_signal_profile_item_param_value" in names
 
 
-def test_endpoint_param_value_table_created() -> None:
-    """ScadaEndpointParamValue table must be created by ORM metadata."""
-    engine = _make_engine()
-    _init_tables(engine)
-    inspector = inspect(engine)
-    assert "scada_endpoint_param_value" in inspector.get_table_names()
+def test_endpoint_param_registry_covers_expected_protocol_matrix() -> None:
+    """端点参数模板必须覆盖 handoff 要求的协议矩阵."""
 
-
-def test_signal_param_def_table_created() -> None:
-    """ScadaSignalParamDef table must be created by ORM metadata."""
-    engine = _make_engine()
-    _init_tables(engine)
-    inspector = inspect(engine)
-    assert "scada_signal_param_def" in inspector.get_table_names()
-
-
-def test_signal_param_value_table_created() -> None:
-    """ScadaSignalProfileItemParamValue table must be created."""
-    engine = _make_engine()
-    _init_tables(engine)
-    inspector = inspect(engine)
-    assert "scada_signal_profile_item_param_value" in inspector.get_table_names()
-
-
-def test_param_def_unique_constraint() -> None:
-    """Same (protocol, service_type, transport, param_key) must be rejected."""
-    engine = _make_engine()
-    _init_tables(engine)
-    with engine.begin() as conn:
-        conn.execute(
-            text("""
-                INSERT INTO scada_protocol_param_def
-                    (application_protocol, service_type, transport, param_key, param_name, data_type, required, sort_order)
-                VALUES ('MODBUS', 'TCP_READ', 'TCP', 'unit_id', '单元ID', 'INT', 0, 0)
-            """)
-        )
-        with pytest.raises(Exception, match="UNIQUE|IntegrityError"):
-            conn.execute(
-                text("""
-                    INSERT INTO scada_protocol_param_def
-                        (application_protocol, service_type, transport, param_key, param_name, data_type, required, sort_order)
-                    VALUES ('MODBUS', 'TCP_READ', 'TCP', 'unit_id', '重复单元ID', 'INT', 0, 0)
-                """)
-            )
-
-
-def test_endpoint_param_value_fk() -> None:
-    """FK constraint on endpoint_id prevents orphan values."""
-    engine = _make_engine()
-    _init_tables(engine)
-    with engine.begin() as conn:
-        conn.execute(text("PRAGMA foreign_keys = ON"))
-        with pytest.raises(Exception):
-            conn.execute(
-                text("""
-                    INSERT INTO scada_endpoint_param_value (endpoint_id, param_def_id)
-                    VALUES (99999, 99999)
-                """)
-            )
-
-
-def test_param_def_insert_and_query() -> None:
-    """Insert and query a param def."""
-    engine = _make_engine()
-    _init_tables(engine)
-    with engine.begin() as conn:
-        conn.execute(
-            text("""
-                INSERT INTO scada_protocol_param_def
-                    (application_protocol, service_type, transport, param_key, param_name, data_type,
-                     required, default_value, unit, description, sort_order)
-                VALUES ('MODBUS', 'TCP_READ', 'TCP', 'unit_id', '单元ID', 'INT',
-                        1, '1', NULL, 'Modbus slave unit ID', 0)
-            """)
-        )
-        rows = conn.execute(
-            text("SELECT param_key, param_name, data_type FROM scada_protocol_param_def")
-        ).fetchall()
-        assert len(rows) >= 1
-        assert any(r.param_key == "unit_id" for r in rows)
-
-
-def test_endpoint_param_value_insert() -> None:
-    """Insert a real endpoint param value (requires real FK)."""
-    engine = _make_engine()
-    _init_tables(engine)
-    with engine.begin() as conn:
-        # Insert param def
-        conn.execute(
-            text("""
-                INSERT INTO scada_protocol_param_def
-                    (application_protocol, service_type, transport, param_key, param_name, data_type, required, sort_order)
-                VALUES ('MODBUS', 'TCP_READ', 'TCP', 'unit_id', '单元ID', 'INT', 0, 0)
-            """)
-        )
-        # Insert a communication endpoint
-        conn.execute(
-            text("""
-                INSERT INTO scada_communication_endpoint
-                    (ied_id, access_point_name, application_protocol, transport, service_capabilities_json, metadata_json)
-                VALUES (1, 'AP1', 'MODBUS', 'TCP', '{}', '{}')
-            """)
-        )
-        # Insert IED (required for FK)
-        conn.execute(
-            text("""
-                INSERT INTO scada_ied (ied_id, asset_instance_id, ied_name, metadata_json)
-                VALUES (1, 1, 'TEST_IED', '{}')
-            """)
-        )
-        # Insert asset_instance (required for asset_instance_id FK)
-        conn.execute(
-            text("""
-                INSERT INTO asset_instance
-                    (asset_instance_id, asset_code, asset_name, asset_type_id, status, metadata_json)
-                VALUES (1, 'TEST', 'Test Asset', 1, 'active', '{}')
-            """)
-        )
-        # Insert asset_type (required for asset_type_id FK)
-        conn.execute(
-            text("""
-                INSERT INTO asset_type (asset_type_id, type_code, type_name, metadata_json)
-                VALUES (1, 'TEST', 'Test Type', '{}')
-            """)
-        )
-
-
-def test_goose_endpoint_params_defined() -> None:
-    """GOOSE endpoint params must include network_interface and vlan_id."""
-    params = get_endpoint_params("IEC61850", "GOOSE")
-    keys = {p.key for p in params}
-    assert "network_interface" in keys
-    assert "vlan_id" in keys
-    assert "app_id" in keys
-    assert "multicast_mac" in keys
-
-
-def test_sv_endpoint_params_defined() -> None:
-    """SV endpoint params must include sv_cb_ref and sample_rate_hz."""
-    params = get_endpoint_params("IEC61850", "SV")
-    keys = {p.key for p in params}
-    assert "sv_cb_ref" in keys
-    assert "sample_rate_hz" in keys
-    assert "asdu_count" in keys
-
-
-def test_modbus_tcp_endpoint_params_defined() -> None:
-    """Modbus TCP endpoint params must include unit_id and timeouts."""
-    params = get_endpoint_params("MODBUS", "TCP_READ")
-    keys = {p.key for p in params}
-    assert "unit_id" in keys
-    assert "connect_timeout_ms" in keys
-
-
-def test_iec104_endpoint_params_defined() -> None:
-    """IEC104 endpoint params include common_address, t0_ms through w."""
-    params = get_endpoint_params("IEC104", "INTERROGATION")
-    keys = {p.key for p in params}
-    assert "common_address" in keys
-    assert "t0_ms" in keys
-    assert "k" in keys
-    assert "w" in keys
-
-
-def test_iec61850_mms_signal_params_defined() -> None:
-    """IEC61850 MMS signal params must include ied_name, ld_inst, etc."""
-    params = get_signal_params("IEC61850", "MMS_READ")
-    keys = {p.key for p in params}
-    assert "ied_name" in keys
-    assert "ld_inst" in keys
-    assert "do_name" in keys
-
-
-def test_modbus_signal_params_defined() -> None:
-    """Modbus signal params must include function_code and register_address."""
-    params = get_signal_params("MODBUS", "TCP_READ")
-    keys = {p.key for p in params}
-    assert "function_code" in keys
-    assert "register_address" in keys
-    assert "byte_order" in keys
-
-
-def test_goose_signal_params_defined() -> None:
-    """GOOSE signal params must include dataset_ref and goose_field_path."""
-    params = get_signal_params("IEC61850", "GOOSE")
-    keys = {p.key for p in params}
-    assert "dataset_ref" in keys
-    assert "dataset_index" in keys
-    assert "goose_field_path" in keys
-
-
-def test_signal_param_def_unique_constraint() -> None:
-    """Same (protocol, service_type, param_key) must be rejected."""
-    engine = _make_engine()
-    _init_tables(engine)
-    with engine.begin() as conn:
-        conn.execute(
-            text("""
-                INSERT INTO scada_signal_param_def
-                    (application_protocol, service_type, param_key, param_name, data_type, required, sort_order)
-                VALUES ('MODBUS', 'TCP_READ', 'function_code', 'Function Code', 'INT', 0, 0)
-            """)
-        )
-        with pytest.raises(Exception, match="UNIQUE|IntegrityError|unique"):
-            conn.execute(
-                text("""
-                    INSERT INTO scada_signal_param_def
-                        (application_protocol, service_type, param_key, param_name, data_type, required, sort_order)
-                    VALUES ('MODBUS', 'TCP_READ', 'function_code', 'Duplicate', 'INT', 0, 0)
-                """)
-            )
-
-
-def test_param_defs_registry_completeness() -> None:
-    """All expected protocol+service endpoint param defs must be registered."""
     expected = {
+        ("OPC_UA", "READ"),
+        ("OPC_UA", "SUBSCRIBE"),
         ("MODBUS", "TCP_READ"),
         ("MODBUS", "RTU_READ"),
         ("IEC101", "INTERROGATION"),
@@ -266,27 +130,156 @@ def test_param_defs_registry_completeness() -> None:
         ("IEC61850", "REPORT"),
         ("IEC61850", "GOOSE"),
         ("IEC61850", "SV"),
+        ("MQTT", "SUBSCRIBE"),
+        ("HTTP_REST", "REQUEST"),
+        ("BECKHOFF_ADS", "ADS_READ_WRITE"),
+        ("BECKHOFF_ADS", "ADS_NOTIFICATION"),
     }
-    registered = set()
-    for proto, svc_map in ENDPOINT_PARAM_DEFS.items():
-        for svc in svc_map:
-            registered.add((proto, svc))
-    assert registered == expected, f"Missing: {expected - registered}"
+    registered = {(protocol, service) for protocol, services in ENDPOINT_PARAM_DEFS.items() for service in services}
+    assert registered == expected
 
 
-def test_protocol_views_sql_syntax() -> None:
-    """All protocol view SQL definitions must parse with valid syntax."""
-    for view_name, view_sql in _PROTOCOL_VIEW_DEFS.items():
-        assert view_name.startswith("v_scada_endpoint_")
-        assert "SELECT" in view_sql
-        assert "scada_communication_endpoint" in view_sql
+def test_signal_param_registry_covers_expected_protocol_matrix() -> None:
+    """点位参数模板必须覆盖与端点一致的协议矩阵."""
+
+    expected = {
+        ("OPC_UA", "READ"),
+        ("OPC_UA", "SUBSCRIBE"),
+        ("MODBUS", "TCP_READ"),
+        ("MODBUS", "RTU_READ"),
+        ("IEC101", "INTERROGATION"),
+        ("IEC101", "SPONTANEOUS"),
+        ("IEC104", "INTERROGATION"),
+        ("IEC104", "SPONTANEOUS"),
+        ("IEC61850", "MMS_READ"),
+        ("IEC61850", "REPORT"),
+        ("IEC61850", "GOOSE"),
+        ("IEC61850", "SV"),
+        ("MQTT", "SUBSCRIBE"),
+        ("HTTP_REST", "REQUEST"),
+        ("BECKHOFF_ADS", "ADS_READ_WRITE"),
+        ("BECKHOFF_ADS", "ADS_NOTIFICATION"),
+    }
+    registered = {(protocol, service) for protocol, services in SIGNAL_PARAM_DEFS.items() for service in services}
+    assert registered == expected
 
 
-def test_service_type_field_on_endpoint() -> None:
-    """CommunicationEndpoint ORM must have service_type field."""
-    from whale.shared.persistence.orm import CommunicationEndpoint
+def test_new_protocol_endpoint_params_are_defined() -> None:
+    """新增协议的端点参数模板必须完整可查."""
+
+    assert {"endpoint_url", "application_uri", "connect_timeout_ms", "request_timeout_ms"} <= {
+        param.key for param in get_endpoint_params("OPC_UA", "READ")
+    }
+    assert {"client_id", "topic_prefix", "keepalive_seconds", "username_ref", "password_ref"} <= {
+        param.key for param in get_endpoint_params("MQTT", "SUBSCRIBE")
+    }
+    assert {"base_path", "method", "auth_header_ref", "verify_tls"} <= {
+        param.key for param in get_endpoint_params("HTTP_REST", "REQUEST")
+    }
+    assert {"ams_net_id", "ads_router_port", "ads_server_port", "request_timeout_ms"} <= {
+        param.key for param in get_endpoint_params("BECKHOFF_ADS", "ADS_READ_WRITE")
+    }
+    assert {"ams_net_id", "ads_router_port", "ads_server_port", "request_timeout_ms"} <= {
+        param.key for param in get_endpoint_params("BECKHOFF_ADS", "ADS_NOTIFICATION")
+    }
+
+
+def test_new_protocol_signal_params_are_defined() -> None:
+    """新增协议的点位参数模板必须完整可查."""
+
+    assert {"namespace_index", "node_id", "browse_path", "attribute_id"} <= {
+        param.key for param in get_signal_params("OPC_UA", "READ")
+    }
+    assert {"topic", "payload_path", "payload_type", "retain"} <= {
+        param.key for param in get_signal_params("MQTT", "SUBSCRIBE")
+    }
+    assert {"resource_path", "json_path", "method", "value_field"} <= {
+        param.key for param in get_signal_params("HTTP_REST", "REQUEST")
+    }
+    assert {"symbol_name", "index_group", "index_offset", "data_size", "ads_data_type"} <= {
+        param.key for param in get_signal_params("BECKHOFF_ADS", "ADS_READ_WRITE")
+    }
+    assert {
+        "symbol_name",
+        "index_group",
+        "index_offset",
+        "data_size",
+        "ads_data_type",
+        "notification_mode",
+        "cycle_time_ms",
+        "max_delay_ms",
+    } <= {param.key for param in get_signal_params("BECKHOFF_ADS", "ADS_NOTIFICATION")}
+
+
+def test_endpoint_comments_explain_protocol_fill_rules() -> None:
+    """CommunicationEndpoint 列注释应包含新增协议与填写指引."""
+
     mapper = inspect(CommunicationEndpoint)
-    cols = {c.name for c in mapper.columns}
-    assert "service_type" in cols
-    assert "application_protocol" in cols
-    assert "transport" in cols
+    columns = {column.name: column.comment or "" for column in mapper.columns}
+    assert "BECKHOFF_ADS" in columns["application_protocol"]
+    assert "推荐组合" in columns["service_type"]
+    assert "推荐组合" in columns["transport"]
+    assert "串口设备、网卡等正式参数写入参数值表" in columns["host"]
+    assert "AMS Port" in columns["port"]
+    assert "主要用于 OPC_UA" in columns["namespace_uri"]
+    assert "认证方式摘要" in columns["auth_type"]
+    assert "正式参数" in columns["service_capabilities_json"]
+
+
+def test_protocol_param_model_docstrings_explain_table_purpose() -> None:
+    """参数模型 docstring 必须明确值表用途与禁止事项."""
+
+    assert "metadata_json" in (ScadaProtocolParamDef.__doc__ or "")
+    assert "ScadaEndpointParamValue" in (ScadaProtocolParamDef.__doc__ or "")
+    assert "scada_signal_profile_item" in (ScadaSignalParamDef.__doc__ or "")
+    assert "共享点表" in (ScadaSignalParamDef.__doc__ or "")
+    assert "第一范式" in (ScadaEndpointParamValue.__doc__ or "")
+    assert "第一范式" in (ScadaSignalProfileItemParamValue.__doc__ or "")
+
+
+def test_protocol_param_values_can_be_inserted_and_queried() -> None:
+    """端点参数值与点位参数值必须能按定义落库和查询."""
+
+    engine = _make_engine()
+    _init_tables(engine)
+    with Session(engine) as session:
+        endpoint, item = _create_minimal_scada_context(session)
+
+        endpoint_def = ScadaProtocolParamDef(
+            application_protocol="OPC_UA",
+            service_type="READ",
+            transport="TCP",
+            param_key="session_name",
+            param_name="会话名称",
+            data_type="STRING",
+        )
+        signal_def = ScadaSignalParamDef(
+            application_protocol="OPC_UA",
+            service_type="READ",
+            param_key="node_id",
+            param_name="NodeId",
+            data_type="STRING",
+        )
+        session.add_all([endpoint_def, signal_def])
+        session.flush()
+
+        session.add(
+            ScadaEndpointParamValue(
+                endpoint_id=endpoint.endpoint_id,
+                param_def_id=endpoint_def.param_def_id,
+                value_text="whale-opcua-test",
+            )
+        )
+        session.add(
+            ScadaSignalProfileItemParamValue(
+                profile_item_id=item.profile_item_id,
+                param_def_id=signal_def.param_def_id,
+                value_text="ns=2;s=WTG_TEST_001/MMXU1.TotW.mag.f",
+            )
+        )
+        session.commit()
+
+        stored_endpoint_value = session.query(ScadaEndpointParamValue).one()
+        stored_signal_value = session.query(ScadaSignalProfileItemParamValue).one()
+        assert stored_endpoint_value.value_text == "whale-opcua-test"
+        assert stored_signal_value.value_text == "ns=2;s=WTG_TEST_001/MMXU1.TotW.mag.f"

@@ -1,0 +1,68 @@
+# Whale Storage - TDengine 连接配置模板
+# =============================================================================
+# L5 验证状态: TDengine L5 verified (Round 5, REST API write + readback 10 fields)
+# 说明: TDengine 作为 raw_index 和 standardized 层的时序存储后端。
+#       使用 taosAdapter REST API 通信（WebSocket 可选）。
+# =============================================================================
+# 复制本文件并修改实际值:
+#   cp config/whale/storage.tdengine.example.yaml config/whale/storage.tdengine.yaml
+
+# ---- TDengine 连接 ----
+tdengine:
+  # DSN 格式（taosAdapter REST API）
+  dsn: "${WHALE_TDENGINE_DSN:-http://localhost:6041}"
+
+  # host 和 port 用于 WebSocket 连接模式（可选）
+  host: "${TDENGINE_HOST:-localhost}"
+  port: ${TDENGINE_PORT:-6041}
+
+  # 认证
+  user: "${TDENGINE_USER:-root}"
+  password: "${TDENGINE_PASSWORD:-taosdata}"
+
+  # 连接池
+  pool_size: 4
+
+# ---- raw_index 数据库 ----
+raw_index:
+  database: "whale_raw_index"
+  # 数据自动过期天数（默认 90 天）
+  ttl_days: 90
+  # 超级表名
+  super_table: "raw_index"
+  # 每张子表最大行数
+  max_rows_per_table: 1000000
+  # 子表命名模板 (按 source_id 创建子表)
+  subtable_prefix: "ri_"
+  # 标签列
+  tags:
+    - "source_id"
+    - "device_id"
+    - "station_id"
+
+# ---- standardized 数据库 ----
+standardized:
+  database: "whale_standardized"
+  # 数据自动过期天数（标准层保留更长，默认 365 天）
+  ttl_days: 365
+  # 超级表名
+  super_table: "standardized"
+  # 子表命名模板 (按 node_key 创建子表)
+  subtable_prefix: "std_"
+  # 标签列
+  tags:
+    - "node_key"
+    - "variable_key"
+    - "source_id"
+    - "station_id"
+
+# ---- 写入配置 ----
+write:
+  # 批量写入大小
+  batch_size: 500
+  # 批量等待时间（ms）
+  batch_wait_ms: 100
+  # 失败重试次数
+  max_retries: 3
+  # 重试退避 (ms)
+  retry_backoff_ms: 1000
