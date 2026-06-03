@@ -1,7 +1,7 @@
 """多协议 source simulator 的测试支持 fixture。
 
 为 source_lab simulator E2E 测试提供可复用的测试源定义。
-证据等级：L3（simulator）。
+测试阶段：模块集成期验证（simulator）。
 """
 from __future__ import annotations
 

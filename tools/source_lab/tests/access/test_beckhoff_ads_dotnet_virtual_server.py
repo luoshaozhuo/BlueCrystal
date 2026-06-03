@@ -1,7 +1,7 @@
 """.NET virtual ADS server 生命周期测试。
 
-证据等级：L4 integration（需 dotnet + AdsServer 项目环境满足）；
-环境不满足时 L2 contract（仅验证接口契约和环境探测）。
+测试阶段：跨模块联调期验证 (integration)（需 dotnet + AdsServer 项目环境满足）；
+环境不满足时为开发期验证 (contract)（仅验证接口契约和环境探测）。
 本测试验证 create_virtual_ads_server 的 start/stop/cleanup 契约。
 环境不足时标记为 skip/environment-pending，原因具体声明。
 """

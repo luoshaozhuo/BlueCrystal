@@ -1,6 +1,6 @@
 # Whale Storage - TDengine 连接配置模板
 # =============================================================================
-# L5 验证状态: TDengine L5 verified (Round 5, REST API write + readback 10 fields)
+# 准生产依赖验证期 状态: TDengine 验证通过 (Round 5, REST API write + readback 10 fields)
 # 说明: TDengine 作为 raw_index 和 standardized 层的时序存储后端。
 #       使用 taosAdapter REST API 通信（WebSocket 可选）。
 # =============================================================================

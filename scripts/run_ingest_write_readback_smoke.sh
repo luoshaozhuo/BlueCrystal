@@ -8,7 +8,7 @@ set -euo pipefail
 # 功能：对 OPC UA / Modbus TCP / IEC 61850 MMS 执行可配置、可审计、
 # 默认 dry-run 安全的 write-readback 验证。
 #
-# 证据等级：L3 simulator/native（无真实设备时为 validation-entry-ready），
+# 测试阶段：模块集成期验证（simulator/native）—— 无真实设备时为 validation-entry-ready，
 # 有真实设备时为 L5 field。
 #
 # 重要安全警告：
@@ -206,7 +206,7 @@ write_evidence_report() {
   local results_text="${1:-}"
   local report_file="${EVIDENCE_REPORT}"
   if [[ -z "${report_file}" ]]; then
-    report_file="${ROOT_DIR}/ai_shared/reports/field_readback_evidence_$(date +%Y%m%d_%H%M%S).md"
+    report_file="${ROOT_DIR}/ai_shared/reports/write_readback_evidence_$(date +%Y%m%d_%H%M%S).md"
   fi
   mkdir -p "$(dirname "${report_file}")"
 
@@ -216,9 +216,9 @@ write_evidence_report() {
   hostname="$(hostname 2>/dev/null || echo "unknown")"
   local evidence_level
   if [[ "${WRITE_ENABLED}" == "true" ]]; then
-    evidence_level="L3 simulator/native（写入已启用，如有真实设备则为 L5 field）"
+    evidence_level="模块集成期验证（simulator/native，写入已启用；如有真实设备则为准生产依赖验证期 field）"
   else
-    evidence_level="L3 simulator/native（写入已禁用，validation-entry-ready）"
+    evidence_level="模块集成期验证（simulator/native，写入已禁用，validation-entry-ready）"
   fi
 
   # 直接构造报告内容，避免 heredoc+sed 的分隔符冲突
@@ -232,14 +232,14 @@ write_evidence_report() {
     printf '| 确认标志 | %s |\n' "${CONFIRM_FLAG}"
     printf '| 执行时间 | %s |\n' "${ts}"
     printf '| 主机名 | %s |\n' "${hostname}"
-    printf '\n## 证据等级\n\n'
+    printf '\n## 测试阶段\n\n'
     printf '%s\n' "${evidence_level}"
     printf '\n## 验证结果\n\n'
     printf '| 协议 | 测试文件 | 状态 | 失败代码 | 说明 |\n'
     printf '|---|---|---|---|---|\n'
     printf '%s\n' "${results_text}"
     printf '\n## 注意事项\n\n'
-    printf '- 若无真实设备环境，本报告证据等级为 **L3 simulator/native**，不得标 L5 field。\n'
+    printf '- 若无真实设备环境，本报告测试阶段为 **模块集成期验证（simulator/native）**，不得标为准生产依赖验证期 field。\n'
     printf '- 写入功能默认关闭（WRITE_ENABLED=false），需显式启用。\n'
     printf '- 本验证入口为 **validation-entry-ready**，非 field-ready。\n'
   } > "${report_file}"

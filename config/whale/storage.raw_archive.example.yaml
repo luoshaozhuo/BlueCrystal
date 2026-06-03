@@ -5,7 +5,7 @@
 # raw_archive 是 Whale 数据底座的最底层，保存 ingest 输出的原始消息的不可变副本。
 # 使用压缩文件格式（JSONL.gz / JSONL.zst），绝不使用 TDengine 替代。
 #
-# L5 验证状态: S3/MinIO L5 verified (Round 5), HDFS env-pending
+# 准生产依赖验证期 状态: S3/MinIO 验证通过 (Round 5), HDFS MISSING_ENVIRONMENT
 
 # ---- 归档后端选择 ----
 # backend: local | hdfs | s3
@@ -21,14 +21,14 @@ raw_archive:
     # zstd 压缩等级 (1-22, 3 为默认)
     # zstd_compression_level: 3
 
-  # ---- HDFS (environment-pending) ----
+  # ---- HDFS (MISSING_ENVIRONMENT) ----
   # hdfs:
   #   namenode_url: "${HDFS_NAMENODE_URL:-http://namenode:9870}"
   #   base_path: "/whale/raw_archive"
   #   user: "${HDFS_USER:-whale}"
   #   compression: "gzip"
 
-  # ---- S3 / MinIO (L5 verified, Round 5) ----
+  # ---- S3 / MinIO (准生产依赖验证期 验证通过, Round 5) ----
   s3:
     endpoint_url: "${WHALE_S3_ENDPOINT:-http://localhost:9000}"
     bucket: "${WHALE_S3_BUCKET:-whale-raw-archive}"

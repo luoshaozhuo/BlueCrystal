@@ -17,7 +17,7 @@
 - whale.storage: LocalCompressedArchiveSink, MemoryRawIndexSink,
   MemoryStandardizedSink, InMemoryServingCache, InMemoryManifestRepository
 
-证据等级：L3 simulator（全内存闭环，完整 E2E 流程覆盖）。
+测试阶段：模块集成期验证 (simulator)（全内存闭环，完整 E2E 流程覆盖）。
 不能证明：真实 Kafka/Pulsar broker、TDengine、HDFS/S3、Flink 的真实环境行为。
 环境依赖：无（纯内存模拟，不需要 docker compose）。
 """

@@ -11,12 +11,12 @@
 │   职责: 保存 ingest 输出的原始消息副本，用于审计和重放        │
 ├─────────────────────────────────────────────────────────────┤
 │ Layer 2: raw_index (原始时序索引层)                          │
-│   存储: TDengine (environment-pending) / Memory (dev)       │
+│   存储: TDengine (MISSING_ENVIRONMENT) / Memory (dev)       │
 │   索引: source_id + device_id + timestamp                   │
 │   职责: 快速查询原始消息位置，不保存完整内容                  │
 ├─────────────────────────────────────────────────────────────┤
 │ Layer 3: standardized (标准时序层)                           │
-│   存储: TDengine (environment-pending) / Memory (dev)       │
+│   存储: TDengine (MISSING_ENVIRONMENT) / Memory (dev)       │
 │   字段: node_key + variable_key + value + quality_code      │
 │   职责: 清洗标准化后的时序数据，支撑 warehouse/mart 聚合      │
 ├─────────────────────────────────────────────────────────────┤
@@ -26,7 +26,7 @@
 │   不负责: 实时查询（由 serving_cache 负责）                   │
 ├─────────────────────────────────────────────────────────────┤
 │ Serving Cache (近实时 KV)                                   │
-│   存储: InMemory (dev) / Redis (field, environment-pending)  │
+│   存储: InMemory (dev) / Redis (field, MISSING_ENVIRONMENT)  │
 │   职责: 低延迟实时数据查询                                    │
 │   TTL: 60s (可配置)                                         │
 └─────────────────────────────────────────────────────────────┘
@@ -66,9 +66,9 @@
 
 | 存储后端 | 状态 | 开发替代 |
 |---|---|---|
-| 本地 raw_archive | 已验证 (L3) | — |
-| HDFS raw_archive | environment-pending | LocalCompressedArchiveSink |
-| S3/MinIO raw_archive | environment-pending | LocalCompressedArchiveSink |
-| TDengine raw_index | environment-pending | MemoryRawIndexSink |
-| TDengine standardized | environment-pending | MemoryStandardizedSink |
-| Redis serving_cache | environment-pending | InMemoryServingCache |
+| 本地 raw_archive | 已验证 (模块集成期) | — |
+| HDFS raw_archive | MISSING_ENVIRONMENT | LocalCompressedArchiveSink |
+| S3/MinIO raw_archive | MISSING_ENVIRONMENT | LocalCompressedArchiveSink |
+| TDengine raw_index | MISSING_ENVIRONMENT | MemoryRawIndexSink |
+| TDengine standardized | MISSING_ENVIRONMENT | MemoryStandardizedSink |
+| Redis serving_cache | MISSING_ENVIRONMENT | InMemoryServingCache |

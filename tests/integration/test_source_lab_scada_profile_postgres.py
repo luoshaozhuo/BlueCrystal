@@ -1,6 +1,6 @@
 """source_lab 消费 PostgreSQL shared persistence 样例库的集成测试。
 
-证据等级：L4 integration。
+测试阶段：跨模块联调期验证 (integration)。
 本测试通过真实 PostgreSQL 临时样例库验证 `ScadaProfileProvider` 已经可以直接
 消费 shared persistence 输入基线，并保留 ADS lightweight runtime 的显式边界。
 它不证明 Beckhoff ADS 真实协议服务端或 shared_source production backend。

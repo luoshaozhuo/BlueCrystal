@@ -8,7 +8,7 @@
   PartitionKey, SourceIdPartitionKey, DeviceIdPartitionKey, StationIdPartitionKey,
   CustomPartitionKey, MessageOffset, ReplayRequest
 
-证据等级：L1 unit/mock（纯内存单元测试，不依赖外部系统）。
+测试阶段：开发期验证 (unit/mock)（纯内存单元测试，不依赖外部系统）。
 """
 
 from __future__ import annotations

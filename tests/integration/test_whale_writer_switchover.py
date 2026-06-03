@@ -11,7 +11,7 @@
 - whale.speed_layer.writers: RawArchiveWriter / RawIndexWriter
 - whale.speed_layer.runner: LocalPipelineRunner
 
-证据等级：L3 simulator（全内存闭环，切换语义验证）。
+测试阶段：模块集成期验证 (simulator)（全内存闭环，切换语义验证）。
 不能证明：真实 Kafka broker 的 consumer group rebalance、网络切换、DNS 切换。
 环境依赖：无（纯内存模拟）。
 """

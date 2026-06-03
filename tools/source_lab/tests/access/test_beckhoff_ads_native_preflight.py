@@ -1,6 +1,6 @@
 """Beckhoff AdsLib native runner 预检测试。
 
-证据等级：L2 contract（测试 preflight 输出的结构化契约和边界行为）。
+测试阶段：开发期验证 (contract)（测试 preflight 输出的结构化契约和边界行为）。
 本测试验证：
 - ads_native_preflight 在 binary 缺失时的返回结构；
 - error 必须包含 protocol、runner、path、build_hint；

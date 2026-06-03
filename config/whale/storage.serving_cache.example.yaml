@@ -1,6 +1,6 @@
 # Whale Storage - serving_cache 配置模板
 # =============================================================================
-# L5 验证状态: Redis L5 verified (Round 5, SET/GET/TTL/stale/out-of-order 全部通过)
+# 准生产依赖验证期 状态: Redis 验证通过 (Round 5, SET/GET/TTL/stale/out-of-order 全部通过)
 # 说明: serving_cache 是 Whale 业务侧近实时 KV 缓存层，使用 Redis 作为后端。
 #       speed layer 实时更新 serving cache，保证数据新鲜度和乱序保护。
 # 复制本文件并修改实际值:

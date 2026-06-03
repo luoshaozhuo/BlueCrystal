@@ -6,8 +6,8 @@
 被验证对象：
 - whale.message_pipeline.adapters.kafka: KafkaSourceAdapter, KafkaSinkAdapter
 
-证据等级：L2 contract/stub（contract adapter 配置校验和接口契约验证）。
-当环境变量 WHALE_KAFKA_BROKERS 存在且真实 Kafka 可用时，为 L4 integration。
+测试阶段：开发期验证 (contract/stub)（contract adapter 配置校验和接口契约验证）。
+当环境变量 WHALE_KAFKA_BROKERS 存在且真实 Kafka 可用时，为跨模块联调期验证 (integration)。
 当前默认为 contract-only。
 
 不能证明（contract mode）：真实 Kafka broker 的发布/消费/offset 管理行为。

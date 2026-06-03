@@ -4,7 +4,7 @@
 #
 # 本文件定义 Kafka broker 连接、topic 配置和 consumer group 设定。
 # SASL/SSL 配置为可选，按现场环境决定是否启用。
-# L5 验证状态: Kafka L5 verified (Round 5, 4 E2E + 2 integration)
+# 准生产依赖验证期 状态: Kafka 验证通过 (Round 5, 4 E2E + 2 integration)
 
 # ---- Kafka broker 连接 ----
 kafka:

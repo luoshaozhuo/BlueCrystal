@@ -1,8 +1,8 @@
-# Whale Message Pipeline - Pulsar 配置模板 (environment-pending)
+# Whale Message Pipeline - Pulsar 配置模板 (MISSING_ENVIRONMENT)
 # =============================================================================
-# 状态: environment-pending
+# 状态: MISSING_ENVIRONMENT
 # 说明: Pulsar 作为 Kafka 的替代消息管道后端。Pulsar broker 和 pulsar-client
-#       Python 库均标记为 environment-pending。当前仅提供 contract adapter。
+#       Python 库均标记为 MISSING_ENVIRONMENT。当前仅提供 contract adapter。
 # 退出条件:
 #   1. Pulsar broker 集群部署完成
 #   2. pulsar-client Python 库可用

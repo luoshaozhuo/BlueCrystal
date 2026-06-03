@@ -9,7 +9,7 @@
 
 注意：readback 的真实 OPC UA E2E 验证（需要运行中的 OPC UA simulator）
 在 tools/source_lab/protocols/opcua/simulator.py 中可通过 ServerSimulatorFacade
-执行。本文件的 mock readback 测试验证 adapter 契约，证据等级 L2 (contract/stub)。
+执行。本文件的 mock readback 测试验证 adapter 契约，测试阶段为开发期验证 (contract/stub)。
 """
 
 from __future__ import annotations
@@ -232,7 +232,7 @@ class TestOpcUaSourceWriteAdapterReadback:
     使用 mock reader 验证 write-then-readback 闭合路径，
     不依赖真实 OPC UA server 或 native runner。
 
-    证据等级：L2 (contract/stub)。
+    测试阶段：开发期验证 (contract/stub)。
     """
 
     def setup_method(self) -> None:

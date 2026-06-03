@@ -1,7 +1,7 @@
 """dynamic runtime state store 韧性测试。
 
 验证 state store 在异常场景（磁盘满、并发写入、文件损坏）下的行为。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

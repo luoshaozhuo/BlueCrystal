@@ -48,9 +48,9 @@ whale.speed.standardized     — 标准层消费 group
 whale.speed.serving_cache    — serving cache 消费 group
 ```
 
-## Pulsar 部署（environment-pending）
+## Pulsar 部署（MISSING_ENVIRONMENT）
 
-Pulsar 支持标记为 environment-pending，仅在 Pulsar 集群部署并安装 pulsar-client
+Pulsar 支持标记为 MISSING_ENVIRONMENT，仅在 Pulsar 集群部署并安装 pulsar-client
 Python 库后可用。
 
 ### 配置模板

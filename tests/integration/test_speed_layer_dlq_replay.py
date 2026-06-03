@@ -6,7 +6,7 @@
 - whale.message_pipeline.adapters.in_memory: InMemoryMessageBus, InMemoryDeadLetterSink
 - whale.speed_layer.writers: writers 的 DLQ 处理行为
 
-证据等级：L3 simulator（全内存闭环，DLQ/replay 语义覆盖）。
+测试阶段：模块集成期验证 (simulator)（全内存闭环，DLQ/replay 语义覆盖）。
 不能证明：真实 broker 的 DLQ topic、replay offset 管理和 fault tolerance。
 """
 

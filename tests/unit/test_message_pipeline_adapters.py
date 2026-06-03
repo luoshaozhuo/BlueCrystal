@@ -7,7 +7,7 @@
 - whale.message_pipeline.adapters.in_memory: InMemoryMessageBus,
   InMemoryDeadLetterSink, InMemorySchemaRegistry
 
-证据等级：L1 unit/mock（纯内存测试，fake 实现，不连接任何 broker）。
+所属生命周期阶段：开发期验证（纯内存测试，fake 实现，不连接任何 broker）。
 不能证明：真实 Kafka/Pulsar broker 的发布/消费/回放行为。
 """
 

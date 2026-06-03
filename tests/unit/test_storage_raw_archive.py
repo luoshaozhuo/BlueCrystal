@@ -7,7 +7,7 @@ InMemoryManifestRepository 的 manifest 记录/查询功能。
 - whale.storage.raw_archive: LocalCompressedArchiveSink, InMemoryManifestRepository,
   HdfsArchiveSinkAdapter, ObjectStorageArchiveSinkAdapter
 
-证据等级：L1 unit/mock（纯内存+本地文件测试）。
+测试阶段：开发期验证 (unit/mock)（纯内存+本地文件测试）。
 不能证明：HDFS/S3 真实存储的写入和查询行为。
 """
 
@@ -143,7 +143,7 @@ class TestS3RawArchiveSink:
             bucket="whale-raw",
         )
         result = await adapter.write("batch-001", [{"msg": "test"}])
-        # boto3 不可用时返回 0（environment-pending）
+        # boto3 不可用时返回 0（MISSING_ENVIRONMENT）
         assert result == 0
 
     def test_config_valid_with_endpoint_and_bucket(self) -> None:

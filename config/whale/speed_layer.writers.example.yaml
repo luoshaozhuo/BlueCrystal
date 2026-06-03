@@ -11,7 +11,7 @@ pipeline:
   # asyncio runner 并发 writer 数
   max_concurrent_writers: 4
 
-  # Flink 配置 (environment-pending)
+  # Flink 配置 (MISSING_ENVIRONMENT)
   # flink:
   #   job_name: "whale-speed-layer"
   #   parallelism: 1
@@ -28,7 +28,7 @@ checkpoint:
   file_path: "/data/whale/checkpoints"
   # Redis checkpoint 配置 (仅在 backend=redis 时使用)
   # redis_url: "redis://localhost:16379/1"
-  # Kafka checkpoint 配置 (仅在 backend=kafka 时使用，environment-pending)
+  # Kafka checkpoint 配置 (仅在 backend=kafka 时使用，MISSING_ENVIRONMENT)
   # kafka_bootstrap_servers: "localhost:9092"
   # kafka_topic: "whale.checkpoints"
   # checkpoint 间隔 (ms)
@@ -88,7 +88,7 @@ metrics:
   backend: "memory"
   # 指标收集间隔 (秒)
   collection_interval: 10
-  # Prometheus pushgateway 配置 (environment-pending)
+  # Prometheus pushgateway 配置 (MISSING_ENVIRONMENT)
   # pushgateway_url: "http://localhost:9091"
   # job_name: "whale-speed-layer"
 

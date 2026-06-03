@@ -1,7 +1,7 @@
 """dynamic runtime state 恢复测试。
 
 验证 state store 在进程重启后的状态恢复能力。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

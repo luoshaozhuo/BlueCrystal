@@ -11,7 +11,7 @@
 - whale.speed_layer.light_processor: EnvelopeValidator, MessageDeduplicator,
   QualityCodePassThrough, OutOfOrderGuard, LightProcessingPipeline
 
-证据等级：L1 unit/mock（纯内存测试，无外部依赖）。
+所属生命周期阶段：开发期验证（纯内存测试，无外部依赖）。
 不能证明：Redis-backed 去重器的分布式去重能力（memory LRU 仅证明单进程）。
 """
 

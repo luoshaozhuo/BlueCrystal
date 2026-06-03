@@ -5,7 +5,7 @@
 被验证对象：
 - whale.storage.raw_index: MemoryRawIndexSink, TdengineRawIndexSink
 
-证据等级：L1 unit/mock（纯内存测试 + contract adapter 配置校验）。
+测试阶段：开发期验证 (unit/mock)（纯内存测试 + contract adapter 配置校验）。
 不能证明：TDengine 真实写入和查询行为。
 """
 

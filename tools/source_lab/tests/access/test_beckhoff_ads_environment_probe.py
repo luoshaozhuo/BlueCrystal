@@ -1,6 +1,6 @@
 """Beckhoff ADS 环境探测测试。
 
-证据等级：L2 contract + environment-pending（当环境不满足时 skip）。
+测试阶段：开发期验证 (contract) + environment-pending（当环境不满足时 skip）。
 本测试验证 probe_dotnet_environment 的结构化输出正确性。
 当环境不满足时，明确声明缺失组件，不制造假通过。
 """

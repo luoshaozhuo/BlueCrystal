@@ -12,7 +12,7 @@ set -euo pipefail
 #   4. 缺失 runner 返回 unavailable（非静默成功）
 #   5. 错误消息包含 build/install hint
 #
-# 证据等级：L2 contract/stub（验证 runner_resolution 模块的路径解析契约）
+# 测试阶段：开发期验证（contract/stub）—— 验证 runner_resolution 模块的路径解析契约。
 # 不要求本轮真实打包完整 artifact。
 # ============================================================================
 
@@ -163,7 +163,7 @@ if errors:
 
 print()
 print("=== ALL VALIDATIONS PASSED ===")
-print("Evidence level: L2 contract/stub")
+print("测试阶段：开发期验证（contract/stub）")
 print("Production runner path resolution works correctly under:")
 print("  - PRODUCTION_RUNNER_DIR env var priority")
 print("  - PATH discovery")
@@ -176,7 +176,7 @@ print("  - Dev fallback marked as non-production")
 # ── 执行 ──────────────────────────────────────────────────────────────────────
 
 echo "=== shared_source production runner artifact validation ==="
-echo "Evidence level: L2 contract/stub (validates runner_resolution module contracts)."
+echo "测试阶段：开发期验证（contract/stub）—— validates runner_resolution module contracts."
 echo "This script does NOT verify actual compiled native binaries — it validates"
 echo "the path resolution logic, which is the prerequisite for artifact delivery."
 echo ""

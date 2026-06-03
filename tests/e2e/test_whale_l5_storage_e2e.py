@@ -9,7 +9,7 @@
   quality_code/source_id/device_id/node_key/timestamp/value 完整字段 readback。
 - Redis serving_cache: 真实 SET/GET/TTL、stale 检测、乱序时间戳保护。
 
-所有测试在对应外部服务不可用时自动 skip (environment-pending: <服务名> 不可达)。
+所有测试在对应外部服务不可用时自动 skip (MISSING_ENVIRONMENT: <服务名> 不可达)。
 不得使用 InMemory、mock、fake、contract-only 作为 L5 E2E 测试。
 
 被验证对象：
@@ -18,9 +18,9 @@
 - whale.storage.standardized: TdengineStandardizedSink
 - whale.storage.serving_cache: RedisServingCache
 
-证据等级：L5 e2e/field（真实外部存储后端）。
+测试阶段：准生产依赖验证期 (e2e/field)（真实外部存储后端）。
 环境依赖：Kafka (9092)，Redis (16379)，MinIO/S3 (9000)，TDengine (6041)。
-不能证明：存储层在无外部依赖环境下的行为（由 L1/L4 测试覆盖）。
+不能证明：存储层在无外部依赖环境下的行为（由开发期验证、跨模块联调期验证覆盖）。
 """
 
 from __future__ import annotations

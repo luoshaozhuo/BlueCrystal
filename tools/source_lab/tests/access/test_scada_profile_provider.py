@@ -1,6 +1,6 @@
 """SCADA sample DB provider 测试。
 
-证据等级：L4 integration。
+测试阶段：跨模块联调期验证 (integration)。
 本测试通过真实 shared persistence sample SQLite 初始化，再由
 `ScadaProfileProvider` 读取 16 组协议服务样例并转换为 source_lab 模型。
 它证明 source_lab 已开始真实消费 shared persistence 输入基线，但不证明

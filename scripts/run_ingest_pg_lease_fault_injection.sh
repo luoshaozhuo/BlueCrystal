@@ -15,9 +15,9 @@ set -euo pipefail
 #   1. docker compose 模式：docker 和 docker compose 可用
 #   2. PG DSN 模式：设置 WHALE_INGEST_TEST_PG_DSN 指向已有 PostgreSQL
 #
-# 证据等级：
-#   - 具备 PostgreSQL 时为 L4 integration
-#   - 仅有 SQLite 时为 L3 simulator（单进程模拟多节点）
+# 测试阶段：
+#   - 具备 PostgreSQL 时为跨模块联调期验证
+#   - 仅有 SQLite 时为模块集成期验证（单进程模拟多节点）
 #   - 环境缺失时为 environment-pending（对应测试正确 skip）
 #
 # 重要：如果环境不可用，脚本保留 skip，不得标 passed。

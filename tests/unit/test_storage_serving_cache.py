@@ -6,7 +6,7 @@
 被验证对象：
 - whale.storage.serving_cache: RedisServingCache
 
-证据等级：L1 unit/mock（使用 unittest.mock 隔离 redis 依赖）。
+测试阶段：开发期验证 (unit/mock)（使用 unittest.mock 隔离 redis 依赖）。
 redis-py 是核心依赖，在 CI 环境可用，但此处用 mock 保证纯单元级隔离。
 """
 

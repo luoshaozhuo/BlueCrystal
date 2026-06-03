@@ -7,7 +7,7 @@
 4. platform_shared 不依赖 whale/turtle/octopus/dolphin/orca/manta。
 5. whale/turtle/octopus 可正常 import platform_shared。
 
-证据等级：L1 unit/mock —— AST 扫描 + 运行时 import 检查。
+测试阶段：开发期验证 (unit/mock) —— AST 扫描 + 运行时 import 检查。
 不能证明：迁移后生产行为正确性、外部消费者已更新。
 """
 

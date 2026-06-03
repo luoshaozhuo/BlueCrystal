@@ -1,5 +1,56 @@
 # source_lab Test Audit
 
+> 最后更新：2026-06-03（Round 2 治理，添加生命周期术语对齐说明）
+> 状态：本文档内容由历史审计积累而成。文件级审计表在 Round 2 中未全量重写，
+> 仅添加生命周期术语对齐说明和边界声明。部分条目仍使用旧 `L1-L4` 证据等级术语，
+> 建议第 3 轮治理时统一迁移。
+
+## 生命周期术语对齐
+
+本文件在历史 rounds 中使用了 `L1 (unit/mock)`、`L2 (contract/stub)`、`L3 (simulator)`、
+`L4 (integration)`、`L4+` 等证据等级术语。这些术语已迁移为 ``ai_shared/rules/testing.md``
+定义的七个生命周期阶段。
+
+旧术语与生命周期阶段的对应关系（仅用于理解本文件中的历史表述）：
+
+| 历史证据等级 | 当前生命周期阶段 | 说明 |
+|---|---|---|
+| L1 (unit/mock) | 开发期验证 | mock/fake/stub，无外部依赖 |
+| L2 (contract/stub) | 开发期验证 | 接口契约验证，stub 闭环 |
+| L3 (simulator) | 模块集成期验证 | subprocess simulator 或 in-memory 全链路 |
+| L4 (integration) | 跨模块联调期验证 或 准生产依赖验证期 | docker-compose 或 real external services |
+| environment-pending | NOT_RUN: MISSING_ENVIRONMENT | 标记环境不满足时的跳过 |
+
+**注意**：上述对应关系是近似的。部分文件中的 L4 可能对应模块集成期（SQLite/TestClient），
+也可能对应准生产依赖验证期（真实 Kafka/PG/Redis）。以 `ai_shared/memory/test_index.md`
+和测试文件头的当前说明为准。
+
+## source_lab 测试边界
+
+source_lab 测试只证明 source_lab **工具自身** 的行为（parser、metrics、reporter、
+runner、factory、CLI、facade、simulator、native runner 协议）。
+不证明 Whale 主平台的生产链路行为。
+
+如果 source_lab 变更影响 ``src/whale/shared/source/`` 或 ``src/whale/ingest/``，
+需在 Whale 侧额外验证。扩跑条件见 ``tools/source_lab/tests/README.md`` 和
+``ai_shared/memory/test_index.md`` 第 6 节。
+
+## 测试结果术语
+
+本审计文件的后续审计工作使用 PASS / FAIL / NOT_RUN 三元结果，不再使用 ``pending``、
+``skipped`` 或 ``env-pending`` 作为测试执行结果。pytest skip/xfail 在报告中转写为 NOT_RUN。
+
+## 第 3 轮治理建议
+
+以下项建议在第 3 轮处理：
+
+1. 审计表中 ``L1``-``L4`` 术语统一替换为生命周期阶段名称。
+2. ``env-pending`` 标记统一转写为 ``NOT_RUN: MISSING_ENVIRONMENT``。
+3. 清理或标注不再维持的测试文件（如 ``test_field_subscribe_cli.py`` 已删除的记录）。
+4. 补充 `keep/rewritten/strengthened/new/deleted` 等 Action 字段与当前文件真实状态的一致性校验。
+
+## 文件级审计表
+
 | Test file | Status | Action | Reason | Coverage |
 | --- | --- | --- | --- | --- |
 | tools/source_lab/tests/test_factory.py | keep | keep | Directly validates simulator factory protocol dispatch path. | tools/source_lab/factory.py protocol normalization and build selection. |

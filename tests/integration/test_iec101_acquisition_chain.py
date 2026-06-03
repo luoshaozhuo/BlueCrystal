@@ -1,7 +1,7 @@
 """IEC 101 全链路采集集成测试。
 
 被验证对象：IEC 101 shared_source backend + ingest adapter 全链路。
-证据等级：L3 simulator — 使用 mock Iec101SerialBackend 模拟串口响应。
+测试阶段：模块集成期验证 (simulator) — 使用 mock Iec101SerialBackend 模拟串口响应。
 不能证明：真实 RS-232 串口设备通信、IEC 101 设备互操作性、interrogation 时序。
 
 Mock 策略：
@@ -10,8 +10,8 @@ Mock 策略：
 - adapter -> reader -> backend 的三层调用链完整；
 - E2E 边界：mock serial backend -> reader -> ingest adapter -> AcquiredNodeStateBatch。
 
-环境说明：无真实串口设备时，本测试提供 L3 simulator 级别覆盖。
-L4 integration（真实串口）标记为 environment-pending。
+环境说明：无真实串口设备时，本测试提供模块集成期验证 (simulator) 级别覆盖。
+跨模块联调期验证（真实串口）标记为 MISSING_ENVIRONMENT。
 """
 from __future__ import annotations
 

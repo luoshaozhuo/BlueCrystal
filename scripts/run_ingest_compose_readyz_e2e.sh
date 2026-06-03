@@ -12,8 +12,8 @@ set -euo pipefail
 #   - 验证 required failure -> not-ready、optional failure -> degraded
 #   - 验证敏感信息脱敏
 #
-# 证据等级：
-#   - Docker 可用且所有依赖启动时：L4 integration
+# 测试阶段：
+#   - Docker 可用且所有依赖启动时：跨模块联调期验证
 #   - Docker 不可用时：environment-pending（测试 correctly skipped）
 #
 # 重要：如果 Docker 环境不可用，脚本保留 skip/pending 状态，不得标 passed。

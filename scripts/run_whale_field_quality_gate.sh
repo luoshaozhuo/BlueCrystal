@@ -11,7 +11,7 @@
 #   - e2e smoke
 #   汇总输出 PASS/FAIL/ENVIRONMENT_PENDING
 #
-# 证据等级: L1 (syntax/type) + L2 (lint/contract) + L3 (unit/integration) + L4 (e2e)
+# 测试阶段：构建期验证（语法/类型检查） + 开发期验证（lint/contract/单元测试） + 跨模块联调期验证（E2E smoke）
 # 环境依赖: Python 3.11+
 # =============================================================================
 
@@ -27,7 +27,7 @@ NC='\033[0m'
 # ---- 默认值 ----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OUTPUT_DIR="${REPO_ROOT}/ai_shared/field_readback"
+OUTPUT_DIR="${REPO_ROOT}/ai_shared/reports"
 FAIL_FAST="${FAIL_FAST:-false}"  # 默认不 fail-fast，跑全量
 declare -A RESULTS
 declare -a GATE_ORDER=(

@@ -1,7 +1,7 @@
 """dynamic CLI accepted_state 子命令测试。
 
 验证 endpoint 的 accepted state 查询/修改 CLI 行为。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

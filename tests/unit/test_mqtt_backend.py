@@ -1,7 +1,7 @@
 """MQTT client backend 单元测试。
 
 被验证对象：``whale.shared.source.mqtt.client.MqttClientBackend``。
-证据等级：L1 unit/mock — 使用 asyncio mock stream 模拟 MQTT broker 通信。
+测试阶段：开发期验证 (unit/mock) — 使用 asyncio mock stream 模拟 MQTT broker 通信。
 不能证明：真实 broker 连接行为、网络故障恢复、大规模消息吞吐。
 """
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """GOOSE/SV dynamic endpoint 权限门禁测试。
 
 验证 L2 权限检查（CAP_NET_RAW、interface 可用性）的准入逻辑。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

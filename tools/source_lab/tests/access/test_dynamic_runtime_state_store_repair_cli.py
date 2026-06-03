@@ -1,7 +1,7 @@
 """state store repair CLI 测试。
 
 验证 state store 修复命令的功能和行为。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

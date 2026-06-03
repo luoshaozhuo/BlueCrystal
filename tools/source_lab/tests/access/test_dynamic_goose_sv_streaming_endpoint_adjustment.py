@@ -1,7 +1,7 @@
 """GOOSE/SV streaming endpoint 动态调整测试。
 
 验证 GOOSE/SV endpoint 在 runtime 的创建、修改和移除行为。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

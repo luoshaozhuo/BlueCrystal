@@ -5,14 +5,14 @@
 - speed_layer pipeline 通过 Kafka consumer group 消费。
 - offset commit 和 consumer group 独立性验证。
 
-所有测试在 Kafka 不可用时自动 skip (environment-pending)。
+所有测试在 Kafka 不可用时自动 skip (MISSING_ENVIRONMENT)。
 
 被验证对象：
 - whale.message_pipeline.adapters.kafka: KafkaSourceAdapter, KafkaSinkAdapter
 - whale.speed_layer.writers: RawArchiveWriter, RawIndexWriter, StandardizedWriter, ServingCacheUpdater
 - whale.speed_layer.runner: SpeedLayerWiring
 
-证据等级：L5 e2e/field（真实 Kafka broker + 真实存储后端）。
+测试阶段：准生产依赖验证期 (e2e/field)（真实 Kafka broker + 真实存储后端）。
 环境依赖：Kafka broker (localhost:9092)，Redis (localhost:16379)，
           MinIO (localhost:9000)，TDengine (localhost:6041)。
 不能证明：无 Kafka 环境下的链路行为（需独立 L4 InMemory 测试覆盖）。

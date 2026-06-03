@@ -6,7 +6,7 @@
 被验证对象：
 - whale.message_pipeline.adapters.in_memory: 全部 InMemory 实现
 
-证据等级：L3 simulator（内存模拟，E2E 流程覆盖）。
+测试阶段：模块集成期验证 (simulator)（内存模拟，E2E 流程覆盖）。
 不能证明：真实 Kafka/Pulsar broker 的网络通信、分区分配和 offset 管理。
 """
 

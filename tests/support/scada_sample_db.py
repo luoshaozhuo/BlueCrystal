@@ -1,9 +1,9 @@
 """shared persistence SCADA sample DB 测试辅助函数。
 
-证据等级：
-- SQLite 路径只提供 L4 lightweight/integration 级隔离样例库，方便 source_lab
+测试阶段：
+- SQLite 路径只提供跨模块联调期验证 级隔离样例库，方便 source_lab
   本地测试真实消费统一输入契约。
-- PostgreSQL 路径提供本轮最终验收所需的 L4 integration 临时测试库；它会显式
+- PostgreSQL 路径提供本轮最终验收所需的跨模块联调期验证 临时测试库；它会显式
   创建带安全标识的临时数据库，并在测试结束后清理，避免误连默认库。
 
 本文件不证明真实协议 runtime、simulator 或现场设备连通性。

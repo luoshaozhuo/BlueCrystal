@@ -1,7 +1,7 @@
 """HTTP REST client backend 单元测试。
 
 被验证对象：``whale.shared.source.http_rest.client.HttpRestClientBackend``。
-证据等级：L1 unit/mock — 使用 asyncio mock stream 模拟 HTTP 服务器通信。
+测试阶段：开发期验证 (unit/mock) — 使用 asyncio mock stream 模拟 HTTP 服务器通信。
 不能证明：真实 HTTP 服务器连接、TLS/HTTPS 握手、大规模并发。
 """
 from __future__ import annotations

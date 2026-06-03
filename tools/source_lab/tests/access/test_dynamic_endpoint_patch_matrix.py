@@ -1,7 +1,7 @@
 """dynamic endpoint PATCH 操作矩阵测试。
 
 验证 endpoint 各属性组合的 PATCH 请求结果。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

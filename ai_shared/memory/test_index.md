@@ -2,6 +2,8 @@
 
 本文件是 Whale 项目唯一测试索引。不另建其他回归索引文件（如 `issue_regression_index.md`）。
 
+> 最后更新: 2026-06-04 (Round 2 收口: "不能证明什么"表补充完成、环境状态术语对齐、MISSING_ENVIRONMENT 统一)
+
 初版为目录级完整、关键链路文件级。不追求全仓逐文件穷尽。
 
 ## 1. 文件定位
@@ -22,6 +24,27 @@
 | 准生产依赖验证期 | 验证真实外部依赖下的系统行为 | `l5` | 需 Kafka/PG/Redis/S3/TDengine 的测试 |
 | 部署前验收期 | 验证部署配置、环境预检、最小数据链路 | `e2e`、`smoke` | `tests/e2e/test_whale_field_*.py`、部署脚本 |
 | 发布后运维验证期 | 生产环境运行时状态、健康检查、故障恢复 | 非 pytest | 运维脚本、监控 probe |
+
+### 2.1 各阶段测试不能证明什么
+
+测试通过不等于下级验证通过。各阶段测试只能证明本阶段覆盖的行为：
+
+| 阶段 | 能证明什么 | 不能证明什么 |
+|------|-----------|-------------|
+| 开发期验证 | 本地逻辑、接口约束、mock/fake/stub 行为正确 | 真实外部依赖行为、模块间协作、真实协议交互 |
+| 构建期验证 | 代码可编译/导入/静态检查通过 | 运行时行为、跨模块依赖、外部服务交互 |
+| 模块集成期验证 (simulator) | 模块内组件协作、simulator-backed 链路 | 真实外部服务行为、多模块间完整数据流 |
+| 跨模块联调期验证 (docker-compose) | 容器化环境下的跨模块数据流和契约 | 真实生产环境行为、硬件设备行为、长期稳定性 |
+| 准生产依赖验证期 (真实服务) | 真实 Kafka/PG/Redis/S3/TDengine 行为 | 现场部署行为、硬件设备行为、7x24 长稳、性能极限 |
+| 部署前验收期 | 部署配置、环境预检、最小数据链路 | 生产负载行为、故障恢复全场景、性能容量 |
+| 发布后运维验证期 | 运行时健康状态、故障恢复路径 | 未发生的故障场景、极端负载、容量上限 |
+
+**关键边界说明**：
+- source_lab 工具测试（`tools/source_lab/tests/`）只证明 source_lab 工具自身行为，不证明 Whale 主平台生产链路。source_lab 测试通过不得自动等同于 Whale 生产链路通过。
+- simulator/fake/mock/stub 测试通过不等于真实设备/服务行为验证通过。
+- 单模块测试通过不等于跨模块全链路通过。
+- 短期跑通不等于长期稳定运行。
+- contract-only adapter 测试通过不等于真实环境下该 adapter 可用。
 
 ## 3. 测试资产索引
 
@@ -115,6 +138,10 @@
 | `tests/unit/shared/persistence/test_scada_sample_data_protocol_coverage.py` | SCADA 样例数据协议覆盖 | 无 | 无 |
 | `tests/unit/shared/persistence/test_scada_protocol_views.py` | SCADA 协议视图 | 无 | 无 |
 
+> l5 marker 说明：`l5` 是历史技术标签，当前语义等同于“准生产依赖验证期”。
+> 后续可逐步新增 `external` 或 `prodlike` 作为新 marker（见 pyproject.toml），
+> 旧测试不需要迁移。l5 marker 含义在 test_index.md 中可追溯，不扩大使用。
+
 #### 模块集成期验证 (integration)
 
 | 测试文件 | 测试对象 | 外部依赖 | NOT_RUN 条件 |
@@ -150,6 +177,38 @@
 | `tests/integration/test_mqtt_acquisition_chain.py` | MQTT 全链路采集 | mock MQTT | 无 |
 | `tests/integration/test_modbus_rtu_acquisition_chain.py` | Modbus RTU 全链路 | mock subprocess | 无 |
 | `tests/integration/test_iec101_acquisition_chain.py` | IEC101 全链路 | mock subprocess | 无 |
+| `tests/integration/test_framework_db_init.py` | 框架 DB 初始化 | SQLite | MISSING_DEPENDENCY (depends on shared/persistence init) |
+| `tests/integration/test_ingest_audit_matrix_api_bundle_scheduler_write.py` | 审计矩阵 API/bundle/scheduler | SQLite/TestClient | 无 |
+| `tests/integration/test_ingest_cache_to_kafka_pipeline.py` | 缓存到 Kafka 发布 | SQLite/TestClient | 无 |
+| `tests/integration/test_ingest_dual_node_db_lease_e2e.py` | 双节点 DB lease E2E | SQLite | 无 |
+| `tests/integration/test_ingest_external_access_policy_contract.py` | 外部授权合同 | SQLite/TestClient | 无 |
+| `tests/integration/test_ingest_external_audit_sink_contract.py` | 外部审计 sink 合同 | SQLite/TestClient | 无 |
+| `tests/integration/test_ingest_iec104_source_write.py` | IEC104 写入 | mock subprocess | 无 |
+| `tests/integration/test_ingest_iec61850_mms_source_write.py` | IEC61850 MMS 写入 | mock subprocess | 无 |
+| `tests/integration/test_ingest_iec61850_report_subscription.py` | IEC61850 Report 订阅 | mock subprocess | 无 |
+| `tests/integration/test_ingest_lightweight_load_gate.py` | 轻量加载门禁 | SQLite/TestClient | 无 |
+| `tests/integration/test_ingest_modbus_source_write.py` | Modbus TCP 写入 | mock subprocess | 无 |
+| `tests/integration/test_ingest_observability_sink_smoke.py` | 观测 sink 烟测 | SQLite/临时文件 | 无 |
+| `tests/integration/test_ingest_opcua_source_write.py` | OPC UA 写入 | mock | 无 |
+| `tests/integration/test_ingest_polling_retry_to_redis.py` | 轮询重试到 Redis | SQLite/mock Redis | 无 |
+| `tests/integration/test_ingest_runtime_alembic_postgres_matrix.py` | Alembic PostgreSQL 矩阵 | PostgreSQL (可选) | MISSING_ENVIRONMENT (需 PG DSN 环境变量) |
+| `tests/integration/test_ingest_runtime_alembic_sqlite_matrix.py` | Alembic SQLite 矩阵 | SQLite | 无 |
+| `tests/integration/test_ingest_runtime_migrate_entrypoint.py` | migrate 入口 | SQLite | 无 |
+| `tests/integration/test_ingest_scheduler_dual_active_partitioned.py` | 调度器双活分区 | SQLite | 无 |
+| `tests/integration/test_ingest_scheduler_missed_tick_and_stagger.py` | missed tick 与错峰 | SQLite | 无 |
+| `tests/integration/test_ingest_security_partition_bundle_flow.py` | Bundle 单向流 | SQLite | 无 |
+| `tests/integration/test_ingest_security_partition_smoke.py` | 安全分区烟测 | SQLite | 无 |
+| `tests/integration/test_ingest_subscription_strategy.py` | 订阅策略 | SQLite/mock | 无 |
+| `tests/integration/test_ingest_worker_runtime_executes_usecase_handlers.py` | WorkerRuntime usecase handler | SQLite | 无 |
+| `tests/integration/test_ingest_worker_runtime_handler_failure.py` | WorkerRuntime handler 失败 | SQLite | 无 |
+| `tests/integration/test_ingest_worker_runtime_shutdown_inflight.py` | WorkerRuntime shutdown inflight | SQLite | 无 |
+| `tests/integration/test_ingest_write_lease_fencing_e2e.py` | 写入租约 fencing E2E | SQLite | 无 |
+| `tests/integration/test_redis_state_cache_faults.py` | Redis 缓存容错 | mock Redis | 无 |
+| `tests/integration/test_shared_persistence_sample_data_init.py` | 样例初始化 | PostgreSQL (可选) | MISSING_ENVIRONMENT (需 PG DSN) |
+| `tests/integration/test_source_lab_beckhoff_ads_runtime.py` | Beckhoff ADS in_process 集成 | dotnet + AdsLib | MISSING_DEPENDENCY (需 dotnet runtime) |
+| `tests/integration/test_source_lab_scada_profile.py` | source_lab SCADA sample DB | SQLite | 无 |
+| `tests/integration/test_source_lab_scada_profile_postgres.py` | source_lab PostgreSQL SCADA | PostgreSQL (可选) | MISSING_ENVIRONMENT (需 PG DSN) |
+| `tests/integration/test_sqlite_config_init.py` | SQLite 配置初始化 | SQLite | 无 |
 
 #### 跨模块联调期验证 (integration/e2e + docker-compose)
 
@@ -166,6 +225,16 @@
 | `tests/integration/test_ingest_source_acquisition_to_redis.py` | 采集到 Redis | docker-compose | MISSING_ENVIRONMENT |
 | `tests/integration/test_ingest_source_cache_message_e2e.py` | 源缓存消息 E2E | docker-compose | MISSING_ENVIRONMENT |
 | `tests/integration/test_message_pipeline_kafka_e2e.py` | Kafka message_pipeline E2E | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_access_policy.py` | prodlike 访问策略 | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_audit_sink.py` | prodlike 审计 sink | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_audit_metrics_resilience.py` | 审计指标韧性 | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_endurance_smoke.py` | prodlike endurance 烟测 | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_kafka_fault_injection.py` | Kafka 故障注入恢复 | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_performance_profile.py` | 性能基线 | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_postgres_fault_injection.py` | PostgreSQL 故障注入恢复 | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_redis_fault_injection.py` | Redis 故障注入恢复 | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_prodlike_scheduler_backpressure.py` | 调度背压与 missed tick | docker-compose | MISSING_ENVIRONMENT |
+| `tests/integration/test_ingest_source_cache_message_kafka_e2e.py` | 源缓存 Kafka 消息 E2E | docker-compose | MISSING_ENVIRONMENT |
 
 #### 准生产依赖验证期 (l5 marker)
 
@@ -184,16 +253,36 @@
 
 ### 3.2 source_lab 工具测试 (tools/source_lab/tests/)
 
-source_lab 变更只触发 source_lab 生命周期验证。详细测试资产索引见 `tools/source_lab/tests/TEST_AUDIT.md`。
+source_lab 变更只触发 source_lab 生命周期验证。这些测试只证明 source_lab 工具自身行为，
+不证明 Whale 主平台生产链路。测试资产按生命周期阶段组织。
 
-| 目录/文件 | 生命周期阶段 | 说明 |
-|----------|------------|------|
-| `tools/source_lab/tests/access/` | 开发期验证 | access 层 parser/metrics/reporter/runner 单测 |
-| `tools/source_lab/tests/test_factory.py` | 开发期验证 | 工厂协议调度验证 |
-| `tools/source_lab/tests/test_fleet_*.py` | 开发期验证 | 机群控制验证 |
-| `tools/source_lab/tests/test_open62541_source_simulation_single_server_smoke.py` | 模块集成期验证 | native 单服务器 smoke |
-| `tools/source_lab/tests/test_source_simulation_multi_server_*.py` | 模块集成期验证 | 多服务器容量/画像 (通过 CLI subprocess) |
-| `tools/source_lab/tests/access/test_beckhoff_ads_real_protocol_readback.py` | 准生产依赖验证期 | 需 dotnet + AdsServer + AdsLib runner |
+| 测试文件 | 阶段 | 测试对象 | 外部依赖 | NOT_RUN 条件 |
+|---------|------|---------|---------|------------|
+| `tools/source_lab/tests/test_factory.py` | 开发期验证 | 工厂协议调度 | 无 | 无 |
+| `tools/source_lab/tests/test_fleet_startup_controls.py` | 开发期验证 | 机群启动控制 | 无 | 无 |
+| `tools/source_lab/tests/test_fleet_partial_lifecycle.py` | 开发期验证 | fleet 部分生命周期 | 无 | 无 |
+| `tools/source_lab/tests/test_open62541_source_simulation_single_server_smoke.py` | 模块集成期验证 | native 单服务器 smoke | C native 二进制 | MISSING_DEPENDENCY (无 open62541 runner) |
+| `tools/source_lab/tests/test_source_simulation_multi_server_polling_capacity.py` | 模块集成期验证 | 多服务器轮询容量 (CLI subprocess) | C native 二进制 | MISSING_DEPENDENCY |
+| `tools/source_lab/tests/test_source_simulation_multi_server_polling_profile.py` | 模块集成期验证 | 多服务器轮询画像 (CLI subprocess) | C native 二进制 | MISSING_DEPENDENCY |
+| `tools/source_lab/tests/test_source_simulation_multi_server_subscribe_capacity.py` | 模块集成期验证 | 多服务器订阅容量 (CLI subprocess) | C native 二进制 | MISSING_DEPENDENCY |
+| `tools/source_lab/tests/test_source_simulation_multi_server_subscribe_profile.py` | 模块集成期验证 | 多服务器订阅画像 (CLI subprocess) | C native 二进制 | MISSING_DEPENDENCY |
+| `tools/source_lab/tests/access/test_beckhoff_ads_real_protocol_readback.py` | 准生产依赖验证期 | Beckhoff ADS 真实协议 readback | dotnet + AdsServer + AdsLib | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_beckhoff_ads_dotnet_virtual_server.py` | 准生产依赖验证期 | ADS .NET virtual server | dotnet + AdsLib | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_beckhoff_ads_environment_probe.py` | 准生产依赖验证期 | ADS 环境探测 | dotnet + ADS Server | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_beckhoff_ads_native_preflight.py` | 准生产依赖验证期 | ADS AdsLib native 预检 | AdsLib | MISSING_DEPENDENCY |
+| `tools/source_lab/tests/access/test_iec104_production_capacity_profile_gate.py` | 准生产依赖验证期 | IEC104 capacity/profile 门禁 | IEC104 设备或模拟器 | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_iec61850_production_capacity_profile_gate.py` | 准生产依赖验证期 | IEC61850 capacity/profile 门禁 | IEC61850 设备或模拟器 | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_iec61850_report_capacity_profile_gate.py` | 准生产依赖验证期 | IEC61850 Report 门禁 | IEC61850 设备 | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_modbus_tcp_production_capacity_profile_gate.py` | 准生产依赖验证期 | Modbus TCP capacity/profile 门禁 | Modbus 设备 | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_protocol_production_readiness_gate.py` | 准生产依赖验证期 | 协议生产准入门禁 | 多协议设备 | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_source_lab_final_protocol_matrix.py` | 准生产依赖验证期 | 最终协议矩阵门禁 | 全协议真实环境 | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_server_simulator_facade_real_protocol_smoke.py` | 跨模块联调期验证 | 真实协议 smoke | C native 二进制 | MISSING_DEPENDENCY |
+| `tools/source_lab/tests/access/test_iec61850_goose_sv_streaming_e2e.py` | 跨模块联调期验证 | GOOSE/SV 流式 E2E | L2 veth 环境 | MISSING_ENVIRONMENT |
+| `tools/source_lab/tests/access/test_native_runners_availability.py` | 构建期验证 | Native 运行器可用性 | C native 二进制 | MISSING_DEPENDENCY |
+
+source_lab tests/access/ 目录下的其余开发期验证测试（parser、metrics、reporter、runner、
+CLI 参数解析、facade 契约、结构检查等）详情见 `tools/source_lab/tests/TEST_AUDIT.md`。
+这些测试不依赖外部服务，在 CI 中可直接执行。
 
 ## 4. 回归测试索引
 
@@ -237,6 +326,11 @@ source_lab 变更只触发 source_lab 生命周期验证。详细测试资产索
 | module regression | 模块内所有测试 | 修改 public interface/schema/config/protocol 时 | 模块 unit+integration |
 | chain regression | 上下游链路测试 | 跨模块影响时 | 上下游模块的集成测试 |
 | release regression | 发布前全量回归 | 发布前 | 全部 ACTIVE 状态回归测试 + module regression |
+
+> release-regression 是回归套件组合，不是独立的生命周期阶段。它从各生命周期阶段
+> （开发期验证、模块集成期验证、跨模块联调期验证、准生产依赖验证期、部署前验收期）
+> 中选取 ACTIVE 状态的回归测试组合而成。执行时机为发布前，典型范围包括全部
+> ACTIVE 回归测试和模块级回归。
 
 ### 套件执行命令参考
 

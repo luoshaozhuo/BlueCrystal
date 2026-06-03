@@ -1,7 +1,7 @@
 """dynamic runtime state store 完整性测试。
 
 验证 state store 数据的完整性、一致性和原子写入。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

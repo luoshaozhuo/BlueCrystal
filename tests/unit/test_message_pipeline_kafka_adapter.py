@@ -6,7 +6,7 @@
 被验证对象：
 - whale.message_pipeline.adapters.kafka: KafkaSourceAdapter, KafkaSinkAdapter
 
-证据等级：L2 contract/stub（contract adapter 配置校验，不连接真实 broker）。
+测试阶段：开发期验证 (contract/stub)（contract adapter 配置校验，不连接真实 broker）。
 不能证明：真实 Kafka broker 的发布/消费/offset 管理行为。
 """
 

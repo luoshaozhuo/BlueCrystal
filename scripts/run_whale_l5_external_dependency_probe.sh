@@ -24,7 +24,7 @@
 #   bash scripts/run_whale_l5_external_dependency_probe.sh
 #   bash scripts/run_whale_l5_external_dependency_probe.sh --json  # JSON 输出
 #
-# 证据等级: L5 (external dependency multi-level availability probe)
+# 测试阶段：准生产依赖验证期（外部依赖多级可用性探针）
 # 环境依赖: 无（纯连接性+driver探测，所有外部服务不可达时降级为 environment-pending）
 #
 # Round 3 变更:

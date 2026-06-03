@@ -1,7 +1,7 @@
 """MQTT 采集适配器单元测试。
 
 被验证对象：``whale.ingest.adapters.source.mqtt_source_acquisition_adapter.MqttSourceAcquisitionAdapter``。
-证据等级：L1 unit/mock — 使用 mock MqttClientBackend 模拟 MQTT broker。
+测试阶段：开发期验证 (unit/mock) — 使用 mock MqttClientBackend 模拟 MQTT broker。
 不能证明：真实 broker 连接、网络故障恢复。
 
 依赖：

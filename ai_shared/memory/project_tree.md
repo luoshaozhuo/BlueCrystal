@@ -1,7 +1,7 @@
 # Whale 项目目录树
 
 > 能源数据统一平台（风光储电场数据接入底座）
-> 最后更新: 2026-06-03 (增量更新: 新增 test_index.md/whale_test.sh，更新 5 个规则文件职责说明)
+> 最后更新: 2026-06-04 (Round 2 收口: deploy/config 全量术语迁至生命周期阶段+MISSING_ENVIRONMENT、test_l5 8 处 L4 修正、test_index 2.1"不能证明什么"表、报告归档 code_reality_docstring_audit_round2_report.md)
 
 本文件维护完整文件级目录树，每个 item 附简短职责注释（不超过 40 中文字符）。
 只用于导航，不替代读取当前源码。
@@ -15,7 +15,7 @@
 ├── README.md                        — 项目简介与快速开始
 ├── Dockerfile                       — ingest统一runtime镜像
 ├── alembic.ini                      — Alembic 主配置
-├── pyproject.toml                   — 项目元数据、依赖与 ruff/mypy/pytest 工具配置（含 pythonpath=["src"]、l5 + environment_pending markers）
+├── pyproject.toml                   — 项目元数据、依赖与 ruff/mypy/pytest 工具配置（含 unit/smoke/integration/e2e/l5/external/prodlike/environment_pending/load/stress/slow/requires_raw_socket/requires_cap_net_raw/requires_root_or_cap_net_raw 共 14 个 markers）
 ├── requirements.txt                 — Python 依赖声明
 ├── alembic/                         — ingest运行库迁移
 │   ├── env.py                       — Alembic 环境配置
@@ -40,7 +40,7 @@
 │   │   ├── endurance.prodlike.yaml
 │   │   ├── performance.prodlike.yaml
 │   │   └── security_partition.example.yaml
-│   └── whale/                       — Whale 现场部署配置模板（6 文件，使用环境变量占位符）
+│   └── whale/                       — Whale 现场部署配置模板（6 文件，"准生产依赖验证期 状态"注释，MISSING_ENVIRONMENT 标记）
 │       ├── message_pipeline.kafka.example.yaml
 │       ├── message_pipeline.pulsar.example.yaml
 │       ├── speed_layer.writers.example.yaml
@@ -55,11 +55,11 @@
 ├── docs/                            — 项目文档
 ├── scripts/                         — 运维与开发脚本
 ├── deploy/                          — Whale/Turtle/Octopus 部署配置
-│   ├── whale/README.md              — Whale 现场部署说明（含环境准备/配置/一键预检/各层启动/故障恢复/安全分区）
+│   ├── whale/README.md              — Whale 现场部署说明（含环境准备/配置/一键预检/各层启动/故障恢复/安全分区，MISSING_ENVIRONMENT 标记）
 │   ├── whale/ingest/README.md       — Whale Ingest 现场部署说明
-│   ├── whale/message_pipeline/README.md — Whale Message Pipeline 现场部署说明
-│   ├── whale/speed_layer/README.md  — Whale Speed Layer 现场部署说明
-│   ├── whale/storage/README.md      — Whale Storage 现场部署说明
+│   ├── whale/message_pipeline/README.md — Whale Message Pipeline 现场部署说明（Kafka 准生产依赖验证期验证通过，Pulsar MISSING_ENVIRONMENT）
+│   ├── whale/speed_layer/README.md  — Whale Speed Layer 现场部署说明（InMemory 生产就绪，Flink MISSING_ENVIRONMENT）
+│   ├── whale/storage/README.md      — Whale Storage 现场部署说明（TDengine/S3/Redis 准生产依赖验证期验证通过，HDFS MISSING_ENVIRONMENT）
 │   ├── turtle/README.md             — Turtle 部署说明
 │   └── octopus/README.md            — Octopus 部署说明
 ├── .claude/                         — Claude Code 配置与技能
@@ -274,16 +274,16 @@ src/whale/
 │   ├── mart.py                       — MartSinkPort/InMemoryMartSink（端口+stub）
 │   └── serving_cache.py              — RedisServingCache (redis-py SETEX/GET/DEL/PING/TTL) + InMemoryServingCache
 │
-├── processing/                       — 数据处理
+├── processing/                       — 数据处理（骨架，依赖缺失无法运行）
 │   ├── __init__.py
-│   ├── cleaner.py                    — 数据清洗
-│   └── normalizer.py                 — 数据标准化
+│   ├── cleaner.py                    — 数据清洗（骨架，whale.models 不存在）
+│   └── normalizer.py                 — 数据标准化（骨架，whale.models 不存在）
 │
-├── aggregation/                      — 数据聚合
+├── aggregation/                      — 数据聚合（骨架，依赖缺失无法运行）
 │   ├── __init__.py
-│   ├── ads.py                        — ADS 聚合
-│   ├── periodic.py                   — 周期性聚合
-│   └── realtime.py                   — 实时聚合
+│   ├── ads.py                        — ADS 聚合（骨架，whale.models 不存在）
+│   ├── periodic.py                   — 周期性聚合（骨架，whale.models 不存在）
+│   └── realtime.py                   — 实时聚合（骨架，whale.models 不存在）
 │
 └── shared/                           — 共享层（跨模块通用能力）
     ├── __init__.py
@@ -547,7 +547,7 @@ src/octopus/
 tests/
 ├── __init__.py
 ├── conftest.py                       — 全局 pytest 夹具
-├── TESTING.md                        — 测试策略说明
+├── TESTING.md                        — Whale 主平台测试指南（生命周期阶段、PASS/FAIL/NOT_RUN、边界说明）
 │
 ├── unit/                             — 单元测试
 │   ├── __init__.py
@@ -719,7 +719,7 @@ tests/
 │   ├── test_source_lab_beckhoff_ads_runtime.py — Beckhoff ADS in_process+dotnet统一输入集成测试
 │   ├── test_whale_writer_failure_recovery.py    — Whale writer 故障恢复集成测试
 │   ├── test_whale_writer_switchover.py          — Whale writer 主备切换集成测试
-│   ├── test_l5_external_dependency_verification.py — L5 外部依赖验证测试（5 services L5 verified; Pulsar/HDFS/Flink env-pending）
+│   ├── test_l5_external_dependency_verification.py — 准生产依赖验证期 外部依赖验证（Kafka/PG/Redis/S3/TDengine 验证通过，Pulsar/HDFS/Flink MISSING_ENVIRONMENT）
 │   ├── test_redis_state_cache_faults.py        — Redis 缓存容错测试
 │   ├── test_ingest_dual_node_db_lease_e2e.py — 双节点 DB lease E2E 集成测试（L3）
 │   └── test_sqlite_config_init.py              — SQLite 配置初始化
@@ -929,8 +929,8 @@ tools/source_lab/
 │
 └── tests/                             — Source Lab 测试
     ├── __init__.py
-    ├── README.md
-    ├── TEST_AUDIT.md                   — 测试审计记录
+    ├── README.md                       — 测试边界、工具名与验证等级区别、NOT_RUN 条件
+    ├── TEST_AUDIT.md                   — 测试审计记录（含生命周期术语对齐说明）
     ├── conftest.py                     — 测试夹具（含 load 测试自动跳过）
     ├── support/
     │   ├── __init__.py
@@ -1080,7 +1080,7 @@ ai_shared/
 │   └── coding_agent_prompt_template.txt — Coding Agent prompt 模板
 ├── memory/                            — 长期记忆
 │   ├── project_tree.md                — 本文件（目录树）
-│   ├── test_index.md                  — 测试资产索引与回归测试唯一索引
+│   ├── test_index.md                  — 测试资产索引与回归测试唯一索引（含 2.1"不能证明什么"表）
 │   ├── 业务目标与价值愿景.md            — 项目白皮书：业务目标与价值愿景
 │   ├── 总体逻辑设计.md                  — 项目白皮书：总体逻辑设计
 │   ├── Whale_REQ_README.md           — 需求文档规范说明
@@ -1102,7 +1102,12 @@ ai_shared/
 │   ├── whale_l5_definition_req_cleanup_round4_closure_report.md — Round 4 L5 定义纠偏、field_readback 清理与 SpeedLayer 证据收口报告
 │   ├── whale_l5_external_dependency_round5_closure_report.md — Round 5 准生产外部依赖 L5 E2E 扩展验证报告
 │   ├── whale_l5_real_chain_round2_closure_report.md — Round 2 真实链路缺口复核与 P0 最小生产链路补齐报告
-│   └── whale_l5_true_external_chain_round3_closure_report.md — Round 3 L5 真实外部依赖链路收口与 REQ 状态纠偏报告
+│   ├── whale_l5_true_external_chain_round3_closure_report.md — Round 3 L5 真实外部依赖链路收口与 REQ 状态纠偏报告
+│   ├── testing_lifecycle_and_repo_audit_round1_closure_report.md — Round 1 测试生命周期化重构与全仓规则审核收口报告
+│   ├── testing_directory_governance_round2_closure_report.md — Round 2 测试目录治理与索引校准收口报告
+│   ├── testing_directory_governance_round3_closure_report.md — Round 3 docs/scripts/reports 残留治理最终收口报告
+│   ├── code_reality_docstring_audit_round1_report.md — Round 1 全仓空实现误判与注释规则合规审计报告
+│   └── code_reality_docstring_audit_round2_report.md — Round 2 补审与残留清理报告（deploy/config 术语迁移、test_l5 L4 修正、test_index"不能证明什么"表）
 └── rules/                             — 公共规则
     ├── routing.md                     — 规则路由
     ├── coding.md                      — 编码规范（架构边界/接口类型/测试同步/文档注释）
@@ -1120,9 +1125,9 @@ ai_shared/
 docs/
 ├── GIT.md                             — Git 工作流说明
 ├── opcua_iec61850_guide.md            — OPC UA / IEC 61850 协议指南
-├── 代码质量与注释.md                   — 代码质量规范与注释要求
+├── 代码质量与注释.md                   — 代码质量规范与注释要求（已过时/历史参考，权威规则源：ai_shared/rules/）
 ├── 工程管理.md                         — 工程管理流程说明
-└── 测试策略.md                         — 测试策略说明
+└── 测试策略.md                         — 测试策略说明（已过时/历史参考，权威规则源：ai_shared/rules/testing.md）
 ```
 
 ## 脚本 `scripts/`
@@ -1130,7 +1135,7 @@ docs/
 ```text
 scripts/
 ├── cleanup_root_logs.sh               — 清理根目录日志文件
-├── whale_test.sh                     — Whale 测试统一入口（dry-run 测试计划输出）
+├── whale_test.sh                     — Whale 测试统一入口（dry-run 默认安全模式 + --execute 显式执行，PASS/FAIL/NOT_RUN 输出）
 ├── run_ingest_dev.sh                  — 启动 ingest 开发环境
 ├── run_ingest_runtime_compose_smoke.sh — ingest compose运行态烟测
 ├── run_ingest_compose_readyz_e2e.sh   — compose readyz 8组件聚合 E2E 脚本
@@ -1150,9 +1155,9 @@ scripts/
 ├── run_whale_field_quality_gate.sh  — Whale 现场质量门禁聚合脚本
 ├── run_whale_field_ready_smoke.sh   — Whale 一键预检验证脚本（8-step）
 ├── run_whale_writer_switchover.sh   — Whale writer 主备切换验证脚本
-├── run_whale_l5_external_dependency_probe.sh — L5 外部依赖环境探测（16 probes，multi-level）
+├── run_whale_l5_external_dependency_probe.sh — L5 外部依赖环境探测（16 probes）（历史命名，功能不变）
 ├── source_lab_l2_test_env.sh          — 可控L2 veth环境搭建
-├── check_l5_field_readback_env.py      — L5 外部依赖环境预检脚本
+├── check_l5_field_readback_env.py      — L5 外部依赖环境预检脚本（历史命名，功能不变）
 ├── check_serial_env.py                 — 串口硬件环境预检脚本（dry-run PENDING）
 ├── check_ads_env.py                    — Beckhoff ADS 环境预检脚本（dry-run PENDING）
 ├── check_l2_goose_sv_env.py            — GOOSE/SV L2 环境预检脚本（dry-run PENDING）

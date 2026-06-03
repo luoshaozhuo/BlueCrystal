@@ -1,7 +1,7 @@
 """Modbus RTU source 采集适配器单元测试。
 
 被验证对象：``whale.ingest.adapters.source.modbus_rtu_source_acquisition_adapter.ModbusRtuSourceAcquisitionAdapter``。
-证据等级：L1 unit/mock — 使用 mock ModbusRtuSourceReader 模拟串口读取。
+测试阶段：开发期验证 (unit/mock) — 使用 mock ModbusRtuSourceReader 模拟串口读取。
 不能证明：真实串口设备通信、Modbus RTU 时序约束。
 
 Mock 策略：

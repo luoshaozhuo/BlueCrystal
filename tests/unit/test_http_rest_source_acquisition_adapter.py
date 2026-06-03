@@ -1,7 +1,7 @@
 """HTTP REST 采集适配器单元测试。
 
 被验证对象：``whale.ingest.adapters.source.http_rest_source_acquisition_adapter.HttpRestSourceAcquisitionAdapter``。
-证据等级：L1 unit/mock — 使用 mock HttpRestClientBackend 模拟 HTTP 服务器。
+测试阶段：开发期验证 (unit/mock) — 使用 mock HttpRestClientBackend 模拟 HTTP 服务器。
 不能证明：真实 HTTP 服务器连接、TLS 握手、JSON Path 复杂路径。
 
 依赖：

@@ -6,7 +6,7 @@ ReplayPort 的 ABC 契约：不可直接实例化、abstractmethod 约束等。
 被验证对象：
 - whale.message_pipeline.ports: 所有端口 ABC
 
-证据等级：L2 contract/stub（接口契约验证，不依赖具体适配器实现）。
+测试阶段：开发期验证 (contract/stub)（接口契约验证，不依赖具体适配器实现）。
 """
 
 from __future__ import annotations

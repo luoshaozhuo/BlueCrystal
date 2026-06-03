@@ -5,7 +5,7 @@
 2. ingest adapter（Iec104SourceAcquisitionAdapter）
 3. state cache 写入
 
-证据等级：L3 simulator — 使用 mock 模拟 lib60870 C runner 子进程响应。
+测试阶段：模块集成期验证 (simulator) — 使用 mock 模拟 lib60870 C runner 子进程响应。
 不能证明：真实 IEC104 RTU 连接、实际 C runner 子进程行为、生产级吞吐。
 """
 from __future__ import annotations

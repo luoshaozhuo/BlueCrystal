@@ -1,217 +1,165 @@
-# Testing Guide
+# Whale 主平台测试指南
 
-## 测试分层与定位
+本文件面向开发者说明 `tests/` 目录的测试组织、运行方式和规则。术语和生命周期阶段以
+`ai_shared/rules/testing.md` 为准；本文件只做补充说明，不重复定义。
 
-`tools/source_lab/access` 的 capacity/profile 路径固定使用 `open62541_client_runner`，不提供 backend selector。
+## 1. 测试阶段与目录
 
-### Unit Tests（单元测试）
+物理目录按历史习惯保留为 `unit/`、`integration/`、`e2e/`、`performance/`，
+但物理目录 **不等于** 生命周期测试阶段。测试的实际阶段归属以：
 
-验证单个函数、类或模块的逻辑正确性。不依赖外部服务（数据库、网络、OPC UA 服务器），所有外部依赖使用 mock 或 fake。
+1. `ai_shared/memory/test_index.md`（唯一测试索引）；
+2. 测试文件头的生命周期阶段说明；
+3. pytest marker（辅助选择，非唯一分类来源）
 
-- **目标**：快速、稳定、精确定位问题
-- **运行频率**：每次提交、每次保存
-- **标记**：`@pytest.mark.unit`
-- **目录**：[tests/unit/](tests/unit/)
+为准。
 
-### Integration Tests（集成测试）
+| 生命周期阶段 | 典型位置 | 特征标志 |
+|---|---|---|
+| 开发期验证 | `tests/unit/` | mock/fake/stub/in-memory，无外部依赖 |
+| 构建期验证 | 非 pytest | `py_compile`、`ruff`、`mypy`、`cmake --build` |
+| 模块集成期验证 | `tests/integration/` | SQLite/TestClient/临时文件/in-memory 闭环 |
+| 跨模块联调期验证 | `tests/integration/`、`tests/e2e/` | docker-compose 或 simulator 全链路 |
+| 准生产依赖验证期 | `tests/integration/`、`tests/e2e/` | 需真实 Kafka/PG/Redis/S3/TDengine |
+| 部署前验收期 | `tests/e2e/`、`scripts/` | 现场最小数据链路、一键预检 |
+| 发布后运维验证期 | scripts/monitoring | 健康检查、告警、故障恢复 |
 
-验证多个组件之间的交互是否正确。依赖真实的数据库连接、真实的 OPC UA 服务器启动/停止、真实的网络通信。不做 mock。
+## 2. root `tests/` 与 `tools/source_lab/tests/` 的边界
 
-- **目标**：验证组件间接口和交互正确
-- **依赖**：PostgreSQL、OPC UA 服务端、open62541 runner
-- **标记**：`@pytest.mark.integration`
-- **目录**：[tests/integration/](tests/integration/)
+- `tests/` 是 **Whale 主平台生产路径测试**，验证可交付行为和跨模块契约。
+- `tools/source_lab/tests/` 是 **source_lab 工具测试**，只证明工具自身行为。
+- source_lab 测试通过不得自动等同于 Whale 生产链路通过。
+- Whale 测试不得依赖 source_lab 运行时。
+- source_lab 变更影响 `src/whale/shared/source/` 或 `src/whale/ingest/` 时，
+  才需扩跑对应的 Whale 测试。具体扩跑条件见 `test_index.md` 第 6 节。
 
-### E2E Tests（端到端测试）
+## 3. PASS / FAIL / NOT_RUN
 
-验证从 OPC UA 数据采集到消息管道（Redis State Cache → Kafka Message Pipeline）的完整链路。
+测试执行结果只使用以下三类：
 
-- **目标**：验证全链路数据流动正确
-- **依赖**：Docker（PostgreSQL + Redis + Kafka）、OPC UA 模拟器、ingest 管道
-- **标记**：`@pytest.mark.e2e`
-- **目录**：[tests/e2e/](tests/e2e/)
+| 结果 | 含义 |
+|---|---|
+| **PASS** | 已执行且通过 |
+| **FAIL** | 已执行且失败 |
+| **NOT_RUN** | 未执行，必须写清原因 |
 
-### Performance Tests（性能测试）
+### pytest skipped 测试的处理
 
-性能测试是总称，包含以下三个子类型，分别验证系统在不同维度下的表现。
+pytest 的 `skip`/`skipif`/环境跳过在报告中 **不** 作为独立的 `skipped` 状态。
+必须转写为 `NOT_RUN` 并说明原因（如 `MISSING_ENVIRONMENT`）。
 
-#### Endurance Tests（耐久测试 / 性能验证）
+NOT_RUN 原因枚举（定义于 `testing.md`）：
 
-验证系统在稳态负载下是否达到预期性能指标。例如：90% 的请求响应时间不超过 1 秒、持续运行 N 小时零错误。
+| 原因 | 适用场景 |
+|---|---|
+| `OUT_OF_SCOPE` | 不属本轮验证范围 |
+| `MISSING_ENVIRONMENT` | 缺少运行环境、服务、硬件或配置 |
+| `MISSING_DEPENDENCY` | 缺少库、二进制、工具或镜像 |
+| `MANUAL_REQUIRED` | 需要人工步骤或受控现场条件 |
+| `TOO_EXPENSIVE_FOR_THIS_RUN` | 本轮执行成本过高 |
+| `USER_NOT_REQUESTED` | 用户或任务未要求执行 |
 
-- **目标**：确认系统满足 SLA 或预期性能指标
-- **特征**：固定负载、较长时间运行、关注延迟/吞吐量指标
-- **标记**：`@pytest.mark.endurance`
-- **目录**：[tests/performance/endurance/](tests/performance/endurance/)
-
-#### Load Tests（负载测试）
-
-对系统施加不同级别的负载（逐步增加用户数、数据量、并发度），观察系统表现，找出最佳运行状态或容量上限。
-
-- **目标**：确定系统在什么负载级别下能平稳运行，找到拐点
-- **特征**：阶梯式或持续高负载、关注吞吐量变化曲线、找上限
-- **标记**：`@pytest.mark.load`
-- **目录**：[tests/performance/load/](tests/performance/load/)
-
-#### Stress Tests（压力测试）
-
-主动将系统推向极限（超大规模数据、极端并发、资源耗尽），观察系统在超出设计容量时的行为：是优雅降级还是崩溃。
-
-- **目标**：验证极端条件下的健壮性和恢复能力
-- **特征**：超出正常容量、故意制造资源瓶颈、关注崩溃模式和恢复
-- **标记**：`@pytest.mark.stress`
-- **目录**：[tests/performance/stress/](tests/performance/stress/)
-
-### 测试分层关系图
-
-```
-                         ┌──────────────┐
-                         │   E2E Tests  │  ← 全链路，最慢，最真实
-                         └──────┬───────┘
-                                │
-              ┌─────────────────┼─────────────────┐
-              │                 │                 │
-    ┌─────────▼──────┐  ┌──────▼──────┐  ┌───────▼────────┐
-    │  Endurance     │  │    Load     │  │    Stress      │
-    │  (稳态验证)     │  │  (找上限)   │  │  (推向崩溃)     │
-    └────────────────┘  └─────────────┘  └────────────────┘
-              │                 │                 │
-              └─────────────────┼─────────────────┘
-                                │
-                     ┌──────────▼──────────┐
-                     │  Integration Tests  │  ← 组件交互，中等速度
-                     └──────────┬──────────┘
-                                │
-                     ┌──────────▼──────────┐
-                     │    Unit Tests       │  ← 单一模块，最快，最稳定
-                     └─────────────────────┘
-```
-
----
-
-## 运行测试
+## 4. 运行测试
 
 ### 按目录
-
 ```bash
-pytest                                          # 默认发现
-pytest tests/unit/tools                         # 只跑 unit/tools
-pytest tests/integration/tools                  # 只跑 integration/tools
-pytest tests/e2e                                # 只跑 e2e
-pytest tests/performance/load                   # 只跑 load 测试
+pytest tests/unit/                    # 全部单元测试（开发期验证）
+pytest tests/integration/             # 全部集成测试（含模块集成和跨模块联调）
+pytest tests/e2e/                     # E2E 测试
 ```
 
-### 按标记
-
+### 按 marker
 ```bash
-pytest -m unit                                  # 所有单元测试
-pytest -m integration                           # 所有集成测试
-pytest -m e2e                                   # 所有端到端测试
-pytest -m load                                  # 所有负载测试
-pytest -m stress                                # 所有压力测试
-pytest -m endurance                             # 所有耐久测试
+pytest -m unit                        # 开发期验证
+pytest -m integration                 # 模块集成期 + 部分跨模块联调
+pytest -m e2e                         # 部署前验收 + 跨模块联调
+pytest -m l5                          # 准生产依赖验证期（需外部服务）
 ```
 
-### 按名称
-
+### 按生命周期阶段（通过脚本）
 ```bash
-pytest -k "10hz"                                # 名称含 "10hz" 的测试
-pytest -k "from_database"                       # 名称含 "from_database" 的测试
+bash scripts/whale_test.sh --stage 开发期验证 --component whale --module ingest --dry-run
+bash scripts/whale_test.sh --stage 模块集成期验证 --component whale --module storage --dry-run
 ```
 
----
-
-## 常用参数
-
+### 常用参数
 | 参数 | 作用 |
-|------|------|
-| `-v` | 详细输出，显示每个测试名称 |
-| `-vv` | 更详细，适合调试 |
+|---|---|
+| `-v` / `-vv` | 详细输出 |
 | `-q` | 简洁输出 |
-| `-s` | 不捕获 print，调试时常用 |
+| `-s` | 不捕获 print/logging |
 | `-x` | 遇到第一个失败立即停止 |
 | `--maxfail=N` | 最多 N 个失败后停止 |
 | `-m <marker>` | 按 pytest marker 过滤 |
-| `-k <expr>` | 按名称关键字过滤 |
+| `-k <expr>` | 按测试名称关键字过滤 |
 
----
+## 5. 环境依赖速查
 
-## 环境依赖速查
+| 测试阶段 | PostgreSQL | Redis | Kafka | Docker | 外部服务 |
+|---|---|---|---|---|---|
+| 开发期验证 | 否 | 否 | 否 | 否 | 否 |
+| 构建期验证 | 否 | 否 | 否 | 否 | 否 |
+| 模块集成期验证 | SQLite 仅 | 否 | 否 | 否 | 否 |
+| 跨模块联调期验证 | 可能 (docker) | 可能 (docker) | 可能 (docker) | 是 | 否 |
+| 准生产依赖验证期 | 是 | 是 | 是 | 是 | 是 |
 
-| 测试层级 | PostgreSQL | Redis | Kafka | OPC UA Server | Docker |
-|----------|-----------|-------|-------|---------------|--------|
-| Unit | No | No | No | No | No |
-| Integration | Yes (shared DB) | No | No | Yes | No |
-| E2E | Yes | Yes | Yes | Yes | Yes |
-| Performance | Yes | Yes | Yes | Yes | Yes |
-
-### 启动 E2E / Performance 所需基础设施
-
+### 启动跨模块联调所需基础设施
 ```bash
-docker compose -f docker-compose.ingest-dev.yaml up -d
+docker compose -f docker-compose.whale-l5.yaml up -d postgres redis kafka minio
+```
+
+### 启动准生产依赖所需基础设施
+```bash
+docker compose -f docker-compose.whale-l5.yaml up -d
 python -m whale.shared.persistence.template.sample_data
 ```
 
----
+## 6. conftest.py
 
-## 负载测试
+`tests/conftest.py` 被 pytest 自动加载，提供共享 fixture：
+- `sample_nodeset_path` / `sample_opcua_connections_path` -- OPC UA 模板路径
+- `free_ports` -- 分配空闲端口
+- `local_opcua_connections_path` -- 生成测试专用 localhost OPC UA 配置
+- `opcua_server_runtime` / `opcua_sim_fleet` -- 启动 OPC UA 模拟服务
 
-负载测试脚本位于 [tests/tmp/load_test.py](tmp/load_test.py)，为标准 Python 脚本，可直接调用：
+`tests/e2e/conftest.py` 和 `tests/performance/load/conftest.py` 负责 Docker 基础设施的连接和表创建。
 
+## 7. 新增测试时的同步要求
+
+新增或删除测试文件时，必须同步更新 `ai_shared/memory/test_index.md`（唯一测试索引）：
+
+1. **新增测试文件**：在测试资产索引中添加条目（文件名、测试对象、外部依赖、NOT_RUN 条件）。
+2. **新增回归测试**：在回归测试列表中添加条目，标注回归分类和状态。
+3. **删除测试文件**：从测试资产索引中移除，回归测试状态改为 `RETIRED` 或 `SUPERSEDED`。
+4. 不另建其他回归索引文件（如 `issue_regression_index.md`）。
+5. 测试索引只维护到文件级别（关键链路可维护到类级别）。
+
+## 8. marker 使用约定
+
+| Marker | 含义 | 执行条件 |
+|---|---|---|
+| `unit` | 开发期验证，无外部依赖 | 任何环境 |
+| `integration` | 模块集成或跨模块联调 | SQLite/TestClient 或 docker-compose |
+| `e2e` | 端到端全链路 | 通常需 docker-compose |
+| `l5` | 准生产依赖验证期，需真实外部服务 | Kafka/PG/Redis/S3/TDengine 就绪 |
+| `smoke` | 最小冒烟验证 | 取决于具体测试 |
+| `slow` | 需 native 二进制或执行时间长 | C build 环境 + native runner 就绪 |
+| `load` | 负载测试 | 专门环境，不在常规 CI 执行 |
+| `stress` | 压力测试 | 专门环境，不在常规 CI 执行 |
+
+marker 用于执行选择，不是测试分类的唯一来源。生命周期阶段以 `test_index.md` 和
+文件头说明为准。
+
+## 9. 负载测试与性能测试
+
+`tests/performance/` 下的负载、压力、耐久测试不在常规 CI 执行，按需手动触发。
+
+### 负载测试脚本
 ```bash
 python tests/tmp/load_test.py --turbines 30 --hz 10 --samples 3
 ```
 
 参数说明：
-- `--turbines N`: 最大风机数 (默认 30)
-- `--hz HZ`: 采集频率 (默认 10)
-- `--samples S`: 每轮采样数 (默认 3)
-
-测试产物：
-- `tests/tmp/load_test_report.md` — 测试报告
-- `tests/tmp/charts/` — 图表（延迟箱线图、时间戳分布、缩放曲线、延迟分解）
-
-### 最近测试结果 (2026-05-05)
-
-**测试条件**: 30 台风机，10Hz 采集，每台 20 变量，3 轮采样
-
-| 策略 | 单批次耗时 | P50 | P95 | 错误 |
-|------|-----------|-----|-----|------|
-| Sequential (one-by-one) | — | 6ms | 7ms | 0 |
-| Async gather (all-at-once) | 148ms | 148ms | 148ms | 0 |
-| ThreadPool (4 workers) | 207ms | 115ms | 200ms | 0 |
-| ThreadPool (8 workers) | 202ms | 120ms | 200ms | 0 |
-| ThreadPool-keep (16 workers) | 200ms | 155ms | 197ms | 0 |
-
-**缩放结果** (ThreadPool-keep, 8 workers):
-
-| 风机数 | P95 |
-|--------|-----|
-| 1 | 14ms |
-| 5 | 32ms |
-| 10 | 68ms |
-| 15 | 104ms |
-| 20 | 130ms |
-| 25 | 163ms |
-| 30 | 204ms |
-
-**结论**:
-- 单台机组全量 395 变量读取延迟 13ms（连接 5ms + 读取 6ms）
-- 30 台风机全部满足 <1s 延迟要求，线性缩放
-- ThreadPool(8 workers) 为最优策略
-- 源时间戳抖动 <0.2ms，满足 1/5 周期要求
-python -m whale.shared.persistence.template.sample_data
-```
-
----
-
-## conftest.py
-
-[tests/conftest.py](tests/conftest.py) 被 pytest 自动加载，提供共享 fixture：
-
-- `sample_nodeset_path` / `sample_opcua_connections_path` — OPC UA 模板路径
-- `free_ports` — 分配空闲端口
-- `local_opcua_connections_path` — 生成测试专用 localhost OPC UA 配置
-- `opcua_server_runtime` / `opcua_sim_fleet` — 启动 OPC UA 模拟服务
-
-`tests/e2e/conftest.py` 和 `tests/performance/load/conftest.py` 负责 Docker 基础设施（PostgreSQL / Redis / Kafka）的连接和表创建。
+- `--turbines N`: 最大风机数（默认 30）
+- `--hz HZ`: 采集频率（默认 10）
+- `--samples S`: 每轮采样数（默认 3）

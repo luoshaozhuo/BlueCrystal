@@ -2,7 +2,7 @@
 
 验证静态 acquisition port registry 的多协议标准化解析，
 包括新增的 IEC 104 协议 key 标准化和边界行为。
-证据等级：L1 unit/mock。
+测试阶段：开发期验证 (unit/mock)。
 """
 
 from __future__ import annotations

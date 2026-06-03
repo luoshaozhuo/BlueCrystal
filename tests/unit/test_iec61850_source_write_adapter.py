@@ -6,7 +6,7 @@
 - write() 正常路径、dry_run、部分失败、异常处理、无效连接。
 - readback() 契约验证（write-then-readback 闭合路径）。
 
-证据等级：L2 (contract/stub)。
+测试阶段：开发期验证 (contract/stub)。
 真实 IEC 61850 MMS E2E readback 需要运行中的 IEC 61850 simulator。
 """
 from __future__ import annotations
@@ -250,7 +250,7 @@ class TestIec61850MmsSourceWriteAdapterReadback:
     使用 mock reader 验证 write-then-readback 闭合路径，
     不依赖真实 IEC 61850 MMS server 或 native runner。
 
-    证据等级：L2 (contract/stub)。
+    测试阶段：开发期验证 (contract/stub)。
     真实 IEC 61850 MMS E2E readback 需要运行中的 IEC 61850 simulator。
     """
 

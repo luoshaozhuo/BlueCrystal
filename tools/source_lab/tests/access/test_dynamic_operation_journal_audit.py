@@ -1,7 +1,7 @@
 """operation journal 审计测试。
 
 验证 dynamic runtime 操作日志的审计记录完整性和不可篡改性。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

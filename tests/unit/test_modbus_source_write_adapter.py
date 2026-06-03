@@ -6,7 +6,7 @@
 - write() 正常路径、dry_run、部分失败、异常处理、hex node_id 解析。
 - readback() 契约验证（write-then-readback 闭合路径）。
 
-证据等级：L2 (contract/stub)。
+测试阶段：开发期验证 (contract/stub)。
 真实 Modbus TCP E2E readback 需要运行中的 Modbus TCP simulator。
 """
 from __future__ import annotations
@@ -266,7 +266,7 @@ class TestModbusSourceWriteAdapterReadback:
     使用 mock reader 验证 write-then-readback 闭合路径，
     不依赖真实 Modbus TCP 设备或 native runner。
 
-    证据等级：L2 (contract/stub)。
+    测试阶段：开发期验证 (contract/stub)。
     真实 Modbus TCP E2E readback 需要运行中的 Modbus simulator。
     """
 

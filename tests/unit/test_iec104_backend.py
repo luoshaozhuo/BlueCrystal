@@ -2,8 +2,8 @@
 
 验证 IEC 104 lib60870 backend 的协议行解析、DTO 行为、
 runner path resolution 及连接超时/错误/清理路径。
-证据等级：L1 unit/mock（解析和 DTO 测试不依赖 native runner）；
-connect/runner 相关测试在无 native runner 环境退化为 L1。
+测试阶段：开发期验证 (unit/mock)（解析和 DTO 测试不依赖 native runner）；
+connect/runner 相关测试在无 native runner 环境退化为开发期验证。
 """
 from __future__ import annotations
 

@@ -5,7 +5,7 @@
 2. ingest adapter（HttpRestSourceAcquisitionAdapter）
 3. batch 转换
 
-证据等级：L3 simulator — 使用 mock HttpRestClientBackend 模拟 HTTP 服务器响应。
+测试阶段：模块集成期验证 (simulator) — 使用 mock HttpRestClientBackend 模拟 HTTP 服务器响应。
 不能证明：真实 HTTP 服务器连接行为和 TLS 握手。
 """
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """native interactive control 边界测试。
 
 验证 native runner 交互式控制接口的安全边界和权限隔离。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

@@ -9,9 +9,9 @@
 3. lease 释放后另一节点可获取
 4. 并发 lease 获取的原子性
 
-证据等级：L2 (contract/stub)。
+所属生命周期阶段：开发期验证（contract/stub，mock lease repository）。
 真实双 WorkerRuntime + DB lease E2E 需要多个进程和 PostgreSQL，
-当前标记为 PENDING。
+属于准生产依赖验证期，当前标记为 NOT_RUN: MISSING_ENVIRONMENT。
 """
 
 from __future__ import annotations

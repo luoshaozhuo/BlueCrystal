@@ -8,10 +8,10 @@
 - Redis state cache 真实读写
 - Flink pipeline runner 真实提交
 
-本文件所有测试在外部服务不可用时自动 skip 或标记为 environment-pending，
+本文件所有测试在外部服务不可用时自动 skip 或标记为 MISSING_ENVIRONMENT，
 不伪造通过。
 
-证据等级：L5 (external dependency verification)
+测试阶段：准生产依赖验证期 (external dependency verification)
 环境依赖：Kafka / TDengine / HDFS / S3 / Pulsar / Redis / Flink
 """
 
@@ -139,7 +139,7 @@ def sample_envelope() -> Envelope:
 
 @pytest.fixture
 def memory_writer_deps():
-    """构建 L5 测试用的内存 sink 组合（可在无外部依赖时使用）。"""
+    """构建准生产依赖验证期 测试用的内存 sink 组合（可在无外部依赖时使用）。"""
     from whale.message_pipeline.adapters.in_memory import InMemoryMessageBus
 
     bus = InMemoryMessageBus()
@@ -156,7 +156,7 @@ def memory_writer_deps():
 
 
 class TestL5ExternalDependencyAvailability:
-    """L5 外部依赖可达性探测。
+    """准生产依赖验证期 外部依赖可达性探测。
 
     所有测试在对应服务不可达时 skip，不伪造通过。
     """
@@ -210,13 +210,13 @@ class TestL5ExternalDependencyAvailability:
         assert FLINK_REACHABLE
 
 
-# ── Phase 2: Kafka message_pipeline adapter L5 contract ──────────────────────
+# ── Phase 2: Kafka message_pipeline adapter 准生产依赖验证期 契约 ──────────────────────
 
 
 class TestL5KafkaMessagePipeline:
-    """Kafka message_pipeline adapter L5 验证。
+    """Kafka message_pipeline adapter 准生产依赖验证期 验证。
 
-    environment-pending: 需要 Kafka broker (localhost:9092) 可用。
+    NOT_RUN 条件: MISSING_ENVIRONMENT — 需要 Kafka broker (localhost:9092) 可用。
     """
 
     @pytest.mark.l5
@@ -225,7 +225,7 @@ class TestL5KafkaMessagePipeline:
     async def test_kafka_sink_publish_real(self, sample_envelope: Envelope) -> None:
         """验证 KafkaSinkAdapter 能向真实 Kafka broker 发布消息并获取 offset。
 
-        L5 通过条件: 返回有效的 partition >= 0 和 offset >= 0。
+        准生产依赖验证期 通过条件: 返回有效的 partition >= 0 和 offset >= 0。
         """
         from whale.message_pipeline.adapters.kafka import KafkaSinkAdapter
 
@@ -247,7 +247,7 @@ class TestL5KafkaMessagePipeline:
     async def test_kafka_source_consume_real(self) -> None:
         """验证 KafkaSourceAdapter 能连接真实 Kafka broker 并订阅 topic。
 
-        L5 通过条件: consumer 初始化成功（不要求有消息，空 topic 即可）。
+        准生产依赖验证期 通过条件: consumer 初始化成功（不要求有消息，空 topic 即可）。
         """
         from whale.message_pipeline.adapters.kafka import KafkaSourceAdapter
 
@@ -268,13 +268,13 @@ class TestL5KafkaMessagePipeline:
         assert True
 
 
-# ── Phase 3: TDengine raw_index + standardized L5 contract ───────────────────
+# ── Phase 3: TDengine raw_index + standardized 准生产依赖验证期 契约 ───────────────────
 
 
 class TestL5TDengineStorage:
-    """TDengine storage adapter L5 验证。
+    """TDengine storage adapter 准生产依赖验证期 验证。
 
-    environment-pending: 需要 TDengine (localhost:6041) 可用。
+    NOT_RUN 条件: MISSING_ENVIRONMENT — 需要 TDengine (localhost:6041) 可用。
     """
 
     @pytest.mark.l5
@@ -283,7 +283,7 @@ class TestL5TDengineStorage:
     async def test_tdengine_raw_index_connect(self) -> None:
         """验证 TdengineRawIndexSink 能连接 TDengine 并尝试 index。
 
-        L5 通过条件: 连接不抛异常，index 调用不超时。
+        准生产依赖验证期 通过条件: 连接不抛异常，index 调用不超时。
         """
         from whale.storage.raw_index import TdengineRawIndexSink
 
@@ -316,7 +316,7 @@ class TestL5TDengineStorage:
     async def test_tdengine_standardized_connect(self) -> None:
         """验证 TdengineStandardizedSink 能连接 TDengine 并尝试写入。
 
-        L5 通过条件: 连接不抛异常，write 调用不超时。
+        准生产依赖验证期 通过条件: 连接不抛异常，write 调用不超时。
         """
         from whale.storage.standardized import TdengineStandardizedSink
 
@@ -343,13 +343,13 @@ class TestL5TDengineStorage:
             raise
 
 
-# ── Phase 4: raw_archive L5 contract (HDFS / S3) ─────────────────────────────
+# ── Phase 4: raw_archive 准生产依赖验证期 契约 (HDFS / S3) ─────────────────────────────
 
 
 class TestL5RawArchiveExternal:
-    """raw_archive 外部存储 L5 验证。
+    """raw_archive 外部存储 准生产依赖验证期 验证。
 
-    environment-pending: 需要 HDFS NameNode (localhost:9870) 或 S3/MinIO (localhost:9000)。
+    NOT_RUN 条件: MISSING_ENVIRONMENT — 需要 HDFS NameNode (localhost:9870) 或 S3/MinIO (localhost:9000)。
     """
 
     @pytest.mark.l5
@@ -385,19 +385,19 @@ class TestL5RawArchiveExternal:
         assert isinstance(adapter, FileArchiveSinkPort)
 
 
-# ── Phase 5: 全链路 L5 smoke（含真实依赖 + 降级到本地） ──────────────────────
+# ── Phase 5: 全链路准生产依赖验证期 smoke（含真实依赖 + 降级到本地） ──────────────────────
 
 
 class TestL5FullChainSmoke:
-    """全链路 smoke 测试（L4 验证等级）。
+    """全链路 smoke 测试（跨模块联调期验证 等级）。
 
     本类所有测试使用 InMemoryMessageBus + LocalCompressedArchiveSink +
     MemorySink（raw_index/standardized）+ InMemoryServingCache，
-    不依赖真实外部服务。证据等级为 L4。
+    不依赖真实外部服务。测试阶段为跨模块联调期验证。
 
     按可用依赖自动选择 adapter：
     - Kafka 可用 → 使用 KafkaSinkAdapter/KafkaSourceAdapter
-    - Kafka 不可用 → 降级为 InMemoryMessageBus（标记 environment-pending）
+    - Kafka 不可用 → 降级为 InMemoryMessageBus（标记 MISSING_ENVIRONMENT）
 
     外部存储的 L5 验证由 Phase 3/4 独立覆盖。
     """
@@ -409,7 +409,8 @@ class TestL5FullChainSmoke:
         """验证 ingest → raw_archive 本地写入链路完整可运行。
 
         使用 LocalPipelineRunner + LocalCompressedArchiveSink + InMemoryMessageBus。
-        无论外部依赖是否可用，此测试必须通过。验证等级：L4。
+        无论外部依赖是否可用，此测试必须通过。
+        测试阶段：跨模块联调期验证（本地 InMemory 闭环）。
         """
         bus, archive, manifest, dlq, index, standardized, cache = memory_writer_deps
 
@@ -443,7 +444,8 @@ class TestL5FullChainSmoke:
     ) -> None:
         """验证 ingest → raw_index 本地写入链路完整可运行。
 
-        使用 MemoryRawIndexSink + InMemoryMessageBus。验证等级：L4。
+        使用 MemoryRawIndexSink + InMemoryMessageBus。
+        测试阶段：跨模块联调期验证（本地 InMemory 闭环）。
         """
         from whale.message_pipeline.adapters.in_memory import InMemoryMessageBus
 
@@ -463,7 +465,8 @@ class TestL5FullChainSmoke:
     ) -> None:
         """验证 ingest → standardized 本地写入链路完整可运行。
 
-        使用 MemoryStandardizedSink + InMemoryMessageBus。验证等级：L4。
+        使用 MemoryStandardizedSink + InMemoryMessageBus。
+        测试阶段：跨模块联调期验证（本地 InMemory 闭环）。
         """
         from whale.message_pipeline.adapters.in_memory import InMemoryMessageBus
 
@@ -483,7 +486,8 @@ class TestL5FullChainSmoke:
     ) -> None:
         """验证 ingest → serving_cache 本地更新链路完整可运行。
 
-        使用 InMemoryServingCache + InMemoryMessageBus。验证等级：L4。
+        使用 InMemoryServingCache + InMemoryMessageBus。
+        测试阶段：跨模块联调期验证（本地 InMemory 闭环）。
         """
         from whale.message_pipeline.adapters.in_memory import InMemoryMessageBus
 
@@ -498,21 +502,22 @@ class TestL5FullChainSmoke:
         assert updated >= 1, f"serving_cache 更新失败，期望 >= 1，实际 {updated}"
 
 
-# ── Phase 6: DLQ + replay L5 contract ────────────────────────────────────────
+# ── Phase 6: DLQ + replay 准生产依赖验证期 契约 ────────────────────────────────────────
 
 
 class TestL5DLQReplay:
-    """DLQ 与 replay 契约验证（L4 验证等级）。
+    """DLQ 与 replay 契约验证（跨模块联调期验证）。
 
     本类测试使用 InMemoryMessageBus + InMemoryDeadLetterSink，
-    不依赖真实外部服务。证据等级为 L4。
+    不依赖真实外部服务。测试阶段为跨模块联调期验证。
     """
 
     @pytest.mark.asyncio
     async def test_dlq_write_and_replay_contract(self, sample_envelope: Envelope) -> None:
         """验证 DLQ 写入 + 回放契约完整。
 
-        使用 InMemoryMessageBus + InMemoryDeadLetterSink。验证等级：L4。
+        使用 InMemoryMessageBus + InMemoryDeadLetterSink。
+        测试阶段：跨模块联调期验证（本地 InMemory 闭环）。
         """
         from whale.message_pipeline.adapters.in_memory import InMemoryDeadLetterSink, InMemoryMessageBus
         from whale.message_pipeline.model import ReplayRequest
@@ -535,14 +540,14 @@ class TestL5DLQReplay:
         assert len(replay_messages) >= 1
 
 
-# ── Phase 7: Writer switchover L5 contract ───────────────────────────────────
+# ── Phase 7: Writer switchover 准生产依赖验证期 契约 ───────────────────────────────────
 
 
 class TestL5WriterSwitchover:
-    """Writer 无缝切换契约验证（L4 验证等级）。
+    """Writer 无缝切换契约验证（跨模块联调期验证）。
 
     本类测试使用 InMemoryMessageBus + MemoryRawIndexSink，
-    不依赖真实外部服务。证据等级为 L4。
+    不依赖真实外部服务。测试阶段为跨模块联调期验证。
     """
 
     @pytest.mark.asyncio
@@ -551,7 +556,8 @@ class TestL5WriterSwitchover:
 
         两个不同的 consumer group 各自维护独立 offset，从各自起始位置消费
         同一 topic 的全部消息。InMemoryMessageBus 正确实现了 per-group offset
-        跟踪，每个 group 独立读取总线上的所有消息。验证等级：L4。
+        跟踪，每个 group 独立读取总线上的所有消息。
+        测试阶段：跨模块联调期验证（本地 InMemory 闭环）。
         """
         from whale.message_pipeline.adapters.in_memory import InMemoryMessageBus
 
@@ -590,10 +596,10 @@ class TestL5WriterSwitchover:
 
 
 class TestL5ImportBoundary:
-    """L5 环境下 import boundary 不回退验证。"""
+    """准生产依赖验证期 环境下 import boundary 不回退验证。"""
 
     def test_no_crosscutting_imports_in_l5_code(self) -> None:
-        """确认 L5 相关代码无 whale.shared.crosscutting import。"""
+        """确认准生产依赖验证期 相关代码无 whale.shared.crosscutting import。"""
         import ast
         from pathlib import Path
 
@@ -611,7 +617,7 @@ class TestL5ImportBoundary:
                 if "whale.shared.crosscutting" in module:
                     offenders.append(module)
 
-        assert not offenders, f"L5 测试文件引用了已删除的 crosscutting 路径: {offenders}"
+        assert not offenders, f"准生产依赖验证期 测试文件引用了已删除的 crosscutting 路径: {offenders}"
 
     def test_platform_shared_imports_work(self) -> None:
         """确认 platform_shared 在 L5 环境下正常可 import。"""

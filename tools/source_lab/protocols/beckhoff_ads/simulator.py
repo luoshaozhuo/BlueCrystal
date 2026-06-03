@@ -1,9 +1,9 @@
 """Beckhoff ADS ServerSimulatorFacade 实现。
 
 当前提供两种 backend：
-1. `backend_kind=in_process` — 进程内 lightweight ADS simulator，协议证据等级 L3；
+1. `backend_kind=in_process` — 进程内 lightweight ADS simulator，测试阶段：模块集成期验证（simulator）；
 2. `backend_kind=beckhoff_dotnet` — 真实 .NET virtual ADS server + native AdsLib
-   客户端 read/write/readback 闭环，协议证据等级 L4+（需环境满足）。
+   客户端 read/write/readback 闭环，测试阶段：准生产依赖验证期（需环境满足）。
 """
 
 from __future__ import annotations

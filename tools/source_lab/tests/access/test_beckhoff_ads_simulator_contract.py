@@ -1,6 +1,6 @@
 """Beckhoff ADS simulator facade 合同测试。
 
-证据等级：L3 simulator。
+测试阶段：模块集成期验证 (simulator)。
 本测试只验证 `backend_kind=in_process` 的 source_lab lightweight ADS tool runtime，
 不证明真实 Beckhoff ADS 协议服务端。
 """

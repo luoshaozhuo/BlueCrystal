@@ -3,7 +3,7 @@
 被验证对象：src/whale/ingest/api/readyz.py 中的 evaluate_readiness() 和
 build_readyz_response()。
 
-证据等级：L1 unit/mock — 注入 fake 组件验证聚合逻辑，不涉及真实外部依赖。
+所属生命周期阶段：开发期验证 — 注入 fake 组件验证聚合逻辑，不涉及真实外部依赖。
 
 使用 fake 组件：
 - FakeEngine / FakeSessionFactory：模拟数据库连接。
@@ -11,8 +11,8 @@ build_readyz_response()。
 - FakeAuditSink / FakeAccessPolicy / FakeAcquisitionRegistry / FakeWriteRegistry。
 
 不能证明：
-- 真实数据库连接超时和故障注入行为（需 L3 integration）。
-- Redis/Kafka 真实网络故障场景（需 L4 integration）。
+- 真实数据库连接超时和故障注入行为（需模块集成期验证）。
+- Redis/Kafka 真实网络故障场景（需准生产依赖验证期）。
 - 生产环境多进程就绪聚合的竞态行为。
 
 关键环境依赖：无。测试独立于任何外部服务。

@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Whale 测试统一入口 (dry-run)
+# Whale 测试统一入口
 #
-# 第一轮只支持 dry-run 输出测试计划，不执行实际测试命令。
-# 不启动外部环境，不执行危险命令。
+# 支持两个模式：
+#   1. dry-run（默认） — 输出测试计划，不执行任何测试。
+#   2. execute（--execute） — 执行低风险评估期和 must-run 命令；
+#      外部依赖、长测、人工条件测试仅列入 NOT_RUN 或 manual-or-expensive。
+#
+# 输出结果使用 PASS / FAIL / NOT_RUN。
 #
 # 参数:
-#   --stage     生命周期阶段 (必选)
+#   --stage     生命周期阶段 (必选，除非指定 --suite)
 #   --component 组件名 (可选，默认 whale)
 #   --module    子模块名 (可选)
 #   --suite     回归套件 (可选)
-#   --dry-run   输出测试计划 (默认开启)
+#   --execute   实际执行测试 (默认 dry-run)
+#   --dry-run   显式 dry-run (默认已开启)
 #
 # 生命周期阶段取值:
 #   开发期验证
@@ -29,6 +34,7 @@
 #
 # 使用示例:
 #   bash scripts/whale_test.sh --stage 开发期验证 --component whale --module storage --dry-run
+#   bash scripts/whale_test.sh --stage 开发期验证 --component whale --module storage --execute
 #   bash scripts/whale_test.sh --suite release-regression --component whale --dry-run
 # =============================================================================
 
@@ -40,23 +46,26 @@ COMPONENT="whale"
 MODULE=""
 SUITE=""
 DRY_RUN="true"
+EXECUTE="false"
 
 usage() {
     cat <<'EOF'
 用法:
-  whale_test.sh --stage <阶段> [--component <组件>] [--module <模块>] [--suite <套件>] [--dry-run]
+  whale_test.sh --stage <阶段> [--component <组件>] [--module <模块>] [--suite <套件>] [--execute|--dry-run]
 
 参数:
   --stage      生命周期阶段 (必选，除非指定 --suite)
   --component  组件: whale|source_lab|platform_shared|turtle|octopus (默认 whale)
   --module     子模块: ingest|message_pipeline|speed_layer|storage|shared_source|batch_layer
   --suite      回归套件: affected-regression|module-regression|chain-regression|release-regression
-  --dry-run    dry-run 模式 (默认开启)
+  --execute    实际执行测试 (默认 dry-run 安全模式)
+  --dry-run    dry-run 模式 (默认开启，输出测试计划)
 
 示例:
   bash scripts/whale_test.sh --stage 开发期验证 --component whale --module storage --dry-run
+  bash scripts/whale_test.sh --stage 开发期验证 --component whale --module storage --execute
   bash scripts/whale_test.sh --suite release-regression --component whale --dry-run
-  bash scripts/whale_test.sh --stage 准生产依赖验证期 --component whale --dry-run
+  bash scripts/whale_test.sh --suite release-regression --component whale --execute
 EOF
 }
 
@@ -78,8 +87,14 @@ while [[ $# -gt 0 ]]; do
             SUITE="$2"
             shift 2
             ;;
+        --execute)
+            DRY_RUN="false"
+            EXECUTE="true"
+            shift
+            ;;
         --dry-run)
             DRY_RUN="true"
+            EXECUTE="false"
             shift
             ;;
         --help|-h)
@@ -169,9 +184,49 @@ if [[ -n "$SUITE" ]]; then
     fi
 fi
 
-# ---- 确认 dry-run 模式 ----
+# ---- 全局计数器 ----
+PASS_COUNT=0
+FAIL_COUNT=0
+NOT_RUN_COUNT=0
+declare -a NOT_RUN_ITEMS=()
+
+# ---- 执行/输出辅助 ----
+
+run_or_dry() {
+    local desc="$1"
+    local cmd="$2"
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "  [dry-run] $cmd"
+        return 0
+    else
+        echo "  [execute] $cmd"
+        if eval "$cmd" 2>&1; then
+            echo "  · PASS: $desc"
+            PASS_COUNT=$((PASS_COUNT + 1))
+            return 0
+        else
+            echo "  · FAIL: $desc"
+            FAIL_COUNT=$((FAIL_COUNT + 1))
+            return 1
+        fi
+    fi
+}
+
+not_run() {
+    local desc="$1"
+    local reason="$2"
+    echo "  · NOT_RUN: $reason — $desc"
+    NOT_RUN_COUNT=$((NOT_RUN_COUNT + 1))
+    NOT_RUN_ITEMS+=("[$reason] $desc")
+}
+
+# ---- 确认模式 ----
 echo "============================================"
-echo "  Whale 测试计划 (dry-run)"
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo "  Whale 测试计划 (dry-run)"
+else
+    echo "  Whale 测试执行 (execute)"
+fi
 echo "============================================"
 echo ""
 if [[ -n "$STAGE" ]]; then
@@ -184,10 +239,14 @@ fi
 if [[ -n "$SUITE" ]]; then
     echo "回归套件:      $SUITE"
 fi
-echo "模式:          dry-run (不执行实际测试)"
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo "模式:          dry-run (不执行实际测试)"
+else
+    echo "模式:          execute (仅 must-run 低风险命令)"
+fi
 echo ""
 
-# ---- 根据 stage 和 suite 生成测试计划 ----
+# ---- 阶段函数 ----
 
 # 构建期验证命令
 print_build_commands() {
@@ -196,24 +255,24 @@ print_build_commands() {
     echo "--- 构建期验证 ---"
     if [[ "$comp" == "whale" ]]; then
         if [[ -z "$mod" ]]; then
-            echo "  NOT_RUN: OUT_OF_SCOPE (未指定模块，不进行全量编译检查)"
+            not_run "全量编译检查（未指定模块）" "OUT_OF_SCOPE"
         else
-            echo "  1. python -m py_compile src/whale/$mod/ (dry-run)"
-            echo "  2. ruff check src/whale/$mod/ (dry-run)"
-            echo "  3. mypy src/whale/$mod/ (dry-run)"
+            run_or_dry "py_compile $mod" "python -m compileall src/whale/$mod/ -q"
+            run_or_dry "ruff $mod" "python -m ruff check src/whale/$mod/"
+            not_run "mypy $mod" "TOO_EXPENSIVE_FOR_THIS_RUN"
         fi
     elif [[ "$comp" == "source_lab" ]]; then
-        echo "  1. cmake -S tools/source_lab/native -B tools/source_lab/native/build (dry-run)"
-        echo "  2. cmake --build tools/source_lab/native/build (dry-run)"
-        echo "  3. ruff check tools/source_lab/ (dry-run)"
-        echo "  4. mypy tools/source_lab/access tools/source_lab/field_*.py (dry-run)"
+        not_run "cmake configure" "MISSING_DEPENDENCY"
+        not_run "cmake build" "MISSING_DEPENDENCY"
+        run_or_dry "ruff source_lab" "python -m ruff check tools/source_lab/"
+        not_run "mypy source_lab" "TOO_EXPENSIVE_FOR_THIS_RUN"
     elif [[ "$comp" == "platform_shared" ]]; then
-        echo "  1. ruff check src/platform_shared/ (dry-run)"
-        echo "  2. mypy src/platform_shared/ (dry-run)"
+        run_or_dry "ruff platform_shared" "python -m ruff check src/platform_shared/"
+        not_run "mypy platform_shared" "TOO_EXPENSIVE_FOR_THIS_RUN"
     elif [[ "$comp" == "turtle" ]]; then
-        echo "  1. ruff check src/turtle/ (dry-run)"
+        run_or_dry "ruff turtle" "python -m ruff check src/turtle/"
     elif [[ "$comp" == "octopus" ]]; then
-        echo "  1. ruff check src/octopus/ (dry-run)"
+        run_or_dry "ruff octopus" "python -m ruff check src/octopus/"
     fi
     echo ""
 }
@@ -225,19 +284,18 @@ print_dev_commands() {
     echo "--- 开发期验证 ---"
     if [[ "$comp" == "whale" ]]; then
         if [[ -z "$mod" ]]; then
-            echo "  MUST_RUN: pytest tests/unit/ -q (dry-run)"
-            echo "  NOT_RUN: TOO_EXPENSIVE_FOR_THIS_ROUND (全量 unit 测试可能过多，建议指定 --module)"
+            not_run "全量 unit 测试" "TOO_EXPENSIVE_FOR_THIS_RUN"
         else
-            echo "  MUST_RUN: pytest tests/unit/ -k '$mod' -q (dry-run)"
+            run_or_dry "pytest unit -k '$mod'" "python -m pytest tests/unit/ -k '$mod' -q"
         fi
     elif [[ "$comp" == "source_lab" ]]; then
-        echo "  MUST_RUN: pytest tools/source_lab/tests/ -q --timeout=120 (dry-run)"
+        run_or_dry "source_lab access tests" "python -m pytest tools/source_lab/tests/access/ -q --timeout=120"
     elif [[ "$comp" == "platform_shared" ]]; then
-        echo "  MUST_RUN: pytest tests/unit/ -k 'platform_shared' -q (dry-run)"
+        run_or_dry "platform_shared unit" "python -m pytest tests/unit/ -k 'platform_shared' -q"
     elif [[ "$comp" == "turtle" ]]; then
-        echo "  MUST_RUN: pytest tests/unit/test_turtle_octopus_import_boundary.py -q (dry-run)"
+        run_or_dry "turtle import boundary" "python -m pytest tests/unit/test_turtle_octopus_import_boundary.py -q"
     elif [[ "$comp" == "octopus" ]]; then
-        echo "  MUST_RUN: pytest tests/unit/test_turtle_octopus_import_boundary.py -q (dry-run)"
+        run_or_dry "octopus import boundary" "python -m pytest tests/unit/test_turtle_octopus_import_boundary.py -q"
     fi
     echo ""
 }
@@ -249,21 +307,20 @@ print_module_integration_commands() {
     echo "--- 模块集成期验证 ---"
     if [[ "$comp" == "whale" ]]; then
         if [[ -z "$mod" ]]; then
-            echo "  SHOULD_RUN: pytest tests/integration/ -q (dry-run)"
-            echo "  NOT_RUN: TOO_EXPENSIVE_FOR_THIS_ROUND (全量集成测试可能过多)"
+            not_run "全量集成测试" "TOO_EXPENSIVE_FOR_THIS_RUN"
         else
-            echo "  SHOULD_RUN: pytest tests/integration/ -k '$mod' -q (dry-run)"
+            run_or_dry "pytest integration -k '$mod'" "python -m pytest tests/integration/ -k '$mod' -q"
         fi
     elif [[ "$comp" == "source_lab" ]]; then
-        echo "  SHOULD_RUN: pytest tools/source_lab/tests/test_open62541_source_simulation_single_server_smoke.py -q (dry-run)"
-        echo "  SHOULD_RUN: pytest tools/source_lab/tests/test_source_simulation_multi_server_polling_capacity.py -q -s (dry-run)"
-        echo "  SHOULD_RUN: pytest tools/source_lab/tests/test_source_simulation_multi_server_subscribe_capacity.py -q -s (dry-run)"
+        run_or_dry "single server smoke" "python -m pytest tools/source_lab/tests/test_open62541_source_simulation_single_server_smoke.py -q"
+        not_run "multi-server polling capacity" "TOO_EXPENSIVE_FOR_THIS_RUN"
+        not_run "multi-server subscribe capacity" "TOO_EXPENSIVE_FOR_THIS_RUN"
     elif [[ "$comp" == "platform_shared" ]]; then
-        echo "  SHOULD_RUN: 无独立集成测试"
+        not_run "无独立集成测试" "OUT_OF_SCOPE"
     elif [[ "$comp" == "turtle" ]]; then
-        echo "  NOT_RUN: OUT_OF_SCOPE (turtle 当前多为空壳模块，暂不触发模块集成验证)"
+        not_run "turtle 当前多为空壳模块" "OUT_OF_SCOPE"
     elif [[ "$comp" == "octopus" ]]; then
-        echo "  NOT_RUN: OUT_OF_SCOPE (octopus 当前为空壳模块，暂不触发模块集成验证)"
+        not_run "octopus 当前为空壳模块" "OUT_OF_SCOPE"
     fi
     echo ""
 }
@@ -274,20 +331,19 @@ print_cross_module_commands() {
     local mod="${2:-}"
     echo "--- 跨模块联调期验证 ---"
     if [[ "$comp" == "whale" ]]; then
-        echo "  MANUAL: 需要 docker-compose 环境"
         if [[ -z "$mod" || "$mod" == "ingest" ]]; then
-            echo "  MANUAL: pytest tests/integration/test_ingest_prodlike_*.py -k 'kafka_publish or redis_cache or postgres_runtime' -q (dry-run)"
+            not_run "prodlike kafka/redis/pg" "MISSING_ENVIRONMENT"
         fi
         if [[ -z "$mod" || "$mod" == "message_pipeline" ]]; then
-            echo "  MANUAL: pytest tests/integration/test_message_pipeline_kafka_e2e.py -q (dry-run)"
+            not_run "Kafka message_pipeline E2E" "MISSING_ENVIRONMENT"
         fi
         if [[ -z "$mod" || "$mod" == "speed_layer" || "$mod" == "storage" ]]; then
-            echo "  MANUAL: pytest tests/integration/test_speed_layer_*_pipeline.py -q (dry-run)"
+            not_run "speed_layer pipeline" "MISSING_ENVIRONMENT"
         fi
     elif [[ "$comp" == "source_lab" ]]; then
-        echo "  NOT_RUN: OUT_OF_SCOPE (source_lab 无跨模块联调阶段)"
+        not_run "source_lab 无跨模块联调阶段" "OUT_OF_SCOPE"
     else
-        echo "  NOT_RUN: OUT_OF_SCOPE"
+        not_run "无跨模块联调" "OUT_OF_SCOPE"
     fi
     echo ""
 }
@@ -298,15 +354,12 @@ print_prodlike_commands() {
     local mod="${2:-}"
     echo "--- 准生产依赖验证期 ---"
     if [[ "$comp" == "whale" ]]; then
-        echo "  MANUAL: 需要真实外部服务或 testcontainers"
-        echo "  marker: l5"
-        echo "  MANUAL: pytest -m l5 -q (dry-run)"
-        echo "  MANUAL: bash scripts/run_whale_l5_external_dependency_probe.sh (dry-run)"
+        not_run "l5 marker 测试" "MISSING_ENVIRONMENT"
+        not_run "准生产依赖验证期 外部依赖探测" "MISSING_ENVIRONMENT"
     elif [[ "$comp" == "source_lab" ]]; then
-        echo "  MANUAL: 需要真实设备和协议"
-        echo "  MANUAL: pytest tools/source_lab/tests/access/test_beckhoff_ads_real_protocol_readback.py -q (dry-run)"
+        not_run "Beckhoff ADS readback" "MISSING_ENVIRONMENT"
     else
-        echo "  NOT_RUN: OUT_OF_SCOPE"
+        not_run "无准生产依赖" "OUT_OF_SCOPE"
     fi
     echo ""
 }
@@ -316,11 +369,10 @@ print_deploy_commands() {
     local comp="$1"
     echo "--- 部署前验收期 ---"
     if [[ "$comp" == "whale" ]]; then
-        echo "  MANUAL: 需要 docker-compose 或目标环境"
-        echo "  SHOULD_RUN: pytest tests/e2e/test_whale_field_minimal_smoke.py -q (dry-run)"
-        echo "  SHOULD_RUN: bash scripts/run_whale_field_ready_smoke.sh (dry-run)"
+        not_run "field minimal smoke" "MISSING_ENVIRONMENT"
+        not_run "field ready smoke 脚本" "MISSING_ENVIRONMENT"
     else
-        echo "  NOT_RUN: OUT_OF_SCOPE"
+        not_run "无部署前验收" "OUT_OF_SCOPE"
     fi
     echo ""
 }
@@ -330,11 +382,10 @@ print_ops_commands() {
     local comp="$1"
     echo "--- 发布后运维验证期 ---"
     if [[ "$comp" == "whale" ]]; then
-        echo "  MANUAL: 需要生产或 staging 环境"
-        echo "  MANUAL: 健康检查 endpoint 验证"
-        echo "  MANUAL: 监控告警验证"
+        not_run "健康检查 endpoint" "MANUAL_REQUIRED"
+        not_run "监控告警验证" "MANUAL_REQUIRED"
     else
-        echo "  NOT_RUN: OUT_OF_SCOPE"
+        not_run "无运维验证" "OUT_OF_SCOPE"
     fi
     echo ""
 }
@@ -347,52 +398,49 @@ print_suite_plan() {
     echo "--- 回归套件: $suite ---"
     case "$suite" in
         affected-regression)
-            echo "  MUST_RUN: 本轮变更影响的测试 (需 code-implementer 根据变更范围确定)"
             if [[ -n "$mod" ]]; then
-                echo "  建议: pytest tests/unit/ -k '$mod' -q (dry-run)"
+                run_or_dry "affected unit -k '$mod'" "python -m pytest tests/unit/ -k '$mod' -q"
             else
-                echo "  建议: 先确定变更范围，再选择测试"
+                not_run "请指定 --module 以确定影响范围" "OUT_OF_SCOPE"
             fi
             ;;
         module-regression)
             if [[ "$comp" == "whale" && -n "$mod" ]]; then
-                echo "  MUST_RUN: pytest tests/unit/ -k '$mod' -q (dry-run)"
-                echo "  SHOULD_RUN: pytest tests/integration/ -k '$mod' -q (dry-run)"
+                run_or_dry "module unit -k '$mod'" "python -m pytest tests/unit/ -k '$mod' -q"
+                run_or_dry "module integration -k '$mod'" "python -m pytest tests/integration/ -k '$mod' -q"
             elif [[ "$comp" == "source_lab" ]]; then
-                echo "  MUST_RUN: pytest tools/source_lab/tests/ -q --timeout=120 (dry-run)"
+                run_or_dry "source_lab full" "python -m pytest tools/source_lab/tests/ -q --timeout=120"
             else
-                echo "  MUST_RUN: pytest tests/unit/ -q (dry-run)"
-                echo "  SHOULD_RUN: pytest tests/integration/ -q (dry-run)"
+                run_or_dry "full unit" "python -m pytest tests/unit/ -q"
+                not_run "full integration" "TOO_EXPENSIVE_FOR_THIS_RUN"
             fi
             ;;
         chain-regression)
-            echo "  上下游链路测试:"
             if [[ "$comp" == "whale" ]]; then
                 if [[ "$mod" == "ingest" || -z "$mod" ]]; then
-                    echo "  SHOULD_RUN: pytest tests/integration/test_ingest_source_acquisition_to_redis.py -q (dry-run)"
-                    echo "  SHOULD_RUN: pytest tests/integration/test_ingest_source_cache_message_e2e.py -q (dry-run)"
+                    not_run "acquisition to Redis" "MISSING_ENVIRONMENT"
+                    not_run "cache message E2E" "MISSING_ENVIRONMENT"
                 fi
                 if [[ "$mod" == "message_pipeline" || -z "$mod" ]]; then
-                    echo "  SHOULD_RUN: pytest tests/integration/test_message_pipeline_kafka_e2e.py -q (dry-run)"
+                    not_run "Kafka E2E" "MISSING_ENVIRONMENT"
                 fi
                 if [[ "$mod" == "speed_layer" || "$mod" == "storage" || -z "$mod" ]]; then
-                    echo "  SHOULD_RUN: pytest tests/integration/test_speed_layer_*_pipeline.py -q (dry-run)"
+                    run_or_dry "speed_layer pipeline" "python -m pytest tests/integration/test_speed_layer_*_pipeline.py -q"
                 fi
             fi
             ;;
         release-regression)
-            echo "  全量回归 (除 slow/load/stress):"
             if [[ "$comp" == "whale" ]]; then
-                echo "  MUST_RUN: pytest -m 'not slow and not load and not stress' -q (dry-run)"
+                run_or_dry "release (no slow/load/stress)" "python -m pytest -m 'not slow and not load and not stress' -q"
             elif [[ "$comp" == "source_lab" ]]; then
-                echo "  MUST_RUN: pytest tools/source_lab/tests/ -q --timeout=120 (dry-run)"
+                run_or_dry "source_lab full" "python -m pytest tools/source_lab/tests/ -q --timeout=120"
             fi
             ;;
     esac
     echo ""
 }
 
-# ---- 输出测试计划 ----
+# ---- 输出测试计划/执行 ----
 echo "============================================"
 echo "  测试计划"
 echo "============================================"
@@ -428,9 +476,29 @@ if [[ -n "$SUITE" ]]; then
     print_suite_plan "$SUITE" "$COMPONENT" "$MODULE"
 fi
 
+# ---- 总结 ----
 echo "============================================"
-echo "  dry-run 完成。以上命令均未实际执行。"
-echo "  如需执行，请直接运行对应的 pytest/脚本命令。"
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo "  dry-run 完成。以上命令均未实际执行。"
+    echo "  如需执行，请添加 --execute 参数。"
+else
+    echo "  执行结果"
+    echo "============================================"
+    echo "  PASS:     $PASS_COUNT"
+    echo "  FAIL:     $FAIL_COUNT"
+    echo "  NOT_RUN:  $NOT_RUN_COUNT"
+    if [[ $NOT_RUN_COUNT -gt 0 ]]; then
+        echo ""
+        echo "  NOT_RUN 详情:"
+        for item in "${NOT_RUN_ITEMS[@]}"; do
+            echo "    $item"
+        done
+    fi
+fi
 echo "============================================"
+
+if [[ "$EXECUTE" == "true" && $FAIL_COUNT -gt 0 ]]; then
+    exit 1
+fi
 
 exit 0

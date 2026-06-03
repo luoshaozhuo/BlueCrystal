@@ -34,7 +34,7 @@ Speed Layer 从 message_pipeline 消费消息，写入各存储层：
 | prodlike | 生产模拟 | LocalPipelineRunner multi-process |
 | field | 现场生产 | FlinkPipelineAdapter / Kubernetes operator |
 
-Flink 模式标记为 environment-pending，需部署 Flink 集群和 PyFlink 依赖后启用。
+Flink 模式标记为 MISSING_ENVIRONMENT，需部署 Flink 集群和 PyFlink 依赖后启用。
 
 ## 配置模板
 

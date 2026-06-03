@@ -1,6 +1,6 @@
 """共享持久化样例初始化 PostgreSQL 集成测试。
 
-证据等级：L4 integration。
+测试阶段：跨模块联调期验证 (integration)。
 本测试通过真实 `python -m whale.shared.persistence.template.sample_data` 子进程
 在安全创建的 PostgreSQL 临时测试库上执行 `init_db + sample_data`，验证 shared
 persistence 输入基线已真实落到 PostgreSQL，而不是继续由 SQLite 冒充最终验收。

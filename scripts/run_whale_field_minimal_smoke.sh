@@ -12,7 +12,7 @@
 #
 # 如 TDengine/Pulsar/HDFS 镜像不可稳定运行，输出 environment-pending 预检信息。
 #
-# 证据等级: L4 (integration with config check)
+# 测试阶段：跨模块联调期验证（含配置检查）
 # 环境依赖: Python 3.11+, Kafka broker (可选)
 # =============================================================================
 

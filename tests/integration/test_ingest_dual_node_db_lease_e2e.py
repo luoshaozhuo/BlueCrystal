@@ -9,7 +9,7 @@
 3. 节点 A 释放 lease 后，节点 B 可重新获取。
 4. 旧主（节点 A）释放后尝试用旧 fencing token 操作被拒绝。
 
-证据等级：L3（simulator — 使用真实 DB 但单进程 SQLite，非 PostgreSQL 多进程）。
+测试阶段：模块集成期验证（simulator — 使用真实 DB 但单进程 SQLite，非 PostgreSQL 多进程）。
 不能证明：
 - 真实多进程跨节点并发行为（SQLite 不支持多写入并发）。
 - 网络分区下的 lease 一致性。
@@ -467,9 +467,9 @@ class TestDualNodeDbLeaseConflict:
 class TestPostgresDualProcessWriteLease:
     """PostgreSQL 双进程租约与 fencing 验证。
 
-    证据等级：
-    - 这些用例在具备 ``WHALE_INGEST_TEST_PG_DSN`` 时提供 L4 风格的真实 PostgreSQL 多进程验证。
-    - 若环境变量缺失则按 environment-pending 跳过，不得视为通过。
+    测试阶段：
+    - 这些用例在具备 ``WHALE_INGEST_TEST_PG_DSN`` 时提供跨模块联调期验证 风格的真实 PostgreSQL 多进程验证。
+    - 若环境变量缺失则按 MISSING_ENVIRONMENT 跳过，不得视为通过。
     - 网络分区与旧主恢复全链路仍需额外 fault injection，不能仅凭本文件收口。
     """
 

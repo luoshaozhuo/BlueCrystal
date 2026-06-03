@@ -9,7 +9,7 @@
 - whale.storage.standardized: MemoryStandardizedSink
 - whale.storage.serving_cache: InMemoryServingCache
 
-证据等级：L3 simulator（全内存闭环，完整链路覆盖）。
+测试阶段：模块集成期验证 (simulator)（全内存闭环，完整链路覆盖）。
 不能证明：TDengine 真实时序写入、Redis serving cache 真实读写。
 """
 

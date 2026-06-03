@@ -9,7 +9,7 @@ InMemoryMessageBus 发布消息 → RawArchiveWriter 消费 → LocalCompressedA
 - whale.storage.raw_archive: LocalCompressedArchiveSink, InMemoryManifestRepository
 - whale.message_pipeline.adapters.in_memory: InMemoryMessageBus, InMemoryDeadLetterSink
 
-证据等级：L3 simulator（内存+本地文件，闭环覆盖完整链路）。
+测试阶段：模块集成期验证 (simulator)（内存+本地文件，闭环覆盖完整链路）。
 不能证明：HDFS/S3 真实存储写入、网络传输和数据持久化。
 """
 

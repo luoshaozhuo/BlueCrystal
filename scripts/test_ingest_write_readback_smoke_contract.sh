@@ -4,7 +4,7 @@
 # ============================================================================
 #
 # 被验证对象：scripts/run_ingest_write_readback_smoke.sh
-# 证据等级：L2 contract（验证脚本 CLI 接口契约和失败码，不产生设备流量）
+# 测试阶段：开发期验证（contract）—— 验证脚本 CLI 接口契约和失败码，不产生设备流量
 #
 # 不能证明：
 #   - 不验证真实设备 write/readback 行为（L5 field）
@@ -164,8 +164,8 @@ REPORT_FILE="/tmp/test_ingest_smoke_contract_$(date +%s).md"
 OUTPUT=$(EVIDENCE_REPORT="${REPORT_FILE}" bash "${SCRIPT}" --protocol opcua 2>&1)
 if [[ -f "${REPORT_FILE}" ]]; then
   REPORT_CONTENT=$(cat "${REPORT_FILE}")
-  if echo "${REPORT_CONTENT}" | grep -q "验证环境" && echo "${REPORT_CONTENT}" | grep -q "证据等级" && echo "${REPORT_CONTENT}" | grep -q "L3 simulator/native"; then
-    echo -e "${GREEN}PASS${NC} [9] 证据报告生成正确（含验证环境/证据等级/L3 标注）"
+  if echo "${REPORT_CONTENT}" | grep -q "验证环境" && echo "${REPORT_CONTENT}" | grep -q "测试阶段" && echo "${REPORT_CONTENT}" | grep -q "simulator/native"; then
+    echo -e "${GREEN}PASS${NC} [9] 证据报告生成正确（含验证环境/测试阶段/simulator标注）"
     PASSED=$((PASSED + 1))
     TOTAL=$((TOTAL + 1))
   else
@@ -245,6 +245,6 @@ if [[ ${FAILED} -gt 0 ]]; then
   exit 2
 else
   echo "入口脚本契约自检全部通过。"
-  echo "证据等级: L2 contract（验证 CLI 契约，不产生设备流量）。"
+  echo "测试阶段：开发期验证（contract）—— 验证 CLI 契约，不产生设备流量。"
   exit 0
 fi

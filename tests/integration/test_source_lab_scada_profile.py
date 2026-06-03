@@ -1,6 +1,6 @@
 """source_lab 消费 shared persistence SCADA sample DB 的集成测试。
 
-证据等级：L4 integration。
+测试阶段：跨模块联调期验证 (integration)。
 本测试通过真实 sample SQLite -> `ScadaProfileProvider` -> `SimulatorSourceProvider`
 -> `ServerSimulatorFacade` 验证 source_lab 已不再手工拼装样例，而是实际消费
 shared persistence 输入基线。它不证明 native runner 或现场设备环境已就绪。

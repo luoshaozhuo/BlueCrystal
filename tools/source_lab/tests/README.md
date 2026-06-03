@@ -2,7 +2,52 @@
 
 This package covers the access helpers, facade wiring, and the smoke wrappers used by source_lab field-capacity commands.
 
-Subscribe capacity expectations:
+## Test boundary
+
+source_lab 测试 (`tools/source_lab/tests/`) 与 Whale 主平台测试 (`tests/`) 边界清楚：
+
+1. **source_lab 测试只证明工具层自身行为**：parser、metrics、reporter、runner、factory、
+   CLI 参数解析、facade 契约、simulator 和 native runner 协议。
+2. **source_lab 测试通过不得自动等同于 Whale 生产链路通过**。Whale 生产链路需
+   ``tests/`` 中对应适配器、use case、API 和端到端测试独立验证。
+3. **扩跑条件**：当 source_lab 变更影响以下范围时，需在 Whale 侧额外验证：
+   - ``tools/source_lab/access/runners/*`` 变更 -> 对应的 ``src/whale/shared/source/*/reader.py``
+     和 ``backend`` 测试
+   - ``tools/source_lab/protocols/*/simulator.py`` 变更 -> 对应的
+     ``src/whale/ingest/adapters/source/*_adapter.py`` 测试
+   - ``tools/source_lab/native/*`` 变更 -> 对应的 native backend 测试
+4. **Whale 测试不得依赖 source_lab 运行时**。
+5. 详细扩跑条件和测试资产索引见 ``ai_shared/memory/test_index.md`` 第 6 和 3.2 节。
+
+## 工具名与验证等级的区别
+
+``field_probe.py``、``field_profile.py``、``field_capacity.py`` 是 **source_lab 工具入口 CLI**，
+不是验证等级或生命周期阶段。它们分别提供现场探测、性能画像和容量测试功能。
+
+这些工具自身有对应的测试（见 ``access/test_field_probe_cli.py``、
+``access/test_field_profile_cli.py``、``access/test_field_capacity_cli.py``），
+属于开发期验证（单元/契约测试）。使用这些工具执行的测试则可能属于模块集成期、
+跨模块联调期或准生产依赖验证期，取决于运行环境和依赖。
+
+## NOT_RUN 条件
+
+source_lab 测试的 NOT_RUN 条件（定义于 ``ai_shared/rules/testing.md``）：
+
+| 条件 | 适用场景 |
+|---|---|
+| `MISSING_ENVIRONMENT` | 缺少 C native 二进制（open62541、lib60870、libiec61850、libmodbus） |
+| `MISSING_DEPENDENCY` | 缺少 dotnet runtime（Beckhoff ADS）、Twincat ADS server 或 AdsLib |
+| `MANUAL_REQUIRED` | 需要真实物理设备（PLC、RTU、IED、串口、L2 可控 veth 环境） |
+| `MISSING_ENVIRONMENT` | 需要 docker-compose 但未启动 |
+| `TOO_EXPENSIVE_FOR_THIS_RUN` | 长时间容量扫描、大规模多服务器 profile、全协议矩阵 |
+| `OUT_OF_SCOPE` | source_lab 变更不影响生产路径时不需要跑 Whale 主平台测试 |
+
+## 测试结果术语
+
+source_lab 测试报告使用与 Whale 主平台一致的术语：PASS / FAIL / NOT_RUN。
+pytest skip/xfail 在报告中统一转写为 NOT_RUN 并说明原因。
+
+## Subscribe capacity expectations
 
 - `p95_ms` / `max_ms` on the capacity summary map to subscribe `data_period_*` verdict fields.
 - `response_period_*` stays diagnostic-only and does not trigger default FAIL.

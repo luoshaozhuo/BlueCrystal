@@ -1,7 +1,7 @@
 """dynamic runtime state store 保留策略测试。
 
 验证 state store 的保留/清理策略行为。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

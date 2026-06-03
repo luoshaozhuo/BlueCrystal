@@ -1,6 +1,6 @@
 """source_lab Beckhoff ADS 统一输入集成测试。
 
-证据等级：L4 integration。
+测试阶段：跨模块联调期验证 (integration)。
 本测试证明 shared persistence 输入可驱动以下两类 ADS tool runtime 闭环：
 1. `backend_kind=in_process` — lightweight ADS simulator 内存态；
 2. `backend_kind=beckhoff_dotnet` — 真实 .NET virtual server + client（环境依赖，

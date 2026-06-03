@@ -1,7 +1,7 @@
 """Beckhoff ADS 真实协议 read/write/readback 闭环测试。
 
-证据等级：L4+ integration（需 dotnet + AdsServer + AdsLib runner 全部就绪时）；
-环境不满足时 L2 contract（仅验证 backend_kind=beckhoff_dotnet 的 facade 契约和
+测试阶段：跨模块联调期验证 (integration)（需 dotnet + AdsServer + AdsLib runner 全部就绪时）；
+环境不满足时为开发期验证 (contract)（仅验证 backend_kind=beckhoff_dotnet 的 facade 契约和
 降级路径，以及 backend_kind=in_process 的 lightweight fallback 对照）。
 
 本测试覆盖：

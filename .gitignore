@@ -69,3 +69,6 @@ third_party/
 
 # Local runtime data
 /data/
+
+# coding agent reports
+/ai_shared/reports/

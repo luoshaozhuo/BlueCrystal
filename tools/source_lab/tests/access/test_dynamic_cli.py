@@ -1,7 +1,7 @@
 """dynamic CLI 功能测试。
 
 验证 dynamic endpoint runtime 的 CLI 命令行为。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 

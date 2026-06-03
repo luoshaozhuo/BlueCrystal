@@ -41,7 +41,7 @@ vim .env.whale.field
 关键变量：`WHALE_KAFKA_BOOTSTRAP_SERVERS`、`WHALE_REDIS_URL`、`WHALE_S3_ENDPOINT`、
 `WHALE_TDENGINE_DSN`、`WHALE_POSTGRES_HOST`。
 
-### 3. 启动 L5 外部依赖环境
+### 3. 启动准生产依赖验证期 外部环境
 
 ```bash
 # 启动 P0 服务 (Kafka + Redis + MinIO + TDengine + PostgreSQL)
@@ -62,7 +62,7 @@ pip install -e ".[dev,s3,redis]"
 ### 5. 一键预检验证
 
 ```bash
-# 完整预检（环境 + L5 E2E + L4 smoke + marker 审计）
+# 完整预检（环境 + 准生产依赖 E2E + 跨模块联调 smoke + marker 审计）
 bash scripts/run_whale_field_ready_smoke.sh
 
 # 仅环境检查，跳过测试
@@ -72,44 +72,44 @@ bash scripts/run_whale_field_ready_smoke.sh --skip-tests
 bash scripts/run_whale_field_ready_smoke.sh --json
 ```
 
-## L5 验证单独运行
+## 准生产依赖验证期 单独运行
 
 ```bash
-# L5 外部依赖环境探测（8 服务，多级探针）
+# 准生产依赖验证期 外部依赖环境探测（8 服务，多级探针）
 bash scripts/run_whale_l5_external_dependency_probe.sh --json
 
-# Kafka pipeline L5 E2E
+# Kafka pipeline 准生产依赖 E2E
 pytest tests/e2e/test_whale_l5_kafka_pipeline_e2e.py -m l5 -v
 
-# Storage L5 E2E（S3/MinIO + TDengine + Redis）
+# Storage 准生产依赖 E2E（S3/MinIO + TDengine + Redis）
 pytest tests/e2e/test_whale_l5_storage_e2e.py -m l5 -v
 
-# L5 外部依赖综合验证
+# 准生产依赖验证期 外部依赖综合验证
 pytest tests/integration/test_l5_external_dependency_verification.py -m l5 -v
 
-# L4 现场最小链路 smoke（InMemory，无需 Docker）
+# 跨模块联调期 现场最小链路 smoke（InMemory，无需 Docker）
 pytest tests/e2e/test_whale_field_minimal_smoke.py -v
 ```
 
 ## 环境依赖状态
 
-### L5 verified（准生产真实外部依赖验证通过，Round 5）
+### 准生产依赖验证期 验证通过（真实外部依赖验证通过，Round 5）
 
 | 组件 | 端口 | 状态 | 证据 |
 | --- | --- | --- | --- |
-| Kafka | 9092 | **L5 verified** | 4 E2E + 2 integration, real pub/consume + consumer group isolation |
-| PostgreSQL | 5432 | **L5 verified** | 1 integration, connect + SELECT 1 |
-| Redis | 16379 | **L5 verified** | 4 E2E + 1 integration, SET/GET/TTL/stale/out-of-order |
-| S3/MinIO | 9000 | **L5 verified** | 3 E2E + 2 integration, write gzip JSONL + readback + manifest |
-| TDengine | 6041 | **L5 verified** | 3 E2E + 2 integration, REST API write + readback 10 fields |
+| Kafka | 9092 | **准生产依赖验证期 验证通过** | 4 E2E + 2 integration, real pub/consume + consumer group isolation |
+| PostgreSQL | 5432 | **准生产依赖验证期 验证通过** | 1 integration, connect + SELECT 1 |
+| Redis | 16379 | **准生产依赖验证期 验证通过** | 4 E2E + 1 integration, SET/GET/TTL/stale/out-of-order |
+| S3/MinIO | 9000 | **准生产依赖验证期 验证通过** | 3 E2E + 2 integration, write gzip JSONL + readback + manifest |
+| TDengine | 6041 | **准生产依赖验证期 验证通过** | 3 E2E + 2 integration, REST API write + readback 10 fields |
 
-### env-pending（环境未就绪）
+### MISSING_ENVIRONMENT（环境未就绪）
 
 | 组件 | 端口 | 状态 | 备注 |
 | --- | --- | --- | --- |
-| Pulsar | 6650 | env-pending | contract-only adapter, P1 可选 |
-| Flink | 8081 | env-pending | contract-only adapter, P1 可选 |
-| HDFS | 9870 | env-pending | contract-only adapter, P1 可选 |
+| Pulsar | 6650 | MISSING_ENVIRONMENT | contract-only adapter, P1 可选 |
+| Flink | 8081 | MISSING_ENVIRONMENT | contract-only adapter, P1 可选 |
+| HDFS | 9870 | MISSING_ENVIRONMENT | contract-only adapter, P1 可选 |
 
 ### stub/未实现
 
@@ -123,15 +123,15 @@ pytest tests/e2e/test_whale_field_minimal_smoke.py -v
 
 | 组件 | 状态 | 说明 |
 | --- | --- | --- |
-| 本地 raw_archive | L4 | LocalCompressedArchiveSink，gzip 压缩本地文件 |
-| InMemory 全链路 | L4 | 7 smoke tests，无外部依赖 |
+| 本地 raw_archive | 跨模块联调期验证 | LocalCompressedArchiveSink，gzip 压缩本地文件 |
+| InMemory 全链路 | 跨模块联调期验证 | 7 smoke tests，无外部依赖 |
 
 ## 配置参考路径
 
 | 配置 | 文件 |
 | --- | --- |
 | Kafka broker / topic | `config/whale/message_pipeline.kafka.example.yaml` |
-| Pulsar broker | `config/whale/message_pipeline.pulsar.example.yaml` (env-pending) |
+| Pulsar broker | `config/whale/message_pipeline.pulsar.example.yaml` (MISSING_ENVIRONMENT) |
 | Speed layer writers | `config/whale/speed_layer.writers.example.yaml` |
 | S3/MinIO raw_archive | `config/whale/storage.raw_archive.example.yaml` |
 | TDengine raw_index/standardized | `config/whale/storage.tdengine.example.yaml` |
@@ -148,14 +148,14 @@ pytest tests/e2e/test_whale_field_minimal_smoke.py -v
 
 ## 测试汇总
 
-Round 5 最终收口: **120 tests passed, 0 failed, 4 skipped** (Pulsar/Flink/HDFS env-pending)
+Round 5 最终收口: **120 tests passed, 0 failed, 4 skipped** (Pulsar/Flink/HDFS MISSING_ENVIRONMENT)
 
 | 测试类别 | 测试数 | 结果 |
 | --- | --- | --- |
-| unit tests (L1) | 全量 | all passed |
-| integration tests (L4/L5) | 全量 | all passed |
-| Kafka pipeline E2E (L5) | 4 | all passed |
-| Storage E2E (L5) | 10 (S3:3, TD:3, Redis:4) | all passed |
-| Field minimal smoke (L4) | 7 | all passed |
-| HDFS (L5) | 1 | skipped (env-pending) |
-| Pulsar + Flink | 3 | skipped (env-pending) |
+| 开发期验证 (unit) | 全量 | all passed |
+| 跨模块/准生产联调验证 (integration) | 全量 | all passed |
+| Kafka pipeline E2E (准生产依赖验证期) | 4 | all passed |
+| Storage E2E (准生产依赖验证期) | 10 (S3:3, TD:3, Redis:4) | all passed |
+| Field minimal smoke (跨模块联调期验证) | 7 | all passed |
+| HDFS (准生产依赖验证期) | 1 | skipped (MISSING_ENVIRONMENT) |
+| Pulsar + Flink | 3 | skipped (MISSING_ENVIRONMENT) |

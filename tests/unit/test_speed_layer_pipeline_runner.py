@@ -7,7 +7,8 @@
 - whale.speed_layer.runner: LocalPipelineRunner, FlinkPipelineAdapter
 - whale.speed_layer.metrics: InMemoryMetricsCollector
 
-证据等级：L1 unit/mock（纯内存测试，不连接任何外部系统）。
+所属生命周期阶段：开发期验证（纯内存测试，不连接任何外部系统）。
+使用 mock/fake/in-memory 替身隔离依赖。
 不能证明：真实 Flink 集群的 job 提交和运行行为。
 """
 
@@ -229,7 +230,7 @@ class TestSpeedLayerWiringWithLightProcessor:
 
     所有测试使用 InMemory 适配器（InMemoryMessageBus + InMemoryDeadLetterSink +
     MemoryRawIndexSink / MemoryStandardizedSink / InMemoryServingCache），
-    不依赖真实外部服务。证据等级为 L4。
+    不依赖真实外部服务。测试阶段为跨模块联调期验证。
     """
 
     def test_with_light_processor_builds_registers_writers(self) -> None:

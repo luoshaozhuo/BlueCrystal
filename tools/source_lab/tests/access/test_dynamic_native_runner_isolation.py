@@ -1,7 +1,7 @@
 """native runner 隔离测试。
 
 验证不同协议 native runner 之间的进程和资源隔离。
-证据等级：L2（contract）。
+测试阶段：开发期验证 (contract)。
 """
 from __future__ import annotations
 
