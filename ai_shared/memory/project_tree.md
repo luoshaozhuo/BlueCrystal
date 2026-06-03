@@ -1,7 +1,7 @@
 # Whale 项目目录树
 
 > 能源数据统一平台（风光储电场数据接入底座）
-> 最后更新: 2026-06-03 (project-tree-reset: 全量重建，移除已删除的 REQ/报告引用，补齐 config/whale、beckhoff_ads、新增测试文件)
+> 最后更新: 2026-06-03 (增量更新: 新增 test_index.md/whale_test.sh，更新 5 个规则文件职责说明)
 
 本文件维护完整文件级目录树，每个 item 附简短职责注释（不超过 40 中文字符）。
 只用于导航，不替代读取当前源码。
@@ -1080,6 +1080,7 @@ ai_shared/
 │   └── coding_agent_prompt_template.txt — Coding Agent prompt 模板
 ├── memory/                            — 长期记忆
 │   ├── project_tree.md                — 本文件（目录树）
+│   ├── test_index.md                  — 测试资产索引与回归测试唯一索引
 │   ├── 业务目标与价值愿景.md            — 项目白皮书：业务目标与价值愿景
 │   ├── 总体逻辑设计.md                  — 项目白皮书：总体逻辑设计
 │   ├── Whale_REQ_README.md           — 需求文档规范说明
@@ -1104,12 +1105,12 @@ ai_shared/
 │   └── whale_l5_true_external_chain_round3_closure_report.md — Round 3 L5 真实外部依赖链路收口与 REQ 状态纠偏报告
 └── rules/                             — 公共规则
     ├── routing.md                     — 规则路由
-    ├── coding.md                      — 编码规范
-    ├── testing.md                     — 测试规范
+    ├── coding.md                      — 编码规范（架构边界/接口类型/测试同步/文档注释）
+    ├── testing.md                     — 测试规范（七个生命周期阶段/回归测试/NOT_RUN 枚举）
     ├── documentation.md               — 文档规范
-    ├── reporting.md                   — 反馈规范
-    ├── validation-routing.md          — 验证路由
-    ├── python-docstring-cn.md         — Python 中文 docstring 规范
+    ├── reporting.md                   — 反馈规范（Agent result 格式/报告命名/NOT_RUN 枚举）
+    ├── validation-routing.md          — 验证路由（变更类型->阶段->优先级路由规则）
+    ├── python-docstring-cn.md         — Python 中文 docstring 规范（生命周期阶段/测试文件头）
     └── quality-gate.md                — 代码质量门禁规则
 ```
 
@@ -1129,6 +1130,7 @@ docs/
 ```text
 scripts/
 ├── cleanup_root_logs.sh               — 清理根目录日志文件
+├── whale_test.sh                     — Whale 测试统一入口（dry-run 测试计划输出）
 ├── run_ingest_dev.sh                  — 启动 ingest 开发环境
 ├── run_ingest_runtime_compose_smoke.sh — ingest compose运行态烟测
 ├── run_ingest_compose_readyz_e2e.sh   — compose readyz 8组件聚合 E2E 脚本

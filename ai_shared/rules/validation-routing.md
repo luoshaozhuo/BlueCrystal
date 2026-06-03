@@ -1,64 +1,52 @@
 # 验证路由规则
 
-## 1. 基本原则
+## 1. 规则定位
 
-1. 验证范围跟随真实变更影响。
-2. 最小验证必须覆盖本轮风险。
-3. 不默认全量测试、长测或重回归。
-4. 跳过验证必须说明原因和风险。
-5. 工具不存在时不得虚构通过，必须说明替代验证和风险。
+本规则用于根据真实变更范围选择验证阶段和验证命令。具体命令以仓库工具链、测试索引和任务 handoff 为准。
 
-## 2. 按变更类型选择验证
+## 2. 执行优先级
 
-```text
-源码行为变化：
-- 语法/编译检查
-- lint/static analysis
-- type-check（如适用）
-- affected unit/integration tests
+| 优先级 | 含义 | 收口要求 |
+|---|---|---|
+| must-run | 本次变更风险必须覆盖 | FAIL 或 NOT_RUN 时不得收口，除非任务明确调整范围 |
+| should-run | 建议执行，可由任务范围裁剪 | 未执行时写入后续建议并说明原因 |
+| manual-or-expensive | 需要人工、专门环境或高成本资源 | 不自动执行，需记录触发条件 |
+| not-run | 与本次变更无关 | 不执行，必要时说明排除理由 |
 
-配置/env/CLI/API/schema 变化：
-- 配置解析测试
-- schema 或 migration 兼容性验证
-- 文档/示例同步检查
-- 相关集成或 smoke 测试
+## 3. 通用路由
 
-协议/消息/文件格式变化：
-- parser/serializer contract tests
-- backward/forward compatibility tests
-- 真实依赖或 simulator/integration 证据等级说明
+| 变更类型 | must-run | should-run | manual-or-expensive |
+|---|---|---|---|
+| 纯文档、报告、注释文字 | 格式、链接、路径或规则一致性检查 | 相关索引或目录树检查 | 无 |
+| 生产源码行为 | 构建期验证、开发期验证 | 模块集成期验证 | 跨模块联调期验证 |
+| public interface / API / CLI | 构建期验证、开发期验证、契约测试 | 模块集成期验证、调用方验证 | 跨模块联调期验证 |
+| schema / migration / 配置 | 解析和兼容性验证、构建期验证 | 模块集成期验证、部署配置检查 | 数据迁移演练 |
+| 消息格式 / 协议 / 文件格式 | parser/serializer、兼容性测试 | 跨模块联调期验证 | 准生产依赖验证期 |
+| adapter / repository / external client | 构建期验证、开发期验证、模块集成期验证 | 准生产依赖验证期 | 故障注入、长稳 |
+| runtime / scheduler / worker / lease | 构建期验证、开发期验证、模块集成期验证 | 跨模块联调期验证 | failover、并发、长稳 |
+| 安全 / 权限 / 审计 / 凭据 | deny/conflict/failure path、审计检查 | 模块集成期验证 | 安全评审、渗透或合规检查 |
+| Docker / Compose / deployment / scripts | 脚本语法、配置检查、部署前 smoke | 准生产依赖验证期 | 发布演练、回滚演练 |
+| 工具/实验模块 | 工具自身构建期和开发期验证 | 工具自身模块集成期验证 | 只有影响生产边界时才扩展到生产链路 |
 
-安全/权限/审计/lease/fencing 变化：
-- deny/conflict/failure path tests
-- audit/metrics evidence
-- concurrency 或 failover 测试（如可负担）
+## 4. 验证计划输出
 
-文档/规则/报告变化：
-- 路径、格式、规则一致性检查
-- 通常不需要代码测试，但必须说明
-```
-
-## 3. 语言命令参考
-
-执行命令以仓库配置为准；可参考 `quality-gate.md` 的语言门禁清单。
-
-## 4. 分类规则
-
-失败必须分类为：
+执行验证前应形成简短计划：
 
 ```text
-本轮引入
-既有失败
-环境失败
-flaky
-依赖缺失
-验证命令错误
-未执行 / environment-pending
+Validation plan:
+- must-run:
+- should-run:
+- manual-or-expensive:
+- not-run:
 ```
+
+计划应说明阶段、对象、命令或测试索引项。未执行项必须使用 `testing.md` 定义的 NOT_RUN 原因。
 
 ## 5. 收口规则
 
-1. 存在本轮引入 failed 时不得收口。
-2. 存在 environment-pending 时不得写成通过。
-3. 如果只运行局部测试，最终反馈必须说明局部范围。
-4. 如果只有 mock/contract/simulator 证据，不得写成真实 e2e/field 通过。
+1. `must-run` 中存在 FAIL 时不得收口。
+2. `must-run` 中存在 NOT_RUN 时不得收口，除非任务范围明确排除该验证。
+3. `should-run` 未执行时，必须记录原因和后续建议。
+4. 只执行局部验证时，反馈和报告必须说明局部范围。
+5. 工具、mock、fake、stub、simulator 验证不得写成生产真实闭环。
+6. 本次变更新增失败不得进入下一阶段。
