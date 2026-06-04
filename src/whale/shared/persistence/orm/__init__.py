@@ -41,6 +41,12 @@ from whale.shared.persistence.orm.scada_ingest import (
     SignalProfile,
     SignalProfileItem,
 )
+from whale.shared.persistence.orm.model_asset import (
+    ModelAsset,
+    SimulationArtifact,
+    SimulationCase,
+    SimulationResult,
+)
 from whale.shared.persistence.orm.scada_protocol_param import (
     ScadaEndpointParamValue,
     ScadaProtocolParamDef,
@@ -62,6 +68,7 @@ __all__ = [
     "IngestRuntimeNode", "IngestRuntimeJob", "IngestJobAssignment",
     "IngestJobLease", "IngestFencingToken", "IngestBundleMetadata",
     "IngestAuditEventOrm", "IngestRuntimeConfigVersion",
+    "ModelAsset", "SimulationCase", "SimulationResult", "SimulationArtifact",
     "ScadaProtocolParamDef", "ScadaEndpointParamValue",
     "ScadaSignalParamDef", "ScadaSignalProfileItemParamValue",
 ]

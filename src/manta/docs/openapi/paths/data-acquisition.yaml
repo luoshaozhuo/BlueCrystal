@@ -1,0 +1,15 @@
+paths:
+  /api/data-acquisition/page:
+    get:
+      tags:
+        - DataAcquisition
+      operationId: getDataAcquisitionPage
+      summary: 获取数据采集页面聚合数据
+      description: 返回数据采集页面顶部指标、设备通信、数据质量、信道资源、存储资源和计算资源所需的数据。
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/DataCollectionPageResponse'

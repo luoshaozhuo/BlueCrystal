@@ -1,0 +1,15 @@
+paths:
+  /api/wind-farm/info:
+    get:
+      tags:
+        - WindFarm
+      operationId: getWindFarmInfo
+      summary: 获取风电场信息
+      description: 返回风电场名称、中心坐标与范围半径。
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/WindFarmInfoResponse'

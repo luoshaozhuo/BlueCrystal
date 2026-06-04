@@ -1,0 +1,22 @@
+paths:
+  /api/lidar/page:
+    get:
+      tags:
+        - Lidar
+      operationId: getLidarPage
+      summary: 获取激光雷达页面聚合数据
+      description: 返回激光雷达页面首屏指标、实时图表与分析图表所需的数据。
+      parameters:
+        - name: turbineId
+          in: query
+          required: false
+          description: 机组编号，不传时返回默认机组数据
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/LidarPageResponse'

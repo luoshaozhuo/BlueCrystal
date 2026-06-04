@@ -1,0 +1,62 @@
+paths:
+  /api/user/login:
+    post:
+      tags:
+        - User
+      operationId: login
+      summary: 用户登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../showtime.openapi.yaml#/components/schemas/LoginData'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/LoginResResponse'
+
+  /api/user/logout:
+    post:
+      tags:
+        - User
+      operationId: logout
+      summary: 用户登出
+      responses:
+        '200':
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/LogoutResponse'
+
+  /api/user/info:
+    post:
+      tags:
+        - User
+      operationId: getUserInfo
+      summary: 获取用户信息
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/UserInfoResponse'
+
+  /api/user/menu:
+    post:
+      tags:
+        - User
+      operationId: getMenuList
+      summary: 获取服务端菜单
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/MenuListResponse'

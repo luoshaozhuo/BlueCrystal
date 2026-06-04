@@ -46,6 +46,16 @@ from whale.storage.serving_cache import (
     RedisServingCache,
     ServingCachePort,
 )
+from whale.storage.waveform import (
+    InMemoryStandardizedWaveformSink,
+    StandardizedWaveformSinkPort,
+    TdengineStandardizedWaveformSink,
+)
+from whale.storage.simulation_result import (
+    InMemorySimulationResultTimeSeriesSink,
+    SimulationResultTimeSeriesSinkPort,
+    TdengineSimulationResultTimeSeriesSink,
+)
 
 __all__ = [
     # raw_archive
@@ -64,6 +74,10 @@ __all__ = [
     "MemoryStandardizedSink",
     "StandardizedTimeSeriesSinkPort",
     "TdengineStandardizedSink",
+    # waveform
+    "InMemoryStandardizedWaveformSink",
+    "StandardizedWaveformSinkPort",
+    "TdengineStandardizedWaveformSink",
     # warehouse
     "InMemoryWarehouseSink",
     "WarehouseSinkPort",
@@ -74,4 +88,8 @@ __all__ = [
     "InMemoryServingCache",
     "RedisServingCache",
     "ServingCachePort",
+    # simulation_result
+    "InMemorySimulationResultTimeSeriesSink",
+    "SimulationResultTimeSeriesSinkPort",
+    "TdengineSimulationResultTimeSeriesSink",
 ]

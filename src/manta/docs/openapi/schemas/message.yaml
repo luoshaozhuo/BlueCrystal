@@ -1,0 +1,69 @@
+components:
+  schemas:
+    MessageRecord:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - subTitle
+        - content
+        - time
+        - status
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        title:
+          type: string
+        subTitle:
+          type: string
+        avatar:
+          type: string
+        content:
+          type: string
+        time:
+          type: string
+        status:
+          type: integer
+          enum:
+            - 0
+            - 1
+        messageType:
+          type: integer
+
+    MessageListType:
+      type: array
+      items:
+        $ref: '#/components/schemas/MessageRecord'
+
+    MessageStatus:
+      type: object
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+
+    MessageListResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/MessageListType'
+
+    MessageReadResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: boolean

@@ -1,0 +1,39 @@
+components:
+  schemas:
+    WindFarmInfo:
+      type: object
+      required:
+        - name
+        - centerLon
+        - centerLat
+        - radiusMeters
+      properties:
+        name:
+          type: string
+          description: 风电场名称
+          example: 西山风电场
+        centerLon:
+          type: number
+          format: double
+          description: 风电场中心经度（WGS84）
+          example: 112.364649
+        centerLat:
+          type: number
+          format: double
+          description: 风电场中心纬度（WGS84）
+          example: 37.9340015
+        radiusMeters:
+          type: number
+          format: double
+          description: 风电场范围半径，单位 m
+          example: 2500
+
+    WindFarmInfoResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/WindFarmInfo'

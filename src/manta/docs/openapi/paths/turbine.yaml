@@ -1,0 +1,37 @@
+paths:
+  /api/turbine/base-info:
+    get:
+      tags:
+        - Turbine
+      operationId: getTurbineBaseInfo
+      summary: 获取风机基础信息列表
+      description: 返回风机位置、高程等静态信息。
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/TurbineBaseInfoResponse'
+
+  /api/turbine/realtime-status:
+    get:
+      tags:
+        - Turbine
+      operationId: getTurbineRealtimeStatus
+      summary: 获取风机实时状态列表
+      description: 返回风机当前时刻的运行状态、功率与风况信息。
+      parameters:
+        - name: ids
+          in: query
+          required: false
+          description: 可选风机 ID 列表，多个值用逗号分隔（例如 `01,02,03`）
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/TurbineRealtimeStatusResponse'

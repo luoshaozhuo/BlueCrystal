@@ -1,0 +1,22 @@
+paths:
+  /api/power-analysis/page:
+    get:
+      tags:
+        - PowerAnalysis
+      operationId: getPowerAnalysisPage
+      summary: 获取功率分析页面聚合数据
+      description: 返回功率分析页面概览、功率曲线、波动性证据和短期扰动事件分析所需的数据。
+      parameters:
+        - name: turbineId
+          in: query
+          required: false
+          description: 机组编号，不传时返回默认机组数据
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/PowerAnalysisPageResponse'

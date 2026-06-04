@@ -1,0 +1,369 @@
+components:
+  schemas:
+    TurbineOption:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+
+    TurbineProfile:
+      type: object
+      required: [turbineId, model, commissionDate, optimizationDate, analysisWindow]
+      properties:
+        turbineId:
+          type: string
+        model:
+          type: string
+        commissionDate:
+          type: string
+        optimizationDate:
+          type: string
+        analysisWindow:
+          type: string
+
+    SummaryMetric:
+      type: object
+      required: [key, title, value, subtitle, trend]
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        value:
+          type: string
+        subtitle:
+          type: string
+        trend:
+          type: string
+          enum: [up, down, neutral]
+        unit:
+          type: string
+        compactValue:
+          type: boolean
+
+    PowerCurvePoint:
+      type: object
+      required: [windSpeed, before, after]
+      properties:
+        windSpeed:
+          type: number
+          format: double
+        before:
+          type: number
+          format: double
+        after:
+          type: number
+          format: double
+
+    RayleighParameters:
+      type: object
+      required: [sigma]
+      properties:
+        sigma:
+          type: number
+          format: double
+
+    QuantileStats:
+      type: object
+      required: [p10, p25, median, p75, p90]
+      properties:
+        p10: { type: number, format: double }
+        p25: { type: number, format: double }
+        median: { type: number, format: double }
+        p75: { type: number, format: double }
+        p90: { type: number, format: double }
+
+    DistributionShiftGroup:
+      type: object
+      required: [metric, baselineSamples, optimizedSamples, baselineStats, optimizedStats]
+      properties:
+        metric:
+          type: string
+          enum: [Peak, P95, P99]
+        baselineSamples:
+          type: array
+          items: { type: number, format: double }
+        optimizedSamples:
+          type: array
+          items: { type: number, format: double }
+        baselineStats:
+          $ref: '#/components/schemas/QuantileStats'
+        optimizedStats:
+          $ref: '#/components/schemas/QuantileStats'
+
+    DistributionShiftEvidence:
+      type: object
+      required: [metrics, groups]
+      properties:
+        metrics:
+          type: array
+          items:
+            type: string
+            enum: [Peak, P95, P99]
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/DistributionShiftGroup'
+
+    TailQuantileMarker:
+      type: object
+      required: [x, y, label]
+      properties:
+        x: { type: number, format: double }
+        y: { type: number, format: double }
+        label: { type: string }
+
+    TailCcdfEvidence:
+      type: object
+      required: [thresholds, baselineCcdf, optimizedCcdf, baselineSamples, optimizedSamples, quantiles, markers]
+      properties:
+        thresholds:
+          type: array
+          items: { type: number, format: double }
+        baselineCcdf:
+          type: array
+          items: { type: number, format: double }
+        optimizedCcdf:
+          type: array
+          items: { type: number, format: double }
+        baselineSamples:
+          type: array
+          items: { type: number, format: double }
+        optimizedSamples:
+          type: array
+          items: { type: number, format: double }
+        quantiles:
+          type: object
+          properties:
+            baseline:
+              type: object
+              properties:
+                p95: { type: number, format: double }
+                p99: { type: number, format: double }
+            optimized:
+              type: object
+              properties:
+                p95: { type: number, format: double }
+                p99: { type: number, format: double }
+        markers:
+          type: object
+          properties:
+            baseline:
+              type: object
+              properties:
+                p95: { $ref: '#/components/schemas/TailQuantileMarker' }
+                p99: { $ref: '#/components/schemas/TailQuantileMarker' }
+            optimized:
+              type: object
+              properties:
+                p95: { $ref: '#/components/schemas/TailQuantileMarker' }
+                p99: { $ref: '#/components/schemas/TailQuantileMarker' }
+
+    BootstrapMetricEvidence:
+      type: object
+      required: [metric, samples, mean, median, ci95]
+      properties:
+        metric:
+          type: string
+          enum: [Peak, P95, P99]
+        samples:
+          type: array
+          items: { type: number, format: double }
+        mean:
+          type: number
+          format: double
+        median:
+          type: number
+          format: double
+        ci95:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+            format: double
+
+    VolatilityEvidence:
+      type: object
+      required: [distributionShift, tailCcdf, bootstrapStability]
+      properties:
+        distributionShift:
+          $ref: '#/components/schemas/DistributionShiftEvidence'
+        tailCcdf:
+          $ref: '#/components/schemas/TailCcdfEvidence'
+        bootstrapStability:
+          type: object
+          required: [metrics]
+          properties:
+            metrics:
+              type: array
+              items:
+                $ref: '#/components/schemas/BootstrapMetricEvidence'
+
+    GustOverview:
+      type: object
+      required: [eventCount, turbineCount, alignSuccessRate, sampleRetentionRate, medianDuration, windowSec]
+      properties:
+        eventCount: { type: number, format: double }
+        turbineCount: { type: integer }
+        alignSuccessRate: { type: number, format: double }
+        sampleRetentionRate: { type: number, format: double }
+        medianDuration: { type: number, format: double }
+        windowSec: { type: number, format: double }
+
+    DisturbanceTemplateData:
+      type: object
+      required: [time, mean, lower, upper, disturbanceStart, disturbanceEnd, peakTime, peakValue]
+      properties:
+        time:
+          type: array
+          items: { type: number, format: double }
+        mean:
+          type: array
+          items: { type: number, format: double }
+        lower:
+          type: array
+          items: { type: number, format: double }
+        upper:
+          type: array
+          items: { type: number, format: double }
+        disturbanceStart: { type: number, format: double }
+        disturbanceEnd: { type: number, format: double }
+        peakTime: { type: number, format: double }
+        peakValue: { type: number, format: double }
+
+    PowerResponseData:
+      type: object
+      required: [time, baseline, optimized, baselineBandLow, baselineBandHigh, optimizedBandLow, optimizedBandHigh]
+      properties:
+        time:
+          type: array
+          items: { type: number, format: double }
+        baseline:
+          type: array
+          items: { type: number, format: double }
+        optimized:
+          type: array
+          items: { type: number, format: double }
+        baselineBandLow:
+          type: array
+          items: { type: number, format: double }
+        baselineBandHigh:
+          type: array
+          items: { type: number, format: double }
+        optimizedBandLow:
+          type: array
+          items: { type: number, format: double }
+        optimizedBandHigh:
+          type: array
+          items: { type: number, format: double }
+
+    FeatureTimelineSeries:
+      type: object
+      required: [responseStart, t10, peakTime, recoveryTime]
+      properties:
+        responseStart: { type: number, format: double }
+        t10: { type: number, format: double }
+        peakTime: { type: number, format: double }
+        recoveryTime: { type: number, format: double }
+
+    GustMetricComparisonRow:
+      type: object
+      required: [name, baseline, optimized, diff, unit]
+      properties:
+        name:
+          type: string
+        baseline:
+          type: number
+          format: double
+        optimized:
+          type: number
+          format: double
+        diff:
+          type: number
+          format: double
+        unit:
+          type: string
+
+    GustResponseMetricItem:
+      type: object
+      required: [label, before, after, improvement]
+      properties:
+        label: { type: string }
+        before: { type: string }
+        after: { type: string }
+        improvement: { type: string }
+
+    GustResponseCardData:
+      type: object
+      required: [overview, disturbanceTemplate, powerResponse, featureTimeline, metricComparison, responseMetrics]
+      properties:
+        overview:
+          $ref: '#/components/schemas/GustOverview'
+        disturbanceTemplate:
+          $ref: '#/components/schemas/DisturbanceTemplateData'
+        powerResponse:
+          $ref: '#/components/schemas/PowerResponseData'
+        featureTimeline:
+          type: object
+          required: [baseline, optimized]
+          properties:
+            baseline:
+              $ref: '#/components/schemas/FeatureTimelineSeries'
+            optimized:
+              $ref: '#/components/schemas/FeatureTimelineSeries'
+        metricComparison:
+          type: array
+          items:
+            $ref: '#/components/schemas/GustMetricComparisonRow'
+        responseMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/GustResponseMetricItem'
+
+    PowerAnalysisPageData:
+      type: object
+      required:
+        - turbineOptions
+        - turbineProfiles
+        - summaryMetrics
+        - windFrequencyRayleighParameters
+        - powerCurveSeries
+        - volatilityEvidence
+        - gustResponseCardData
+      properties:
+        turbineOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TurbineOption'
+        turbineProfiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/TurbineProfile'
+        summaryMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/SummaryMetric'
+        windFrequencyRayleighParameters:
+          $ref: '#/components/schemas/RayleighParameters'
+        powerCurveSeries:
+          type: array
+          items:
+            $ref: '#/components/schemas/PowerCurvePoint'
+        volatilityEvidence:
+          $ref: '#/components/schemas/VolatilityEvidence'
+        gustResponseCardData:
+          $ref: '#/components/schemas/GustResponseCardData'
+
+    PowerAnalysisPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/PowerAnalysisPageData'

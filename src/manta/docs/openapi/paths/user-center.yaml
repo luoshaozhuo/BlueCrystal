@@ -1,0 +1,82 @@
+paths:
+  /api/user/my-project/list:
+    post:
+      tags:
+        - UserCenter
+      operationId: queryMyProjectList
+      summary: 获取我的项目列表
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/MyProjectListResponse'
+
+  /api/user/my-team/list:
+    post:
+      tags:
+        - UserCenter
+      operationId: queryMyTeamList
+      summary: 获取我的团队列表
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/MyTeamListResponse'
+
+  /api/user/latest-activity:
+    post:
+      tags:
+        - UserCenter
+      operationId: queryLatestActivity
+      summary: 获取最新动态
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/LatestActivityListResponse'
+
+  /api/user/certification:
+    post:
+      tags:
+        - UserCenter
+      operationId: queryCertification
+      summary: 获取认证信息
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/UnitCertificationResponse'
+
+  /api/user/upload:
+    post:
+      tags:
+        - UserCenter
+      operationId: userUploadApi
+      summary: 上传用户附件
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/UserUploadResponse'

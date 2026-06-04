@@ -20,7 +20,7 @@ Whale 需要将 ingest 采集的数据异步发布给下游 speed layer/downstre
 2. model.py 定义统一消息模型：Envelope（schema_version, message_id, message_type, trace_id, source_id, published_at, items）、TopicSpec、PartitionKey、MessageOffset、ReplayRequest。
 3. ports.py 定义端口接口：MessageSourcePort、MessageSinkPort、SchemaRegistryPort、DeadLetterSinkPort、ReplayPort。
 4. adapters/ 提供三类适配器：
-   - in_memory.py：InMemoryMessageBus 用于开发测试（L1/L2 级验证）。
+   - in_memory.py：InMemoryMessageBus 用于开发测试（P1/P3 级验证）。
    - kafka.py：KafkaSourceAdapter/KafkaSinkAdapter，提供 contract + real 两种模式。
    - pulsar.py：PulsarSourceAdapter/PulsarSinkAdapter，当前 contract-only（real 标记 environment-pending）。
 5. Kafka/Pulsar 的 topic 创建、partition 管理、consumer group 协调和 broker 运维职责不属于 message_pipeline，由部署运维侧负责。

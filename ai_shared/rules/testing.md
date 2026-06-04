@@ -8,15 +8,15 @@
 
 测试应归入以下阶段之一。阶段用于说明测试目的和执行时机，不强制等同于物理目录结构。
 
-| 阶段 | 目标 | 常见对象 |
-|---|---|---|
-| 开发期验证 | 验证本地逻辑、接口约束、边界条件和错误路径 | 单元测试、契约测试、解析/转换测试、fake/mock/stub 语义测试 |
-| 构建期验证 | 验证代码、脚本、配置和包结构可构建、可导入、可静态检查 | 编译、lint、type-check、import boundary、脚本语法检查 |
-| 模块集成期验证 | 验证单一模块内部组件协作 | use case + adapter、repository、scheduler、临时文件/SQLite/local server |
-| 跨模块联调期验证 | 验证多个模块之间的数据流和调用链路 | API 到 use case、消息管道、存储链路、simulator-backed 链路 |
-| 准生产依赖验证期 | 验证真实或等价外部依赖下的行为 | 数据库、消息队列、缓存、对象存储、时序库、外部服务 |
-| 部署前验收期 | 验证部署配置、运行入口、预检脚本和最小 smoke | Docker/Compose、entrypoint、health/ready、migration、rollback/switchover |
-| 发布后运维验证期 | 沉淀运行问题、故障恢复、容量、性能和可观测性验证 | 运行问题复现、故障注入、长稳、性能基线、告警和审计检查 |
+| 编号 | 阶段 | 目标 | 常见对象 |
+|---|---|---|---|---|
+| P1 | 开发期验证 | 验证本地逻辑、接口约束、边界条件和错误路径 | 单元测试、契约测试、解析/转换测试、fake/mock/stub 语义测试 |
+| P2 | 构建期验证 | 验证代码、脚本、配置和包结构可构建、可导入、可静态检查 | 编译、lint、type-check、import boundary、脚本语法检查 |
+| P3 | 模块集成期验证 | 验证单一模块内部组件协作 | use case + adapter、repository、scheduler、临时文件/SQLite/local server |
+| P4 | 跨模块联调期验证 | 验证多个模块之间的数据流和调用链路 | API 到 use case、消息管道、存储链路、simulator-backed 链路 |
+| P5 | 准生产依赖验证期 | 验证真实或等价外部依赖下的行为 | 数据库、消息队列、缓存、对象存储、时序库、外部服务 |
+| P6 | 部署前验收期 | 验证部署配置、运行入口、预检脚本和最小 smoke | Docker/Compose、entrypoint、health/ready、migration、rollback/switchover |
+| P7 | 发布后运维验证期 | 沉淀运行问题、故障恢复、容量、性能和可观测性验证 | 运行问题复现、故障注入、长稳、性能基线、告警和审计检查 |
 
 发布回归不是独立生命周期阶段，而是从上述阶段中选择测试形成回归套件。
 

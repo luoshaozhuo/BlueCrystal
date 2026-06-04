@@ -74,8 +74,16 @@
 
 | 编号 | 上承需求 | 标题 | 类型 | 优先级 | 责任模块 | 验证等级 | 实现状态 | 实现证据 | 验收测试 | 差距 | 下一步 | 更新时间 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| BL-FR-001 | P-FR-002 | 批处理调度 | FR | 高 | batch_layer | - | 未实现 | Lambda arm (batch layer) 不在当前 6 轮 L5 收口范围内，待现场部署后启动 | 无 | 全部（未实现） | 现场部署后启动 batch layer 实现 | 2026-06-03 (Round 6) |
-| BL-FR-002 | P-NFR-002 | 批处理状态管理 | FR | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 L5 收口范围内 | 无 | 全部（未实现） | 现场部署后实现批处理状态管理 | 2026-06-03 (Round 6) |
-| BL-FR-003 | P-FR-004 | raw -> standard 批处理链路 | FR | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 L5 收口范围内 | 无 | 全部（未实现） | 现场部署后实现 raw->standard 批处理链路 | 2026-06-03 (Round 6) |
-| BL-NFR-001 | P-NFR-002 | 可恢复与幂等 | NFR | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 L5 收口范围内 | 无 | 全部（未实现） | 现场部署后实现恢复与幂等机制 | 2026-06-03 (Round 6) |
-| BL-TEST-001 | P-NFR-004 | 批处理 E2E | TEST | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 L5 收口范围内 | 无 | 全部（未实现） | 现场部署后补充批处理 E2E 测试 | 2026-06-03 (Round 6) |
+| BL-FR-001 | P-FR-002 | 批处理调度 | FR | 高 | batch_layer | - | 未实现 | Lambda arm (batch layer) 不在当前 6 轮 P5 收口范围内，待现场部署后启动 | 无 | 全部（未实现） | 现场部署后启动 batch layer 实现 | 2026-06-03 (Round 6) |
+| BL-FR-002 | P-NFR-002 | 批处理状态管理 | FR | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 P5 收口范围内 | 无 | 全部（未实现） | 现场部署后实现批处理状态管理 | 2026-06-03 (Round 6) |
+| BL-FR-003 | P-FR-004 | raw -> standard 批处理链路 | FR | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 P5 收口范围内 | 无 | 全部（未实现） | 现场部署后实现 raw->standard 批处理链路 | 2026-06-03 (Round 6) |
+| BL-NFR-001 | P-NFR-002 | 可恢复与幂等 | NFR | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 P5 收口范围内 | 无 | 全部（未实现） | 现场部署后实现恢复与幂等机制 | 2026-06-03 (Round 6) |
+| BL-TEST-001 | P-NFR-004 | 批处理 E2E | TEST | 高 | batch_layer | - | 未实现 | 不在当前 6 轮 P5 收口范围内 | 无 | 全部（未实现） | 现场部署后补充批处理 E2E 测试 | 2026-06-03 (Round 6) |
+
+## 七、本轮边界说明
+
+仿真模型资产与结果（`src/whale/model_asset/`）暂不进入 batch layer pipeline。
+模型资产元数据（model_code/case_code/result_code）由 model_asset.repository 直接写入 PostgreSQL，不经 batch layer 调度。
+仿真结果时序数据由 `src/whale/storage/simulation_result.py` 的 SimulationResultTimeSeriesSinkPort 直接写入 TDengine，不经 batch layer 的 raw -> standardized 批处理链路。
+
+Batch layer 职责仍限于实时链路采集数据（ingest -> message_pipeline -> speed_layer -> storage raw）的批处理，不扩展至仿真数据域。

@@ -1,0 +1,417 @@
+components:
+  schemas:
+    LidarTurbineOption:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+
+    LidarDeviceInfo:
+      type: object
+      required:
+        - deviceModel
+        - deviceId
+        - scanMode
+        - scanLayers
+        - scanAngleRange
+        - sampleFrequencyHz
+      properties:
+        deviceModel:
+          type: string
+        deviceId:
+          type: string
+        scanMode:
+          type: string
+          enum: ['1D', '2D', '3D']
+        scanLayers:
+          type: integer
+        scanAngleRange:
+          type: string
+        sampleFrequencyHz:
+          type: number
+          format: double
+
+    LidarTopMetricItem:
+      type: object
+      required: [key, label, value]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          oneOf:
+            - type: number
+            - type: string
+        unit:
+          type: string
+        status:
+          type: string
+          enum: [normal, warning, offline]
+        trend:
+          type: number
+          format: double
+        precision:
+          type: integer
+
+    RealtimeWindWavePoint:
+      type: object
+      required: [ts, windSpeed]
+      properties:
+        ts:
+          type: string
+        windSpeed:
+          type: number
+          format: double
+
+    RealtimeWindWaveResponse:
+      type: object
+      required: [points, current, mean60s, min60s, max60s]
+      properties:
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/RealtimeWindWavePoint'
+        current:
+          type: number
+          format: double
+        mean60s:
+          type: number
+          format: double
+        min60s:
+          type: number
+          format: double
+        max60s:
+          type: number
+          format: double
+
+    LidarRawPoint3D:
+      type: object
+      required: [id, beamIndex, distance, x, y, z, windSpeed, isValid, quality]
+      properties:
+        id:
+          type: string
+        beamIndex:
+          type: integer
+        distance:
+          type: number
+          format: double
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        z:
+          type: number
+          format: double
+        windSpeed:
+          type: number
+          format: double
+        isValid:
+          type: boolean
+        quality:
+          type: number
+          format: double
+
+    LidarSynthPoint3D:
+      type: object
+      required: [id, distance, x, y, z, windSpeed, windDirection, ti, isValid, validRawCount]
+      properties:
+        id:
+          type: string
+        distance:
+          type: number
+          format: double
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        z:
+          type: number
+          format: double
+        windSpeed:
+          type: number
+          format: double
+        windDirection:
+          type: number
+          format: double
+        ti:
+          type: number
+          format: double
+        isValid:
+          type: boolean
+        validRawCount:
+          type: integer
+
+    LidarForwardComposite3DResponse:
+      type: object
+      required: [turbineId, hubWindSpeed, hubWindDirection, distances, rawPoints, synthPoints]
+      properties:
+        turbineId:
+          type: string
+        hubWindSpeed:
+          type: number
+          format: double
+        hubWindDirection:
+          type: number
+          format: double
+        distances:
+          type: array
+          items:
+            type: number
+            format: double
+        rawPoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarRawPoint3D'
+        synthPoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarSynthPoint3D'
+
+    LidarInflowProfilePoint:
+      type: object
+      required: [distance, windSpeed, windDirection, horizontalShear, verticalShear]
+      properties:
+        distance:
+          type: number
+          format: double
+        windSpeed:
+          type: number
+          format: double
+        windDirection:
+          type: number
+          format: double
+        horizontalShear:
+          type: number
+          format: double
+        verticalShear:
+          type: number
+          format: double
+
+    LidarInflowProfilePanelData:
+      type: object
+      required: [title, subtitle, activeDistance, distances, profiles]
+      properties:
+        title:
+          type: string
+        subtitle:
+          type: string
+        activeDistance:
+          type: number
+          format: double
+        distances:
+          type: array
+          items:
+            type: number
+            format: double
+        profiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarInflowProfilePoint'
+
+    WindRoseSector:
+      type: object
+      required: [direction, angle, frequency, ti, meanWindSpeed]
+      properties:
+        direction:
+          type: string
+        angle:
+          type: number
+          format: double
+        frequency:
+          type: number
+          format: double
+        ti:
+          type: number
+          format: double
+        meanWindSpeed:
+          type: number
+          format: double
+
+    WindRoseTiStats:
+      type: object
+      required: [sectors]
+      properties:
+        sectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/WindRoseSector'
+
+    TransferFunctionPoint:
+      type: object
+      required: [frequency, gain, phase]
+      properties:
+        frequency:
+          type: number
+          format: double
+        gain:
+          type: number
+          format: double
+        phase:
+          type: number
+          format: double
+
+    TransferFunctionData:
+      type: object
+      required: [points, markerFrequencies]
+      properties:
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferFunctionPoint'
+        markerFrequencies:
+          type: array
+          items:
+            type: number
+            format: double
+
+    ConsistencyAlignmentPoint:
+      type: object
+      required: [lidarWindSpeed, nacelleWindSpeed]
+      properties:
+        lidarWindSpeed:
+          type: number
+          format: double
+        nacelleWindSpeed:
+          type: number
+          format: double
+
+    ConsistencyRegression:
+      type: object
+      required: [slope, intercept]
+      properties:
+        slope:
+          type: number
+          format: double
+        intercept:
+          type: number
+          format: double
+
+    ConsistencyAlignmentStats:
+      type: object
+      required: [bias, rmse, corr]
+      properties:
+        bias:
+          type: number
+          format: double
+        rmse:
+          type: number
+          format: double
+        corr:
+          type: number
+          format: double
+
+    ConsistencyAlignmentData:
+      type: object
+      required: [points, regression, stats]
+      properties:
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsistencyAlignmentPoint'
+        regression:
+          $ref: '#/components/schemas/ConsistencyRegression'
+        stats:
+          $ref: '#/components/schemas/ConsistencyAlignmentStats'
+
+    DataQualityMetricItem:
+      type: object
+      required: [key, label, value, status, progress]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          oneOf:
+            - type: number
+            - type: string
+        unit:
+          type: string
+        prefix:
+          type: string
+        status:
+          type: string
+        progress:
+          type: number
+          format: double
+        highlight:
+          type: boolean
+        precision:
+          type: integer
+
+    DataQualityOverview:
+      type: object
+      required: [topMetrics, bottomMetrics]
+      properties:
+        topMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataQualityMetricItem'
+        bottomMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataQualityMetricItem'
+
+    DataQualitySummary:
+      type: object
+      required: [qualityOverview]
+      properties:
+        qualityOverview:
+          $ref: '#/components/schemas/DataQualityOverview'
+
+    LidarPageData:
+      type: object
+      required:
+        - turbineOptions
+        - deviceInfo
+        - topMetrics
+        - topRealtimeWindWave
+        - forwardComposite
+        - inflowProfile
+        - windRoseTiStats
+        - transferFunction
+        - consistencyAlignment
+        - dataQualitySummary
+      properties:
+        turbineOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarTurbineOption'
+        deviceInfo:
+          $ref: '#/components/schemas/LidarDeviceInfo'
+        topMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/LidarTopMetricItem'
+        topRealtimeWindWave:
+          $ref: '#/components/schemas/RealtimeWindWaveResponse'
+        forwardComposite:
+          $ref: '#/components/schemas/LidarForwardComposite3DResponse'
+        inflowProfile:
+          $ref: '#/components/schemas/LidarInflowProfilePanelData'
+        windRoseTiStats:
+          $ref: '#/components/schemas/WindRoseTiStats'
+        transferFunction:
+          $ref: '#/components/schemas/TransferFunctionData'
+        consistencyAlignment:
+          $ref: '#/components/schemas/ConsistencyAlignmentData'
+        dataQualitySummary:
+          $ref: '#/components/schemas/DataQualitySummary'
+
+    LidarPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/LidarPageData'

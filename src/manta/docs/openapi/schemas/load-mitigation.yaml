@@ -1,0 +1,296 @@
+components:
+  schemas:
+    LoadMitigationSelectOption:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+
+    LoadMitigationInfoItem:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+
+    LoadMitigationKpiItem:
+      type: object
+      required: [title, trend, value, footnote]
+      properties:
+        title:
+          type: string
+        trend:
+          type: string
+        value:
+          type: string
+        footnote:
+          type: string
+
+    LoadMitigationMetricTab:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+          enum:
+            - bladeRootMoment
+            - nacelleAcceleration
+            - generatorTorque
+
+    MeanBinDistribution:
+      type: object
+      required: [meanBin, values]
+      properties:
+        meanBin:
+          type: string
+        values:
+          type: array
+          items:
+            type: number
+            format: double
+
+    AmplitudeStructureComparisonData:
+      type: object
+      required: [meanBins, amplitudeBins, baseline, optimized]
+      properties:
+        meanBins:
+          type: array
+          items:
+            type: string
+        amplitudeBins:
+          type: array
+          items:
+            type: string
+        baseline:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeanBinDistribution'
+        optimized:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeanBinDistribution'
+
+    MatrixCountData:
+      type: object
+      properties:
+        baseline:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+        optimized:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+
+    MarkovMatrixComparisonData:
+      type: object
+      required: [meanBins, amplitudeBins, baseline, optimized]
+      properties:
+        meanBins:
+          type: array
+          items:
+            type: string
+        amplitudeBins:
+          type: array
+          items:
+            type: string
+        baseline:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+        optimized:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+        counts:
+          $ref: '#/components/schemas/MatrixCountData'
+
+    EvidenceBarDatum:
+      type: object
+      required: [label, baseline, optimized, changePct]
+      properties:
+        label:
+          type: string
+        baseline:
+          type: number
+          format: double
+        optimized:
+          type: number
+          format: double
+        changePct:
+          type: number
+          format: double
+
+    PeakQqEvidence:
+      type: object
+      required: [beforePeaks, afterPeaks]
+      properties:
+        beforePeaks:
+          type: array
+          items:
+            type: number
+            format: double
+        afterPeaks:
+          type: array
+          items:
+            type: number
+            format: double
+
+    EvidenceStabilityDatum:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+          format: double
+
+    EnergySpectrumPoint:
+      type: object
+      required: [frequency, before, after]
+      properties:
+        frequency:
+          type: number
+          format: double
+        before:
+          type: number
+          format: double
+        after:
+          type: number
+          format: double
+
+    OptimizationEvidence:
+      type: object
+      required: [unit, rmsSeries, peakQqEvidence, stabilitySeries, energySpectrum]
+      properties:
+        unit:
+          type: string
+        rmsSeries:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceBarDatum'
+        peakQqEvidence:
+          $ref: '#/components/schemas/PeakQqEvidence'
+        stabilitySeries:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceStabilityDatum'
+        energySpectrum:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnergySpectrumPoint'
+
+    HighAmplitudeRiskData:
+      type: object
+      required: [meanBins, baselineRisk, optimizedRisk, effectiveHighAmplitudeBins]
+      properties:
+        meanBins:
+          type: array
+          items:
+            type: string
+        baselineRisk:
+          type: array
+          items:
+            type: number
+            format: double
+        optimizedRisk:
+          type: array
+          items:
+            type: number
+            format: double
+        effectiveHighAmplitudeBins:
+          type: array
+          items:
+            type: string
+
+    LoadMitigationMetricBundle:
+      type: object
+      required: [label, structureData, migrationData, riskData, evidence]
+      properties:
+        label:
+          type: string
+        structureData:
+          $ref: '#/components/schemas/AmplitudeStructureComparisonData'
+        migrationData:
+          $ref: '#/components/schemas/MarkovMatrixComparisonData'
+        riskData:
+          $ref: '#/components/schemas/HighAmplitudeRiskData'
+        evidence:
+          $ref: '#/components/schemas/OptimizationEvidence'
+
+    LoadMitigationMetricMap:
+      type: object
+      required:
+        - bladeRootMoment
+        - nacelleAcceleration
+        - generatorTorque
+      properties:
+        bladeRootMoment:
+          $ref: '#/components/schemas/LoadMitigationMetricBundle'
+        nacelleAcceleration:
+          $ref: '#/components/schemas/LoadMitigationMetricBundle'
+        generatorTorque:
+          $ref: '#/components/schemas/LoadMitigationMetricBundle'
+
+    LoadMitigationPageData:
+      type: object
+      required:
+        - turbineOptions
+        - turbineInfoItems
+        - kpiList
+        - metricTabs
+        - highAmplitudeBins
+        - metrics
+      properties:
+        turbineOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadMitigationSelectOption'
+        turbineInfoItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadMitigationInfoItem'
+        kpiList:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadMitigationKpiItem'
+        metricTabs:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadMitigationMetricTab'
+        highAmplitudeBins:
+          type: array
+          items:
+            type: string
+        metrics:
+          $ref: '#/components/schemas/LoadMitigationMetricMap'
+
+    LoadMitigationPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/LoadMitigationPageData'

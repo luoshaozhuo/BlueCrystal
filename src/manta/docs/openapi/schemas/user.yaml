@@ -1,0 +1,100 @@
+components:
+  schemas:
+    LoginData:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    LoginRes:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+
+    UserState:
+      type: object
+      required:
+        - role
+      properties:
+        name:
+          type: string
+        avatar:
+          type: string
+        job:
+          type: string
+        organization:
+          type: string
+        location:
+          type: string
+        email:
+          type: string
+        introduction:
+          type: string
+        personalWebsite:
+          type: string
+        jobName:
+          type: string
+        organizationName:
+          type: string
+        locationName:
+          type: string
+        phone:
+          type: string
+        registrationDate:
+          type: string
+        accountId:
+          type: string
+        certification:
+          type: integer
+        role:
+          $ref: './common.yaml#/components/schemas/RoleType'
+
+    LoginResResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/LoginRes'
+
+    LogoutResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              nullable: true
+
+    UserInfoResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/UserState'
+
+    MenuListResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: array
+              items:
+                $ref: './common.yaml#/components/schemas/ServerMenuItem'

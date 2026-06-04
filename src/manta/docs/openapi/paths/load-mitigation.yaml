@@ -1,0 +1,32 @@
+paths:
+  /api/load-mitigation/page:
+    get:
+      tags:
+        - LoadMitigation
+      operationId: getLoadMitigationPage
+      summary: 获取载荷缓解页面聚合数据
+      description: 返回载荷缓解页面概览、循环结构、迁移矩阵、高幅值风险和证据分析所需的数据。
+      parameters:
+        - name: turbineId
+          in: query
+          required: false
+          description: 机组编号，不传时返回默认机组数据
+          schema:
+            type: string
+        - name: metric
+          in: query
+          required: false
+          description: 指标类型，不传时返回全部指标数据
+          schema:
+            type: string
+            enum:
+              - bladeRootMoment
+              - nacelleAcceleration
+              - generatorTorque
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '../showtime.openapi.yaml#/components/schemas/LoadMitigationPageResponse'

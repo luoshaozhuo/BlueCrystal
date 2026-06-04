@@ -1,0 +1,215 @@
+components:
+  schemas:
+    Contributor:
+      type: object
+      required:
+        - name
+        - email
+        - avatar
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        avatar:
+          type: string
+
+    MyProjectRecord:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - peopleNumber
+        - contributors
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        peopleNumber:
+          type: integer
+        contributors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contributor'
+
+    MyTeamRecord:
+      type: object
+      required:
+        - id
+        - avatar
+        - name
+        - peopleNumber
+      properties:
+        id:
+          type: integer
+        avatar:
+          type: string
+        name:
+          type: string
+        peopleNumber:
+          type: integer
+
+    LatestActivity:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - avatar
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        avatar:
+          type: string
+
+    BasicInfoModel:
+      type: object
+      required:
+        - email
+        - nickname
+        - countryRegion
+        - area
+        - address
+        - profile
+      properties:
+        email:
+          type: string
+        nickname:
+          type: string
+        countryRegion:
+          type: string
+        area:
+          type: string
+        address:
+          type: string
+        profile:
+          type: string
+
+    EnterpriseCertificationModel:
+      type: object
+      required:
+        - accountType
+        - status
+        - time
+        - legalPerson
+        - certificateType
+        - authenticationNumber
+        - enterpriseName
+        - enterpriseCertificateType
+        - organizationCode
+      properties:
+        accountType:
+          type: string
+        status:
+          type: integer
+        time:
+          type: string
+        legalPerson:
+          type: string
+        certificateType:
+          type: string
+        authenticationNumber:
+          type: string
+        enterpriseName:
+          type: string
+        enterpriseCertificateType:
+          type: string
+        organizationCode:
+          type: string
+
+    CertificationRecordItem:
+      type: object
+      required:
+        - certificationType
+        - certificationContent
+        - status
+        - time
+      properties:
+        certificationType:
+          type: integer
+        certificationContent:
+          type: string
+        status:
+          type: integer
+        time:
+          type: string
+
+    CertificationRecord:
+      type: array
+      items:
+        $ref: '#/components/schemas/CertificationRecordItem'
+
+    UnitCertification:
+      type: object
+      required:
+        - enterpriseInfo
+        - record
+      properties:
+        enterpriseInfo:
+          $ref: '#/components/schemas/EnterpriseCertificationModel'
+        record:
+          $ref: '#/components/schemas/CertificationRecord'
+
+    MyProjectListResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/MyProjectRecord'
+
+    MyTeamListResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/MyTeamRecord'
+
+    LatestActivityListResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/LatestActivity'
+
+    UnitCertificationResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/UnitCertification'
+
+    UserUploadResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              type: string

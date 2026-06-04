@@ -1,0 +1,47 @@
+components:
+  schemas:
+    ApiResponseMeta:
+      type: object
+      required:
+        - status
+        - msg
+        - code
+      properties:
+        status:
+          type: string
+          description: 业务处理状态
+          example: ok
+        msg:
+          type: string
+          description: 业务提示信息
+          example: 请求成功
+        code:
+          type: integer
+          format: int32
+          description: 业务状态码，20000 表示成功
+          example: 20000
+
+    RoleType:
+      type: string
+      enum:
+        - ''
+        - '*'
+        - admin
+        - user
+
+    ServerMenuItem:
+      type: object
+      additionalProperties: true
+      properties:
+        path:
+          type: string
+        name:
+          type: string
+        meta:
+          type: object
+          additionalProperties: true
+        children:
+          type: array
+          items:
+            type: object
+            additionalProperties: true

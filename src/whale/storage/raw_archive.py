@@ -292,10 +292,19 @@ class S3RawArchiveSink(FileArchiveSinkPort):
     boto3 依赖标记为 optional。如果 boto3 不可用，adapter 标记为 degraded，
     所有写操作返回 environment-pending sentinel（count=0），不抛异常。
 
+    环境变量支持（参数为空或未提供时回退读取）：
+    - WHALE_S3_ENDPOINT_URL: S3 endpoint URL。
+    - WHALE_S3_BUCKET: bucket 名称。
+    - WHALE_S3_REGION: AWS region（默认 us-east-1）。
+    - WHALE_S3_ACCESS_KEY: 访问密钥 ID。
+    - WHALE_S3_SECRET_KEY: 访问密钥 Secret。
+    - WHALE_S3_ADDRESSING_STYLE: 寻址风格（path 或 virtual-host，默认 path for MinIO）。
+
     适配器边界：
     - 将 batch 消息压缩为 .jsonl.gz 后 upload 到 S3。
     - 管理 object key 命名（{prefix}{batch_id}.jsonl.gz）。
-    - 支持 health check（通过 S3 list_buckets 验证连通性）。
+    - 支持 health check（通过 S3 head_bucket 验证连通性）。
+    - 支持 path-style / virtual-host 寻址切换。
 
     Attributes:
         _endpoint_url: S3/MinIO endpoint URL。
@@ -304,6 +313,7 @@ class S3RawArchiveSink(FileArchiveSinkPort):
         _secret_key: 访问密钥 Secret。
         _prefix: 对象前缀路径。
         _compression: 压缩算法。
+        _addressing_style: S3 寻址风格（path 或 virtual-host）。
         _client: boto3 S3 client 实例（延迟初始化）。
         _connected: 是否成功初始化 S3 client。
         _error: 初始化或操作失败时的错误信息。
@@ -312,8 +322,8 @@ class S3RawArchiveSink(FileArchiveSinkPort):
 
     def __init__(
         self,
-        endpoint_url: str,
-        bucket: str,
+        endpoint_url: str = "",
+        bucket: str = "",
         *,
         access_key: str = "",
         secret_key: str = "",
@@ -321,30 +331,39 @@ class S3RawArchiveSink(FileArchiveSinkPort):
         compression: str = "gzip",
         region_name: str = "us-east-1",
         use_ssl: bool = False,
+        addressing_style: str = "path",
     ) -> None:
         """初始化 S3/MinIO 归档 adapter。
 
         校验 endpoint_url 和 bucket 非空。S3 client 延迟初始化（首次操作时创建）。
+        参数为空时回退读取对应环境变量（WHALE_S3_*）。
 
         Args:
-            endpoint_url: S3/MinIO endpoint URL。
-            bucket: S3 bucket 名称。
+            endpoint_url: S3/MinIO endpoint URL。为空时读取 WHALE_S3_ENDPOINT_URL。
+            bucket: S3 bucket 名称。为空时读取 WHALE_S3_BUCKET。
             access_key: 访问密钥 ID，MinIO 可为空字符串表示匿名访问。
-            secret_key: 访问密钥 Secret。
+                为空时读取 WHALE_S3_ACCESS_KEY。
+            secret_key: 访问密钥 Secret。为空时读取 WHALE_S3_SECRET_KEY。
             prefix: 对象前缀（目录路径），末尾建议带 /。
             compression: 压缩算法（"gzip" 或 "zstd"）。
-            region_name: AWS region 名称，MinIO 通常使用 "us-east-1"。
+            region_name: AWS region 名称。可被 WHALE_S3_REGION 环境变量覆盖。
             use_ssl: 是否启用 HTTPS，MinIO 本地部署通常为 False。
+            addressing_style: S3 寻址风格，"path"（适用于 MinIO）或 "virtual-host"。
+                可被 WHALE_S3_ADDRESSING_STYLE 环境变量覆盖。
         """
-        self._endpoint_url = endpoint_url
-        self._bucket = bucket
-        self._access_key = access_key
-        self._secret_key = secret_key
+        self._endpoint_url = endpoint_url or os.getenv("WHALE_S3_ENDPOINT_URL", "")
+        self._bucket = bucket or os.getenv("WHALE_S3_BUCKET", "")
+        self._access_key = access_key or os.getenv("WHALE_S3_ACCESS_KEY", "")
+        self._secret_key = secret_key or os.getenv("WHALE_S3_SECRET_KEY", "")
         self._prefix = prefix.rstrip("/") + "/" if prefix else "raw_archive/"
         self._compression = compression
-        self._region_name = region_name
+        self._region_name = os.getenv("WHALE_S3_REGION", region_name)
         self._use_ssl = use_ssl
-        self._config_valid = bool(endpoint_url and bucket)
+        self._addressing_style = os.getenv(
+            "WHALE_S3_ADDRESSING_STYLE", addressing_style
+        )
+        # 环境变量 reading 后重新判定 config_valid，支持纯 env 配置
+        self._config_valid = bool(self._endpoint_url and self._bucket)
         self._client: Any = None
         self._connected = False
         self._error: str | None = None
@@ -354,6 +373,8 @@ class S3RawArchiveSink(FileArchiveSinkPort):
         """确保 boto3 S3 client 已初始化。
 
         延迟导入 boto3 并创建 S3 client。如果 boto3 不可用，记录错误。
+        根据 WHALE_S3_ADDRESSING_STYLE 或 addressing_style 参数设置 boto3
+        S3 寻址风格（path 或 virtual-host）。
 
         Returns:
             boto3 S3 client 实例，不可用时返回 None。
@@ -362,28 +383,37 @@ class S3RawArchiveSink(FileArchiveSinkPort):
             return self._client
         try:
             import boto3  # type: ignore[import-untyped]
-
+            from botocore.config import Config  # type: ignore[import-untyped]
+        except ImportError:
+            self._error = "boto3 未安装，S3 raw_archive 不可用"
+            logger.warning(self._error)
+            self._connected = False
+            return None
+        try:
+            s3_config = Config(
+                s3={"addressing_style": self._addressing_style},
+            )
             client_kwargs: dict[str, Any] = {
                 "endpoint_url": self._endpoint_url,
                 "region_name": self._region_name,
                 "use_ssl": self._use_ssl,
+                "config": s3_config,
             }
             if self._access_key and self._secret_key:
                 client_kwargs["aws_access_key_id"] = self._access_key
                 client_kwargs["aws_secret_access_key"] = self._secret_key
             self._client = boto3.client("s3", **client_kwargs)
             self._connected = True
-            logger.info("S3 client 初始化成功: endpoint=%s bucket=%s",
-                        self._endpoint_url, self._bucket)
+            logger.info(
+                "S3 client 初始化成功: endpoint=%s bucket=%s addressing=%s",
+                self._endpoint_url, self._bucket, self._addressing_style,
+            )
             return self._client
-        except ImportError:
-            self._error = "boto3 未安装，S3 raw_archive 不可用"
-            logger.warning(self._error)
         except Exception as exc:
             self._error = f"S3 client 初始化失败: {exc}"
             logger.warning(self._error)
-        self._connected = False
-        return None
+            self._connected = False
+            return None
 
     async def write(
         self, batch_id: str, envelopes: list[dict[str, Any]]

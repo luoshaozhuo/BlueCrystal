@@ -38,7 +38,7 @@ Round 1 架构重构将治理控制面（Turtle）和运维执行面（Octopus�
 1. Turtle 和 Octopus 的多数子包当前为 `__init__.py` 空壳（skeleton-ready），尚未实现业务逻辑。
 2. `src/turtle/` 下 auth/security/compliance 已有真实代码实现（从 crosscutting 迁入），其余子包（audit/policy/governance/risk/deployment_policy/change_control/ports/adapters/api/runtime/sdk）均为空壳。
 3. `src/octopus/` 下所有 11 个子包均为空壳。
-4. 跨组件 import 门禁仅验证 AST 级别引用合规（L1 unit/mock），不验证运行时行为。
+4. 跨组件 import 门禁仅验证 AST 级别引用合规（P1 unit/mock），不验证运行时行为。
 
 ## 备选方案
 
@@ -54,7 +54,7 @@ Round 1 架构重构将治理控制面（Turtle）和运维执行面（Octopus�
 
 ## 验证与后续
 
-- `test_turtle_octopus_import_boundary.py`：29 个门禁测试，L1 unit/mock 级别，验证 AST 引用合规。
+- `test_turtle_octopus_import_boundary.py`：29 个门禁测试，P1 unit/mock 级别，验证 AST 引用合规。
 - `compileall`：所有 turtle/octopus 模块通过语法检查。
 - `ruff`：0 violations。
 - `mypy`：0 个新错误。

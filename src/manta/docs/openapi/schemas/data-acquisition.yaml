@@ -1,0 +1,411 @@
+components:
+  schemas:
+    DataAcquisitionMetricStatus:
+      type: string
+      enum:
+        - normal
+        - warning
+        - offline
+
+    DeviceCommStatus:
+      type: string
+      enum:
+        - online
+        - warning
+        - offline
+
+    DataAcquisitionTopMetric:
+      type: object
+      required:
+        - key
+        - label
+        - value
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          oneOf:
+            - type: number
+            - type: string
+        unit:
+          type: string
+        precision:
+          type: integer
+        trend:
+          type: number
+          format: double
+        status:
+          $ref: '#/components/schemas/DataAcquisitionMetricStatus'
+
+    DeviceCommItem:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - delay
+        - signal
+        - packetLoss
+        - heartbeatSec
+        - anomalies
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+            - turbine
+            - lidar
+        status:
+          $ref: '#/components/schemas/DeviceCommStatus'
+        delay:
+          type: number
+          format: double
+        signal:
+          type: number
+          format: double
+        packetLoss:
+          type: number
+          format: double
+        heartbeatSec:
+          type: number
+          format: double
+        anomalies:
+          type: integer
+
+    DeviceCommStatusBlock:
+      type: object
+      required:
+        - devices
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceCommItem'
+
+    DataQualityTrendPoint:
+      type: object
+      required:
+        - time
+        - value
+      properties:
+        time:
+          type: string
+        value:
+          type: number
+          format: double
+
+    DataQualityBinItem:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+          format: double
+
+    DataQualityAnomalyItem:
+      type: object
+      required:
+        - name
+        - value
+        - count
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+          format: double
+        count:
+          type: integer
+
+    DataQualityLatencyItem:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+          enum: [P50, P75, P90, P95, P99]
+        value:
+          type: number
+          format: double
+
+    DataQualityAnalysisData:
+      type: object
+      required:
+        - completenessTrend
+        - syncDiffBins
+        - anomalyRatio
+        - latencyQuantiles
+      properties:
+        completenessTrend:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataQualityTrendPoint'
+        syncDiffBins:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataQualityBinItem'
+        anomalyRatio:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataQualityAnomalyItem'
+        latencyQuantiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataQualityLatencyItem'
+
+    ChannelTrafficPoint:
+      type: object
+      required:
+        - time
+        - value
+      properties:
+        time:
+          type: string
+        value:
+          type: number
+          format: double
+
+    ChannelCompositionItem:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+          format: double
+
+    ChannelHealthMetric:
+      type: object
+      required:
+        - name
+        - value
+        - unit
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+          enum: ['%', ms]
+
+    ChannelResourceData:
+      type: object
+      required:
+        - utilization
+        - currentTraffic
+        - packetLoss
+        - avgDelay
+        - peakBandwidth
+        - trafficTrend
+        - channelComposition
+        - healthMetrics
+      properties:
+        utilization:
+          type: number
+          format: double
+        currentTraffic:
+          type: number
+          format: double
+        packetLoss:
+          type: number
+          format: double
+        avgDelay:
+          type: number
+          format: double
+        peakBandwidth:
+          type: number
+          format: double
+        trafficTrend:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelTrafficPoint'
+        channelComposition:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelCompositionItem'
+        healthMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelHealthMetric'
+
+    StoragePartitionItem:
+      type: object
+      required:
+        - name
+        - used
+        - total
+      properties:
+        name:
+          type: string
+        used:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+
+    StorageGrowthPoint:
+      type: object
+      required:
+        - date
+        - value
+      properties:
+        date:
+          type: string
+        value:
+          type: number
+          format: double
+
+    StorageResourceData:
+      type: object
+      required:
+        - totalData
+        - dailyGrowth
+        - diskUsage
+        - remainingSpace
+        - partitions
+        - growthTrend30d
+      properties:
+        totalData:
+          type: number
+          format: double
+        dailyGrowth:
+          type: number
+          format: double
+        diskUsage:
+          type: number
+          format: double
+        remainingSpace:
+          type: number
+          format: double
+        partitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoragePartitionItem'
+        growthTrend30d:
+          type: array
+          items:
+            $ref: '#/components/schemas/StorageGrowthPoint'
+
+    ComputeUsageMinutePoint:
+      type: object
+      required:
+        - time
+        - cpu
+        - memory
+      properties:
+        time:
+          type: string
+        cpu:
+          type: number
+          format: double
+        memory:
+          type: number
+          format: double
+
+    ComputeServiceItem:
+      type: object
+      required:
+        - name
+        - cpu
+        - memory
+        - status
+        - qps
+      properties:
+        name:
+          type: string
+        cpu:
+          type: number
+          format: double
+        memory:
+          type: number
+          format: double
+        status:
+          type: string
+          enum:
+            - online
+            - warning
+            - offline
+        qps:
+          type: number
+          format: double
+
+    ComputeResourceData:
+      type: object
+      required:
+        - cpuUsage
+        - memoryUsage
+        - processingDelay
+        - peakCapacity
+        - usageTrend1m
+        - services
+      properties:
+        cpuUsage:
+          type: number
+          format: double
+        memoryUsage:
+          type: number
+          format: double
+        processingDelay:
+          type: number
+          format: double
+        peakCapacity:
+          type: number
+          format: double
+        usageTrend1m:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComputeUsageMinutePoint'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComputeServiceItem'
+
+    DataCollectionPageData:
+      type: object
+      required:
+        - topMetrics
+        - deviceCommStatus
+        - dataQualityAnalysis
+        - channelResource
+        - storageResource
+        - computeResource
+      properties:
+        topMetrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataAcquisitionTopMetric'
+        deviceCommStatus:
+          $ref: '#/components/schemas/DeviceCommStatusBlock'
+        dataQualityAnalysis:
+          $ref: '#/components/schemas/DataQualityAnalysisData'
+        channelResource:
+          $ref: '#/components/schemas/ChannelResourceData'
+        storageResource:
+          $ref: '#/components/schemas/StorageResourceData'
+        computeResource:
+          $ref: '#/components/schemas/ComputeResourceData'
+
+    DataCollectionPageResponse:
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiResponseMeta'
+        - type: object
+          required:
+            - data
+          properties:
+            data:
+              $ref: '#/components/schemas/DataCollectionPageData'

@@ -1,0 +1,244 @@
+openapi: 3.0.3
+info:
+  title: Showtime API
+  version: 1.0.0
+  description: 前端使用的统一 OpenAPI 规范入口。
+
+servers:
+  - url: /
+    description: 当前站点
+
+tags:
+  - name: User
+    description: 用户相关接口
+  - name: UserCenter
+    description: 用户中心相关接口
+  - name: Message
+    description: 消息相关接口
+  - name: WindFarm
+    description: 风电场相关接口
+  - name: Turbine
+    description: 风机相关接口
+  - name: DataAcquisition
+    description: 数据采集页面相关接口
+  - name: Lidar
+    description: 激光雷达页面相关接口
+  - name: LoadMitigation
+    description: 载荷缓解页面相关接口
+  - name: PowerAnalysis
+    description: 功率分析页面相关接口
+
+paths:
+  /api/user/login:
+    post:
+      $ref: './paths/user.yaml#/paths/~1api~1user~1login/post'
+  /api/user/logout:
+    post:
+      $ref: './paths/user.yaml#/paths/~1api~1user~1logout/post'
+  /api/user/info:
+    post:
+      $ref: './paths/user.yaml#/paths/~1api~1user~1info/post'
+  /api/user/menu:
+    post:
+      $ref: './paths/user.yaml#/paths/~1api~1user~1menu/post'
+
+  /api/message/list:
+    post:
+      $ref: './paths/message.yaml#/paths/~1api~1message~1list/post'
+  /api/message/read:
+    post:
+      $ref: './paths/message.yaml#/paths/~1api~1message~1read/post'
+  /api/user/my-project/list:
+    post:
+      $ref: './paths/user-center.yaml#/paths/~1api~1user~1my-project~1list/post'
+  /api/user/my-team/list:
+    post:
+      $ref: './paths/user-center.yaml#/paths/~1api~1user~1my-team~1list/post'
+  /api/user/latest-activity:
+    post:
+      $ref: './paths/user-center.yaml#/paths/~1api~1user~1latest-activity/post'
+  /api/user/certification:
+    post:
+      $ref: './paths/user-center.yaml#/paths/~1api~1user~1certification/post'
+  /api/user/upload:
+    post:
+      $ref: './paths/user-center.yaml#/paths/~1api~1user~1upload/post'
+
+  /api/turbine/base-info:
+    get:
+      $ref: './paths/turbine.yaml#/paths/~1api~1turbine~1base-info/get'
+  /api/turbine/realtime-status:
+    get:
+      $ref: './paths/turbine.yaml#/paths/~1api~1turbine~1realtime-status/get'
+  /api/wind-farm/info:
+    get:
+      $ref: './paths/windfarm.yaml#/paths/~1api~1wind-farm~1info/get'
+  /api/data-acquisition/page:
+    get:
+      $ref: './paths/data-acquisition.yaml#/paths/~1api~1data-acquisition~1page/get'
+  /api/lidar/page:
+    get:
+      $ref: './paths/lidar.yaml#/paths/~1api~1lidar~1page/get'
+  /api/load-mitigation/page:
+    get:
+      $ref: './paths/load-mitigation.yaml#/paths/~1api~1load-mitigation~1page/get'
+  /api/power-analysis/page:
+    get:
+      $ref: './paths/power-analysis.yaml#/paths/~1api~1power-analysis~1page/get'
+
+components:
+  schemas:
+    ApiResponseMeta:
+      $ref: './schemas/common.yaml#/components/schemas/ApiResponseMeta'
+    RoleType:
+      $ref: './schemas/common.yaml#/components/schemas/RoleType'
+    ServerMenuItem:
+      $ref: './schemas/common.yaml#/components/schemas/ServerMenuItem'
+
+    LoginData:
+      $ref: './schemas/user.yaml#/components/schemas/LoginData'
+    LoginRes:
+      $ref: './schemas/user.yaml#/components/schemas/LoginRes'
+    UserState:
+      $ref: './schemas/user.yaml#/components/schemas/UserState'
+    LoginResResponse:
+      $ref: './schemas/user.yaml#/components/schemas/LoginResResponse'
+    LogoutResponse:
+      $ref: './schemas/user.yaml#/components/schemas/LogoutResponse'
+    UserInfoResponse:
+      $ref: './schemas/user.yaml#/components/schemas/UserInfoResponse'
+    MenuListResponse:
+      $ref: './schemas/user.yaml#/components/schemas/MenuListResponse'
+
+    MessageRecord:
+      $ref: './schemas/message.yaml#/components/schemas/MessageRecord'
+    MessageListType:
+      $ref: './schemas/message.yaml#/components/schemas/MessageListType'
+    MessageStatus:
+      $ref: './schemas/message.yaml#/components/schemas/MessageStatus'
+    MessageListResponse:
+      $ref: './schemas/message.yaml#/components/schemas/MessageListResponse'
+    MessageReadResponse:
+      $ref: './schemas/message.yaml#/components/schemas/MessageReadResponse'
+
+    Contributor:
+      $ref: './schemas/user-center.yaml#/components/schemas/Contributor'
+    MyProjectRecord:
+      $ref: './schemas/user-center.yaml#/components/schemas/MyProjectRecord'
+    MyTeamRecord:
+      $ref: './schemas/user-center.yaml#/components/schemas/MyTeamRecord'
+    LatestActivity:
+      $ref: './schemas/user-center.yaml#/components/schemas/LatestActivity'
+    BasicInfoModel:
+      $ref: './schemas/user-center.yaml#/components/schemas/BasicInfoModel'
+    EnterpriseCertificationModel:
+      $ref: './schemas/user-center.yaml#/components/schemas/EnterpriseCertificationModel'
+    CertificationRecordItem:
+      $ref: './schemas/user-center.yaml#/components/schemas/CertificationRecordItem'
+    CertificationRecord:
+      $ref: './schemas/user-center.yaml#/components/schemas/CertificationRecord'
+    UnitCertification:
+      $ref: './schemas/user-center.yaml#/components/schemas/UnitCertification'
+    MyProjectListResponse:
+      $ref: './schemas/user-center.yaml#/components/schemas/MyProjectListResponse'
+    MyTeamListResponse:
+      $ref: './schemas/user-center.yaml#/components/schemas/MyTeamListResponse'
+    LatestActivityListResponse:
+      $ref: './schemas/user-center.yaml#/components/schemas/LatestActivityListResponse'
+    UnitCertificationResponse:
+      $ref: './schemas/user-center.yaml#/components/schemas/UnitCertificationResponse'
+    UserUploadResponse:
+      $ref: './schemas/user-center.yaml#/components/schemas/UserUploadResponse'
+
+    WindFarmInfo:
+      $ref: './schemas/windfarm.yaml#/components/schemas/WindFarmInfo'
+    WindFarmInfoResponse:
+      $ref: './schemas/windfarm.yaml#/components/schemas/WindFarmInfoResponse'
+    TurbineBaseInfo:
+      $ref: './schemas/turbine.yaml#/components/schemas/TurbineBaseInfo'
+    TurbineRealtimeStatus:
+      $ref: './schemas/turbine.yaml#/components/schemas/TurbineRealtimeStatus'
+    TurbineBaseInfoResponse:
+      $ref: './schemas/turbine.yaml#/components/schemas/TurbineBaseInfoResponse'
+    TurbineRealtimeStatusResponse:
+      $ref: './schemas/turbine.yaml#/components/schemas/TurbineRealtimeStatusResponse'
+
+    DataAcquisitionMetricStatus:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/DataAcquisitionMetricStatus'
+    DeviceCommStatus:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/DeviceCommStatus'
+    DataAcquisitionTopMetric:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/DataAcquisitionTopMetric'
+    DeviceCommItem:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/DeviceCommItem'
+    DataQualityAnalysisData:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/DataQualityAnalysisData'
+    ChannelResourceData:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/ChannelResourceData'
+    StorageResourceData:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/StorageResourceData'
+    ComputeResourceData:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/ComputeResourceData'
+    DataCollectionPageData:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/DataCollectionPageData'
+    DataCollectionPageResponse:
+      $ref: './schemas/data-acquisition.yaml#/components/schemas/DataCollectionPageResponse'
+
+    LidarTurbineOption:
+      $ref: './schemas/lidar.yaml#/components/schemas/LidarTurbineOption'
+    LidarDeviceInfo:
+      $ref: './schemas/lidar.yaml#/components/schemas/LidarDeviceInfo'
+    LidarTopMetricItem:
+      $ref: './schemas/lidar.yaml#/components/schemas/LidarTopMetricItem'
+    RealtimeWindWaveResponse:
+      $ref: './schemas/lidar.yaml#/components/schemas/RealtimeWindWaveResponse'
+    LidarForwardComposite3DResponse:
+      $ref: './schemas/lidar.yaml#/components/schemas/LidarForwardComposite3DResponse'
+    LidarInflowProfilePanelData:
+      $ref: './schemas/lidar.yaml#/components/schemas/LidarInflowProfilePanelData'
+    WindRoseTiStats:
+      $ref: './schemas/lidar.yaml#/components/schemas/WindRoseTiStats'
+    TransferFunctionData:
+      $ref: './schemas/lidar.yaml#/components/schemas/TransferFunctionData'
+    ConsistencyAlignmentData:
+      $ref: './schemas/lidar.yaml#/components/schemas/ConsistencyAlignmentData'
+    DataQualitySummary:
+      $ref: './schemas/lidar.yaml#/components/schemas/DataQualitySummary'
+    LidarPageData:
+      $ref: './schemas/lidar.yaml#/components/schemas/LidarPageData'
+    LidarPageResponse:
+      $ref: './schemas/lidar.yaml#/components/schemas/LidarPageResponse'
+
+    LoadMitigationSelectOption:
+      $ref: './schemas/load-mitigation.yaml#/components/schemas/LoadMitigationSelectOption'
+    LoadMitigationInfoItem:
+      $ref: './schemas/load-mitigation.yaml#/components/schemas/LoadMitigationInfoItem'
+    LoadMitigationKpiItem:
+      $ref: './schemas/load-mitigation.yaml#/components/schemas/LoadMitigationKpiItem'
+    LoadMitigationMetricTab:
+      $ref: './schemas/load-mitigation.yaml#/components/schemas/LoadMitigationMetricTab'
+    LoadMitigationMetricBundle:
+      $ref: './schemas/load-mitigation.yaml#/components/schemas/LoadMitigationMetricBundle'
+    LoadMitigationPageData:
+      $ref: './schemas/load-mitigation.yaml#/components/schemas/LoadMitigationPageData'
+    LoadMitigationPageResponse:
+      $ref: './schemas/load-mitigation.yaml#/components/schemas/LoadMitigationPageResponse'
+
+    TurbineOption:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/TurbineOption'
+    TurbineProfile:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/TurbineProfile'
+    SummaryMetric:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/SummaryMetric'
+    PowerCurvePoint:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/PowerCurvePoint'
+    RayleighParameters:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/RayleighParameters'
+    VolatilityEvidence:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/VolatilityEvidence'
+    GustResponseCardData:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/GustResponseCardData'
+    PowerAnalysisPageData:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/PowerAnalysisPageData'
+    PowerAnalysisPageResponse:
+      $ref: './schemas/power-analysis.yaml#/components/schemas/PowerAnalysisPageResponse'

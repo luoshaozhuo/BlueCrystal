@@ -2,7 +2,7 @@
 
 本文件是 Whale 项目唯一测试索引。不另建其他回归索引文件（如 `issue_regression_index.md`）。
 
-> 最后更新: 2026-06-04 (Round 2 收口: "不能证明什么"表补充完成、环境状态术语对齐、MISSING_ENVIRONMENT 统一)
+> 最后更新: 2026-06-04 (Round 3 P5 外部依赖环境拉起收口: docker-compose.p5.yml + start/stop/diagnose/regression 脚本覆盖 5 依赖; .env.p5.example 环境变量模板)
 
 初版为目录级完整、关键链路文件级。不追求全仓逐文件穷尽。
 
@@ -130,13 +130,26 @@
 | `tests/unit/test_source_write_port_registry.py` | 写入端口注册表 | mock | 无 |
 | `tests/unit/test_speed_layer_light_processor.py` | light_processor | 无 (in-memory) | 无 |
 | `tests/unit/test_speed_layer_pipeline_runner.py` | pipeline runner | 无 (in-memory) | 无 |
+| `tests/unit/test_speed_layer_preprocessing.py` | preprocessing Round A（固定 10 阶段 pipeline + registry + 11 operator + 6 DTO） | 无 (in-memory) | 无 |
 | `tests/unit/test_storage_raw_archive.py` | raw_archive | 无 (in-memory) | 无 |
 | `tests/unit/test_storage_raw_index.py` | raw_index | 无 (in-memory) | 无 |
 | `tests/unit/test_storage_standardized.py` | standardized | 无 (in-memory) | 无 |
 | `tests/unit/test_storage_serving_cache.py` | serving_cache | 无 (in-memory) | 无 |
+| `tests/unit/test_storage_waveform.py` | waveform sink (port/InMemory/Tdengine real REST adapter) | 无 (in-memory) | 无 |
+| `tests/unit/test_storage_simulation_result.py` | simulation_result sink (InMemory/TDengine real REST adapter) | 无 (in-memory) | MISSING_ENVIRONMENT (需 TDengine 验证) |
+| `tests/unit/test_ingest_file_ingest_models.py` | file_ingest FaultRecordBinary/SourceFile models | 无 | 无 |
+| `tests/unit/test_ingest_file_ingest_detector.py` | file_ingest FileCompletionDetector | 无 | 无 |
+| `tests/unit/test_ingest_file_ingest_decoder.py` | file_ingest FaultRecordBinaryDecoder | 无 | 无 |
+| `tests/unit/test_ingest_file_ingest_repository.py` | file_ingest FileIngestJobRepository | 无 | 无 |
+| `tests/unit/test_ingest_file_ingest_service.py` | file_ingest FileIngestService 编排 | 无 | 无 |
+| `tests/unit/test_model_asset_models.py` | model_asset DTO/枚举（SimulationFileType/Manifest 等） | 无 (in-memory) | 无 |
+| `tests/unit/test_model_asset_detector.py` | SimulationFileTypeDetector 文件类型检测 | 无 | 无 |
+| `tests/unit/test_model_asset_repository.py` | ModelAssetRepository 四表 CRUD | SQLite :memory: | MISSING_ENVIRONMENT (需 PostgreSQL 验证 FK/indexes) |
+| `tests/unit/test_model_asset_service.py` | ModelAssetImportService 导入编排 | 无 (in-memory/mock) | 无 |
 | `tests/unit/shared/persistence/test_scada_protocol_params.py` | SCADA 协议参数模板 | 无 | 无 |
 | `tests/unit/shared/persistence/test_scada_sample_data_protocol_coverage.py` | SCADA 样例数据协议覆盖 | 无 | 无 |
 | `tests/unit/shared/persistence/test_scada_protocol_views.py` | SCADA 协议视图 | 无 | 无 |
+| `tests/unit/shared/persistence/test_model_asset_orm.py` | model_asset ORM 四表（唯一约束/FK/自引用） | SQLite :memory: | MISSING_ENVIRONMENT (需 PostgreSQL 验证并发写/indexes) |
 
 > l5 marker 说明：`l5` 是历史技术标签，当前语义等同于“准生产依赖验证期”。
 > 后续可逐步新增 `external` 或 `prodlike` 作为新 marker（见 pyproject.toml），
@@ -163,6 +176,9 @@
 | `tests/integration/test_ingest_audit_db_jsonl_consistency.py` | DB/JSONL 审计一致性 | SQLite/临时文件 | 无 |
 | `tests/integration/test_ingest_bundle_import_export.py` | bundle 导入导出 | SQLite | 无 |
 | `tests/integration/test_ingest_bundle_offline_one_way_flow.py` | bundle 单向流 | SQLite | 无 |
+| `tests/integration/test_ingest_file_ingest_integration.py` | file_ingest 模块集成（detect->archive->decode->waveform） | 临时文件 | 无 |
+| `tests/integration/test_model_asset_integration.py` | model_asset 模块集成（import->detect->archive->persist） | SQLite :memory: + 临时文件 | MISSING_ENVIRONMENT (需 PostgreSQL 验证 FK/并发) |
+| `tests/integration/test_model_asset_alembic_migration.py` | model_asset Alembic 迁移（upgrade/downgrade 4 表） | SQLite | MISSING_ENVIRONMENT (需 PostgreSQL 验证) |
 | `tests/integration/test_ingest_runtime_alembic_migration.py` | Alembic 迁移 | SQLite | 无 |
 | `tests/integration/test_ingest_runtime_db_init.py` | runtime DB 初始化 | SQLite | 无 |
 | `tests/integration/test_ingest_runtime_entrypoint_smoke.py` | entrypoint 烟测 | SQLite | 无 |
@@ -241,6 +257,9 @@
 | 测试文件 | 测试对象 | 外部依赖 | NOT_RUN 条件 |
 |---------|---------|---------|------------|
 | `tests/integration/test_l5_external_dependency_verification.py` | 5 大外部服务验证 | Kafka/PG/Redis/S3/TDengine | MISSING_ENVIRONMENT |
+| `tests/integration/test_storage_waveform_tdengine_integration.py` | TdengineStandardizedWaveformSink 真实 REST API 写入/读回 (4 tests, TCP+REST 两阶段探测 skipif) | TDengine REST API | MISSING_ENVIRONMENT (TDengine taosAdapter TCP 或 REST API 不可达) |
+| `tests/integration/test_storage_simulation_result_tdengine_integration.py` | TdengineSimulationResultTimeSeriesSink 真实 REST API 写入/读回 (5 tests, TCP+REST 两阶段探测 skipif) | TDengine REST API | MISSING_ENVIRONMENT (TDengine taosAdapter TCP 或 REST API 不可达) |
+| `tests/integration/test_model_asset_postgres_integration.py` | model_asset 四表 PostgreSQL 持久化 (16 tests, DSN 未设置时 NOT_RUN, DSN 已设置但连接失败时 FAIL) | PostgreSQL | MISSING_ENVIRONMENT (DSN 未设置) / FAIL (DSN 已设置但连接失败) |
 | `tests/e2e/test_whale_l5_kafka_pipeline_e2e.py` | Kafka pipeline E2E | Kafka/S3/TDengine/Redis | MISSING_ENVIRONMENT |
 | `tests/e2e/test_whale_l5_storage_e2e.py` | 存储 E2E | S3/TDengine/Redis | MISSING_ENVIRONMENT |
 
@@ -250,6 +269,11 @@
 |---------|---------|---------|------------|
 | `tests/e2e/test_whale_field_minimal_smoke.py` | 现场最小数据链路 | docker-compose | MISSING_ENVIRONMENT |
 | `scripts/run_whale_field_ready_smoke.sh` | 一键预检脚本 | docker-compose | MISSING_ENVIRONMENT |
+| `docker-compose.p5.yml` | 最小 P5 本地编排（PG+Redis+Kafka/MinIO+TDengine+taosAdapter，含 healthcheck） | Docker | MISSING_ENVIRONMENT (Docker 不可用或未启动) |
+| `scripts/start_whale_p5_dependencies.sh` | P5 外部依赖启动 | Docker | MISSING_ENVIRONMENT (Docker 不可用) |
+| `scripts/stop_whale_p5_dependencies.sh` | P5 外部依赖停止/清理 | Docker | N/A (仅影响环境) |
+| `scripts/diagnose_whale_p5_dependencies.sh` | P5 依赖诊断（5 依赖逐项 TCP+auth+minimal operation+脱敏） | PostgreSQL/Redis/Kafka/MinIO/TDengine | NOT_RUN (依赖不可达或环境变量未设置) |
+| `scripts/run_whale_p5_external_dependency_regression.sh` | P5 全链路回归（5 测试组，逐项输出/SUMMARY/PASS 计数） | Kafka/PG/Redis/MinIO/TDengine | NOT_RUN (依赖不可达) |
 
 ### 3.2 source_lab 工具测试 (tools/source_lab/tests/)
 

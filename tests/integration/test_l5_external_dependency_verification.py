@@ -1,4 +1,4 @@
-"""L5 外部依赖接入验证测试。
+"""P5 准生产依赖验证期 — 外部依赖接入验证测试。
 
 验证 Whale 全链路对真实外部依赖的可接入性：
 - Kafka message_pipeline adapter 真实发布/消费
@@ -8,11 +8,14 @@
 - Redis state cache 真实读写
 - Flink pipeline runner 真实提交
 
-本文件所有测试在外部服务不可用时自动 skip 或标记为 MISSING_ENVIRONMENT，
+本文件所有测试在外部服务不可用时自动 skip 或标记为 NOT_RUN: MISSING_ENVIRONMENT，
 不伪造通过。
 
-测试阶段：准生产依赖验证期 (external dependency verification)
+测试阶段：准生产依赖验证期 (P5 external dependency verification)
 环境依赖：Kafka / TDengine / HDFS / S3 / Pulsar / Redis / Flink
+历史 marker：l5 是历史技术标签，当前语义等同于"准生产依赖验证期"（P5）。
+  后续可逐步新增 `external` 或 `prodlike` 作为新 marker（见 pyproject.toml），
+  旧测试不需要迁移。l5 marker 含义在 test_index.md 中可追溯，不扩大使用。
 """
 
 from __future__ import annotations
@@ -399,7 +402,7 @@ class TestL5FullChainSmoke:
     - Kafka 可用 → 使用 KafkaSinkAdapter/KafkaSourceAdapter
     - Kafka 不可用 → 降级为 InMemoryMessageBus（标记 MISSING_ENVIRONMENT）
 
-    外部存储的 L5 验证由 Phase 3/4 独立覆盖。
+    外部存储的 P5 验证由 Phase 3/4 独立覆盖。
     """
 
     @pytest.mark.asyncio
