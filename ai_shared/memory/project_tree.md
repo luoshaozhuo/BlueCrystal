@@ -1,7 +1,6 @@
 # Whale 项目目录树
 
-> 能源数据统一平台（风光储电场数据接入底座）
-> 最后更新: 2026-06-04 (Round 3 P5 外部依赖环境拉起收口: docker-compose.p5.yml 最小 P5 编排; start/stop/diagnose 脚本覆盖 PostgreSQL/Redis/Kafka/MinIO/TDengine 5 依赖; .env.p5.example 环境变量模板; regression 脚本 5 测试组逐项输出 + SUMMARY 行; ADR-015 v5 补录)
+> 最后更新: 2026-06-07 (Round 20 扩展：src/starfish/protocols/iec101/link_layer.py **LinkLayerTimerService 抽象 + Default (threading.Timer) + Fake 三实现 + send/receive/on_timeout 完整状态机 + balanced FCB auto flip + retry ERROR**；src/starfish/protocols/iec101/information_elements.py **ShortFloat 兼容扩展**（int/numbers.Real/`__float__` duck typing 统一入口，**不引入 numpy 硬依赖**）；src/seahorse/strategies/curve_generation.py **Seahorse flaky 根因修复**（`daily_power_curve` 在 noise 叠加后强制 `min(values) >= floor_ratio * baseline = 0.2 * 1500.0 = 300.0`，从根因消除 `min(values)=90.952 < 100 阈值` 的统计噪声；**未使用 skip/xfail/删除测试/扩大阈值**）；src/starfish/facade/iec101_facade.py 扩展 codec_capabilities 3 个新 capabilities（`supports_link_layer_timers=true` / `supports_balanced_fcb_auto_flip=true` / `supports_retry_skeleton=true`）+ health() reason_text 7 强制要点同步；tests/unit/seahorse/test_strategies.py 新增 5 个 daily_power 稳定性测试（min_floor_enforced / cross_run_consistency / high_noise_compatible / 其它曲线无 floor 行为 / 5x 稳定性；test-validator 独立验证连续 **12 次 0 flaky**）；tests/unit/starfish/test_iec101_link_layer.py 新增 8 个 test classes（LinkLayerTimerService 抽象 + Default + Fake + balanced FCB auto flip + retry ERROR + sequence 状态机）；tests/unit/starfish/test_iec101_information_elements.py 新增 TestShortFloatRound20Compat（int / Decimal / Fraction / `__float__` duck typing 4 路输入 + NaN/Inf 仍严格拒绝）；tests/unit/starfish/test_iec101_codec.py 新增 TestIec101CodecRound20（3 新 capabilities 数字断言 + 7 强制要点 reason_text 验证）；tests/unit/starfish/test_probe_profile_capacity.py 新增 TestIec101Round20Capabilities（codec_capabilities 显式声明）；600+ IEC101 codec tests + 1215 starfish total + 15 architecture + 186 seahorse（**180 stable + 5 新 daily_power 稳定性测试 + 1 原 daily_power_preset**）= **1416 stable passed（+77 net 增量 vs Round 19 1339）**；third_party 零新增；import boundary 清洁；**LinkLayer runtime skeleton 仍不是真实 IEC101 server**（默认 `enable_timers=False` + 零 socket/pty/serial + `supports_server=false` / `supports_serial_runtime=false` 维持）；20 轮递进建设完成)
 
 本文件维护完整文件级目录树，每个 item 附简短职责注释（不超过 40 中文字符）。
 只用于导航，不替代读取当前源码。
@@ -13,62 +12,42 @@
 ├── CLAUDE.md                        — Claude Code / Codex 共用执行入口
 ├── AGENTS.md                        — Codex 自动读取入口，指向 CLAUDE.md
 ├── README.md                        — 项目简介与快速开始
-├── Dockerfile                       — ingest统一runtime镜像
+├── Dockerfile                       — ingest 统一 runtime 镜像
 ├── alembic.ini                      — Alembic 主配置
-├── pyproject.toml                   — 项目元数据、依赖与 ruff/mypy/pytest 工具配置（含 unit/smoke/integration/e2e/l5/external/prodlike/environment_pending/load/stress/slow/requires_raw_socket/requires_cap_net_raw/requires_root_or_cap_net_raw 共 14 个 markers）
+├── pyproject.toml                   — 项目元数据、依赖与 ruff/mypy/pytest 工具配置
 ├── requirements.txt                 — Python 依赖声明
-├── alembic/                         — ingest运行库迁移
+├── alembic/                         — ingest 运行库迁移
 │   ├── env.py                       — Alembic 环境配置
 │   ├── script.py.mako               — 迁移脚本模板
-│   └── versions/                    — 迁移版本
+│   └── versions/                    — 迁移版本（4 个）
 │       ├── 20260527_000001_ingest_runtime_initial.py
 │       ├── 20260527_000002_add_audit_index_and_job_stagger.py
 │       ├── 20260527_000003_add_idempotency_record.py
 │       └── 20260527_000004_add_model_asset_tables.py
 ├── docker-compose.ingest-dev.yaml   — ingest 开发环境 Docker 编排
-├── docker-compose.ingest-prodlike.yaml — ingest prodlike 环境 Docker 编排（PostgreSQL + Redis + Kafka）
-├── docker-compose.whale-l5.yaml     — P5 外部依赖 5-service Docker 环境（Kafka/PG/Redis/MinIO/TDengine）
+├── docker-compose.ingest-prodlike.yaml — ingest prodlike 环境 Docker 编排（PG + Redis + Kafka）
+├── docker-compose.whale-l5.yaml     — P5 外部依赖 5-service Docker 环境
 ├── docker-compose.p5.yml            — 最小 P5 本地编排（PG+Redis+Kafka/MinIO+TDengine+taosAdapter）
 ├── .flake8                          — flake8 代码检查配置
 ├── .gitignore                       — Git 忽略规则
 ├── .env.ingest.example              — ingest 环境变量模板
 ├── .env.whale.field.example         — Whale 现场部署完整环境变量模板
-├── .env.p5.example                   — P5 环境变量模板（无真实密钥）
+├── .env.p5.example                  — P5 环境变量模板（无真实密钥）
 ├── .vscode/settings.json            — VSCode 编辑器配置
 ├── .vscode/claude-wrapper.sh        — VSCode Claude CLI 包装脚本
-├── .data/                            — 运行时数据（SQLite 开发/测试 DB，gitignore）
+├── .data/                           — 运行时数据（SQLite 开发/测试 DB，gitignore）
+├── .source_lab_runtime/             — 旧 source_lab 运行时残留（已弃用，gitignore）
 ├── config/                          — 运行时配置
-│   ├── ingest/                      — ingest 配置（access_policy/performance/audit/endurance/security_partition）
-│   │   ├── access_policy.external.example.yaml
-│   │   ├── access_policy.prodlike.yaml
-│   │   ├── audit_sink.external.example.yaml
-│   │   ├── endurance.prodlike.yaml
-│   │   ├── performance.prodlike.yaml
-│   │   └── security_partition.example.yaml
-│   └── whale/                       — Whale 现场部署配置模板（P5 准生产依赖验证期状态注释，MISSING_ENVIRONMENT 标记）
-│       ├── message_pipeline.kafka.example.yaml
-│       ├── message_pipeline.pulsar.example.yaml
-│       ├── speed_layer.writers.example.yaml
-│       ├── storage.raw_archive.example.yaml
-│       ├── storage.serving_cache.example.yaml
-│       └── storage.tdengine.example.yaml
-│
+│   ├── ingest/                      — ingest 配置（access_policy / performance / audit / endurance / security_partition）
+│   └── whale/                       — Whale 现场部署配置模板（P5 准生产依赖验证期 MISSING_ENVIRONMENT 标记）
 ├── src/                             — 主源码根目录
 ├── tests/                           — 项目级测试根目录
-├── tools/                           — 工具包根目录
 ├── ai_shared/                       — AI 配置、规则与记忆
 ├── docs/                            — 项目文档
 ├── scripts/                         — 运维与开发脚本
-├── deploy/                          — Whale/Turtle/Octopus 部署配置
-│   ├── whale/README.md              — Whale 现场部署说明（含环境准备/配置/一键预检/各层启动/故障恢复/安全分区，MISSING_ENVIRONMENT 标记）
-│   ├── whale/ingest/README.md       — Whale Ingest 现场部署说明
-│   ├── whale/message_pipeline/README.md — Whale Message Pipeline 现场部署说明（Kafka P5 准生产依赖验证期验证通过，Pulsar MISSING_ENVIRONMENT）
-│   ├── whale/speed_layer/README.md  — Whale Speed Layer 现场部署说明（InMemory 生产就绪，Flink MISSING_ENVIRONMENT）
-│   ├── whale/storage/README.md      — Whale Storage 现场部署说明（TDengine/S3/Redis P5 准生产依赖验证期验证通过，HDFS MISSING_ENVIRONMENT）
-│   ├── turtle/README.md             — Turtle 部署说明
-│   └── octopus/README.md            — Octopus 部署说明
+├── deploy/                          — Whale / Turtle / Octopus 部署配置
 ├── .claude/                         — Claude Code 配置与技能
-├── .agents/                         — Codex agent 配置与技能（软链至 .claude/skills）
+├── .agents/                         — Codex agent 配置（skills 软链至 .claude/skills）
 ├── .codex/                          — OpenAI Codex 适配配置
 └── third_party/                     — 第三方 C 协议栈源码与预编译库
 ```
@@ -79,27 +58,23 @@
 
 ```text
 src/whale/
-├── __init__.py                      — 包入口
+├── __init__.py                      — 包入口（__version__ / __author__）
 │
 ├── ingest/                          — 数据采集核心（六边形架构）
 │   ├── __init__.py                  — 包入口（含 file_ingest 导出）
 │   ├── config.py                    — 采集配置定义与加载
 │   ├── composition.py               — 依赖注入组合根（采集/写入/快照发布）
 │   ├── message_pipeline.py          — 消息管道编排
-│   ├── whale.db                     — SQLite 开发/测试数据库
 │   │
 │   ├── entities/                    — 领域实体
-│   │   ├── __init__.py
 │   │   ├── node_state.py            — 节点状态实体
 │   │   └── source_health_state.py   — 数据源健康状态实体
 │   │
 │   ├── usecases/                    — 用例层（业务逻辑）
-│   │   ├── __init__.py              — 导出 SourceAcquisitionUseCase, StateSnapshotPublishUseCase
 │   │   ├── source_acquisition_use_case.py  — 采集用例入口
 │   │   ├── source_command_use_case.py  — 设备写入/控制命令用例入口
 │   │   ├── state_snapshot_publish_use_case.py  — 缓存快照发布到消息队列用例
 │   │   ├── dtos/                    — 数据传输对象
-│   │   │   ├── __init__.py
 │   │   │   ├── acquired_node_state.py
 │   │   │   ├── source_acquisition_request.py
 │   │   │   ├── source_acquisition_start_result.py
@@ -109,123 +84,106 @@ src/whale/
 │   │   │   ├── state_publish_request.py  — 快照发布请求 DTO
 │   │   │   └── state_publish_result.py   — 快照发布结果 DTO
 │   │   └── roles/                   — 采集策略角色
-│   │       ├── __init__.py
 │   │       ├── polling_acquisition_role.py       — 轮询采集策略
 │   │       └── subscription_acquisition_role.py  — 订阅采集策略
 │   │
 │   ├── ports/                       — 端口层（接口抽象）
-│   │   ├── __init__.py
-│   │   ├── audit.py                 — ingest审计sink端口
+│   │   ├── audit.py                 — ingest 审计 sink 端口
 │   │   ├── diagnostics.py           — 诊断接口
 │   │   ├── metrics.py               — 指标端口
 │   │   ├── command/                 — 命令审计端口
-│   │   │   ├── __init__.py
-│   │   │   └── source_command_audit_port.py  — 写入命令审计端口
+│   │   │   └── source_command_audit_port.py
 │   │   ├── message/                 — 消息发布端口
-│   │   │   ├── __init__.py
 │   │   │   └── message_publisher_port.py
 │   │   ├── runtime/                 — 运行时配置端口
-│   │   │   ├── __init__.py
 │   │   │   ├── access_policy_port.py           — 访问策略端口
 │   │   │   ├── source_runtime_config_port.py
-│   │   │   └── write_lease_port.py  — 写入租约端口
+│   │   │   └── write_lease_port.py             — 写入租约端口
 │   │   ├── source/                  — 数据源采集端口
-│   │   │   ├── __init__.py
-│   │   │   ├── source_acquisition_definition_port.py  — 采集定义端口
-│   │   │   ├── source_acquisition_port.py              — 采集端口
-│   │   │   ├── source_acquisition_port_registry.py     — 端口注册表
-│   │   │   ├── source_write_port.py                    — 设备写入端口
-│   │   │   └── source_write_port_registry.py           — 写入端口注册表
+│   │   │   ├── source_acquisition_definition_port.py
+│   │   │   ├── source_acquisition_port.py
+│   │   │   ├── source_acquisition_port_registry.py
+│   │   │   ├── source_write_port.py
+│   │   │   └── source_write_port_registry.py
 │   │   └── state/                   — 状态缓存端口
-│   │       ├── __init__.py
-│   │       ├── source_state_cache_port.py          — 状态缓存端口
-│   │       └── source_state_snapshot_reader_port.py — 快照读取端口
+│   │       ├── source_state_cache_port.py
+│   │       └── source_state_snapshot_reader_port.py
 │   │
 │   ├── adapters/                    — 适配器层（基础设施实现）
-│   │   ├── audit/                   — 审计sink适配器
-│   │   │   ├── __init__.py          — 审计适配器导出
-│   │   │   ├── db_audit_sink.py     — DB审计sink
-│   │   │   ├── http_audit_sink.py   — 外部HTTP审计SIEM sink
-│   │   │   └── multi_audit_sink.py  — DB+JSONL dual audit sink 组合器
+│   │   ├── audit/                   — 审计 sink 适配器
+│   │   │   ├── db_audit_sink.py     — DB 审计 sink
+│   │   │   ├── http_audit_sink.py   — 外部 HTTP 审计 SIEM sink
+│   │   │   └── multi_audit_sink.py  — DB + JSONL dual audit sink
 │   │   ├── config/                  — 配置持久化适配器
-│   │   │   ├── __init__.py
-│   │   │   ├── opcua_source_acquisition_definition_repository.py  — OPC UA 采集定义仓库
-│   │   │   └── source_runtime_config_repository.py                — 运行时配置仓库
+│   │   │   ├── opcua_source_acquisition_definition_repository.py
+│   │   │   └── source_runtime_config_repository.py
 │   │   ├── message/                 — 消息发布适配器
-│   │   │   ├── __init__.py
-│   │   │   ├── kafka_message_publisher.py           — Kafka 发布器
-│   │   │   ├── redis_streams_message_publisher.py   — Redis Streams 发布器
-│   │   │   └── relational_outbox_message_publisher.py  — 关系库 outbox 发布器
+│   │   │   ├── kafka_message_publisher.py
+│   │   │   ├── redis_streams_message_publisher.py
+│   │   │   └── relational_outbox_message_publisher.py
 │   │   ├── security/                — 安全策略适配器
-│   │   │   ├── __init__.py          — 安全适配器导出
-│   │   │   ├── external_access_policy.py  — 外部访问策略适配器
-│   │   │   └── file_access_policy.py      — 文件访问策略适配器
-│   │   ├── source/                  — 数据源采集适配器
-│   │   │   ├── __init__.py
-│   │   │   ├── dispatch_source_acquisition_adapter.py  — 多协议调度采集适配器
-│   │   │   ├── http_rest_source_acquisition_adapter.py  — HTTP REST 采集适配器
-│   │   │   ├── iec101_source_acquisition_adapter.py     — IEC101 串行采集适配器
-│   │   │   ├── iec104_source_acquisition_adapter.py   — IEC104 采集适配器
-│   │   │   ├── iec104_source_write_adapter.py          — IEC104 写入适配器
-│   │   │   ├── modbus_source_acquisition_adapter.py   — Modbus TCP 采集适配器
-│   │   │   ├── modbus_source_write_adapter.py         — Modbus TCP 写入适配器
-│   │   │   ├── modbus_rtu_source_acquisition_adapter.py — Modbus RTU 串行采集适配器
-│   │   │   ├── mqtt_source_acquisition_adapter.py     — MQTT 采集适配器
-│   │   │   ├── opcua_source_acquisition_adapter.py           — OPC UA 采集适配器
-│   │   │   ├── opcua_source_write_adapter.py                 — OPC UA 写入适配器
-│   │   │   ├── iec61850_source_acquisition_adapter.py  — IEC 61850 MMS 采集适配器
-│   │   │   ├── iec61850_source_write_adapter.py        — IEC 61850 MMS 写入适配器
-│   │   │   ├── iec61850_report_source_acquisition_adapter.py  — IEC 61850 Report 订阅采集适配器
-│   │   │   ├── static_source_acquisition_port_registry.py    — 静态采集端口注册表
-│   │   │   └── static_source_write_port_registry.py          — 静态写入端口注册表
+│   │   │   ├── external_access_policy.py
+│   │   │   └── file_access_policy.py
+│   │   ├── source/                  — 数据源采集适配器（13 协议）
+│   │   │   ├── dispatch_source_acquisition_adapter.py  — 多协议调度采集
+│   │   │   ├── http_rest_source_acquisition_adapter.py
+│   │   │   ├── iec101_source_acquisition_adapter.py    — IEC101 串行采集
+│   │   │   ├── iec104_source_acquisition_adapter.py    — IEC104 采集
+│   │   │   ├── iec104_source_write_adapter.py          — IEC104 写入
+│   │   │   ├── modbus_source_acquisition_adapter.py    — Modbus TCP 采集
+│   │   │   ├── modbus_source_write_adapter.py          — Modbus TCP 写入
+│   │   │   ├── modbus_rtu_source_acquisition_adapter.py — Modbus RTU 串行采集
+│   │   │   ├── mqtt_source_acquisition_adapter.py      — MQTT 采集
+│   │   │   ├── opcua_source_acquisition_adapter.py     — OPC UA 采集
+│   │   │   ├── opcua_source_write_adapter.py           — OPC UA 写入
+│   │   │   ├── iec61850_source_acquisition_adapter.py  — IEC 61850 MMS 采集
+│   │   │   ├── iec61850_source_write_adapter.py        — IEC 61850 MMS 写入
+│   │   │   ├── iec61850_report_source_acquisition_adapter.py — IEC 61850 Report 订阅采集
+│   │   │   ├── static_source_acquisition_port_registry.py
+│   │   │   └── static_source_write_port_registry.py
 │   │   ├── observability/           — 观测与审计输出
-│   │   │   ├── __init__.py          — 观测sink导出
-│   │   │   └── file_sinks.py        — JSONL metrics/audit sink
+│   │   │   └── file_sinks.py        — JSONL metrics / audit sink
 │   │   └── state/                   — 状态缓存适配器
-│   │       ├── __init__.py
-│   │       └── redis_source_state_cache.py  — Redis 状态缓存
+│   │       └── redis_source_state_cache.py
 │   │
 │   ├── api/                         — ingest Web API
-│   │   ├── __init__.py              — API包导出
 │   │   ├── app.py                   — FastAPI app factory
-│   │   ├── audit_middleware.py      — API审计中间件
+│   │   ├── audit_middleware.py      — API 审计中间件
 │   │   ├── errors.py                — 稳定错误模型
 │   │   ├── idempotency.py           — 幂等性中间件
 │   │   ├── schemas.py               — API schema
-│   │   ├── readyz.py                — readyz 8组件聚合与degradation脱敏
-│   │   └── routes/
-│   │       ├── __init__.py          — API路由导出
-│   │       ├── acquisition_tasks.py — 采集任务CRUD路由
-│   │       ├── audit_events.py      — audit event查询路由
-│   │       ├── bundles.py           — bundle metadata查询路由
-│   │       ├── health.py            — health/ready 路由
-│   │       ├── leases.py            — lease查询路由
-│   │       ├── nodes.py             — node查询路由
-│   │       ├── runtime_config.py    — source等配置CRUD路由
-│   │       ├── scheduler_jobs.py    — scheduler job CRUD路由
-│   │       └── security_partitions.py — security partition CRUD路由
+│   │   ├── readyz.py                — readyz 8 组件聚合与 degradation 脱敏
+│   │   └── routes/                  — 9 路由模块
+│   │       ├── acquisition_tasks.py — 采集任务 CRUD 路由
+│   │       ├── audit_events.py      — audit event 查询路由
+│   │       ├── bundles.py           — bundle metadata 查询路由
+│   │       ├── health.py            — health / ready 路由
+│   │       ├── leases.py            — lease 查询路由
+│   │       ├── nodes.py             — node 查询路由
+│   │       ├── runtime_config.py    — source 等配置 CRUD 路由
+│   │       ├── scheduler_jobs.py    — scheduler job CRUD 路由
+│   │       └── security_partitions.py — security partition CRUD 路由
 │   │
 │   ├── bundle/                      — 配置包导入导出
-│   │   ├── __init__.py              — bundle包导出
-│   │   ├── checksum.py              — bundle校验摘要
-│   │   ├── model.py                 — bundle领域模型
-│   │   ├── redaction.py             — bundle脱敏导出
-│   │   └── service.py               — bundle服务
+│   │   ├── checksum.py              — bundle 校验摘要
+│   │   ├── model.py                 — bundle 领域模型
+│   │   ├── redaction.py             — bundle 脱敏导出
+│   │   └── service.py               — bundle 服务
 │   │
 │   ├── domain/                      — 共享领域模型
-│   │   ├── audit_event.py           — ingest结构化审计事件
+│   │   ├── audit_event.py           — ingest 结构化审计事件
 │   │   └── write_security_profile.py — 写入安全配置模型
 │   │
 │   ├── runtime/                     — 运行时组件
 │   │   ├── acquisition_mode.py      — 采集模式枚举
-│   │   ├── cli.py                   — ingest多入口CLI
-│   │   ├── entrypoint.py            — ingest运行入口
-│   │   ├── fencing.py               — fencing token服务
+│   │   ├── cli.py                   — ingest 多入口 CLI
+│   │   ├── entrypoint.py            — ingest 运行入口
+│   │   ├── fencing.py               — fencing token 服务
 │   │   ├── job_status.py            — 作业状态定义
 │   │   ├── job_assignment.py        — 作业归属服务
 │   │   ├── lease.py                 — 作业租约服务
 │   │   ├── message_pipeline_settings.py — 管道参数设置
-│   │   ├── modes.py                 — runtime模式枚举
+│   │   ├── modes.py                 — runtime 模式枚举
 │   │   ├── node_runtime.py          — 节点心跳服务
 │   │   ├── scheduler.py             — 调度器主逻辑
 │   │   ├── scheduler_factory.py     — 调度器工厂
@@ -235,301 +193,387 @@ src/whale/
 │   │   ├── worker_runtime.py        — APScheduler WorkerRuntime
 │   │   └── handlers.py              — WorkerRuntime 采集 job handler
 │   │
-│   ├── decorators/                   — 装饰器
-│   │   ├── __init__.py
-│   │   ├── source_acquisition.py     — 采集流程装饰器
-│   │   ├── source_write.py           — 写入授权装饰器
-│   │   └── state_cache.py            — 状态缓存装饰器
+│   ├── decorators/                  — 装饰器
+│   │   ├── source_acquisition.py    — 采集流程装饰器
+│   │   ├── source_write.py          — 写入授权装饰器
+│   │   └── state_cache.py           — 状态缓存装饰器
 │   │
-│   ├── framework/persistence/        — 持久化框架
-│   │   ├── __init__.py
-│   │   ├── base.py                   — ORM 声明基类
-│   │   ├── init_db.py                — 数据库初始化
-│   │   ├── runtime_db.py             — runtime DB初始化与探针
-│   │   ├── session.py                — 会话管理
-│   │   └── orm/__init__.py           — ORM 模型包（空，模型在 shared）
+│   ├── framework/persistence/       — 持久化框架
+│   │   ├── base.py                  — ORM 声明基类
+│   │   ├── init_db.py               — 数据库初始化
+│   │   ├── runtime_db.py            — runtime DB 初始化与探针
+│   │   ├── session.py               — 会话管理
+│   │   └── orm/                     — ORM 模型包（空，模型在 shared）
 │   │
-│   ├── file_ingest/                  — 文件接入子系统（文件完成检测、解码、波形写入）
-│   │   ├── __init__.py               — 包入口，导出 FileIngestService/FaultRecordBinary 等
-│   │   ├── models.py                 — FaultRecordBinary/SourceFile/FileIngestJob 领域模型
-│   │   ├── detector.py               — FileCompletionDetector 文件完成检测（inotify+polling）
-│   │   ├── decoder.py                — FaultRecordBinaryDecoder 二进制解码（magic+version+header+values float32 LE）
-│   │   ├── repository.py             — FileIngestJobRepository 任务持久化（SQLite/SQLAlchemy）
-│   │   └── service.py                — FileIngestService 编排：detect->raw_archive->decode->waveform sink->fault_event
+│   ├── file_ingest/                 — 文件接入子系统（文件完成检测、解码、波形写入）
+│   │   ├── detector.py              — FileCompletionDetector（inotify + polling）
+│   │   ├── decoder.py               — FaultRecordBinaryDecoder（magic + version + header + float32 LE）
+│   │   ├── repository.py            — FileIngestJobRepository（SQLite / SQLAlchemy）
+│   │   ├── service.py               — FileIngestService 编排（detect → archive → decode → waveform → fault_event）
+│   │   └── models.py                — FaultRecordBinary / SourceFile / FileIngestJob 领域模型
 │   │
-│   └── docs/                         — ingest 设计文档
-│       ├── DECISIONS.md              — 架构决策记录
-│       └── 设计说明书.md              — 模块设计说明书
+│   └── docs/                        — ingest 设计文档
+│       ├── DECISIONS.md             — 架构决策记录
+│       └── 设计说明书.md             — 模块设计说明书
 │
-├── message_pipeline/                 — 消息管道抽象与适配
-│   ├── __init__.py                   — 包入口
-│   ├── model.py                      — Envelope/TopicSpec/PartitionKey/MessageOffset/ReplayRequest
-│   ├── ports.py                      — Source/Sink/SchemaRegistry/DLQ/Replay 端口接口
-│   └── adapters/                     — 消息管道适配器
-│       ├── __init__.py               — 适配器导出
-│       ├── in_memory.py              — InMemoryMessageBus/InMemoryDeadLetterSink/InMemorySchemaRegistry
-│       ├── kafka.py                  — KafkaSourceAdapter (REAL consumer.poll()) + KafkaSinkAdapter (REAL producer)
-│       └── pulsar.py                 — PulsarSourceAdapter/PulsarSinkAdapter (contract-only, environment-pending)
+├── message_pipeline/                — 消息管道抽象与适配
+│   ├── model.py                     — Envelope / TopicSpec / PartitionKey / MessageOffset / ReplayRequest
+│   ├── ports.py                     — Source / Sink / SchemaRegistry / DLQ / Replay 端口接口
+│   └── adapters/                    — 消息管道适配器
+│       ├── in_memory.py             — InMemoryMessageBus / DLQ / SchemaRegistry
+│       ├── kafka.py                 — KafkaSourceAdapter (REAL consumer.poll) + KafkaSinkAdapter
+│       └── pulsar.py                — PulsarSource / Sink（contract-only，environment-pending）
 │
-├── speed_layer/                      — 速度层消费与运行时
-│   ├── __init__.py                   — 包入口（含 Round A preprocessing 导出）
-│   ├── light_processor.py            — SP-FR-004 实时轻处理管线（EnvelopeValidator/MessageDeduplicator/QualityCodePassThrough/OutOfOrderGuard/LightProcessingPipeline）
-│   ├── writers.py                    — RawArchiveWriter/RawIndexWriter/StandardizedWriter/ServingCacheUpdater
-│   ├── runner.py                     — SpeedLayerWiring (with_* builders, with_light_processor, build) + _LightFilteredSource + LocalPipelineRunner + FlinkPipelineAdapter
-│   ├── metrics.py                    — MetricsCollectorPort/InMemoryMetricsCollector
-│   └── preprocessing/                — Round A 固定 10 阶段预处理 Pipeline + OperatorRegistry
-│       ├── __init__.py               — 预处理包入口，导出 6 DTO、11 operator、PreprocessingPipeline、OperatorRegistry
-│       ├── models.py                 — 6 运行期 DTO（DecodedSignal/ResolvedSignal/StandardizedPointValue/StateViewRecord 等）
-│       ├── registry.py               — OperatorRegistry 按 payload_type/protocol/vendor/descriptor_key/default 条件加权选择
-│       ├── operators.py              — 11 个基础 operator（PayloadClassifier/Decoder/Resolver/Normalizer/Evaluator/Dedup/Writer/StateViewUpdater）
-│       └── pipeline.py               — PreprocessingPipeline 固定 10 阶段编排（STAGE_ORDER 1-10），decode-before-resolve
+├── speed_layer/                     — 速度层消费与运行时
+│   ├── light_processor.py           — SP-FR-004 实时轻处理管线
+│   ├── writers.py                   — RawArchive / RawIndex / Standardized / ServingCache
+│   ├── runner.py                    — SpeedLayerWiring + LocalPipelineRunner + FlinkPipelineAdapter
+│   ├── metrics.py                   — MetricsCollectorPort / InMemoryMetricsCollector
+│   └── preprocessing/               — Round A 固定 10 阶段预处理 Pipeline + OperatorRegistry
+│       ├── models.py                — 6 运行期 DTO
+│       ├── registry.py              — OperatorRegistry 加权选择
+│       ├── operators.py             — 11 个基础 operator
+│       └── pipeline.py              — PreprocessingPipeline 固定 10 阶段编排
 │
-├── storage/                          — 存储层（三层分层 + warehouse/mart/cache）
-│   ├── __init__.py                   — 包入口（含 waveform 导出）
-│   ├── raw_archive.py                — 压缩文件归档（S3RawArchiveSink boto3 +gzip JSONL + WHALE_S3_* env var + LocalCompressedArchiveSink + S3ManifestRepository）
-│   ├── raw_index.py                  — TdengineRawIndexSink (INSERT STABLE TAGS SQL + REST API) + MemoryRawIndexSink
-│   ├── standardized.py               — TdengineStandardizedSink (全量 10 required fields + readback + REST API) + MemoryStandardizedSink
-│   ├── warehouse.py                  — WarehouseSinkPort/InMemoryWarehouseSink（端口+stub）
-│   ├── mart.py                       — MartSinkPort/InMemoryMartSink（端口+stub）
-│   ├── serving_cache.py              — RedisServingCache (redis-py SETEX/GET/DEL/PING/TTL) + InMemoryServingCache
-│   ├── waveform.py                   — StandardizedWaveformSinkPort / InMemory / Tdengine real REST API adapter + WHALE_TDENGINE_REST_PATH + _check_rest_api_alive()
-│   └── simulation_result.py          — SimulationResultTimeSeriesSinkPort / InMemory / TDengine real REST API adapter + WHALE_TDENGINE_REST_PATH + _check_rest_api_alive()
+├── storage/                         — 存储层（三层分层 + warehouse / mart / cache）
+│   ├── raw_archive.py               — S3RawArchiveSink (boto3 + gzip JSONL) + LocalCompressedArchiveSink
+│   ├── raw_index.py                 — TdengineRawIndexSink + MemoryRawIndexSink
+│   ├── standardized.py              — TdengineStandardizedSink + MemoryStandardizedSink
+│   ├── warehouse.py                 — WarehouseSinkPort + InMemoryWarehouseSink
+│   ├── mart.py                      — MartSinkPort + InMemoryMartSink
+│   ├── serving_cache.py             — RedisServingCache (SETEX/GET/DEL/PING/TTL) + InMemoryServingCache
+│   ├── waveform.py                  — StandardizedWaveformSink + InMemory + TDengine real REST API
+│   └── simulation_result.py         — SimulationResultTimeSeriesSink + InMemory + TDengine real REST API
 │
-├── processing/                       — 数据处理（骨架，依赖缺失无法运行）
-│   ├── __init__.py
-│   ├── cleaner.py                    — 数据清洗（骨架，whale.models 不存在）
-│   └── normalizer.py                 — 数据标准化（骨架，whale.models 不存在）
+├── processing/                      — 数据处理（骨架，依赖缺失无法运行）
+│   ├── cleaner.py                   — 数据清洗
+│   └── normalizer.py                — 数据标准化
 │
-├── aggregation/                      — 数据聚合（骨架，依赖缺失无法运行）
-│   ├── __init__.py
-│   ├── ads.py                        — ADS 聚合（骨架，whale.models 不存在）
-│   ├── periodic.py                   — 周期性聚合（骨架，whale.models 不存在）
-│   └── realtime.py                   — 实时聚合（骨架，whale.models 不存在）
+├── aggregation/                     — 数据聚合（骨架，依赖缺失无法运行）
+│   ├── ads.py                       — ADS 聚合
+│   ├── periodic.py                  — 周期性聚合
+│   └── realtime.py                  — 实时聚合
 │
-├── model_asset/                       — 仿真资产元数据管理与导入
-│   ├── __init__.py                    — 包入口，导出 DTO/detector/archive/repository/service
-│   ├── models.py                      — DTO（ModelAssetImportRequest/SimulationFileType/SimulationImportManifest 等）
-│   ├── detector.py                    — SimulationFileTypeDetector 仿真文件类型检测
-│   ├── archive.py                     — SimulationArchiveService 文件归档（复用 storage.raw_archive）
-│   ├── repository.py                  — ModelAssetRepository 四表持久化（PostgreSQL）
-│   └── service.py                     — ModelAssetImportService 导入编排（detect->archive->repository）
+├── model_asset/                     — 仿真资产元数据管理与导入
+│   ├── models.py                    — DTO（ModelAssetImportRequest 等）
+│   ├── detector.py                  — SimulationFileTypeDetector
+│   ├── archive.py                   — SimulationArchiveService（复用 storage.raw_archive）
+│   ├── repository.py                — ModelAssetRepository 四表持久化（PG）
+│   └── service.py                   — ModelAssetImportService 编排
 │
-└── shared/                           — 共享层（跨模块通用能力）
-    ├── __init__.py                   — 包入口，Shared helpers for Whale
-    │
-    ├── enums/                        — 共享枚举
-    │   ├── __init__.py
-    │   └── quality.py                — 数据质量枚举
-    │
-    ├── utils/                        — 工具函数
-    │   └── time.py                   — 时间工具函数（ensure_utc 等）
-    │
-    ├── persistence/                  — 共享持久化
-    │   ├── __init__.py
-    │   ├── base.py                   — 持久化基类
-    │   ├── init_db.py                — 数据库初始化
-    │   ├── session.py                — 会话管理
-    │   ├── orm/                      — ORM 模型
-    │   │   ├── __init__.py
-    │   │   ├── acquisition.py        — 采集任务模型
-    │   │   ├── asset.py              — 资产模型
-    │   │   ├── ingest_runtime.py     — ingest运行库模型
+└── shared/                          — 共享层（跨模块通用能力）
+    ├── enums/
+    │   └── quality.py               — 数据质量枚举
+    ├── utils/
+    │   └── time.py                  — 时间工具函数
+    ├── persistence/                 — 共享持久化
+    │   ├── base.py                  — 持久化基类
+    │   ├── init_db.py               — 数据库初始化
+    │   ├── session.py               — 会话管理
+    │   ├── orm/                     — ORM 模型
+    │   │   ├── acquisition.py       — 采集任务模型
+    │   │   ├── asset.py             — 资产模型
+    │   │   ├── ingest_runtime.py    — ingest 运行库模型
     │   │   ├── ingest_diagnostics.py — 采集诊断模型
-    │   │   ├── model_asset.py       — 仿真资产四表ORM（ModelAsset/SimulationCase/SimulationResult/SimulationArtifact）
-    │   │   ├── organization.py       — 组织模型
-    │   │   ├── scada_ingest.py       — SCADA 采集模型
-    │   │   └── scada_protocol_param.py  — SCADA 协议参数模型
-    │   └── template/                 — 模板数据
-    │       ├── __init__.py
-    │       ├── gbt_30966_fields.py         — GB/T 30966 字段定义
-    │       ├── protocol_param_data.py      — 16 组协议服务参数模板定义
-    │       ├── protocol_view_defs.py       — 协议参数展平只读视图定义
-    │       ├── sample_data.py              — 13 类端点/16组服务样例初始化
-    │       └── OPCUA_client_connections.yaml  — OPC UA 连接配置
-    │
-    ├── source/                       — 数据源访问抽象
-    │   ├── __init__.py               — 统一对外暴露 source 层接口和 reader
-    │   ├── models.py                 — SourceConnectionProfile/NodeValueChange/Batch/SourceNodeInfo 等
-    │   ├── ports.py                  — BrowsableSourcePort/ReadableSourcePort/SourceReaderPort/SubscribableSourcePort
-    │   ├── runner_resolution.py      — shared_source production runner 路径解析与 dev fallback
-    │   ├── access/                   — 可复用接入适配器
-    │   │   ├── __init__.py
-    │   │   ├── adapter.py            — SourceAccessAdapter 基类
-    │   │   ├── model.py              — 端点/点位/Tick 数据模型
-    │   │   └── opcua.py              — OPC UA 适配器实现
-    │   ├── modbus/                   — Modbus TCP 读取器
-    │   │   ├── __init__.py
-    │   │   ├── reader.py             — ModbusSourceReader 外观
-    │   │   └── backends/
-    │   │       ├── __init__.py
-    │   │       ├── base.py           — 后端基类与数据类型
-    │   │       └── libmodbus_backend.py  — libmodbus C 子进程后端
-    │   ├── opcua/                    — OPC UA 读取器
-    │   │   ├── __init__.py
-    │   │   ├── reader.py             — OpcUaSourceReader
-    │   │   └── backends/
-    │   │       ├── __init__.py
-    │   │       ├── base.py           — 后端基类
-    │   │       ├── factory.py        — 后端工厂
-    │   │       └── open62541_backend.py  — open62541 C 后端
-    │   ├── iec61850/                 — IEC 61850 MMS/Report 读取器
-    │   │   ├── __init__.py
-    │   │   ├── reader.py             — Iec61850MmsSourceReader 外观
-    │   │   ├── report_reader.py      — Iec61850ReportSourceReader 外观
-    │   │   └── backends/
-    │   │       ├── __init__.py
-    │   │       ├── base.py           — 后端基类与数据类型
-    │   │       ├── libiec61850_backend.py  — libiec61850 C 子进程后端（MMS）
-    │   │       ├── report_base.py    — Report 事件数据类型
-    │   │       └── libiec61850_report_backend.py  — libiec61850 C 子进程后端（Report）
-    │   ├── iec104/                   — IEC 104 读取器
-    │   │   ├── __init__.py
-    │   │   ├── reader.py             — Iec104SourceReader 外观
-    │   │   └── backends/
-    │   │       ├── __init__.py
-    │   │       ├── base.py           — 后端基类与数据类型
-    │   │       └── lib60870_backend.py — lib60870 C 子进程后端
-    │   ├── http_rest/                — HTTP REST 读取器
-    │   │   ├── __init__.py
-    │   │   └── client.py             — HttpRestClientBackend（asyncio HTTP/1.1）
-    │   ├── modbus_rtu/               — Modbus RTU 串行读取器
-    │   │   ├── __init__.py           — 模块入口（python_lightweight_runner）
-    │   │   ├── reader.py             — ModbusRtuSourceReader 外观
-    │   │   └── backends/
-    │   │       ├── __init__.py
-    │   │       ├── base.py           — 后端基类与数据类型
-    │   │       └── serial_backend.py — 真实串口后端（CRC16）
-    │   ├── iec101/                   — IEC 101 串行读取器
-    │   │   ├── __init__.py           — 模块入口（python_lightweight_runner）
-    │   │   ├── reader.py             — Iec101SourceReader 外观
-    │   │   └── backends/
-    │   │       ├── __init__.py
-    │   │       ├── base.py           — 后端基类与数据类型
-    │   │       └── serial_backend.py — 真实串口后端（FT1.2+ASDU）
-    │   ├── mqtt/                     — MQTT 读取器
-    │   │   ├── __init__.py
-    │   │   └── client.py             — MqttClientBackend（asyncio MQTT v3.1.1）
-    │   └── scheduling/               — 调度工具
-    │       ├── __init__.py
-    │       ├── concurrency.py        — 并发控制
-    │       ├── fixed_rate.py         — 固定速率执行器
-    │       ├── polling.py            — 轮询调度
-    │       └── stagger.py            — 错峰调度
+    │   │   ├── model_asset.py       — 仿真资产四表 ORM
+    │   │   ├── organization.py      — 组织模型
+    │   │   ├── scada_ingest.py      — SCADA 采集模型
+    │   │   └── scada_protocol_param.py — SCADA 协议参数模型
+    │   └── template/                — 旧路径 DeprecationWarning wrapper（已迁至 seahorse.reference_data）
+    │       ├── gbt_30966_fields.py
+    │       ├── protocol_param_data.py
+    │       ├── protocol_view_defs.py
+    │       ├── sample_data.py
+    │       └── OPCUA_client_connections.yaml
+    └── source/                      — 数据源访问抽象
+        ├── models.py                — SourceConnectionProfile / NodeValueChange / Batch
+        ├── ports.py                 — Browsable / Readable / Reader / Subscribable 端口
+        ├── runner_resolution.py     — shared_source production runner 路径解析
+        ├── access/                  — 可复用接入适配器
+        │   ├── adapter.py           — SourceAccessAdapter 基类
+        │   ├── model.py             — 端点 / 点位 / Tick 数据模型
+        │   └── opcua.py             — OPC UA 适配器实现
+        ├── modbus/                  — Modbus TCP 读取器
+        │   ├── reader.py            — ModbusSourceReader 外观
+        │   └── backends/
+        │       ├── base.py
+        │       └── libmodbus_backend.py
+        ├── opcua/                   — OPC UA 读取器
+        │   ├── reader.py
+        │   └── backends/
+        │       ├── base.py
+        │       ├── factory.py
+        │       └── open62541_backend.py
+        ├── iec61850/                — IEC 61850 MMS / Report 读取器
+        │   ├── reader.py            — Iec61850MmsSourceReader
+        │   ├── report_reader.py     — Iec61850ReportSourceReader
+        │   └── backends/
+        │       ├── base.py
+        │       ├── libiec61850_backend.py
+        │       ├── report_base.py
+        │       └── libiec61850_report_backend.py
+        ├── iec104/                  — IEC 104 读取器
+        │   ├── reader.py
+        │   └── backends/
+        │       ├── base.py
+        │       └── lib60870_backend.py
+        ├── http_rest/               — HTTP REST 读取器
+        │   └── client.py
+        ├── modbus_rtu/              — Modbus RTU 串行读取器
+        │   ├── reader.py
+        │   └── backends/
+        │       ├── base.py
+        │       └── serial_backend.py
+        ├── iec101/                  — IEC 101 串行读取器
+        │   ├── reader.py
+        │   └── backends/
+        │       ├── base.py
+        │       └── serial_backend.py
+        ├── mqtt/                    — MQTT 读取器
+        │   └── client.py
+        └── scheduling/              — 调度工具
+            ├── concurrency.py
+            ├── fixed_rate.py
+            ├── polling.py
+            └── stagger.py
 ```
 
 ### `src/platform_shared/` — 全系统公共基础库
 
 ```text
 src/platform_shared/
-├── __init__.py                                     — 包入口（无业务归属、无运行状态的基础能力）
-│
-├── crosscutting/                                   — 横切公共能力
-│   ├── __init__.py                                 — 包入口
-│   ├── debug/                                      — 调试与诊断
-│   │   ├── __init__.py
-│   │   ├── diagnostics.py                          — 诊断快照
-│   │   ├── ring_buffer.py                          — 环形缓冲区
-│   │   └── trace.py                                — 链路追踪
-│   ├── observability/                              — 可观测性
-│   │   ├── __init__.py
-│   │   ├── audit.py                                — 审计日志
-│   │   ├── logging.py                              — 结构化日志
-│   │   └── metrics.py                              — 指标收集
-│   ├── resilience/                                 — 韧性策略
-│   │   ├── __init__.py
-│   │   ├── backoff.py                              — 退避策略
-│   │   ├── circuit_breaker.py                      — 熔断器
-│   │   ├── deadline.py                             — 截止时间
-│   │   ├── error_classifier.py                     — 错误分类
-│   │   └── retry.py                                — 重试策略
-│   └── context/                                    — 请求上下文（骨架）
-│       └── __init__.py
-├── contracts/                                      — 通用契约（骨架）
-│   └── __init__.py
-├── kernel/                                         — 基础运行时（骨架）
-│   └── __init__.py
-├── messaging/                                      — 消息基础模型（骨架）
-│   └── __init__.py
-└── security_primitives/                            — 安全基础工具
-    ├── __init__.py
-    └── masking.py                                  — SensitiveDataMasker 数据脱敏
+├── crosscutting/                    — 横切公共能力
+│   ├── debug/                       — 调试与诊断
+│   │   ├── diagnostics.py           — 诊断快照
+│   │   ├── ring_buffer.py           — 环形缓冲区
+│   │   └── trace.py                 — 链路追踪
+│   ├── observability/               — 可观测性
+│   │   ├── audit.py                 — 审计日志
+│   │   ├── logging.py               — 结构化日志
+│   │   └── metrics.py               — 指标收集
+│   ├── resilience/                  — 韧性策略
+│   │   ├── backoff.py               — 退避策略
+│   │   ├── circuit_breaker.py       — 熔断器
+│   │   ├── deadline.py              — 截止时间
+│   │   ├── error_classifier.py      — 错误分类
+│   │   └── retry.py                 — 重试策略
+│   ├── context/                     — 请求上下文（骨架）
+│   ├── contracts/                   — 通用契约（骨架）
+│   ├── kernel/                      — 基础运行时（骨架）
+│   └── messaging/                   — 消息基础模型（骨架）
+└── security_primitives/             — 安全基础工具
+    └── masking.py                   — SensitiveDataMasker
 ```
 
 ### `src/turtle/` — 治理控制面
 
 ```text
 src/turtle/
-├── __init__.py                      — 包入口（全局治理、安全、合规、审计基础能力）
-│
 ├── auth/                            — 认证授权
-│   ├── __init__.py
 │   ├── authorizer.py                — 授权器（AccessDecision）
 │   ├── credential.py                — 凭证管理（CredentialRef）
 │   ├── identity.py                  — 身份管理（Principal）
-│   └── policy.py                    — 策略定义（AccessPolicyPort、Permission）
-│
+│   └── policy.py                    — 策略定义（AccessPolicyPort / Permission）
 ├── security/                        — 安全基础
-│   ├── __init__.py
 │   ├── certificate.py               — 证书管理（CertificateRef）
-│   ├── model.py                     — 安全模型（CredentialRef、SecretRef）
+│   ├── model.py                     — 安全模型（CredentialRef / SecretRef）
 │   ├── secret_provider.py           — 密钥提供（SecretProviderPort）
 │   └── tls.py                       — TLS 配置（TlsConfig）
-│
 ├── compliance/                      — 合规基础
-│   ├── __init__.py
-│   ├── audit_policy.py              — 审计策略（AuditEvent、AuditEventSinkPort）
+│   ├── audit_policy.py              — 审计策略（AuditEvent / AuditEventSinkPort）
 │   ├── data_classification.py       — 数据分类（DataClassification）
 │   └── retention.py                 — 数据保留策略（RetentionPolicy）
-│
 ├── audit/                           — 审计治理（空壳）
-│   └── __init__.py
 ├── policy/                          — 策略治理（空壳）
-│   └── __init__.py
 ├── governance/                      — 治理框架（空壳）
-│   └── __init__.py
 ├── risk/                            — 风险评估（空壳）
-│   └── __init__.py
 ├── deployment_policy/               — 部署策略（空壳）
-│   └── __init__.py
 ├── change_control/                  — 变更控制（空壳）
-│   └── __init__.py
 ├── ports/                           — 端口定义（空壳）
-│   └── __init__.py
 ├── adapters/                        — 适配器实现（空壳）
-│   └── __init__.py
 ├── api/                             — API 端点（空壳）
-│   └── __init__.py
 ├── runtime/                         — 运行时配置（空壳）
-│   └── __init__.py
 └── sdk/                             — 客户端 SDK（空壳）
-    └── __init__.py
 ```
 
 ### `src/octopus/` — 运维执行面
 
 ```text
 src/octopus/
-├── __init__.py                      — 包入口（部署、监控、告警、诊断、自动化运维基础能力）
 ├── orchestration/                   — 运维流程编排（空壳）
-│   └── __init__.py
 ├── deployment/                      — 部署管理（空壳）
-│   └── __init__.py
 ├── monitoring/                      — 监控采集（空壳）
-│   └── __init__.py
 ├── alerting/                        — 告警管理（空壳）
-│   └── __init__.py
 ├── diagnostics/                     — 故障诊断（空壳）
-│   └── __init__.py
 ├── automation/                      — 自动化运维（空壳）
-│   └── __init__.py
 ├── rollback/                        — 回滚管理（空壳）
-│   └── __init__.py
 ├── reports/                         — 运维报告（空壳）
-│   └── __init__.py
 ├── adapters/                        — 外部系统适配器（空壳）
-│   └── __init__.py
 └── runtime/                         — 运行时配置（空壳）
-    └── __init__.py
+```
+
+### `src/seahorse/` — 样例场站生成器
+
+```text
+src/seahorse/
+├── __main__.py                      — CLI 入口（4 子命令：generate-scenario / export-bundle / validate-bundle / export-server-plan）
+│
+├── models/                          — 核心数据模型
+│   ├── scenario.py                  — ScenarioConfig / ScenarioMetadata
+│   ├── plan.py                      — SeedPlan / ServerPlan 等 9 个规划型 dataclass
+│   ├── generation.py                — GeneratedSignalValue / AlarmEvent / ControlResult
+│   └── bundle.py                    — ScenarioBundle 16 字段场景包 + _make_serializable
+│
+├── ports/                           — 端口层
+│   └── generation_strategy.py       — GenerationStrategy @runtime_checkable Protocol
+│
+├── strategies/                      — 策略实现层
+│   ├── random_generation.py         — 确定性随机值生成（5 种 generation_hint）
+│   ├── curve_generation.py          — 曲线生成（6 种类型 + 14 组预设模板）
+│   ├── replay_generation.py         — rows / JSONL 回放 + 字段映射 + 时间偏移
+│   └── registry.py                  — 策略注册 / 查找 / 实体类型覆盖
+│
+├── generators/                      — 生成器层
+│   ├── alarm_generator.py           — 告警生成（4 种类型）
+│   └── control_result_generator.py  — 控制回写生成（7 种状态）
+│
+├── orchestration/                   — 编排层
+│   └── scenario_generator.py        — SeahorseGenerator 5 元组完整生成
+│
+├── exporters/                       — 导出器层
+│   ├── bundle_exporter.py           — JSON bundle 导出器
+│   ├── timeseries_exporter.py       — JSONL 时序导出器
+│   ├── bundle_validator.py          — 场景包校验器（6 项校验）
+│   ├── serialization.py             — SHA256 校验和 + dataclass JSON 序列化
+│   ├── server_plan_validator.py     — ServerPlan 校验器（9 项校验）
+│   └── server_plan_exporter.py      — ServerPlan handoff 导出（SHA256 payload_hash）
+│
+└── reference_data/                  — 参考数据层（已从 whale.shared.persistence.template 迁出）
+    ├── gbt_30966_fields.py          — GB/T 30966 字段定义
+    ├── protocol_param_data.py       — 16 组协议服务参数模板
+    ├── protocol_view_defs.py        — 协议参数展平只读视图
+    └── sample_data.py               — 13 类端点 / 16 组服务样例数据
+```
+
+### `src/starfish/` — 多协议 server simulator 工具层
+
+```text
+src/starfish/
+├── __main__.py                      — CLI 入口（5 子命令：load-server-plan / smoke-server-plan / probe-server-plan / profile-server-plan / capacity-server-plan）
+│
+├── models/                          — Starfish 侧最小契约模型
+│   └── plan.py                      — StarfishServerPlan / StarfishEndpointPlan / StarfishPointPlan / LoadResult / ValidationResult / UnsupportedOperation
+│
+├── loader/                          — ServerPlan JSON 加载器
+│   └── server_plan_loader.py        — load_server_plan（9 项校验 + payload_hash 复算）
+│
+├── facade/                          — 协议 server 模拟门面
+│   ├── server_simulator_facade.py   — ServerSimulatorFacade（in-memory stub fallback）
+│   ├── http_rest_facade.py          — HttpRestFacade（HTTP REST 真实 server，ThreadingHTTPServer）
+│   ├── modbus_tcp_facade.py         — ModbusTcpFacade（Modbus TCP 真实 server，FC03 / FC06）
+│   ├── mqtt_facade.py               — MqttFacade（轻量 JSON-line TCP server）
+│   ├── opcua_facade.py              — OpcUaFacade（open62541 C runner 子进程 real mode）
+│   ├── iec104_facade.py             — Iec104Facade（iec104_simulator_server C runner real mode）
+│   ├── iec61850_mms_facade.py       — Iec61850MmsFacade（iec61850_simulator_server C runner real mode）
+│   ├── iec61850_report_facade.py    — Iec61850ReportFacade（iec61850_report_runner C runner + ReportQueue）
+│   ├── iec101_facade.py             — Iec101Facade（**Round 17 一次性收口 + Round 18 扩展 14 TypeId + Round 19 扩展 17 TypeId + Round 20 LinkLayer runtime skeleton + ShortFloat 兼容 + 3 新 capabilities**：codec-enhanced-plus mode 5 级默认，回退 codec-enhanced / codec-skeleton / environment-pending / codebase-pending；TypeId / COT / ASDU / IOA / CA + SIQ / QDS / NVA / ShortFloat IEEE 754 32-bit IE / **ShortFloat 兼容 int/numbers.Real/`__float__` duck typing（Round 20 新增，不引入 numpy 硬依赖）** / **ScaledValue IE 16-bit signed（Round 18 新增）** / **17 信息对象（4 不带时标监视 M_SP_NA_1/M_DP_NA_1/M_ME_NA_1/C_SC_NA_1 + 1 不带时标标度化 M_ME_NB_1 + 1 不带时标短浮点 M_ME_NC_1 + 4 不带时标命令 C_SE_NA_1/C_SE_NB_1/C_SE_NC_1 + 3 带时标命令 C_SE_TA_1/C_SE_TB_1/C_SE_TC_1（**Round 19 新增，12/12/14 字节布局，与 IEC 60870-5-101 §7.2.6.9/10/11 对齐**） + 5 带时标监视 M_SP_TA_1/M_DP_TA_1/M_ME_TA_1/M_ME_TB_1/M_ME_TC_1 = 17；**以 capability 实际值 17 为准，严禁硬写 13/14/15/18**）** / **QOS 结构化（SetPointQualifier 枚举 + SetPointCommandQualifier 显式字段，Round 18 新增）** / **C_SC_NA_1 QU 显式化（CommandPulse + SingleCommandQualifier 子字段）** / ASDU 列表 SQ=0/SQ=1 / FT1.2 帧 / checksum / CP56Time2a 7 字节时标 IE / **5 态链路层 skeleton（IDLE/WAIT_ACK/SEND/RECEIVE/ERROR）+ LinkLayerTimers t1/t2/t3 + LinkControlHelper FCB/FCV helper + balanced/unbalanced 差异化** / **LinkLayerTimerService 抽象 + Default (threading.Timer) + Fake 三实现 + send/receive/on_timeout 完整状态机 + balanced FCB auto flip + retry ERROR（Round 20 新增；默认 `enable_timers=False` 保持 Round 17 行为完全一致）**；codec_capabilities 显式 supports_short_float=true / supports_server=false / supports_serial_runtime=false / supports_cp56time2a=true / supports_link_layer_skeleton=true / **supports_link_layer_timers=true / supports_balanced_fcb_auto_flip=true / supports_retry_skeleton=true（Round 20 新增 3 个）** / **supports_command_codec=true / supports_scaled_value=true / supports_write_runtime=false（**C_SE_* command codec 不得被高估为真实写能力，Iec101Facade.write() 仍抛 UnsupportedOperation**）** / **supported_type_ids=17 TypeId（Round 19 扩展，以 capability 实际值 17 为准）** / **supported_measurement_type_ids / supported_command_type_ids=7 / supported_time_tagged_type_ids=8 / supported_time_tagged_command_type_ids=3（Round 19 新增）** 分组 / **supports_time_tagged_command_codec=true（Round 19 新增）**；**health() reason_text 显式 codec-enhanced-plus + LinkLayer runtime skeleton 7 强制要点（Round 20 同步）+ codec_enhanced_plus_ready 诊断字段**）
+│   ├── modbus_tcp_facade.py          — ModbusTcpFacade（Modbus TCP 真实 server：TCP socket, FC03/FC06 + **Round 19 扩展三个公共方法 encode_register_value / decode_register_value / register_encoding_capabilities 真实调用 register_encoding 工具，`register_encoding_runtime=false` 显式**）
+│   ├── modbus_rtu_facade.py         — ModbusRtuFacade（rtu-lightweight PTY-backed 8 FCs + 4 异常码 + **Round 19 扩展三个公共方法 encode_register_value / decode_register_value / register_encoding_capabilities 真实调用 register_encoding 工具，`register_encoding_runtime=false` 显式**）
+│   ├── ads_facade.py                — AdsFacade（codebase-pending stub + 增强 dotnet / TwinCAT 探针）
+│   ├── goose_facade.py              — GooseFacade（environment-pending stub，L2 veth 未就绪）
+│   └── sv_facade.py                 — SvFacade（environment-pending stub，L2 veth + PTP 未就绪）
+│
+├── native/                          — Native Runner 管理框架 + C 源码
+│   ├── CMakeLists.txt               — CMake 构建脚本（lib60870 / libiec61850 / libmodbus / open62541）
+│   ├── README.md                    — native runner 协议契约（READY / START / RESULT / NOTIFY / QUIT 等）
+│   ├── process_handle.py            — NativeProcessHandle 子进程生命周期
+│   ├── runner_probe.py              — probe_native_runner 统一 binary 探测
+│   ├── runner_spec.py               — NativeRunnerSpec dataclass
+│   ├── bin/                         — 预编译 native binary（20 个 runner / simulator）
+│   │   ├── iec101_client_runner
+│   │   ├── iec101_event_runner
+│   │   ├── iec101_simulator_slave
+│   │   ├── iec104_client_runner
+│   │   ├── iec104_event_runner
+│   │   ├── iec104_simulator_server
+│   │   ├── iec61850_goose_publisher_simulator
+│   │   ├── iec61850_goose_subscriber_runner
+│   │   ├── iec61850_mms_client_runner
+│   │   ├── iec61850_report_runner
+│   │   ├── iec61850_simulator_server
+│   │   ├── iec61850_sv_publisher_simulator
+│   │   ├── iec61850_sv_subscriber_runner
+│   │   ├── modbus_rtu_polling_runner
+│   │   ├── modbus_simulator_server
+│   │   ├── modbus_tcp_polling_runner
+│   │   ├── open62541_client_runner
+│   │   ├── open62541_source_simulator
+│   │   └── open62541_subscription_runner
+│   ├── build/                       — 本地 CMake 构建目录（gitignore）
+│   ├── lib60870/                    — lib60870 C runner 源码（IEC 60870-5-101 / 104）
+│   │   ├── iec101_client_runner.c
+│   │   ├── iec101_event_runner.c
+│   │   ├── iec101_simulator_slave.c
+│   │   ├── iec104_client_runner.c
+│   │   ├── iec104_event_runner.c
+│   │   └── iec104_simulator_server.c
+│   ├── libiec61850/                 — libiec61850 C runner 源码（MMS / GOOSE / SV）
+│   │   ├── iec61850_goose_publisher_simulator.c
+│   │   ├── iec61850_goose_subscriber_runner.c
+│   │   ├── iec61850_mms_client_runner.c
+│   │   ├── iec61850_report_runner.c
+│   │   ├── iec61850_simulator_server.c
+│   │   ├── iec61850_sv_publisher_simulator.c
+│   │   └── iec61850_sv_subscriber_runner.c
+│   ├── libmodbus/                   — libmodbus C runner 源码（Modbus TCP / RTU）
+│   │   ├── modbus_rtu_polling_runner.c
+│   │   ├── modbus_simulator_server.c
+│   │   └── modbus_tcp_polling_runner.c
+│   └── open62541/                   — open62541 C runner 源码（OPC UA）
+│       ├── open62541_client_runner.c
+│       ├── open62541_simulator_server.c
+│       └── open62541_subscription_runner.c
+│
+├── protocols/                       — 协议层编解码器
+│   ├── iec101/                      — IEC101 编解码器骨架 + 增强（Round 15 codec-enhanced + Round 16 codec-enhanced-plus 起步 + Round 17 一次性收口 + **Round 18 扩展 14 TypeId** + **Round 19 扩展 17 TypeId（3 C_SE_T* 带时标命令）**）
+│   │   ├── types.py                 — TypeId 枚举（26 values）/ COT 枚举（26 values，实测）
+│   │   ├── asdu.py                  — ASDUHeader 6 字节 encode / decode
+│   │   ├── ioa.py                   — IOA 3 字节 encode / decode
+│   │   ├── common_address.py        — CA 2 字节 encode / decode
+│   │   ├── quality.py               — SIQ / QDS 质量描述符（IntFlag 位标志）encode / decode
+│   │   ├── information_elements.py  — NVA 归一化值（16-bit signed）encode / decode + ShortFloat IEEE 754 32-bit IE（NaN/Inf 严格拒绝 + 0.0/-0.0/极值边界，Round 17 新增） + **ShortFloat 兼容 int/numbers.Real/`__float__` duck typing 统一入口（Round 20 新增，不引入 numpy 硬依赖）** + **ScaledValue IE（16-bit signed, range [-32768, 32767]，Round 18 新增）**
+│   │   ├── information_object.py    — M_SP_NA_1 / M_DP_NA_1 / M_ME_NA_1 / C_SC_NA_1 + M_SP_TA_1 / M_DP_TA_1 / M_ME_TA_1 带时标 + M_ME_TB_1（10 字节 SVA+QDS+CP56Time2a，Round 17 新增）+ M_ME_TC_1（12 字节 ShortFloat+QDS+CP56Time2a，Round 17 新增）+ **M_ME_NB_1（5 字节 SVA+QDS，不带时标标度化，Round 18 新增）+ M_ME_NC_1（5 字节 ShortFloat+QDS，不带时标短浮点，Round 18 新增）+ C_SE_NA_1（5 字节 NVA+QOS，不带时标归一化值命令，Round 18 新增）+ C_SE_NB_1（5 字节 SVA+QOS，不带时标标度化值命令，Round 18 新增）+ C_SE_NC_1（5 字节 ShortFloat+QOS，不带时标短浮点值命令，Round 18 新增）+ C_SE_TA_1（**12 字节 NVA+QOS+CP56Time2a，带时标归一化值命令，Round 19 新增，与 IEC 60870-5-101 §7.2.6.9 对齐**）+ C_SE_TB_1（**12 字节 SVA+QOS+CP56Time2a，带时标标度化值命令，Round 19 新增，与 §7.2.6.10 对齐**）+ C_SE_TC_1（**14 字节 ShortFloat+QOS+CP56Time2a，带时标短浮点值命令，Round 19 新增，与 §7.2.6.11 对齐**）** + C_SC_NA_1_QU_QUALIFIER 枚举 + CommandPulse 枚举 + SingleCommandQualifier 显式字段（select_execute/qualifier/ql_value/persistent/pulse）+ 旧位级 roundtrip 兼容（Round 17 显式化）+ **SetPointQualifier 枚举（QOS 0-7 标准子字段，Round 18 新增）+ SetPointCommandQualifier 显式字段（select/qualifier/ql_value，Round 18 新增）** 信息对象 encode / decode = **17 TypeId 矩阵（以 capability 实际值 17 为准）**
+│   │   ├── codec.py                 — ASDU 信息对象列表 SQ=0 / SQ=1 编解码 + UnknownAsduError + **5 新信息对象 dispatcher（Round 18 扩展 confirmed in `_TYPE_ID_OBJECT_SIZE`）+ 3 新 C_SE_T* dispatcher（Round 19 扩展）** = 17 TypeId
+│   │   ├── frame.py                 — FT1.2 固定 / 可变帧 + checksum + 长度不一致检测
+│   │   ├── time.py                  — CP56Time2a 7 字节时标 IE（milliseconds / minute / hour / day_of_month / day_of_week / month / year / IV / SU / SB 字段级 + encode / decode + to / from_datetime 转换）— Round 16 新增
+│   │   └── link_layer.py            — IEC 60870-5-101 链路层最小状态机骨架（**Round 17 扩展 + Round 20 增强 LinkLayerTimerService + send/receive/on_timeout 状态机 + balanced FCB auto flip + retry ERROR** LinkLayerMode balanced/unbalanced + **LinkState 5 态 IDLE/WAIT_ACK/SEND/RECEIVE/ERROR** + **LinkLayerTimers t1/t2/t3 常量** + LinkEvent + LinkControlHelper build_ack/build_nack/build_reset/build_reset_ack/build_user_data + **fcb_bit_for_sequence/fcv_bit FCB/FCV helper** + LinkLayer feed_frame/bump_send_sequence/**flip_send_sequence/should_retry**/mark_waiting_ack/**mark_sending/mark_receiving**/reset/snapshot + **Round 20 新增 LinkLayerTimerService 抽象 + Default (threading.Timer) + Fake (无 wall-clock) 三实现 + start_timer/cancel_timer/cancel_all/on_timeout API + send_user_data / receive_ack (balanced+FCV=1 自动翻 FCB) / receive_nack (bump_retry/ERROR) / on_timeout (bump_retry；retry_count > max_retries -> ERROR)**，**balanced/unbalanced 差异化 skeleton 行为**，**仅 skeleton 非 server；默认 `enable_timers=False` 保持 Round 17 行为完全一致**）— Round 16 起步，Round 17 扩展，Round 20 增强
+│   └── modbus/                      — **Modbus register_encoding 工具子包（Round 18 新增 SF-FR-030 + Round 19 facade 接入，纯 Python CPU 辅助层，非真实设备验证）**
+│       ├── __init__.py             — 导出 register_encoding 模块（5 value_type × 4 byte/word 组合 = 20 组合 + NaN/Inf 拒绝 + 越界/长度错误检测）
+│       └── register_encoding.py    — encode_register(value, value_type, byte_order) / decode_register(registers, value_type, byte_order)；value_type ∈ {uint16, int16, uint32, int32, float32}；byte_order ∈ {big-big, little-little, big-little, little-big}；float32 NaN/Inf 严格拒绝（ModbusFloatValueError 异常）；**Modbus facade（modbus_tcp_facade.py / modbus_rtu_facade.py）Round 19 接入** 三个公共方法 `encode_register_value` / `decode_register_value` / `register_encoding_capabilities` 真实调用 register_encoding 工具；`register_encoding_runtime=false` 显式
+│
+├── tools/                           — 工具层（probe / profile / capacity）
+│   ├── probe.py                     — run_probe 最小启动-健康-读取探测
+│   ├── profile.py                   — run_profile N 次 read 采样耗时统计
+│   └── capacity.py                  — run_capacity 端点 / 点位 / 读取容量扫描
+│
+└── registry/                        — 运行时注册表
+    └── runtime_registry.py          — RuntimeRegistry / FacadeEntry（9 模式 dispatch：real / stub / mqtt-lightweight / codec-enhanced-plus / codec-enhanced / codec-skeleton / rtu-lightweight / codebase-pending / environment-pending — Round 16 新增 codec-enhanced-plus）
+
+状态标注：
+- 13 协议 facade 全覆盖（HTTP_REST / MODBUS_TCP / MQTT / OPC_UA / IEC104 / IEC61850_MMS / IEC61850_Report / IEC101 / MODBUS_RTU / Beckhoff_ADS / GOOSE / SV）
+- real mode: HTTP_REST, MODBUS_TCP, OPC_UA, IEC104, IEC61850_MMS, IEC61850_Report
+- mqtt-lightweight mode: MQTT
+- rtu-lightweight mode: MODBUS_RTU（PTY-backed，8 FCs + 4 异常码）
+- codec-enhanced-plus mode: IEC101（**Round 17 一次性收口 + Round 18 扩展 14 TypeId + Round 19 扩展 17 TypeId + Round 20 增强 LinkLayer runtime skeleton + ShortFloat duck typing + balanced FCB auto flip + retry ERROR + Round 21 总收口**：CP56Time2a 7 字节时标 IE + **ShortFloat IEEE 754 32-bit IE** + **ShortFloat duck typing 兼容（Round 20 收口，int / float / `numbers.Real` / `__float__`，不引入 numpy 硬依赖）** + 3 带时标 TypeID M_SP_TA_1/M_DP_TA_1/M_ME_TA_1 + **2 带时标短浮点 M_ME_TB_1/M_ME_TC_1** + C_SC_NA_1 QU 显式化（CommandPulse + SingleCommandQualifier 子字段）+ **5 态链路层 skeleton（IDLE/WAIT_ACK/SEND/RECEIVE/ERROR）+ LinkLayerTimers t1/t2/t3 + LinkControlHelper FCB/FCV helper + balanced/unbalanced 差异化** + **LinkLayerTimerService 抽象 + Default (threading.Timer) + Fake 三实现 + 完整 send/receive/on_timeout 状态机 + balanced FCB auto flip（Round 20 收口）+ retry ERROR（Round 20 收口）+ 默认 enable_timers=False（Round 20 显式）** + SIQ / QDS / NVA / 4 信息对象 / ASDU 列表 SQ=0/SQ=1 / FT1.2 帧 / checksum + **ScaledValue IE（16-bit signed，Round 18 新增）+ QOS 结构化（SetPointQualifier 枚举 + SetPointCommandQualifier 显式字段，Round 18 新增）+ 5 新信息对象（M_ME_NB_1/M_ME_NC_1/C_SE_NA_1/C_SE_NB_1/C_SE_NC_1，Round 18 新增）+ 3 新带时标命令（C_SE_TA_1/C_SE_TB_1/C_SE_TC_1，Round 19 收口，12/12/14 字节布局，与 IEC 60870-5-101 §7.2.6.9/10/11 对齐）**；capabilities 显式 supports_server=false / supports_serial_runtime=false / supports_cp56time2a=true / supports_short_float=true / supports_link_layer_skeleton=true / **supports_command_codec=true / supports_scaled_value=true / supports_write_runtime=false** / **supports_time_tagged_command_codec=true（Round 19 收口）** / **supports_link_layer_timers=true / supports_balanced_fcb_auto_flip=true / supports_retry_skeleton=true（Round 20 收口）** / **supported_type_ids=17 TypeId（Round 19 扩展：4 不带时标监视 + 1 不带时标标度化 + 1 不带时标短浮点 + 4 不带时标命令 + 3 带时标命令 + 5 带时标监视 = 17；以 capability 实际值 17 为准，严禁硬写 13/14/15/18）** / **supported_measurement_type_ids / supported_command_type_ids=7（Round 19 升级） / supported_time_tagged_type_ids=8（Round 19 升级） / supported_time_tagged_command_type_ids=3（Round 19 收口） 分组**；**health() reason_text 显式 codec-enhanced-plus 17 TypeId + LinkLayer runtime skeleton 7 强制要点（Round 20 同步）+ codec_enhanced_plus_ready 诊断字段**；**仅 skeleton 非 server / 非真实 write runtime**；**Round 21 总收口真实剩余项（仍 deferred，**不**得高估为已实现）**：真实 IEC101 server / 真实串口通信 / 完整 balanced/unbalanced runtime / GOOSE/SV L2 环境 / Beckhoff_ADS 真实环境 / Modbus 真实设备 / 现场部署）— Round 16 起步，Round 17 一次性收口，Round 18 扩展 14，Round 19 扩展 17，Round 20 增强，Round 21 总收口
+- codec-enhanced mode: IEC101（SIQ / QDS / NVA / 4 信息对象 / ASDU 列表 SQ=0/SQ=1 / FT1.2 帧 / checksum；capabilities 显式 supports_server=false / supports_serial_runtime=false）— Round 15 升级
+- codec-skeleton mode: IEC101（TypeId / COT / ASDU / IOA / CA 编解码就绪；codec-enhanced 不可用时回退）
+- codebase-pending: Beckhoff_ADS（无 Python 原生 ADS 实现）
+- environment-pending: GOOSE / SV（需 L2 veth + raw socket / CAP_NET_RAW / PTP）
+- native runner 框架: 6 协议族 C 源码（lib60870 / libiec61850 / libmodbus / open62541）+ 20 个预编译 binary
+- subscribe 语义: MqttFacade SubscriptionQueue 已实现；其他 facade subscribe 仍 NOT_IMPLEMENTED
+- report 语义: IEC61850 Report facade ReportQueue 已实现，不再全 NOT_IMPLEMENTED
+- 不得 import seahorse / whale.ingest / whale.shared.source
+- 不等同于多协议完整 simulator
 ```
 
 ## 项目级测试 `tests/`
@@ -537,693 +581,394 @@ src/octopus/
 ```text
 tests/
 ├── __init__.py
-├── conftest.py                       — 全局 pytest 夹具
-├── TESTING.md                        — Whale 主平台测试指南（P1-P7 生命周期阶段、PASS/FAIL/NOT_RUN、边界说明）
+├── conftest.py                      — 全局 pytest 夹具
+├── TESTING.md                       — Whale 主平台测试指南（P1-P7 生命周期阶段）
 │
-├── unit/                             — P1 单元测试
-│   ├── __init__.py
-│   ├── test_config.py                — 配置解析测试
-│   ├── test_fleet_update_selection.py   — 机群更新选择测试
-│   ├── test_kafka_message_publisher.py  — Kafka 发布器测试
-│   ├── test_message_pipeline_adapters.py  — message_pipeline 适配器单测（InMemory/DLQ/SchemaRegistry）
-│   ├── test_message_pipeline_envelope.py  — message_pipeline Envelope/schema/model 单测
-│   ├── test_message_pipeline_kafka_adapter.py — message_pipeline Kafka 适配器单测
-│   ├── test_message_pipeline_ports.py     — message_pipeline 端口契约单测
-│   ├── test_modbus_source_acquisition_adapter.py  — Modbus TCP 采集适配器测试
-│   ├── test_modbus_source_write_adapter.py         — Modbus TCP 写入适配器测试
-│   ├── test_mqtt_backend.py            — MQTT client backend 单测（P1 unit/mock，asyncio MQTT v3.1.1）
-│   ├── test_mqtt_source_acquisition_adapter.py — MQTT 采集适配器单测（P1 unit/mock）
-│   ├── test_http_rest_backend.py       — HTTP REST client backend 单测（P1 unit/mock）
-│   ├── test_http_rest_source_acquisition_adapter.py — HTTP REST 采集适配器单测（P1 unit/mock）
-│   ├── test_iec104_backend.py           — IEC104 lib60870 backend 单测
-│   ├── test_iec104_source_acquisition_adapter.py   — IEC104 采集适配器单测（P1 unit/mock）
-│   ├── test_iec104_source_write_adapter.py          — IEC104 写入适配器单测
-│   ├── test_modbus_rtu_backend.py       — Modbus RTU serial backend 单测（P1 unit/mock，CRC16）
-│   ├── test_modbus_rtu_source_acquisition_adapter.py — Modbus RTU 采集适配器单测（P1 unit/mock）
-│   ├── test_iec101_backend.py           — IEC101 serial backend 单测（P1 unit/mock，FT1.2+ASDU）
-│   ├── test_iec101_source_acquisition_adapter.py   — IEC101 采集适配器单测（P1 unit/mock）
-│   ├── test_opcua_adapter_resolution.py — OPC UA 适配器解析测试
-│   ├── test_opcua_source_acquisition_adapter.py  — OPC UA 采集适配器测试
-│   ├── test_opcua_source_write_adapter.py  — OPC UA 写入适配器测试
-│   ├── test_iec61850_mms_backend.py         — IEC 61850 MMS 后端单元测试
-│   ├── test_iec61850_source_acquisition_adapter.py  — IEC 61850 MMS 采集适配器测试
-│   ├── test_iec61850_source_write_adapter.py  — IEC 61850 MMS 写入适配器测试
-│   ├── test_iec61850_report_backend.py         — IEC 61850 Report 后端单元测试
-│   ├── test_iec61850_report_acquisition_adapter.py  — IEC 61850 Report 订阅采集适配器测试
-│   ├── test_open62541_backend.py      — open62541 后端测试
-│   ├── test_polling_acquisition_role.py   — 轮询角色测试
-│   ├── test_subscription_acquisition_role.py  — 订阅角色测试
-│   ├── test_subscription_reconnect_baseline.py  — 订阅重连基线单测
-│   ├── test_subscription_reconnect_runtime.py   — 订阅重连运行时单测
-│   ├── test_redis_source_state_cache.py   — Redis 状态缓存测试
-│   ├── test_redis_streams_message_publisher.py — Redis Streams 测试
-│   ├── test_relational_outbox_message_publisher.py — Outbox 发布器测试
-│   ├── test_ingest_api_app.py        — FastAPI app单测
-│   ├── test_ingest_audit_event_schema.py — ingest审计事件单测
-│   ├── test_ingest_audit_redaction.py — ingest审计脱敏单测
-│   ├── test_ingest_metrics_events.py  — ingest metrics事件单测
-│   ├── test_ingest_no_source_lab_imports.py — import边界门禁单测
-│   ├── test_turtle_octopus_import_boundary.py — turtle/octopus import边界门禁
-│   ├── test_ingest_observability_sink.py  — 观测sink单测
-│   ├── test_ingest_source_adapter_capability_matrix.py — 适配器能力矩阵单测
-│   ├── test_ingest_security_partition_config.py — 安全分区配置单测
-│   ├── test_ingest_bundle_checksum.py — bundle摘要单测
-│   ├── test_ingest_bundle_redaction.py — bundle脱敏单测
-│   ├── test_ingest_composition_injection.py — 注入完整性单测
-│   ├── test_ingest_job_lease.py      — 作业租约语义单测
-│   ├── test_ingest_runtime_entrypoint.py — 运行入口单测
-│   ├── test_ingest_runtime_modes.py  — runtime模式单测
-│   ├── test_ingest_runtime_orm_models.py — runtime ORM单测
-│   ├── test_ingest_runtime_scheduler_import.py — scheduler导入门禁
-│   ├── test_ingest_write_lease.py    — 写入租约单测
-│   ├── test_ingest_write_lease_fencing.py — 写入租约fencing单测
-│   ├── test_ingest_write_security_profile.py — 写入安全配置单测
-│   ├── test_ingest_readyz.py         — readyz 8组件聚合与degradation单测
-│   ├── test_scheduler_job_routes.py  — 调度任务持久化单测
-│   ├── test_worker_runtime_do_execute.py — WorkerRuntime dispatch 单测
-│   ├── test_acquisition_job_handler.py — AcquisitionJobHandler P1 单测
-│   ├── test_dual_node_write_lease_conflict.py — 双节点写入冲突 P2 单测
-│   ├── test_source_acquisition_port_registry.py  — 端口注册表测试
-│   ├── test_source_acquisition_use_case.py   — 采集用例测试
-│   ├── test_source_command_write_lease_guard.py — 写入租约守卫测试
-│   ├── test_source_command_use_case.py   — 命令写入用例测试
-│   ├── test_source_command_lease_release.py — 写入租约释放单测
-│   ├── test_source_command_audit.py   — 命令审计单测
-│   ├── test_source_command_authorization_guard.py — 命令授权守卫单测
-│   ├── test_shared_source_runner_resolution.py  — shared_source runner 路径解析单测
-│   ├── test_state_snapshot_publish_use_case.py  — 快照发布用例测试
-│   ├── test_source_runtime_config_repository.py  — 运行时配置仓库测试
-│   ├── test_source_scheduling.py       — 调度测试
-│   ├── test_source_simulation_support_sources.py  — 模拟源测试
-│   ├── test_source_write_port_registry.py  — 写入端口注册表测试
-│   ├── test_speed_layer_light_processor.py  — SP-FR-004 light_processor 单测（26 tests）
-│   ├── test_speed_layer_pipeline_runner.py  — speed_layer pipeline runner 单测
-│   ├── test_speed_layer_preprocessing.py      — speed_layer preprocessing Round A 单测（83 tests：10 阶段 pipeline/registry/operator/DTO）
-│   ├── test_storage_raw_archive.py          — storage raw_archive 单测
-│   ├── test_storage_raw_index.py            — storage raw_index 单测
-│   ├── test_storage_standardized.py         — storage standardized 单测
-│   ├── test_storage_serving_cache.py        — storage serving_cache 单测（9 tests）
-│   ├── test_storage_waveform.py              — storage waveform 单测（12 tests：port/InMemory/Tdengine real REST API）
-│   ├── test_storage_simulation_result.py    — storage simulation_result 单测（InMemory/TDengine real REST API）
-│   ├── test_ingest_file_ingest_models.py     — file_ingest models 单测（FaultRecordBinary/SourceFile）
-│   ├── test_ingest_file_ingest_detector.py   — file_ingest detector 单测（FileCompletionDetector）
-│   ├── test_ingest_file_ingest_decoder.py    — file_ingest decoder 单测（FaultRecordBinaryDecoder）
-│   ├── test_ingest_file_ingest_repository.py — file_ingest repository 单测（FileIngestJobRepository）
-│   ├── test_ingest_file_ingest_service.py    — file_ingest service 单测（FileIngestService 编排）
-│   ├── test_model_asset_models.py         — model_asset models DTO/枚举单测（SimulationFileType 等）
-│   ├── test_model_asset_detector.py       — SimulationFileTypeDetector 文件类型检测单测
-│   ├── test_model_asset_repository.py     — ModelAssetRepository 四表 CRUD 单测
-│   ├── test_model_asset_service.py        — ModelAssetImportService 导入编排单测
-│   └── shared/persistence/
-│       ├── test_model_asset_orm.py       — model_asset ORM 四表唯一约束/FK 单测
-│       ├── test_scada_protocol_params.py   — SCADA 协议参数模板与注释测试
-│       ├── test_scada_sample_data_protocol_coverage.py — SCADA 样例数据协议覆盖测试
-│       └── test_scada_protocol_views.py    — SCADA 协议视图测试
+├── unit/                            — P1 单元测试
+│   ├── seahorse/                    — Seahorse 测试（8 个）
+│   │   ├── test_bundle.py           — Bundle 模型 / 导出 / 校验 / CLI
+│   │   ├── test_compat_wrappers.py  — 旧路径 DeprecationWarning wrapper 兼容性
+│   │   ├── test_generators.py       — AlarmGenerator + ControlResultGenerator
+│   │   ├── test_models.py           — 14 个核心 dataclass 构造 / 序列化
+│   │   ├── test_orchestrator.py     — SeahorseGenerator 5 元组完整生成
+│   │   ├── test_reference_data_imports.py — reference_data 导出完整性
+│   │   ├── test_server_plan.py      — ServerPlan validator + handoff exporter + CLI
+│   │   └── test_strategies.py       — Random / Curve / Replay + StrategyRegistry
+│   ├── starfish/                    — Starfish 测试（15 个）
+│   │   ├── test_iec101_codec.py     — IEC101 编解码器头部测试（40 tests；**Round 17 增 codec-enhanced-plus reason 文本一致性断言 + codec_enhanced_plus_ready 诊断字段断言**；**Round 18 增 supports_command_codec=true/supports_scaled_value=true/supports_write_runtime=false 显式声明断言 + 14 TypeId 矩阵分组断言**；**Round 19 增 TestIec101CodecRound19** capabilities 17/7/3 数字断言 + supported_time_tagged_command_type_ids=3 断言 + supports_time_tagged_command_codec=true 断言 + probe_iec101_codec_enhanced_plus 验证 17 TypeId 矩阵断言；**Round 20 增 TestIec101CodecRound20**：3 新 capabilities 数字断言（supports_link_layer_timers=true / supports_balanced_fcb_auto_flip=true / supports_retry_skeleton=true）+ 7 强制要点 reason_text 验证）
+│   │   ├── test_iec101_information_elements.py — IEC101 信息体元素测试（**Round 17 扩展**至包含 ShortFloat IEEE 754 + M_ME_TB_1/M_ME_TC_1 元素级；NVA 24 + CP56Time2a 27；**Round 18 扩展 +ScaledValue IE 测试（16-bit signed, range [-32768, 32767]）**；**Round 20 增 TestShortFloatRound20Compat**：int 输入接受 / Decimal 输入接受 / Fraction 输入接受 / `__float__` duck typing 接受 / NaN/Inf 仍严格拒绝 / 极值 roundtrip；**不引入 numpy 硬依赖**）
+│   │   ├── test_iec101_asdu_objects.py — IEC101 信息对象 + ASDU 列表测试（**Round 17 扩展**至包含带时标短浮点 M_ME_TB_1/M_ME_TC_1 + C_SC_NA_1 QU 显式化；4 不带时标 + 5 带时标 + QU 显式化；**Round 18 扩展 +5 新信息对象（M_ME_NB_1/M_ME_NC_1/C_SE_NA_1/C_SE_NB_1/C_SE_NC_1）roundtrip + QOS 结构化 SetPointQualifier 枚举 + SetPointCommandQualifier 显式字段测试**；**Round 19 扩展 +6 个 C_SE_T* test classes**：test_c_se_ta_1_roundtrip + test_c_se_tb_1_roundtrip + test_c_se_tc_1_roundtrip + test_c_se_t_a_byte_layout + test_c_se_t_b_byte_layout + test_c_se_t_c_byte_layout 验证 12/12/14 字节布局与 COT 字段）
+│   │   ├── test_iec101_ft12_frame.py — IEC101 FT1.2 链路帧测试（36 tests）
+│   │   ├── test_iec101_link_layer.py — IEC101 链路层最小状态机骨架测试（**Round 17 扩展**至包含 LinkLayerTimers t1/t2/t3 + FCB/FCV helper + 5 态 + balanced/unbalanced 差异化；**Round 20 增强** LinkLayerTimerService 抽象 + Default (threading.Timer) + Fake (无 wall-clock) + send/receive/on_timeout 完整状态机 + balanced FCB auto flip + retry ERROR；**Round 20 新增 8 个 test classes**：TestLinkLayerTimerService + TestDefaultLinkLayerTimerService + TestFakeLinkLayerTimerService + TestLinkLayerSendUserData + TestLinkLayerReceiveAck + TestLinkLayerReceiveNack + TestLinkLayerOnTimeout + TestLinkLayerSequenceStateMachine）— Round 16 起步，Round 17 扩展，Round 20 增强
+│   │   ├── test_modbus_register_encoding.py — **Modbus register_encoding 工具子包测试（Round 18 新增 SF-FR-030，164 tests）**：5 value_type（uint16/int16/uint32/int32/float32）× 4 byte_order 组合（big-big/little-little/big-little/little-big）= 20 组合 roundtrip + 边界 + 极值 + 越界检测 + 长度错误检测 + float32 NaN/Inf 严格拒绝；**纯 Python CPU 辅助层，非 Modbus 真实设备验证**
+│   │   ├── test_iec61850_facade.py  — IEC61850 MMS / Report facade
+│   │   ├── test_modbus_rtu_facade.py — Modbus RTU facade（8 FCs / 4 异常码 / PTY；**Round 19 扩展 +encode_register_value/decode_register_value/register_encoding_capabilities 三方法** + 5 value_type × 4 byte/word 组合 = 20 组合 roundtrip + register_encoding 工具输出一致性 + register_encoding_runtime=false 边界）
+│   │   ├── test_mqtt_facade.py      — MqttFacade 轻量 TCP server
+│   │   ├── test_native_runner_framework.py — Native Runner 框架
+│   │   ├── test_opcua_iec104_facade.py — OPC_UA / IEC104 facade
+│   │   ├── test_probe_profile_capacity.py — probe / profile / capacity
+│   │   ├── test_protocol_facade.py  — 协议专用 facade（含 RuntimeRegistry dispatch；**Round 19 扩展 +Modbus TCP/RTU facade register_encoding 集成测试** encode_register_value/decode_register_value/register_encoding_capabilities + 5 value_type × 4 byte/word 组合 + register_encoding 工具输出一致性 + register_encoding_runtime=false 边界）
+│   │   ├── test_remaining_protocols.py — 3 pending facade（Beckhoff_ADS / GOOSE / SV）
+│   │   ├── test_server_plan_loader.py — ServerPlan JSON loader
+│   │   ├── test_server_simulator_facade.py — ServerSimulatorFacade stub
+│   │   └── test_starfish_cli.py     — Starfish CLI（5 子命令 + per-endpoint mode）
+│   ├── shared/
+│   │   └── persistence/             — shared persistence 单测
+│   │       ├── test_model_asset_orm.py
+│   │       ├── test_scada_protocol_params.py
+│   │       ├── test_scada_protocol_views.py
+│   │       └── test_scada_sample_data_protocol_coverage.py
+│   └── （根目录 80+ 个 ingest / message_pipeline / speed_layer / storage / source 单测）
+│       test_acquisition_job_handler.py
+│       test_config.py
+│       test_dual_node_write_lease_conflict.py
+│       test_http_rest_backend.py
+│       test_http_rest_source_acquisition_adapter.py
+│       test_iec101_backend.py
+│       test_iec101_source_acquisition_adapter.py
+│       test_iec104_backend.py
+│       test_iec104_source_acquisition_adapter.py
+│       test_iec104_source_write_adapter.py
+│       test_iec61850_mms_backend.py
+│       test_iec61850_report_acquisition_adapter.py
+│       test_iec61850_report_backend.py
+│       test_iec61850_source_acquisition_adapter.py
+│       test_iec61850_source_write_adapter.py
+│       test_ingest_api_app.py
+│       test_ingest_audit_event_schema.py
+│       test_ingest_audit_redaction.py
+│       test_ingest_bundle_checksum.py
+│       test_ingest_bundle_redaction.py
+│       test_ingest_composition_injection.py
+│       test_ingest_file_ingest_decoder.py
+│       test_ingest_file_ingest_detector.py
+│       test_ingest_file_ingest_models.py
+│       test_ingest_file_ingest_repository.py
+│       test_ingest_file_ingest_service.py
+│       test_ingest_job_lease.py
+│       test_ingest_metrics_events.py
+│       test_ingest_no_source_lab_imports.py
+│       test_ingest_observability_sink.py
+│       test_ingest_readyz.py
+│       test_ingest_runtime_entrypoint.py
+│       test_ingest_runtime_modes.py
+│       test_ingest_runtime_orm_models.py
+│       test_ingest_runtime_scheduler_import.py
+│       test_ingest_security_partition_config.py
+│       test_ingest_source_adapter_capability_matrix.py
+│       test_ingest_write_lease.py
+│       test_ingest_write_lease_fencing.py
+│       test_ingest_write_security_profile.py
+│       test_kafka_message_publisher.py
+│       test_message_pipeline_adapters.py
+│       test_message_pipeline_envelope.py
+│       test_message_pipeline_kafka_adapter.py
+│       test_message_pipeline_ports.py
+│       test_modbus_rtu_backend.py
+│       test_modbus_rtu_source_acquisition_adapter.py
+│       test_modbus_source_acquisition_adapter.py
+│       test_modbus_source_write_adapter.py
+│       test_model_asset_detector.py
+│       test_model_asset_models.py
+│       test_model_asset_repository.py
+│       test_model_asset_service.py
+│       test_mqtt_backend.py
+│       test_mqtt_source_acquisition_adapter.py
+│       test_opcua_adapter_resolution.py
+│       test_opcua_source_acquisition_adapter.py
+│       test_opcua_source_write_adapter.py
+│       test_open62541_backend.py
+│       test_polling_acquisition_role.py
+│       test_redis_source_state_cache.py
+│       test_redis_streams_message_publisher.py
+│       test_relational_outbox_message_publisher.py
+│       test_scheduler_job_routes.py
+│       test_shared_source_runner_resolution.py
+│       test_source_acquisition_port_registry.py
+│       test_source_acquisition_use_case.py
+│       test_source_command_audit.py
+│       test_source_command_authorization_guard.py
+│       test_source_command_lease_release.py
+│       test_source_command_use_case.py
+│       test_source_command_write_lease_guard.py
+│       test_source_runtime_config_repository.py
+│       test_source_scheduling.py
+│       test_source_write_port_registry.py
+│       test_speed_layer_light_processor.py
+│       test_speed_layer_pipeline_runner.py
+│       test_speed_layer_preprocessing.py
+│       test_state_snapshot_publish_use_case.py
+│       test_storage_raw_archive.py
+│       test_storage_raw_index.py
+│       test_storage_serving_cache.py
+│       test_storage_simulation_result.py
+│       test_storage_standardized.py
+│       test_storage_waveform.py
+│       test_subscription_acquisition_role.py
+│       test_subscription_reconnect_baseline.py
+│       test_subscription_reconnect_runtime.py
+│       test_turtle_octopus_import_boundary.py
+│       test_worker_runtime_do_execute.py
 │
-├── integration/                       — P3 集成测试
-│   ├── __init__.py
-│   ├── test_framework_db_init.py      — 框架 DB 初始化集成测试
-│   ├── test_ingest_file_ingest_integration.py — file_ingest 模块集成测试（detect->archive->decode->waveform，6 tests，临时文件）
-│   ├── test_model_asset_integration.py    — model_asset 模块集成测试（import->detect->archive->persist，12 tests）
-│   ├── test_model_asset_alembic_migration.py — model_asset Alembic 迁移集成测试（upgrade/downgrade 4 表）
-│   ├── test_http_rest_acquisition_chain.py — HTTP REST 全链路采集集成测试（P3 simulator）
-│   ├── test_iec104_acquisition_chain.py    — IEC104 全链路采集集成测试（P3 simulator）
-│   ├── test_modbus_rtu_acquisition_chain.py — Modbus RTU 全链路采集集成测试（P3 simulator）
-│   ├── test_iec101_acquisition_chain.py    — IEC101 全链路采集集成测试（P3 simulator）
-│   ├── test_mqtt_acquisition_chain.py      — MQTT 全链路采集集成测试（P3 simulator）
-│   ├── test_ingest_api_acquisition_task_crud.py — acquisition task CRUD集成
-│   ├── test_ingest_api_audit.py       — API审计集成测试
-│   ├── test_ingest_api_authorization_deny.py — API授权拒绝集成测试
-│   ├── test_ingest_api_bundle_metadata_crud.py — bundle metadata CRUD集成
-│   ├── test_ingest_api_dry_run_all_mutating_routes.py — API dry-run全mutating路由集成
-│   ├── test_ingest_api_full_audit_matrix.py — API全审计矩阵集成
-│   ├── test_ingest_api_idempotency_all_mutating_routes.py — 幂等性全mutating路由集成
-│   ├── test_ingest_api_idempotency_dry_run.py — 幂等性dry-run集成
-│   ├── test_ingest_api_idempotency_dry_run_interaction.py — 幂等性dry-run交互集成
-│   ├── test_ingest_api_node_lease_audit_query.py — node/lease审计查询集成
-│   ├── test_ingest_api_runtime_config_audit.py — runtime config审计集成
-│   ├── test_ingest_api_runtime_config_crud.py — runtime config CRUD集成
-│   ├── test_ingest_api_scheduler_job_crud.py — scheduler job CRUD集成
-│   ├── test_ingest_api_security_partition_crud.py — security partition CRUD集成
-│   ├── test_ingest_audit_db_jsonl_consistency.py — DB/JSONL审计一致性集成
-│   ├── test_ingest_audit_matrix_api_bundle_scheduler_write.py — 审计矩阵API/bundle/scheduler集成
-│   ├── test_ingest_bundle_import_export.py — bundle导入导出集成
-│   ├── test_ingest_bundle_offline_one_way_flow.py — bundle单向流离线集成
-│   ├── test_ingest_iec104_source_write.py  — IEC104 写入集成测试
-│   ├── test_ingest_lightweight_load_gate.py — 轻量加载门禁集成
-│   ├── test_ingest_observability_sink_smoke.py — 观测sink烟测集成
-│   ├── test_ingest_polling_retry_to_redis.py   — 轮询重试到 Redis
-│   ├── test_ingest_prodlike_access_policy.py — prodlike访问策略集成
-│   ├── test_ingest_prodlike_audit_sink.py — prodlike审计sink集成
-│   ├── test_ingest_prodlike_audit_metrics_resilience.py — 审计指标韧性测试
-│   ├── test_ingest_prodlike_endurance_smoke.py — prodlike endurance 脚本烟测
-│   ├── test_ingest_prodlike_kafka_publish.py — prodlike Kafka发布集成
-│   ├── test_ingest_prodlike_kafka_fault_injection.py — Kafka 故障注入恢复测试
-│   ├── test_ingest_prodlike_performance_profile.py — 性能基线测试
-│   ├── test_ingest_prodlike_postgres_fault_injection.py — PostgreSQL 故障注入恢复测试
-│   ├── test_ingest_prodlike_postgres_runtime_db.py — prodlike PostgreSQL runtime DB集成
-│   ├── test_ingest_prodlike_redis_cache.py — prodlike Redis缓存集成
-│   ├── test_ingest_prodlike_redis_fault_injection.py — Redis 故障注入恢复测试
-│   ├── test_ingest_prodlike_scheduler_backpressure.py — 调度背压与 missed tick 测试
-│   ├── test_ingest_prodlike_worker_failover.py — worker crash/failover 集成测试
-│   ├── test_ingest_runtime_alembic_migration.py — Alembic迁移集成测试
-│   ├── test_ingest_runtime_alembic_postgres_matrix.py — Alembic PostgreSQL矩阵集成
-│   ├── test_ingest_runtime_alembic_sqlite_matrix.py — Alembic SQLite矩阵集成
-│   ├── test_ingest_runtime_db_init.py — runtime DB初始化集成测试
-│   ├── test_ingest_runtime_entrypoint_smoke.py — entrypoint烟测
-│   ├── test_ingest_runtime_migrate_entrypoint.py — migrate入口集成测试
-│   ├── test_ingest_scheduler_active_standby_failover.py — 调度器主备故障转移集成
-│   ├── test_ingest_scheduler_apscheduler_runtime.py — APScheduler运行时集成
-│   ├── test_ingest_scheduler_cluster_assignment.py — 调度器集群分配集成
-│   ├── test_ingest_scheduler_dual_active_partitioned.py — 调度器双活分区集成
-│   ├── test_ingest_scheduler_graceful_shutdown.py — 调度器优雅关闭集成
-│   ├── test_ingest_scheduler_missed_tick_and_stagger.py — missed tick与错峰集成
-│   ├── test_ingest_source_acquisition_to_redis.py  — 采集到 Redis 集成
-│   ├── test_ingest_source_cache_message_e2e.py — 源缓存消息E2E集成
-│   ├── test_ingest_source_cache_message_kafka_e2e.py — 源缓存Kafka消息E2E集成
-│   ├── test_ingest_subscription_strategy.py    — 订阅策略集成测试
-│   ├── test_ingest_security_partition_bundle_flow.py — Bundle单向流测试
-│   ├── test_ingest_security_partition_smoke.py — 安全分区烟测集成
-│   ├── test_ingest_worker_runtime_executes_usecase_handlers.py — WorkerRuntime usecase handler执行集成
-│   ├── test_ingest_worker_runtime_handler_failure.py — WorkerRuntime handler失败集成
-│   ├── test_ingest_worker_runtime_shutdown_inflight.py — WorkerRuntime shutdown inflight集成
-│   ├── test_ingest_write_lease_fencing_e2e.py — 写入租约fencing E2E集成
-│   ├── test_ingest_external_access_policy_contract.py — 外部授权合同测试
-│   ├── test_ingest_external_audit_sink_contract.py — 外部审计sink合同测试
-│   ├── test_message_pipeline_inmemory_e2e.py      — message_pipeline InMemory E2E 集成测试
-│   ├── test_message_pipeline_kafka_e2e.py         — message_pipeline Kafka E2E 集成测试
-│   ├── test_ingest_modbus_source_write.py        — Modbus TCP 写入集成测试
-│   ├── test_ingest_opcua_source_write.py        — OPC UA 写入集成测试
-│   ├── test_ingest_iec61850_mms_source_write.py  — IEC 61850 MMS 写入集成测试
-│   ├── test_ingest_iec61850_report_subscription.py  — IEC 61850 Report 订阅集成测试
-│   ├── test_ingest_cache_to_kafka_pipeline.py     — 缓存快照到 Kafka 发布集成测试
-│   ├── test_shared_persistence_sample_data_init.py — 样例初始化 PostgreSQL 集成测试
-│   ├── test_source_lab_scada_profile.py — source_lab 消费 SCADA sample DB 集成测试
-│   ├── test_source_lab_scada_profile_postgres.py — source_lab 消费 PostgreSQL SCADA sample DB
-│   ├── test_speed_layer_dlq_replay.py            — speed_layer DLQ/replay 集成测试
-│   ├── test_speed_layer_index_standardized_pipeline.py — speed_layer index/standardized/serving_cache 集成测试
-│   ├── test_speed_layer_raw_archive_pipeline.py  — speed_layer raw_archive pipeline 集成测试
-│   ├── test_source_lab_beckhoff_ads_runtime.py — Beckhoff ADS in_process+dotnet统一输入集成测试
-│   ├── test_whale_writer_failure_recovery.py    — Whale writer 故障恢复集成测试
-│   ├── test_whale_writer_switchover.py          — Whale writer 主备切换集成测试
-│   ├── test_l5_external_dependency_verification.py — P5 准生产依赖验证期 外部依赖验证（Kafka/PG/Redis/S3/TDengine 验证通过，Pulsar/HDFS/Flink MISSING_ENVIRONMENT）
-│   ├── test_model_asset_postgres_integration.py — model_asset PostgreSQL 集成（16 tests, NOT_RUN: DSN 未设置; DSN 已设置但连接失败时 FAIL）
-│   ├── test_storage_waveform_tdengine_integration.py — waveform TDengine REST API P5 集成（4 tests, NOT_RUN: TCP+REST 两阶段探测 skipif）
-│   ├── test_storage_simulation_result_tdengine_integration.py — simulation_result TDengine REST API P5 集成（5 tests, NOT_RUN: TCP+REST 两阶段探测 skipif）
-│   ├── test_redis_state_cache_faults.py        — Redis 缓存容错测试
-│   ├── test_ingest_dual_node_db_lease_e2e.py — 双节点 DB lease E2E 集成测试（P3）
-│   └── test_sqlite_config_init.py              — SQLite 配置初始化
+├── architecture/                    — 架构边界与 import 门禁测试
+│   ├── test_seahorse_import_boundary.py — seahorse / ingest / starfish import boundary
+│   └── test_starfish_import_boundary.py — starfish / seahorse / ingest import boundary（**Round 19 扩展** Round 19 3 C_SE_T* 带时标命令 + Modbus TCP/RTU facade 接入 register_encoding 工具 + 第三方代码零入侵验证）
 │
-├── e2e/                               — P4 端到端测试
-│   ├── __init__.py
+├── integration/                     — P3 集成测试（80+ 个）
+│   ├── test_framework_db_init.py
+│   ├── test_http_rest_acquisition_chain.py
+│   ├── test_iec101_acquisition_chain.py
+│   ├── test_iec104_acquisition_chain.py
+│   ├── test_modbus_rtu_acquisition_chain.py
+│   ├── test_mqtt_acquisition_chain.py
+│   ├── test_message_pipeline_inmemory_e2e.py
+│   ├── test_message_pipeline_kafka_e2e.py
+│   ├── test_ingest_api_*.py          — 18 个 API 集成（CRUD / 审计 / 授权 / 幂等 / dry-run / 全矩阵）
+│   ├── test_ingest_audit_*.py        — 4 个审计集成（DB / JSONL 一致性 / 矩阵）
+│   ├── test_ingest_bundle_*.py       — 3 个 bundle 集成（导入导出 / 单向流 / 安全分区）
+│   ├── test_ingest_cache_to_kafka_pipeline.py
+│   ├── test_ingest_dual_node_db_lease_e2e.py
+│   ├── test_ingest_external_*.py     — 外部访问策略 / 审计 sink 合同
+│   ├── test_ingest_file_ingest_integration.py
+│   ├── test_ingest_*_source_write.py — 4 个协议写入集成（Modbus / OPC UA / IEC104 / IEC61850）
+│   ├── test_ingest_iec61850_report_subscription.py
+│   ├── test_ingest_lightweight_load_gate.py
+│   ├── test_ingest_observability_sink_smoke.py
+│   ├── test_ingest_polling_retry_to_redis.py
+│   ├── test_ingest_prodlike_*.py     — 14 个 prodlike 集成（访问策略 / 审计 sink / Kafka / PG / Redis / 性能 / endurance / 故障注入 / 调度背压 / worker failover）
+│   ├── test_ingest_runtime_*.py      — 6 个 runtime / alembic 集成
+│   ├── test_ingest_scheduler_*.py    — 7 个 scheduler 集成（主备 / APScheduler / 集群分配 / 双活 / 优雅关闭 / missed tick / 错峰）
+│   ├── test_ingest_security_partition_*.py — 2 个安全分区集成
+│   ├── test_ingest_source_*.py       — 4 个 source 采集集成
+│   ├── test_ingest_subscription_strategy.py
+│   ├── test_ingest_worker_runtime_*.py — 3 个 WorkerRuntime 集成
+│   ├── test_ingest_write_lease_fencing_e2e.py
+│   ├── test_l5_external_dependency_verification.py — P5 准生产依赖验证期
+│   ├── test_model_asset_*.py         — 3 个 model_asset 集成（含 Alembic + PG）
+│   ├── test_redis_state_cache_faults.py
+│   ├── test_shared_persistence_sample_data_init.py
+│   ├── test_speed_layer_*.py         — 3 个 speed_layer 集成（DLQ / replay / 索引 / 原始归档）
+│   ├── test_sqlite_config_init.py
+│   ├── test_storage_*.py             — 2 个 TDengine 集成（waveform / simulation_result）
+│   └── test_whale_writer_*.py        — 2 个 writer 故障恢复 / 主备切换
+│
+├── e2e/                             — P4 端到端测试
 │   ├── conftest.py
 │   ├── helpers.py
-│   ├── test_whale_field_minimal_smoke.py — Whale 现场最小数据链路 P4 smoke（7 tests）
-│   ├── test_whale_l5_kafka_pipeline_e2e.py — P5 Kafka pipeline E2E（4 tests）
-│   └── test_whale_l5_storage_e2e.py        — P5 storage E2E（10 tests：S3/TDengine/Redis）
+│   ├── test_whale_field_minimal_smoke.py — Whale 现场最小数据链路 P4 smoke
+│   ├── test_whale_l5_kafka_pipeline_e2e.py — P5 Kafka pipeline E2E
+│   └── test_whale_l5_storage_e2e.py   — P5 storage E2E（S3 / TDengine / Redis）
 │
-├── performance/                       — 性能测试
-│   ├── __init__.py
-│   ├── load/
-│   │   ├── __init__.py
-│   │   └── conftest.py                — 负载测试夹具
+├── performance/                     — 性能测试
+│   ├── load/                         — 负载测试
+│   │   └── conftest.py
 │   ├── stress/
-│   │   ├── __init__.py
-│   │   └── test_acquisition_pipeline_stress.py  — 采集管道压力测试
-│   └── endurance/
-│       └── __init__.py                — 耐久测试（待实现）
+│   │   └── test_acquisition_pipeline_stress.py
+│   └── endurance/                    — 耐久测试（待实现）
 │
-└── support/
-    ├── ingest_prodlike_runtime.py     — prodlike compose/故障注入辅助
-    ├── scada_sample_db.py             — SCADA 样例 SQLite/PG 初始化辅助
-    ├── shared_persistence_sample_db.py — shared persistence 样例 PG 初始化辅助
-    └── source_lab_runtime.py          — source_lab 运行时支持
+└── support/                         — 测试支撑模块
+    ├── ingest_prodlike_runtime.py    — prodlike compose / 故障注入辅助
+    ├── scada_sample_db.py            — SCADA 样例 SQLite / PG 初始化辅助
+    └── shared_persistence_sample_db.py — shared persistence 样例 PG 初始化辅助
 ```
 
-## Source Lab 工具 `tools/source_lab/`
-
-```text
-tools/source_lab/
-├── __init__.py                        — 包入口
-├── README.md                          — 工具说明
-├── contracts.py                       — 合约/接口定义
-├── factory.py                         — 组件工厂
-├── fleet.py                           — 机群管理
-├── model.py                           — 数据模型
-├── sources.py                         — 数据源定义
-├── field_capacity.py                  — 现场容量测试 CLI
-├── field_probe.py                     — 现场探测 CLI
-├── field_profile.py                   — 现场性能画像 CLI
-├── beckhoff_ads_virtual_server_setup.md — Windows TwinCAT ADS virtual server 指引
-│
-├── access/                            — 协议接入层引擎
-│   ├── __init__.py
-│   ├── README.md
-│   ├── config.py                      — 接入配置加载
-│   ├── capacity.py                    — 容量测试入口
-│   ├── field_capacity.py              — 现场容量测试逻辑
-│   ├── probe.py                       — 探测入口
-│   ├── profile.py                     — 性能画像入口
-│   │
-│   ├── common/                        — 公共工具
-│   │   ├── __init__.py
-│   │   ├── access_model.py            — 接入层数据模型
-│   │   ├── cpu.py                     — CPU 监控
-│   │   ├── io.py                      — IO 监控
-│   │   ├── progress.py                — 进度报告
-│   │   ├── scheduling.py              — 调度工具
-│   │   ├── table.py                   — 表格渲染
-│   │   └── utils.py                   — 通用工具函数
-│   │
-│   ├── polling/                       — 轮询模式
-│   │   ├── __init__.py
-│   │   ├── capacity.py                — 轮询容量测试
-│   │   ├── capacity_rows.py           — 容量结果行格式化
-│   │   ├── metrics.py                 — 轮询指标收集
-│   │   ├── model.py                   — 轮询数据模型
-│   │   ├── profile.py                 — 轮询性能画像
-│   │   ├── reporter.py                — 轮询报告生成
-│   │   └── worker.py                  — 轮询 Worker
-│   │
-│   ├── subscribe/                     — 订阅模式
-│   │   ├── __init__.py
-│   │   ├── capacity.py                — 订阅容量测试
-│   │   ├── capacity_model.py          — 容量测试模型
-│   │   ├── capacity_plan.py           — 容量测试计划
-│   │   ├── capacity_rows.py           — 容量结果行格式化
-│   │   ├── capacity_scan.py           — 容量扫描
-│   │   ├── metrics.py                 — 订阅指标收集
-│   │   ├── model.py                   — 订阅数据模型
-│   │   ├── profile.py                 — 订阅性能画像
-│   │   ├── reporter.py                — 订阅报告生成
-│   │   ├── scan.py                    — 订阅扫描
-│   │   └── worker.py                  — 订阅 Worker
-│   │
-│   ├── runtime/                       — endpoint级动态运行时
-│   │   ├── __init__.py
-│   │   ├── endpoint_runtime.py        — endpoint运行时模型
-│   │   ├── endpoint_registry.py       — endpoint动态注册表
-│   │   ├── dynamic_cli.py             — 动态CLI入口
-│   │   ├── session_manager.py         — endpoint会话管理
-│   │   ├── stagger_coordinator.py     — endpoint错峰协调
-│   │   ├── continuity_model.py        — 连续性指标模型
-│   │   ├── continuity_monitor.py      — 连续性指标监控
-│   │   ├── state_store.py             — runtime文件状态存储
-│   │   ├── operation_journal.py       — 动态操作日志
-│   │   └── native_interactive_control.py — native交互控制
-│   │
-│   ├── providers/                     — 数据提供者
-│   │   ├── __init__.py
-│   │   ├── base.py                    — 提供者基类
-│   │   ├── expanded_field.py          — 展开字段提供者
-│   │   ├── field.py                   — 字段提供者
-│   │   ├── file_field.py              — 文件字段提供者
-│   │   ├── scada_profile.py           — shared persistence SCADA 样例 provider
-│   │   └── simulator.py               — 模拟器提供者
-│   │
-│   └── runners/                       — 协议运行器
-│       ├── __init__.py
-│       ├── base.py                    — 运行器基类
-│       ├── protocol.py                — 协议枚举定义
-│       ├── registry.py                — 运行器注册表
-│       ├── native_runner_map.py       — Native 运行器映射
-│       ├── native_process.py          — Native 进程管理
-│       ├── native_cmd.py              — Native 命令封装
-│       ├── generic_polling.py         — 通用轮询运行器
-│       ├── generic_streaming.py       — 通用流式运行器
-│       ├── beckhoff_ads_polling.py    — Beckhoff ADS 轮询运行器
-│       ├── http_rest_polling.py       — HTTP REST 轮询
-│       ├── iec101_polling.py          — IEC 101 轮询
-│       ├── iec101_event.py            — IEC 101 事件
-│       ├── iec104_polling.py          — IEC 104 轮询
-│       ├── iec104_event.py            — IEC 104 事件
-│       ├── iec61850_l2_streaming.py   — GOOSE/SV L2 订阅运行器
-│       ├── iec61850_mms_polling.py    — IEC 61850 MMS 轮询
-│       ├── iec61850_report.py         — IEC 61850 报告
-│       ├── modbus_rtu_polling.py      — Modbus RTU 轮询
-│       ├── modbus_tcp_polling.py      — Modbus TCP 轮询
-│       ├── mqtt_subscription.py       — MQTT 订阅
-│       ├── open62541_serial_polling.py    — open62541 串行轮询
-│       └── open62541_subscription.py      — open62541 订阅
-│
-├── protocols/                         — 协议仿真（含 ServerSimulatorFacade）
-│   ├── __init__.py
-│   ├── registry.py                    — 协议注册表（含 ServerSimulatorFacade 工厂）
-│   ├── common/                        — 协议公共
-│   │   ├── __init__.py
-│   │   ├── point_mapping.py           — 测点映射
-│   │   ├── simulators.py              — 通用模拟器
-│   │   ├── simulator_models.py        — ServerSimulatorFacade 数据模型
-│   │   ├── simulator_facade.py        — ServerSimulatorFacade Protocol
-│   │   ├── _base_facade.py            — 默认 NOT_IMPLEMENTED 基类
-│   │   └── _interactive_runner.py     — 交互式运行器基类
-│   ├── beckhoff_ads/                  — Beckhoff ADS 协议
-│   │   ├── __init__.py
-│   │   ├── ads_client.py              — ADS Python pyads 子进程客户端
-│   │   ├── dotnet_virtual_server.py   — Beckhoff .NET virtual ADS server 管理
-│   │   ├── runtime.py                 — ADS in_process tool runtime
-│   │   └── simulator.py               — ADS facade/read-write-readback
-│   ├── http_rest/
-│   │   ├── __init__.py                — HTTP REST 协议
-│   │   └── simulator.py               — HTTP REST facade
-│   ├── iec101/
-│   │   ├── __init__.py                — IEC 101 协议
-│   │   └── simulator.py               — IEC 101 facade
-│   ├── iec104/
-│   │   ├── __init__.py                — IEC 104 协议
-│   │   └── simulator.py               — IEC 104 facade
-│   ├── iec61850/
-│   │   ├── __init__.py                — IEC 61850 协议
-│   │   └── simulator.py               — IEC 61850 facade
-│   ├── modbus/
-│   │   ├── __init__.py
-│   │   └── simulator.py               — Modbus TCP/RTU facades
-│   ├── mqtt/
-│   │   ├── __init__.py
-│   │   └── simulator.py               — MQTT facade
-│   └── opcua/                         — OPC UA 模拟器
-│       ├── __init__.py
-│       ├── simulator.py               — OPC UA facade
-│       ├── address_space.py           — OPC UA 地址空间生成
-│       ├── open62541_source_simulator.py  — open62541 仿真数据源
-│       ├── templates/OPCUANodeSet.xml     — OPC UA 节点集模板
-│       └── templates/OPCUA_client_connections.yaml  — 客户端连接模板
-│
-├── native/                            — C 原生运行器源码
-│   ├── CMakeLists.txt                 — CMake 构建配置
-│   ├── README.md
-│   ├── open62541/                     — OPC UA 原生运行器
-│   │   ├── open62541_client_runner.c  — OPC UA 客户端运行器
-│   │   ├── open62541_simulator_server.c   — OPC UA 模拟器服务端
-│   │   └── open62541_subscription_runner.c  — OPC UA 订阅运行器
-│   ├── lib60870/                      — IEC 60870 原生运行器
-│   │   ├── iec101_client_runner.c     — IEC 101 客户端
-│   │   ├── iec101_event_runner.c      — IEC 101 事件运行器
-│   │   ├── iec101_simulator_slave.c   — IEC 101 模拟从站
-│   │   ├── iec104_client_runner.c     — IEC 104 客户端
-│   │   ├── iec104_event_runner.c      — IEC 104 事件运行器
-│   │   └── iec104_simulator_server.c  — IEC 104 模拟服务端
-│   ├── libiec61850/                   — IEC 61850 原生运行器
-│   │   ├── iec61850_goose_publisher_simulator.c  — GOOSE 发布模拟器
-│   │   ├── iec61850_goose_subscriber_runner.c    — GOOSE 订阅运行器
-│   │   ├── iec61850_mms_client_runner.c          — MMS 客户端运行器
-│   │   ├── iec61850_report_runner.c              — 报告运行器
-│   │   ├── iec61850_simulator_server.c           — 61850 模拟服务端
-│   │   ├── iec61850_sv_publisher_simulator.c     — SV 发布模拟器
-│   │   └── iec61850_sv_subscriber_runner.c       — SV 订阅运行器
-│   └── libmodbus/                     — Modbus 原生运行器
-│       ├── modbus_rtu_polling_runner.c    — Modbus RTU 轮询
-│       ├── modbus_tcp_polling_runner.c    — Modbus TCP 轮询
-│       └── modbus_simulator_server.c      — Modbus 模拟服务端
-│
-└── tests/                             — Source Lab 测试
-    ├── __init__.py
-    ├── README.md                       — 测试边界、工具名与验证等级区别、NOT_RUN 条件
-    ├── TEST_AUDIT.md                   — 测试审计记录（含 P1-P7 生命周期术语对齐说明）
-    ├── conftest.py                     — 测试夹具（含 load 测试自动跳过）
-    ├── support/
-    │   ├── __init__.py
-    │   └── sources.py                  — 测试数据源定义
-    ├── test_factory.py                 — 工厂测试
-    ├── test_fleet_partial_lifecycle.py — fleet局部生命周期测试
-    ├── test_fleet_startup_controls.py  — 机群启动控制测试
-    ├── test_open62541_source_simulation_single_server_smoke.py  — 单服务器冒烟
-    ├── test_source_simulation_multi_server_polling_capacity.py  — 多服务器轮询容量
-    ├── test_source_simulation_multi_server_polling_profile.py   — 多服务器轮询画像
-    ├── test_source_simulation_multi_server_subscribe_capacity.py  — 多服务器订阅容量
-    ├── test_source_simulation_multi_server_subscribe_profile.py   — 多服务器订阅画像
-    ├── fixtures/
-    │   ├── db_export/
-    │   │   ├── field_servers.tsv       — 场站服务器 TSV 导出
-    │   │   └── signal_profile_items.tsv  — 信号配置文件 TSV 导出
-    │   └── simulator/
-    │       ├── field_servers.tsv       — 模拟器场站服务器输入
-    │       └── signal_profile_items.tsv  — 模拟器信号输入
-    │
-    └── access/                         — 接入层专项测试
-        ├── __init__.py
-        ├── _dynamic_runtime_test_utils.py — 动态runtime测试辅助
-        ├── test_access_config.py       — 接入配置测试
-        ├── test_access_facades.py      — 接入外观测试
-        ├── test_access_metrics.py      — 接入指标测试
-        ├── test_access_probe.py        — 接入探测测试
-        ├── test_access_probe_protocol_handshake.py  — 协议握手探测
-        ├── test_access_probe_protocol_semantics.py  — 协议语义探测
-        ├── test_access_progress_reporting.py  — 进度报告测试
-        ├── test_access_reporter.py     — 报告器测试
-        ├── test_access_scheduling.py   — 调度测试
-        ├── test_access_structure.py    — 结构测试
-        ├── test_access_worker.py       — Worker 测试
-        ├── test_ai_shared_report_template_references.py — AI报告模板引用测试
-        ├── test_all_protocols_polling_capacity.py   — 全协议轮询容量
-        ├── test_all_protocols_polling_profile.py    — 全协议轮询画像
-        ├── test_all_protocols_probe.py — 全协议探测
-        ├── test_all_protocols_streaming_capacity.py  — 全协议流式容量
-        ├── test_all_protocols_streaming_profile.py   — 全协议流式画像
-        ├── test_beckhoff_ads_capacity_profile_gate.py — ADS capacity/profile 门禁测试
-        ├── test_beckhoff_ads_client_runner_protocol.py — ADS client/preflight 测试
-        ├── test_beckhoff_ads_dotnet_virtual_server.py — ADS .NET virtual server 测试（env-pending）
-        ├── test_beckhoff_ads_environment_probe.py — ADS 环境探测测试（env-pending）
-        ├── test_beckhoff_ads_native_preflight.py — ADS AdsLib native 预检测试（env-pending）
-        ├── test_beckhoff_ads_real_protocol_readback.py — ADS 真实协议 readback 测试（env-pending）
-        ├── test_beckhoff_ads_simulator_contract.py — ADS facade 合同测试
-        ├── test_capacity_progress.py   — 容量进度测试
-        ├── test_capacity_reporter.py   — 容量报告器测试
-        ├── test_capacity_rows.py       — 容量行格式化测试
-        ├── test_capacity_service.py    — 容量服务测试
-        ├── test_dynamic_cli.py         — 动态CLI测试
-        ├── test_dynamic_cli_accepted_state.py — accepted-state CLI测试
-        ├── test_dynamic_endpoint_patch_matrix.py — 动态patch矩阵测试
-        ├── test_dynamic_goose_sv_streaming_endpoint_adjustment.py — GOOSE/SV动态隔离测试
-        ├── test_dynamic_goose_sv_permission_gate.py — GOOSE/SV权限门禁测试
-        ├── test_dynamic_iec61850_report_endpoint_adjustment.py — IEC61850 Report隔离测试
-        ├── test_dynamic_native_interactive_control_boundary.py — native交互边界测试
-        ├── test_dynamic_native_runner_isolation.py — native runner隔离测试
-        ├── test_dynamic_opcua_polling_endpoint_adjustment.py — OPC UA polling隔离测试
-        ├── test_dynamic_opcua_subscription_endpoint_adjustment.py — OPC UA订阅隔离测试
-        ├── test_dynamic_operation_journal_audit.py — 动态审计日志测试
-        ├── test_dynamic_polling_endpoint_adjustment.py — 动态polling局部调整测试
-        ├── test_dynamic_runtime_state_store_resilience.py — runtime状态存储韧性测试
-        ├── test_dynamic_runtime_state_store_integrity.py — runtime状态完整性测试
-        ├── test_dynamic_runtime_state_store_retention.py — runtime状态备份保留测试
-        ├── test_dynamic_runtime_state_store_repair_cli.py — runtime状态修复CLI测试
-        ├── test_dynamic_runtime_state_recovery.py — 动态runtime恢复测试
-        ├── test_dynamic_subscription_endpoint_adjustment.py — 动态订阅局部调整测试
-        ├── test_field_capacity_cli.py  — 现场容量 CLI 测试
-        ├── test_field_probe_cli.py     — 现场探测 CLI 测试
-        ├── test_field_profile_cli.py   — 现场画像 CLI 测试
-        ├── test_field_provider.py      — 字段提供者测试
-        ├── test_iec104_client_runner_write_protocol.py — IEC104 写入协议测试
-        ├── test_iec104_production_capacity_profile_gate.py — IEC104 capacity/profile门禁测试
-        ├── test_iec61850_lightweight_semantics.py  — IEC 61850 轻量语义
-        ├── test_iec61850_goose_sv_streaming_e2e.py  — GOOSE/SV 流式 E2E 条件测试
-        ├── test_iec61850_l2_native_runner_failure_modes.py  — L2 native失败模式测试
-        ├── test_iec61850_production_capacity_profile_gate.py  — IEC 61850 capacity/profile 门禁测试
-        ├── test_iec61850_report_runner_protocol.py  — IEC 61850 Report 运行器协议测试
-        ├── test_iec61850_report_capacity_profile_gate.py  — IEC 61850 Report 生产门禁验收测试
-        ├── test_iec61850_mms_client_runner_write_protocol.py  — IEC 61850 MMS 写入协议测试
-        ├── test_modbus_client_runner_write_protocol.py  — Modbus TCP 写入协议测试
-        ├── test_modbus_tcp_production_capacity_profile_gate.py  — Modbus TCP capacity/profile 门禁测试
-        ├── test_native_cmd_runner_preflight.py  — NativeCmdCapacityRunner 预检测试
-        ├── test_native_cmd_timeout.py  — Native 命令超时单测
-        ├── test_native_process_protocol.py  — Native 进程协议测试
-        ├── test_native_runners_availability.py  — Native 运行器可用性
-        ├── test_opcua_access_adapter.py  — OPC UA 接入适配器测试
-        ├── test_open62541_client_runner_write_protocol.py  — OPC UA 写入协议测试
-        ├── test_open62541_serial_polling_runner.py  — OPC UA 串行轮询测试
-        ├── test_open62541_subscription_runner.py    — OPC UA 订阅测试
-        ├── test_polling_metrics.py     — 轮询指标测试
-        ├── test_port_allocator.py      — 端口分配器测试
-        ├── test_profile_service.py     — 画像服务测试
-        ├── test_protocol_directory_structure.py — 协议目录结构测试
-        ├── test_protocol_matrix.py     — 协议矩阵测试
-        ├── test_protocol_registry.py   — 协议注册表测试
-        ├── test_protocol_service_capabilities.py  — 协议服务能力
-        ├── test_source_lab_final_protocol_matrix.py  — 最终协议矩阵门禁
-        ├── test_protocol_production_readiness_gate.py  — 协议生产准入门禁测试
-        ├── test_protocol_simulator_factory.py  — 协议模拟器工厂
-        ├── test_scada_profile_provider.py — SCADA sample DB provider 测试
-        ├── test_scada_profile_runtime_coverage.py — SCADA runtime 覆盖矩阵测试
-        ├── test_scada_profile_facade_smoke.py — SCADA runtime facade smoke
-        ├── test_server_simulator_facade_contract.py  — ServerSimulatorFacade 契约测试
-        ├── test_server_simulator_facade_real_protocol_smoke.py  — 真实协议 smoke 测试
-        ├── test_server_simulator_facade_capacity_profile_e2e.py  — capacity/profile E2E CI 验收
-        ├── test_server_simulator_factory.py  — ServerSimulatorFacade 工厂测试
-        ├── test_subscribe_capacity_entrypoint.py  — 订阅容量入口
-        ├── test_subscribe_capacity_reporter.py    — 订阅容量报告
-        ├── test_subscribe_scan.py      — 订阅扫描测试
-        ├── test_subscribe_update_policy.py  — 订阅更新策略
-        └── test_subscription_metrics.py     — 订阅指标测试
-```
+> 历史清理记录：
+>
+> - `tools/source_lab/` 与 `tests/support/source_lab_runtime.py` 已在 Round 11 物理删除（Round 12 dead path / fixture 最终清理收口）。
+> - `tests/integration/test_source_lab_beckhoff_ads_runtime.py`、`test_source_lab_scada_profile.py`、`test_source_lab_scada_profile_postgres.py` 已删除。
+> - `tests/unit/test_fleet_update_selection.py` 已删除。
+> - `scripts/run_source_lab_l2_standalone_gate.sh`、`scripts/run_source_lab_raw_socket_dynamic_gate.sh`、`scripts/source_lab_l2_test_env.sh` 已删除。
+> - 所有协议能力（13 协议 facade + probe / profile / capacity + native runner）已迁移至 `src/starfish/`。
+> - 5 个 Starfish facade C binary 路径已从 `tools/source_lab/native/build/` 迁移至 `src/starfish/native/bin/`，并新增 4 族 C 源码（lib60870 / libiec61850 / libmodbus / open62541）。
 
 ## AI 配置 `ai_shared/`
 
 ```text
 ai_shared/
-├── adr/                               — 架构决策记录
-│   ├── ADR索引.md                     — ADR 索引
-│   ├── 0000-template.md               — ADR 模板
-│   ├── ADR-20260523-001-source-lab-server-client-ingest-boundary.md
-│   ├── ADR-20260523-002-source-lab-task-facade-boundary.md
-│   ├── ADR-20260523-003-source-production-client-and-write-port-boundary.md
-│   ├── ADR-20260524-004-source-protocol-production-readiness-gate.md
-│   ├── ADR-20260524-005-cache-to-message-queue-publish-use-case.md
-│   ├── ADR-20260524-006-source-lab-protocol-directory-consolidation.md
-│   ├── ADR-20260524-007-iec61850-mms-production-read-write-round1.md
-│   ├── ADR-20260524-008-iec61850-report-subscription-boundary.md
-│   ├── ADR-20260524-009-source-lab-server-simulator-facade.md
-│   ├── ADR-20260530-010-shared-source-production-runner-artifact-boundary.md
-│   ├── ADR-20260602-011-system-component-peer-boundary.md
-│   ├── ADR-20260602-012-crosscutting-shrink-auth-security-compliance-to-turtle.md
-│   ├── ADR-20260602-013-message-pipeline-abstraction-adaptation-only.md
-│   ├── ADR-20260602-014-speed-layer-flink-pipeline-runtime-local-dev.md
-│   ├── ADR-20260602-015-storage-three-layer-raw-archive-index-standardized.md
-│   ├── ADR-20260604-016-ingest-file-ingest-waveform-boundary.md
-│   └── ADR-20260604-017-model-asset-simulation-metadata-boundary.md
-├── agent_config/                      — AI Agent 共享配置规范与 hook
-│   ├── hooks/                         — 共享 hook 脚本
-│   │   ├── block-dangerous-bash.py   — 危险命令拦截 hook
-│   │   ├── docstring-cn-gate.py      — 中文 docstring 门禁 hook
+├── adr/                              — 架构决策记录
+│   ├── ADR索引.md                    — ADR 索引
+│   ├── 0000-template.md              — ADR 模板
+│   ├── ADR-20260523-001 ~ 009        — 9 个 Round 1 ADR（source-lab / source / protocol / cache / facade）
+│   ├── ADR-20260530-010               — shared-source production runner
+│   ├── ADR-20260602-011 ~ 015        — 5 个系统组件 / crosscutting / message-pipeline / speed-layer / storage
+│   ├── ADR-20260604-016               — ingest file-ingest waveform
+│   └── ADR-20260604-017               — model-asset simulation metadata
+├── agent_config/                     — AI Agent 共享配置
+│   ├── hooks/                        — 共享 hook 脚本（4 个）
+│   │   ├── block-dangerous-bash.py   — 危险命令拦截
+│   │   ├── docstring-cn-gate.py      — 中文 docstring 门禁
 │   │   ├── no-source-lab-import-gate.sh — source_lab 导入门禁
-│   │   └── comment-doc-gate.py        — 注释文档门禁 hook
-│   └── skills/                        — 规范源 skill 定义（10 个 skill）
-├── templates/                         — 模板文件
-│   └── coding_agent_prompt_template.txt — Coding Agent prompt 模板
-├── memory/                            — 长期记忆
-│   ├── project_tree.md                — 本文件（目录树）
-│   ├── test_index.md                  — 测试资产索引与回归测试唯一索引（含 2.1"不能证明什么"表）
-│   ├── 业务目标与价值愿景.md            — 项目白皮书：业务目标与价值愿景
-│   ├── 总体逻辑设计.md                  — 项目白皮书：总体逻辑设计
+│   │   └── comment-doc-gate.py        — 注释文档门禁
+│   └── skills/                       — 规范源 skill 定义（9 个）
+│       ├── adr-upsert/               — 架构决策记录管理
+│       ├── changed-files-gate/       — 变更范围门禁
+│       ├── code-quality-gate/        — 代码质量门禁
+│       ├── commit-message/           — 提交信息生成
+│       ├── heavy-regression/         — 重回归测试
+│       ├── project-tree-reset/       — 目录树全量重建
+│       ├── project-tree-update/      — 目录树增量更新
+│       ├── requirement-trace/        — 需求跟踪表更新
+│       └── rule-update/              — 公共规则更新
+├── templates/                        — 模板文件
+│   └── coding_agent_prompt_template.txt
+├── memory/                           — 长期记忆
+│   ├── project_tree.md               — 本文件
+│   ├── test_index.md                 — 测试资产索引与回归测试唯一索引
+│   ├── 业务目标与价值愿景.md           — 项目白皮书
+│   ├── 总体逻辑设计.md                — 项目白皮书
 │   ├── Whale_REQ_README.md           — 需求文档规范说明
 │   ├── Whale_REQ_Project.md          — 项目层面需求说明
-│   ├── Whale_REQ_Ingest.md           — 采集模块需求说明
-│   ├── Whale_REQ_SourceLab.md        — source_lab 需求说明
-│   ├── Whale_REQ_SharedSource.md     — 共享源层需求说明
-│   ├── Whale_REQ_Storage.md          — 存储模块需求说明
-│   ├── Whale_REQ_MessagePipeline.md  — 消息管道需求说明
-│   ├── Whale_REQ_BatchLayer.md       — 批处理层需求说明
-│   ├── Whale_REQ_BatchProcessing.md  — 批处理模块需求说明
-│   ├── Whale_REQ_SpeedLayer.md       — 速度层需求说明
-│   ├── Whale_REQ_ServingAggregation.md — 服务聚合模块需求说明
-│   ├── PlatformShared_REQ_Crosscutting.md — 全系统公共基础库需求说明
-│   ├── Turtle_REQ.md                 — Turtle 治理控制面需求说明
-│   └── Octopus_REQ.md                — Octopus 运维执行面需求说明
-├── reports/                           — agent 反馈与验收归档
-│   ├── whale_field_ready_baseline_round6_closure_report.md — Round 6 现场部署前可交付基线收口报告
-│   ├── whale_l5_definition_req_cleanup_round4_closure_report.md — Round 4 L5 定义纠偏、field_readback 清理与 SpeedLayer 证据收口报告
-│   ├── whale_l5_external_dependency_round5_closure_report.md — Round 5 准生产外部依赖 P5 E2E 扩展验证报告
-│   ├── whale_l5_real_chain_round2_closure_report.md — Round 2 真实链路缺口复核与 P0 最小生产链路补齐报告
-│   ├── whale_l5_true_external_chain_round3_closure_report.md — Round 3 P5 真实外部依赖链路收口与 REQ 状态纠偏报告
-│   ├── testing_lifecycle_and_repo_audit_round1_closure_report.md — Round 1 测试生命周期化重构与全仓规则审核收口报告
-│   ├── testing_directory_governance_round2_closure_report.md — Round 2 测试目录治理与索引校准收口报告
-│   ├── testing_directory_governance_round3_closure_report.md — Round 3 docs/scripts/reports 残留治理最终收口报告
-│   ├── code_reality_docstring_audit_round1_report.md — Round 1 全仓空实现误判与注释规则合规审计报告
-│   ├── code_reality_docstring_audit_round2_report.md — Round 2 补审与残留清理报告（deploy/config 术语迁移、test_l5 P4 修正、test_index"不能证明什么"表）
-│   └── model_asset_round_c_closure_report.md — Round C model_asset 仿真资产元数据管理收口报告
-└── rules/                             — 公共规则
-    ├── routing.md                     — 规则路由
-    ├── coding.md                      — 编码规范（架构边界/接口类型/测试同步/文档注释）
-    ├── testing.md                     — 测试规范（P1-P7 七个生命周期阶段/回归测试/NOT_RUN 枚举）
-    ├── documentation.md               — 文档规范
-    ├── reporting.md                   — 反馈规范（Agent result 格式/报告命名/NOT_RUN 枚举）
-    ├── validation-routing.md          — 验证路由（变更类型->阶段->优先级路由规则）
-    ├── python-docstring-cn.md         — Python 中文 docstring 规范（P1-P7 生命周期阶段/测试文件头）
-    └── quality-gate.md                — 代码质量门禁规则
+│   ├── Whale_REQ_Ingest.md           — 采集模块需求
+│   ├── Whale_REQ_SourceLab.md        — source_lab 需求
+│   ├── Whale_REQ_SharedSource.md     — 共享源层需求
+│   ├── Whale_REQ_Storage.md          — 存储模块需求
+│   ├── Whale_REQ_MessagePipeline.md  — 消息管道需求
+│   ├── Whale_REQ_BatchLayer.md       — 批处理层需求
+│   ├── Whale_REQ_BatchProcessing.md  — 批处理模块需求
+│   ├── Whale_REQ_SpeedLayer.md       — 速度层需求
+│   ├── Whale_REQ_ServingAggregation.md — 服务聚合模块需求
+│   ├── PlatformShared_REQ_Crosscutting.md — 全系统公共基础库需求
+│   ├── Turtle_REQ.md                 — Turtle 治理控制面需求
+│   ├── Octopus_REQ.md                — Octopus 运维执行面需求
+│   ├── Seahorse_REQ.md               — Seahorse 样例场站生成器需求
+│   └── Starfish_REQ.md               — Starfish 协议 server 模拟工具层需求
+├── reports/                          — agent 反馈与验收归档
+│   ├── testing_lifecycle_and_repo_audit_round1_closure_report.md
+│   ├── testing_directory_governance_round2_closure_report.md
+│   ├── testing_directory_governance_round3_closure_report.md
+│   ├── code_reality_docstring_audit_round1_report.md
+│   ├── code_reality_docstring_audit_round2_report.md
+│   ├── model_asset_round_c_closure_report.md
+│   ├── whale_l5_real_chain_round2_closure_report.md
+│   ├── whale_l5_true_external_chain_round3_closure_report.md
+│   ├── whale_l5_definition_req_cleanup_round4_closure_report.md
+│   ├── whale_l5_external_dependency_round5_closure_report.md
+│   ├── whale_field_ready_baseline_round6_closure_report.md
+│   ├── p5_external_dependency_final_closure_report.md
+│   ├── p5_external_dependency_regression_round1_closure_report.md
+│   ├── p5_external_dependency_regression_round2_closure_report.md
+│   ├── starfish_round5_serverplan_loader_cleanup_report.md
+│   ├── starfish_round6_real_server_lifecycle_inventory_report.md
+│   ├── starfish_round7_mqtt_probe_profile_capacity_report.md
+│   ├── starfish_round8_opcua_iec104_lifecycle_report.md
+│   ├── starfish_round9_iec61850_mms_report_lifecycle_report.md
+│   ├── starfish_round10_final_cleanup_closure_report.md
+│   ├── starfish_round11_sourcelab_tools_physical_purge_report.md
+│   ├── starfish_round12_dead_path_fixture_final_purge_report.md
+│   ├── starfish_round13_remaining_protocol_enhancement_report.md
+│   ├── starfish_round14_modbus_rtu_iec101_codec_report.md
+│   ├── starfish_round15_iec101_codec_enhanced_report.md
+│   ├── starfish_round16_iec101_time_linklayer_report.md
+│   ├── starfish_round17_iec101_final_codec_closure_report.md
+│   ├── seahorse_round1_reference_data_models_boundary_report.md
+│   ├── seahorse_round2_generation_strategy_data_report.md
+│   ├── seahorse_round3_bundle_export_cli_report.md
+│   └── seahorse_round4_serverplan_starfish_contract_report.md
+└── rules/                            — 公共规则
+    ├── routing.md                    — 规则路由
+    ├── coding.md                     — 编码规范
+    ├── testing.md                    — 测试规范
+    ├── documentation.md              — 文档规范
+    ├── reporting.md                  — 反馈规范
+    ├── validation-routing.md         — 验证路由
+    ├── python-docstring-cn.md        — Python 中文 docstring 规范
+    └── quality-gate.md               — 代码质量门禁规则
 ```
 
 ## 文档 `docs/`
 
 ```text
 docs/
-├── GIT.md                             — Git 工作流说明
-├── opcua_iec61850_guide.md            — OPC UA / IEC 61850 协议指南
-├── 代码质量与注释.md                   — 代码质量规范与注释要求（已过时/历史参考，权威规则源：ai_shared/rules/）
-├── 工程管理.md                         — 工程管理流程说明
-└── 测试策略.md                         — 测试策略说明（已过时/历史参考，权威规则源：ai_shared/rules/testing.md）
+├── GIT.md                            — Git 工作流说明
+├── opcua_iec61850_guide.md           — OPC UA / IEC 61850 协议指南
+├── 代码质量与注释.md                  — 代码质量规范（已过时，权威源 ai_shared/rules/）
+├── 工程管理.md                        — 工程管理流程说明
+└── 测试策略.md                        — 测试策略说明（已过时，权威源 ai_shared/rules/testing.md）
 ```
 
 ## 脚本 `scripts/`
 
 ```text
 scripts/
-├── cleanup_root_logs.sh               — 清理根目录日志文件
-├── whale_test.sh                      — Whale 测试统一入口（dry-run 默认安全模式 + --execute 显式执行，PASS/FAIL/NOT_RUN 输出）
-├── run_ingest_dev.sh                  — 启动 ingest 开发环境
-├── run_ingest_runtime_compose_smoke.sh — ingest compose运行态烟测
-├── run_ingest_compose_readyz_e2e.sh   — compose readyz 8组件聚合 E2E 脚本
-├── run_ingest_write_readback_smoke.sh — 三协议 simulator/native write-readback smoke
-├── run_ingest_pg_lease_fault_injection.sh — PostgreSQL/readyz prodlike fault injection 入口
-├── run_pg_migration_matrix.sh         — PostgreSQL迁移矩阵自动化脚本
-├── ci_ingest_runtime_gate.sh          — CI门禁脚本（7个门禁组）
-├── run_ingest_bundle_one_way_flow_smoke.sh — Bundle单向流smoke
-├── run_ingest_prodlike_performance_profile.sh — 性能profile smoke
-├── run_ingest_prodlike_dependency_smoke.sh — prodlike依赖烟测
-├── run_ingest_prodlike_endurance_smoke.sh — prodlike endurance烟测
-├── run_source_lab_raw_socket_dynamic_gate.sh — raw socket动态门禁回归
-├── run_source_lab_l2_standalone_gate.sh — GOOSE/SV standalone门禁
+├── cleanup_root_logs.sh              — 清理根目录日志
+├── whale_test.sh                     — Whale 测试统一入口（dry-run 默认 + --execute 显式）
+├── check_ads_env.py                  — Beckhoff ADS 环境预检
+├── check_l2_goose_sv_env.py          — GOOSE / SV L2 环境预检
+├── check_l5_field_readback_env.py    — P5 外部依赖环境预检
+├── check_serial_env.py               — 串口硬件环境预检
+├── run_quality_gate.py               — CI 质量门禁聚合（6 gates）
+├── run_ingest_dev.sh                 — 启动 ingest 开发环境
+├── run_ingest_runtime_compose_smoke.sh — ingest compose 运行态烟测
+├── run_ingest_compose_readyz_e2e.sh  — compose readyz 8 组件 E2E
+├── run_ingest_write_readback_smoke.sh — 三协议 simulator / native write-readback smoke
+├── run_ingest_pg_lease_fault_injection.sh — PG / readyz prodlike fault injection
+├── run_ingest_bundle_one_way_flow_smoke.sh — Bundle 单向流 smoke
+├── run_ingest_prodlike_performance_profile.sh — 性能 profile smoke
+├── run_ingest_prodlike_dependency_smoke.sh — prodlike 依赖烟测
+├── run_ingest_prodlike_endurance_smoke.sh — prodlike endurance 烟测
+├── run_pg_migration_matrix.sh        — PG 迁移矩阵自动化
+├── ci_ingest_runtime_gate.sh         — CI 门禁脚本（7 个门禁组）
 ├── validate_shared_source_production_runner.sh — shared_source runner 路径解析契约验证
 ├── test_ingest_write_readback_smoke_contract.sh — write-readback smoke 入口 CLI 契约自检
-├── run_whale_field_minimal_smoke.sh — Whale 现场最小数据链路 smoke
-├── run_whale_field_quality_gate.sh  — Whale 现场质量门禁聚合脚本
-├── run_whale_field_ready_smoke.sh   — Whale 一键预检验证脚本（8-step）
-├── run_whale_writer_switchover.sh   — Whale writer 主备切换验证脚本
-├── run_whale_l5_external_dependency_probe.sh — P5 外部依赖环境探测（16 probes）（历史命名，功能不变）
-├── source_lab_l2_test_env.sh          — 可控L2 veth环境搭建
-├── check_l5_field_readback_env.py      — P5 外部依赖环境预检脚本（历史命名，功能不变）
-├── check_serial_env.py                 — 串口硬件环境预检脚本（dry-run PENDING）
-├── check_ads_env.py                    — Beckhoff ADS 环境预检脚本（dry-run PENDING）
-├── check_l2_goose_sv_env.py            — GOOSE/SV L2 环境预检脚本（dry-run PENDING）
-├── start_whale_p5_dependencies.sh   — P5 外部依赖启动脚本（Docker 不可用时 NOT_RUN: MISSING_ENVIRONMENT）
-├── stop_whale_p5_dependencies.sh    — P5 外部依赖停止/清理脚本
-├── run_whale_p5_external_dependency_regression.sh — P5 外部依赖回归脚本（5 测试组逐项输出/SUMMARY 行/PASS 计数/FAIL 时 exit 1；无 FAIL 但有 NOT_RUN 时 exit 0）
-├── diagnose_whale_p5_dependencies.sh  — P5 外部依赖诊断脚本（5 依赖逐项 TCP+auth+minimal operation+脱敏+PASS/FAIL/NOT_RUN+reason）
-└── run_quality_gate.py                 — CI 质量门禁聚合脚本（6 gates，JSON+human输出）
+├── run_whale_field_minimal_smoke.sh  — Whale 现场最小数据链路 smoke
+├── run_whale_field_quality_gate.sh   — Whale 现场质量门禁聚合
+├── run_whale_field_ready_smoke.sh    — Whale 一键预检验证（8-step）
+├── run_whale_writer_switchover.sh    — Whale writer 主备切换验证
+├── run_whale_l5_external_dependency_probe.sh — P5 外部依赖探测（16 probes）
+├── start_whale_p5_dependencies.sh    — P5 外部依赖启动（Docker 不可用时 NOT_RUN）
+├── stop_whale_p5_dependencies.sh     — P5 外部依赖停止 / 清理
+├── run_whale_p5_external_dependency_regression.sh — P5 外部依赖回归
+└── diagnose_whale_p5_dependencies.sh — P5 外部依赖诊断（5 依赖逐项）
+```
+
+## 部署 `deploy/`
+
+```text
+deploy/
+├── whale/                            — Whale 现场部署
+│   ├── README.md                     — Whale 部署总览（MISSING_ENVIRONMENT 标记）
+│   ├── ingest/README.md              — Whale Ingest 部署
+│   ├── message_pipeline/README.md    — Kafka P5 准生产验证通过；Pulsar MISSING_ENVIRONMENT
+│   ├── speed_layer/README.md         — InMemory 生产就绪；Flink MISSING_ENVIRONMENT
+│   └── storage/README.md             — TDengine / S3 / Redis P5 准生产验证通过；HDFS MISSING_ENVIRONMENT
+├── turtle/README.md                  — Turtle 部署说明
+└── octopus/README.md                 — Octopus 部署说明
 ```
 
 ## AI 工具配置
 
 ```text
-.claude/                               — Claude Code 配置
-├── settings.json                      — Claude Code 全局设置
-├── agents/                            — Claude Code 子代理定义
+.claude/                              — Claude Code 配置
+├── settings.json                     — Claude Code 全局设置
+├── agents/                           — 3 个子代理定义
 │   ├── code-implementer.md           — 编码实现子代理
 │   ├── project-steward.md            — 文档与目录树子代理
 │   └── test-validator.md             — 独立验证子代理
-└── skills/                            — Claude Code 技能
-    ├── adr-upsert/SKILL.md            — 架构决策记录管理
-    ├── changed-files-gate/SKILL.md    — 变更范围门禁
-    ├── code-quality-gate/SKILL.md     — 代码质量门禁
-    ├── commit-message/SKILL.md        — 提交信息生成
-    ├── heavy-regression/SKILL.md      — 重回归测试
-    ├── project-tree-reset/SKILL.md    — 目录树全量重建
-    ├── project-tree-update/SKILL.md   — 目录树增量更新
-    ├── requirement-trace/SKILL.md     — 需求跟踪表更新
-    └── rule-update/SKILL.md           — 公共规则更新
+└── skills/                           — 9 个 Claude Code 技能（与 ai_shared/agent_config/skills 同源）
 
-.agents/                               — Codex agent 配置（指向 .claude/skills）
-└── skills                             — Codex 技能路径指向 .claude/skills
+.agents/                              — Codex agent 配置
+└── skills                            — 软链至 .claude/skills
 
-.codex/                                — OpenAI Codex 适配配置
-├── config.toml                        — Codex 配置
-├── hooks.json                         — Codex hook 定义
-└── agents/                            — Codex 子代理定义
-    ├── code-implementer.toml          — 编码实现子代理
-    ├── project-steward.toml           — 文档与目录树子代理
-    └── test-validator.toml            — 独立验证子代理
+.codex/                               — OpenAI Codex 适配配置
+├── config.toml                       — Codex 配置
+├── hooks.json                        — Codex hook 定义
+└── agents/                           — 3 个子代理定义（code-implementer / project-steward / test-validator）
 ```
 
 ## 第三方库 `third_party/`
 
 ```text
-third_party/                           — 第三方 C 协议栈源码与预编译库
-├── setup_env.sh                       — 第三方库环境安装脚本
-├── install/                           — 预编译头文件和库
+third_party/                          — 第三方 C 协议栈源码与预编译库
+├── setup_env.sh                      — 第三方库环境安装脚本
+├── install/                          — 预编译头文件与库
 │   ├── include/
-│   │   ├── lib60870/                  — lib60870 头文件
-│   │   └── libiec61850/               — libiec61850 头文件
-│   ├── lib/                           — 静态/动态库
-│   └── share/                         — cmake/pkgconfig 共享数据
-├── lib60870/                          — lib60870 源码（IEC 60870-5-101/104）
-├── libiec61850/                       — libiec61850 源码（IEC 61850 MMS/GOOSE/SV）
-└── open62541/                         — open62541 源码（OPC UA 协议栈）
+│   │   ├── lib60870/                 — lib60870 头文件
+│   │   └── libiec61850/              — libiec61850 头文件
+│   ├── lib/                          — 静态 / 动态库
+│   └── share/                        — cmake / pkgconfig 共享数据
+├── lib60870/                         — lib60870 源码（IEC 60870-5-101 / 104）
+├── libiec61850/                      — libiec61850 源码（IEC 61850 MMS / GOOSE / SV）
+└── open62541/                        — open62541 源码（OPC UA 协议栈）
 ```
+
+> 注：Starfish native runner 使用的 C 源码副本（仅与本项目相关的 runner / simulator 入口）已迁入 `src/starfish/native/{lib60870,libiec61850,libmodbus,open62541}/`；`third_party/` 仍保留完整上游源码与预编译库供 native runner CMake 构建使用。

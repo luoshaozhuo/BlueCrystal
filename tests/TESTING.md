@@ -24,16 +24,7 @@
 | 部署前验收期 | `tests/e2e/`、`scripts/` | 现场最小数据链路、一键预检 |
 | 发布后运维验证期 | scripts/monitoring | 健康检查、告警、故障恢复 |
 
-## 2. root `tests/` 与 `tools/source_lab/tests/` 的边界
-
-- `tests/` 是 **Whale 主平台生产路径测试**，验证可交付行为和跨模块契约。
-- `tools/source_lab/tests/` 是 **source_lab 工具测试**，只证明工具自身行为。
-- source_lab 测试通过不得自动等同于 Whale 生产链路通过。
-- Whale 测试不得依赖 source_lab 运行时。
-- source_lab 变更影响 `src/whale/shared/source/` 或 `src/whale/ingest/` 时，
-  才需扩跑对应的 Whale 测试。具体扩跑条件见 `test_index.md` 第 6 节。
-
-## 3. PASS / FAIL / NOT_RUN
+## 2. PASS / FAIL / NOT_RUN
 
 测试执行结果只使用以下三类：
 
@@ -59,7 +50,7 @@ NOT_RUN 原因枚举（定义于 `testing.md`）：
 | `TOO_EXPENSIVE_FOR_THIS_RUN` | 本轮执行成本过高 |
 | `USER_NOT_REQUESTED` | 用户或任务未要求执行 |
 
-## 4. 运行测试
+## 3. 运行测试
 
 ### 按目录
 ```bash
@@ -93,7 +84,7 @@ bash scripts/whale_test.sh --stage 模块集成期验证 --component whale --mod
 | `-m <marker>` | 按 pytest marker 过滤 |
 | `-k <expr>` | 按测试名称关键字过滤 |
 
-## 5. 环境依赖速查
+## 4. 环境依赖速查
 
 | 测试阶段 | PostgreSQL | Redis | Kafka | Docker | 外部服务 |
 |---|---|---|---|---|---|
@@ -111,20 +102,18 @@ docker compose -f docker-compose.whale-l5.yaml up -d postgres redis kafka minio
 ### 启动准生产依赖所需基础设施
 ```bash
 docker compose -f docker-compose.whale-l5.yaml up -d
-python -m whale.shared.persistence.template.sample_data
+python -m seahorse.reference_data
 ```
 
-## 6. conftest.py
+## 5. conftest.py
 
 `tests/conftest.py` 被 pytest 自动加载，提供共享 fixture：
-- `sample_nodeset_path` / `sample_opcua_connections_path` -- OPC UA 模板路径
-- `free_ports` -- 分配空闲端口
-- `local_opcua_connections_path` -- 生成测试专用 localhost OPC UA 配置
-- `opcua_server_runtime` / `opcua_sim_fleet` -- 启动 OPC UA 模拟服务
+- `real_redis_url` / `real_redis_client` / `real_redis_hash_key` -- Redis 连接和 key 管理
+- `pytest_configure` -- 自动修正 ingest 后端环境变量到安全默认值
 
 `tests/e2e/conftest.py` 和 `tests/performance/load/conftest.py` 负责 Docker 基础设施的连接和表创建。
 
-## 7. 新增测试时的同步要求
+## 6. 新增测试时的同步要求
 
 新增或删除测试文件时，必须同步更新 `ai_shared/memory/test_index.md`（唯一测试索引）：
 
@@ -134,7 +123,7 @@ python -m whale.shared.persistence.template.sample_data
 4. 不另建其他回归索引文件（如 `issue_regression_index.md`）。
 5. 测试索引只维护到文件级别（关键链路可维护到类级别）。
 
-## 8. marker 使用约定
+## 7. marker 使用约定
 
 | Marker | 含义 | 执行条件 |
 |---|---|---|
@@ -150,7 +139,7 @@ python -m whale.shared.persistence.template.sample_data
 marker 用于执行选择，不是测试分类的唯一来源。生命周期阶段以 `test_index.md` 和
 文件头说明为准。
 
-## 9. 负载测试与性能测试
+## 8. 负载测试与性能测试
 
 `tests/performance/` 下的负载、压力、耐久测试不在常规 CI 执行，按需手动触发。
 

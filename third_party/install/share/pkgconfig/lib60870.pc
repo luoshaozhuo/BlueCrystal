@@ -1,0 +1,13 @@
+prefix=/home/luosh/Whale/third_party/install
+exec_prefix=/home/luosh/Whale/third_party/install/bin
+libdir=/home/luosh/Whale/third_party/install/lib
+sharedlibdir=/home/luosh/Whale/third_party/install/lib
+includedir=/home/luosh/Whale/third_party/install/include
+
+Name: lib60870-C
+Description: 
+Version: 2.4.0
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -llib60870
+Cflags: -I${includedir}

@@ -2,7 +2,7 @@
 
 ## 一、文件定位
 
-本文件描述 `src/platform_shared` 全系统公共基础库需求。`platform_shared` 为 Whale、Turtle、Octopus、Dolphin、Orca、Manta 提供可复用、无业务归属、无运行状态或弱状态的基础代码能力。
+本文件描述 `src/platform_shared` 全系统公共基础库需求。`platform_shared` 为 Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta 提供可复用、无业务归属、无运行状态或弱状态的基础代码能力。
 
 本文件不描述 Whale 数据底座内部 source/persistence 能力，不描述 Turtle 的治理、安全、审计、合规策略，不描述 Octopus 的监控平台、告警平台、部署执行和自动化恢复实现。
 
@@ -103,7 +103,7 @@
 - 需求描述：
   - platform_shared 必须保持最小依赖，不得反向依赖任何业务组件或平台组件。
 - 验收要点：
-  - 不 import whale、turtle、octopus、dolphin、orca、manta。
+  - 不 import whale、turtle、octopus、dolphin、jellyfish、manta。
   - 仅依赖标准库和明确允许的轻量第三方库。
 
 ## 五、架构约束
@@ -113,7 +113,7 @@
 - 类型：架构约束
 - 优先级：高
 - 需求描述：
-  - Whale、Turtle、Octopus、Dolphin、Orca、Manta 可以依赖 platform_shared；platform_shared 不得依赖它们。
+  - Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta 可以依赖 platform_shared；platform_shared 不得依赖它们。
 - 验收要点：
   - import boundary gate 覆盖该约束。
 
@@ -160,7 +160,7 @@
 | PS-FR-005 | P-FR-002/P-NFR-003 | messaging 基础模型 | FR | 高 | platform_shared | L0 | 骨架就绪 | `src/platform_shared/messaging/__init__.py` 为空壳骨架 | import 可用（boundary gate 覆盖） | envelope/correlation/schema_version 尚未实现 | 实现 messaging 完整能力 | 2026-06-02 |
 | PS-FR-006 | P-NFR-005/P-SCR-001 | security primitives | FR | 高 | platform_shared | L3 simulator | 已实现并收口 | `src/platform_shared/security_primitives/masking.py` (SensitiveDataMasker)；security_primitives/__init__.py 正确导出 | boundary 79 passed（test_platform_shared_symbols_importable 含 SensitiveDataMasker） | hash/redaction 工具尚未实现 | 补充 hash/checksum/redaction helper | 2026-06-02 |
 | PS-NFR-001 | P-AR-001 | 低侵入复用 | NFR | 高 | platform_shared | L3 | 已验证 | 迁移通过 decorator/wrapper 模式保持低侵入；8 类横切能力 6 个业务文件 import 均已更新 | boundary 79 passed + compileall/ruff/mypy | 无 | 持续维护 | 2026-06-02 |
-| PS-NFR-002 | P-NFR-003 | 稳定依赖边界 | NFR | 高 | platform_shared | L3 | 已验证 | AST 扫描确认 platform_shared 0 个上层依赖（不 import whale/turtle/octopus/dolphin/orca/manta）；仅依赖标准库和明确允许的轻量第三方库 | boundary 79 passed（test_platform_shared_no_upper_dependency） | 无 | 持续维护 | 2026-06-02 |
-| PS-AR-001 | P-AR-001 | platform_shared 依赖边界 | AR | 高 | platform_shared | L3 | 已验证并收口 | boundary gate 79 tests + AST scan 确认：platform_shared 不依赖 whale/turtle/octopus/dolphin/orca/manta；whale/turtle/octopus 可正常 import platform_shared | test_platform_shared_no_upper_dependency (AST scan) + test_whale/turtle/octopus_can_import_platform_shared | 无 | 持续维护 | 2026-06-02 |
+| PS-NFR-002 | P-NFR-003 | 稳定依赖边界 | NFR | 高 | platform_shared | L3 | 已验证 | AST 扫描确认 platform_shared 0 个上层依赖（不 import whale/turtle/octopus/dolphin/jellyfish/manta）；仅依赖标准库和明确允许的轻量第三方库 | boundary 79 passed（test_platform_shared_no_upper_dependency） | 无 | 持续维护 | 2026-06-02 |
+| PS-AR-001 | P-AR-001 | platform_shared 依赖边界 | AR | 高 | platform_shared | L3 | 已验证并收口 | boundary gate 79 tests + AST scan 确认：platform_shared 不依赖 whale/turtle/octopus/dolphin/jellyfish/manta；whale/turtle/octopus 可正常 import platform_shared | test_platform_shared_no_upper_dependency (AST scan) + test_whale/turtle/octopus_can_import_platform_shared | 无 | 持续维护 | 2026-06-02 |
 | PS-AR-002 | P-AR-003 | whale.shared.crosscutting 删除约束 | AR | 高 | platform_shared + whale.shared | L3 | 已验证并收口 | `src/whale/shared/crosscutting/` 整棵目录已物理删除；全仓 AST 扫描 0 个 whale.shared.crosscutting import；11 个旧路径 import 均触发 ImportError | boundary 79 passed（test_crosscutting_directory_deleted + test_whale_no_crosscutting_imports + test_old_crosscutting_paths_raise_import_error） | 无 | 持续维护 boundary gate | 2026-06-02 |
 | PS-TEST-001 | P-NFR-004 | platform_shared 质量门禁 | TEST | 高 | platform_shared | L3 | 已通过 | compileall PASS；ruff PASS；mypy (platform_shared strict) PASS；boundary 79/79 PASS；关键 ingest/source_lab 测试不回退 | boundary 79 tests + compileall + ruff + mypy | 无；质量门禁全部收口 | 保持 CI gate 防退化 | 2026-06-02 |

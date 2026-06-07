@@ -8,7 +8,7 @@ set -euo pipefail
 # 验证 shared_source native runner 在生产环境下的正确解析行为：
 #   1. WHALE_SHARED_SOURCE_RUNNER_DIR 指向独立目录时优先使用
 #   2. PATH 发现
-#   3. dev fallback disabled 时不得使用 tools/source_lab/native/build
+#   3. dev fallback disabled 时不得使用 src/starfish/native/bin
 #   4. 缺失 runner 返回 unavailable（非静默成功）
 #   5. 错误消息包含 build/install hint
 #
@@ -65,7 +65,7 @@ with tempfile.TemporaryDirectory() as tmp:
     assert result.used_dev_fallback is False, \
         f"FAIL v1: dev fallback should be False"
     assert not is_source_lab_dev_runner_path(result.path), \
-        f"FAIL v1: path should NOT point to source_lab native build"
+        f"FAIL v1: path should NOT point to starfish native bin"
     print("PASS v1: PRODUCTION_RUNNER_DIR priority")
 
 # ── 验证 2：PATH 发现 ──────────────────────────────────────────────────
@@ -101,10 +101,10 @@ result = resolve_native_runner_path(
 assert result.used_dev_fallback is False, \
     f"FAIL v3: dev fallback should not be used"
 assert not is_source_lab_dev_runner_path(result.path), \
-    f"FAIL v3: default path should not point to source_lab native/build"
-assert "tools/source_lab/native/build" not in str(result.path), \
-    f"FAIL v3: path should not contain source_lab native/build, got {result.path}"
-print("PASS v3: no dev fallback means no source_lab path")
+    f"FAIL v3: default path should not point to starfish native/bin"
+assert "src/starfish/native/bin" not in str(result.path), \
+    f"FAIL v3: path should not contain starfish native/bin, got {result.path}"
+print("PASS v3: no dev fallback means no starfish path")
 
 # ── 验证 4：缺失 runner 返回 unavailable（非静默成功） ─────────────────
 msg = build_runner_unavailable_message(
@@ -140,14 +140,14 @@ assert "dev/test fallback" in msg_fb, \
     f"FAIL v5b: message should mention dev/test fallback"
 assert "does not count as a production runner artifact" in msg_fb, \
     f"FAIL v5c: message should state it is not production artifact"
-assert "source_lab native build" in msg_fb, \
-    f"FAIL v5d: message should reference source_lab native build"
+assert "starfish native bin" in msg_fb, \
+    f"FAIL v5d: message should reference starfish native bin"
 print("PASS v5: dev fallback message distinguishes production vs dev/test")
 
-# ── 验证 6：is_source_lab_dev_runner_path 识别 source_lab build 路径 ──
+# ── 验证 6：is_source_lab_dev_runner_path 识别 starfish native bin 路径 ──
 assert is_source_lab_dev_runner_path(
-    Path("/home/user/project/tools/source_lab/native/build/open62541")
-), "FAIL v6a: should identify source_lab native build path"
+    Path("/home/user/project/src/starfish/native/bin/open62541")
+), "FAIL v6a: should identify starfish native bin path"
 
 assert not is_source_lab_dev_runner_path(
     Path("/opt/whale/shared-source/bin/open62541")
@@ -189,7 +189,7 @@ if run_python_validation; then
   echo "The runner_resolution module correctly:"
   echo "  1. Prioritizes WHALE_SHARED_SOURCE_RUNNER_DIR"
   echo "  2. Discovers runners via PATH"
-  echo "  3. Does NOT fall back to source_lab native/build without opt-in"
+  echo "  3. Does NOT fall back to starfish native/bin without opt-in"
   echo "  4. Returns clear unavailable messages with build/install hints"
   echo "  5. Marks dev fallback as non-production"
   exit ${RC_OK}

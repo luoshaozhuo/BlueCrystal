@@ -59,8 +59,6 @@ logs/
 .tox/
 .pytest_cache/
 /tests/tmp/
-tools/source_lab/native/build/
-third_party/
 
 # Environment variables
 .env
@@ -68,7 +66,7 @@ third_party/
 .env.*.local
 
 # Local runtime data
-/data/
+/.data/
 
 # coding agent reports
 /ai_shared/reports/

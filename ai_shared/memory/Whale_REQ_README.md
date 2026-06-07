@@ -23,7 +23,9 @@ ai_shared/requirements/
 ├── Whale_REQ_Aggregation.md
 ├── PlatformShared_REQ_Crosscutting.md
 ├── Turtle_REQ.md
-└── Octopus_REQ.md
+├── Octopus_REQ.md
+├── Seahorse_REQ.md
+├── Starfish_REQ.md
 ```
 
 `Whale_REQ_Crosscutting.md` 已废止，应删除，不再维护。原 `whale.shared.crosscutting` 中的 `debug / observability / resilience` 迁入 `platform_shared.crosscutting`；原 `auth / security / compliance / audit / policy` 归入 `Turtle`；监控、告警、诊断执行、自动化恢复归入 `Octopus`。
@@ -34,7 +36,7 @@ ai_shared/requirements/
 |---|---|
 | Whale_REQ_Project.md | Whale 数据底座项目级需求、总体架构、模块承接关系 |
 | Whale_REQ_Ingest.md | source 接入、状态缓存、消息发布、写入控制 |
-| Whale_REQ_SourceLab.md | simulator、probe、profile、capacity、协议验证工具 |
+| Whale_REQ_SourceLab.md | （已废弃）simulator、probe、profile、capacity、协议验证工具 — 功能已迁至 Starfish |
 | Whale_REQ_SharedSource.md | production source client、协议 backend |
 | Whale_REQ_MessagePipeline.md | 消息主题、schema、分区、回放、DLQ、consumer group |
 | Whale_REQ_SpeedLayer.md | 消费消息、写 raw、更新 serving cache、实时轻处理 |
@@ -45,6 +47,8 @@ ai_shared/requirements/
 | PlatformShared_REQ_Crosscutting.md | 全系统公共基础库：observability、debug、resilience、context、contracts、kernel、messaging、security_primitives |
 | Turtle_REQ.md | 治理、安全、审计、合规、策略、部署准入、变更控制 |
 | Octopus_REQ.md | 运维观测、统一部署编排、监控、告警、诊断、自动化恢复、回滚和运行报告 |
+| Seahorse_REQ.md | Seahorse 样例场站生成器需求：reference_data、核心数据模型、GenerationStrategy、编排器、import boundary |
+| Starfish_REQ.md | Starfish 多协议 server simulator 工具层需求：ServerPlan JSON loader、ServerSimulatorFacade、CLI、import boundary |
 
 ## 4. 编号规则
 
@@ -63,6 +67,8 @@ ai_shared/requirements/
 | PlatformShared | PS | PS-FR-001 |
 | Turtle | TU | TU-FR-001 |
 | Octopus | OC | OC-FR-001 |
+| Seahorse | SH | SH-FR-001 |
+| Starfish | SF | SF-FR-001 |
 
 需求类型：
 
@@ -121,6 +127,6 @@ NOT_RUN 原因码（MISSING_ENVIRONMENT、OUT_OF_SCOPE 等）适用，
 - 修改实现状态必须读取源码、测试、报告或 ADR。
 - skipped 测试不得作为完成证据。
 - failed 必须明确处理。
-- `platform_shared` 不得依赖 Whale、Turtle、Octopus、Dolphin、Orca、Manta。
+- `platform_shared` 不得依赖 Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta。
 - `whale.shared` 只服务 Whale 内部，不得被其他并列组件依赖。
 - 现场真实电站、真实设备、真实生产网络环境验证不作为本项目需求跟踪表验证等级；若发生，只能作为独立交付/验收/运维证据归档，不替代 P1-P7。

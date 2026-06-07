@@ -48,7 +48,8 @@ from whale.ingest.usecases.dtos.source_write_request import (
 
 
 def _resolve_binary(name: str) -> Path | None:
-    build_dir = Path(__file__).resolve().parents[2] / "tools" / "source_lab" / "native" / "build"
+    # Starfish native binary 目录，由 Round 10 C runner 迁移后定义
+    build_dir = Path(__file__).resolve().parents[2] / "src" / "starfish" / "native" / "bin"
     for candidate in (build_dir / name, build_dir / f"{name}.exe"):
         if candidate.exists():
             return candidate.resolve()

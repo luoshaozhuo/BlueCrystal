@@ -1,4 +1,0 @@
-profile_item_id	signal_profile_id	ln_class	ln_name	do_name	da_name	relative_path	fc	cdc	data_type_id	default_unit	default_scale	default_offset	default_precision	default_constraint_expr	default_sample_mode	default_sample_interval_ms	default_deadband	quality_supported	timestamp_supported	writable	display_name	description
-item-001	profile-template	WPPD	WPPD1	TotW	mag	fxIED001.LD0.WPPD1.TotW	MX	WYE	FLOAT64	kW	1	0	3		polling	1000	0	true	true	false	Total Power	Fixture total active power
-item-002	profile-template	WPPD	WPPD1	DevSt	stVal	fxIED001.LD0.WPPD1.DevSt	ST	ENS	BOOLEAN		1	0	0		polling	1000	0	true	true	false	Device Status	Fixture boolean status
-item-003	profile-template	WPPD	WPPD1	OpCnt	stVal	fxIED001.LD0.WPPD1.OpCnt	ST	INS	INT32		1	0	0		polling	1000	0	true	true	false	Operation Count	Fixture integer counter

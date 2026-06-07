@@ -1,1 +1,0 @@
-{"access_mode": "subscribe", "process_count": 1, "server_count": 1, "protocol": "opcua", "hz": 0.0, "sample_hz": 5.0, "publishing_interval_ms": 200.0, "sampling_interval_ms": 200.0, "queue_size": 1, "point_count": 3, "cpu_mean_pct": 0.0, "cpu_max_pct": 0.0, "rss_mb": 0.0, "status": "PASS", "reason": "", "warnings": "psutil_not_installed", "runner_protocol_noise_count": 0}

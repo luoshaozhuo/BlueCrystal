@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.source_lab_runtime import import_source_lab_module
+# import_source_lab_module 已移除，source_lab 目录已物理删除
 from whale.ingest.adapters.source.opcua_source_acquisition_adapter import (
     OpcUaSourceAcquisitionAdapter,
 )
@@ -46,16 +46,7 @@ from whale.ingest.usecases.dtos.source_write_request import (
     SourceWriteRequest,
 )
 
-_MODEL_MODULE = import_source_lab_module("tools.source_lab.model")
-_ADDRESS_SPACE_MODULE = import_source_lab_module("tools.source_lab.protocols.opcua.address_space")
-_SIMULATOR_MODULE = import_source_lab_module("tools.source_lab.protocols.opcua.open62541_source_simulator")
-
-SimulatedPoint = _MODEL_MODULE.SimulatedPoint
-SimulatedSource = _MODEL_MODULE.SimulatedSource
-SourceConnection = _MODEL_MODULE.SourceConnection
-logical_path = _ADDRESS_SPACE_MODULE.logical_path
-Open62541SourceSimulator = _SIMULATOR_MODULE.Open62541SourceSimulator
-resolve_runner_path = _SIMULATOR_MODULE.resolve_runner_path
+pytestmark = pytest.mark.skip(reason="source_lab 已删除，需迁移到 Starfish facade 或 standalone simulator")
 
 
 def _resolve_client_runner_path() -> Path | None:

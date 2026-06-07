@@ -1,10 +1,10 @@
 """Shared native runner path resolution for production source clients.
 
-生产路径与 source_lab native build dev/test 目录必须明确分离：
+生产路径与 starfish native bin dev/test 目录必须明确分离：
 
 - 生产优先级：显式单 runner 环境变量 -> 共享 runner 目录环境变量 -> PATH / 安装路径。
 - dev/test fallback：仅当 ``WHALE_SHARED_SOURCE_ALLOW_DEV_RUNNER_FALLBACK=1`` 时允许。
-- 本模块不 import source_lab Python 包，只在文件系统层给出可选 fallback 路径。
+- 本模块不 import starfish Python 包，只在文件系统层给出可选 fallback 路径。
 """
 
 from __future__ import annotations
@@ -54,15 +54,25 @@ def _iter_install_candidates(executable_name: str) -> tuple[Path, ...]:
 
 
 def _dev_fallback_candidate(executable_name: str) -> Path:
+    """Return the dev/test fallback path under src/starfish/native/bin/.
+
+    This is only used when WHALE_SHARED_SOURCE_ALLOW_DEV_RUNNER_FALLBACK=1.
+    It replaces the old tools/source_lab/native/build/ path (deleted in Round 11).
+    """
     repo_root = Path(__file__).resolve().parents[4]
-    return repo_root / "tools" / "source_lab" / "native" / "build" / executable_name
+    return repo_root / "src" / "starfish" / "native" / "bin" / executable_name
 
 
 def is_source_lab_dev_runner_path(path: Path) -> bool:
-    """Return whether the path points to the source_lab native build tree."""
+    """Return whether the path points to the starfish native bin tree.
+
+    The function name is retained for backward compatibility with existing
+    backends (lib60870, lib61850, libmodbus, open62541) that import it by name.
+    Internally it now checks the ``src/starfish/native/bin`` subtree.
+    """
 
     normalized_parts = tuple(part.lower() for part in path.parts)
-    target = ("tools", "source_lab", "native", "build")
+    target = ("src", "starfish", "native", "bin")
     for index in range(len(normalized_parts) - len(target) + 1):
         if normalized_parts[index:index + len(target)] == target:
             return True
@@ -154,7 +164,7 @@ def build_runner_unavailable_message(
     ]
     if resolution.used_dev_fallback:
         details.append(
-            "Current path is the explicit dev/test fallback from the source_lab native build "
+            "Current path is the explicit dev/test fallback from the starfish native bin "
             "directory; it does not count as a production runner artifact."
         )
         details.append(
@@ -163,7 +173,7 @@ def build_runner_unavailable_message(
         )
         details.append(
             f"For local dev/test only, compile `{resolution.executable_name}` in the "
-            "source_lab native build directory."
+            "starfish native bin directory."
         )
         return " ".join(details)
 
@@ -172,7 +182,7 @@ def build_runner_unavailable_message(
         f"or install `{resolution.executable_name}` into PATH or a production runner directory."
     )
     details.append(
-        f"The source_lab native build directory is dev/test only; enable `{_ALLOW_DEV_FALLBACK_ENV}=1` "
+        f"The starfish native bin directory is dev/test only; enable `{_ALLOW_DEV_FALLBACK_ENV}=1` "
         "only for local verification."
     )
     return " ".join(details)

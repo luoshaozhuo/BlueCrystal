@@ -166,7 +166,7 @@
 - 优先级：高
 - 需求描述：
   - 平台应设置 `platform_shared` 作为全系统公共基础库。
-  - Whale、Turtle、Octopus、Dolphin、Orca、Manta 可以依赖 `platform_shared`。
+  - Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta 可以依赖 `platform_shared`。
   - `platform_shared` 不得依赖任何上层组件。
   - `whale.shared` 只服务 Whale 数据底座内部，不得作为全系统公共库。
 - 验收要点：

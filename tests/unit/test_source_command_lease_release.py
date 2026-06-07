@@ -212,7 +212,7 @@ def test_success_path_releases_lease() -> None:
 #
 # 以下测试验证 SourceCommandUseCase 的 readback 编排逻辑。
 # 注意：这些测试使用模拟 SourceWritePort，不涉及真实 native runner 或真实设备。
-# 当生产 adapter 实现 readback() 后，应在 tools/source_lab 目录补充真实 E2E 验证。
+# 当生产 adapter 实现 readback() 后，应由 Starfish facade 补充真实 E2E 验证。
 #
 # 已知差距（Gap）：
 # 1. 当前生产 adapter（OpcUaSourceWriteAdapter / ModbusSourceWriteAdapter /

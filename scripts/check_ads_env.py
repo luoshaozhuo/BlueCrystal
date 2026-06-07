@@ -282,8 +282,8 @@ def _check_pyads(env_report: EnvReport) -> None:
 def _check_adslib_binary(env_report: EnvReport) -> None:
     """检查 AdsLib binary (native C runner)。"""
     possible_paths = [
-        "tools/source_lab/native/build/beckhoff_ads_polling_runner",
-        "tools/source_lab/native/build/Release/beckhoff_ads_polling_runner.exe",
+        "src/starfish/native/bin/beckhoff_ads_polling_runner",
+        "src/starfish/native/bin/Release/beckhoff_ads_polling_runner.exe",
     ]
 
     # 以 Whale 项目根目录为基准
@@ -308,8 +308,8 @@ def _check_adslib_binary(env_report: EnvReport) -> None:
                 status="pending",
                 detail="未找到编译后的 AdsLib binary (beckhoff_ads_polling_runner)",
                 suggestion=(
-                    "在 Windows 上编译: cd tools/source_lab/native && "
-                    "mkdir build && cd build && cmake .. && cmake --build . --target beckhoff_ads_polling_runner"
+                    "在 Windows 上编译: cd src/starfish/native && "
+                    "mkdir bin && cd bin && cmake .. && cmake --build . --target beckhoff_ads_polling_runner"
                 ),
             )
         )

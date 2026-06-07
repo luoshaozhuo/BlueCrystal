@@ -96,7 +96,7 @@ Round 4 仅完成 auth/security/compliance 的迁出和 shim 清理，剩余 deb
   - `security_primitives/` (SensitiveDataMasker)
 - **删除 whale.shared.crosscutting**：整棵目录 15+ 文件已物理删除，不再兼容
 - **import boundary**：全仓 AST 扫描 0 个 `whale.shared.crosscutting` import；11 个旧路径 import 均触发 ImportError
-- **平台依赖边界**：AST 扫描确认 platform_shared 0 个上层依赖（不 import whale/turtle/octopus/dolphin/orca/manta）
+- **平台依赖边界**：AST 扫描确认 platform_shared 0 个上层依赖（不 import whale/turtle/octopus/dolphin/jellyfish/manta）
 - **业务文件更新**：6 个文件 import 路径从 `whale.shared.crosscutting.*` 更新为 `platform_shared.*`
 - **门禁通过**：
   - boundary tests: 79/79 passed（从 Round 4 的 41 tests 升级至 79 tests）

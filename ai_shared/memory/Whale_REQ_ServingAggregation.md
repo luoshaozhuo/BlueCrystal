@@ -74,7 +74,7 @@
 - 优先级：高
 - 责任模块：serving
 - 需求描述：
-  - 聚合结果应通过 Whale `serving` 层提供稳定查询能力，支撑 Dolphin、Orca 和 Manta 使用。
+  - 聚合结果应通过 Whale `serving` 层提供稳定查询能力，支撑 Dolphin、Jellyfish 和 Manta 使用。
 - 验收要点：
   - 支持分页、过滤、时间范围查询。
   - 支持指标口径查询。
@@ -184,7 +184,7 @@
 - 不得直接连接现场 source。
 - 不得负责 raw_archive 写入。
 - 不得承担基础清洗、标准化和质量处理职责。
-- 不得让 Manta 或 Orca 直接查询底层存储表。
+- 不得让 Manta 或 Jellyfish 直接查询底层存储表。
 - 不得把 skipped 测试作为完成证据。
 
 ---

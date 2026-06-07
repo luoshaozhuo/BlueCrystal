@@ -8,8 +8,8 @@
 - 双节点写入冲突的 lease/fencing 语义。
 
 注意：readback 的真实 OPC UA E2E 验证（需要运行中的 OPC UA simulator）
-在 tools/source_lab/protocols/opcua/simulator.py 中可通过 ServerSimulatorFacade
-执行。本文件的 mock readback 测试验证 adapter 契约，测试阶段为开发期验证 (contract/stub)。
+已由 Starfish OpcUaFacade 承接。本文件的 mock readback 测试验证 adapter 契约，
+测试阶段为开发期验证 (contract/stub)。
 """
 
 from __future__ import annotations

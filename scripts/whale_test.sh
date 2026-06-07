@@ -26,7 +26,7 @@
 #   部署前验收期
 #   发布后运维验证期
 #
-# 组件取值: whale, source_lab, platform_shared, turtle, octopus
+# 组件取值: whale, platform_shared, turtle, octopus
 #
 # 模块取值 (仅 whale 组件): ingest, message_pipeline, speed_layer, storage, shared_source, batch_layer
 #
@@ -55,7 +55,7 @@ usage() {
 
 参数:
   --stage      生命周期阶段 (必选，除非指定 --suite)
-  --component  组件: whale|source_lab|platform_shared|turtle|octopus (默认 whale)
+  --component  组件: whale|platform_shared|turtle|octopus (默认 whale)
   --module     子模块: ingest|message_pipeline|speed_layer|storage|shared_source|batch_layer
   --suite      回归套件: affected-regression|module-regression|chain-regression|release-regression
   --execute    实际执行测试 (默认 dry-run 安全模式)
@@ -112,7 +112,7 @@ done
 # ---- 输入验证 ----
 
 VALID_STAGES=("开发期验证" "构建期验证" "模块集成期验证" "跨模块联调期验证" "准生产依赖验证期" "部署前验收期" "发布后运维验证期")
-VALID_COMPONENTS=("whale" "source_lab" "platform_shared" "turtle" "octopus")
+VALID_COMPONENTS=("whale" "platform_shared" "turtle" "octopus")
 VALID_MODULES=("ingest" "message_pipeline" "speed_layer" "storage" "shared_source" "batch_layer")
 VALID_SUITES=("affected-regression" "module-regression" "chain-regression" "release-regression")
 
@@ -261,11 +261,6 @@ print_build_commands() {
             run_or_dry "ruff $mod" "python -m ruff check src/whale/$mod/"
             not_run "mypy $mod" "TOO_EXPENSIVE_FOR_THIS_RUN"
         fi
-    elif [[ "$comp" == "source_lab" ]]; then
-        not_run "cmake configure" "MISSING_DEPENDENCY"
-        not_run "cmake build" "MISSING_DEPENDENCY"
-        run_or_dry "ruff source_lab" "python -m ruff check tools/source_lab/"
-        not_run "mypy source_lab" "TOO_EXPENSIVE_FOR_THIS_RUN"
     elif [[ "$comp" == "platform_shared" ]]; then
         run_or_dry "ruff platform_shared" "python -m ruff check src/platform_shared/"
         not_run "mypy platform_shared" "TOO_EXPENSIVE_FOR_THIS_RUN"
@@ -288,8 +283,6 @@ print_dev_commands() {
         else
             run_or_dry "pytest unit -k '$mod'" "python -m pytest tests/unit/ -k '$mod' -q"
         fi
-    elif [[ "$comp" == "source_lab" ]]; then
-        run_or_dry "source_lab access tests" "python -m pytest tools/source_lab/tests/access/ -q --timeout=120"
     elif [[ "$comp" == "platform_shared" ]]; then
         run_or_dry "platform_shared unit" "python -m pytest tests/unit/ -k 'platform_shared' -q"
     elif [[ "$comp" == "turtle" ]]; then
@@ -311,10 +304,6 @@ print_module_integration_commands() {
         else
             run_or_dry "pytest integration -k '$mod'" "python -m pytest tests/integration/ -k '$mod' -q"
         fi
-    elif [[ "$comp" == "source_lab" ]]; then
-        run_or_dry "single server smoke" "python -m pytest tools/source_lab/tests/test_open62541_source_simulation_single_server_smoke.py -q"
-        not_run "multi-server polling capacity" "TOO_EXPENSIVE_FOR_THIS_RUN"
-        not_run "multi-server subscribe capacity" "TOO_EXPENSIVE_FOR_THIS_RUN"
     elif [[ "$comp" == "platform_shared" ]]; then
         not_run "无独立集成测试" "OUT_OF_SCOPE"
     elif [[ "$comp" == "turtle" ]]; then
@@ -340,8 +329,6 @@ print_cross_module_commands() {
         if [[ -z "$mod" || "$mod" == "speed_layer" || "$mod" == "storage" ]]; then
             not_run "speed_layer pipeline" "MISSING_ENVIRONMENT"
         fi
-    elif [[ "$comp" == "source_lab" ]]; then
-        not_run "source_lab 无跨模块联调阶段" "OUT_OF_SCOPE"
     else
         not_run "无跨模块联调" "OUT_OF_SCOPE"
     fi
@@ -356,8 +343,6 @@ print_prodlike_commands() {
     if [[ "$comp" == "whale" ]]; then
         not_run "l5 marker 测试" "MISSING_ENVIRONMENT"
         not_run "准生产依赖验证期 外部依赖探测" "MISSING_ENVIRONMENT"
-    elif [[ "$comp" == "source_lab" ]]; then
-        not_run "Beckhoff ADS readback" "MISSING_ENVIRONMENT"
     else
         not_run "无准生产依赖" "OUT_OF_SCOPE"
     fi
@@ -408,8 +393,6 @@ print_suite_plan() {
             if [[ "$comp" == "whale" && -n "$mod" ]]; then
                 run_or_dry "module unit -k '$mod'" "python -m pytest tests/unit/ -k '$mod' -q"
                 run_or_dry "module integration -k '$mod'" "python -m pytest tests/integration/ -k '$mod' -q"
-            elif [[ "$comp" == "source_lab" ]]; then
-                run_or_dry "source_lab full" "python -m pytest tools/source_lab/tests/ -q --timeout=120"
             else
                 run_or_dry "full unit" "python -m pytest tests/unit/ -q"
                 not_run "full integration" "TOO_EXPENSIVE_FOR_THIS_RUN"
@@ -432,8 +415,6 @@ print_suite_plan() {
         release-regression)
             if [[ "$comp" == "whale" ]]; then
                 run_or_dry "release (no slow/load/stress)" "python -m pytest -m 'not slow and not load and not stress' -q"
-            elif [[ "$comp" == "source_lab" ]]; then
-                run_or_dry "source_lab full" "python -m pytest tools/source_lab/tests/ -q --timeout=120"
             fi
             ;;
     esac

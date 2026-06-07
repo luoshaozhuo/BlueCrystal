@@ -21,7 +21,7 @@
 - 类型：功能
 - 优先级：高
 - 需求描述：
-  - Octopus 应统一编排 Whale、Turtle、Dolphin、Orca、Manta 等组件的部署、升级、回滚和健康检查。
+  - Octopus 应统一编排 Whale、Turtle、Dolphin、Jellyfish、Manta 等组件的部署、升级、回滚和健康检查。
 - 验收要点：
   - 读取各模块自己的部署定义。
   - 不接管单模块部署定义。

@@ -1,2 +1,0 @@
-endpoint_id	ied_id	access_point_name	endpoint_name	application_protocol	transport	host	port	namespace_uri	source_lab_runtime	security_policy	security_mode	auth_type	credential_ref	heartbeat_interval_ms	service_capabilities_json	metadata_json	profile_id
-endpoint-template	IED001	LD0	IED001	opcua	tcp	127.0.0.1	45000	urn:whale:source-lab:fixture	simulator	None	None	anonymous		1000	{}	{}	profile-template

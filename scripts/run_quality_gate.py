@@ -101,7 +101,7 @@ def _run_compileall(report: GateReport) -> None:
     import time
     start = time.time()
     ret, stdout, stderr = _run_cmd(
-        [sys.executable, "-m", "compileall", "-q", "src", "tools", "tests", "scripts"],
+        [sys.executable, "-m", "compileall", "-q", "src", "tests", "scripts"],
         timeout=120,
     )
     elapsed = time.time() - start
@@ -109,7 +109,7 @@ def _run_compileall(report: GateReport) -> None:
     if ret == 0:
         report.add(GateItem(
             name="compileall",
-            description="全仓 Python 语法编译检查 (src+tools+tests+scripts)",
+            description="全仓 Python 语法编译检查 (src+tests+scripts)",
             status="passed",
             detail="全仓语法通过",
             duration_sec=elapsed,
@@ -129,12 +129,12 @@ def _run_ruff(report: GateReport) -> None:
     import time
     start = time.time()
     # 尝试多种方式运行 ruff
-    cmd: list[str] = ["ruff", "check", "src", "tools", "tests", "scripts"]
+    cmd: list[str] = ["ruff", "check", "src", "tests", "scripts"]
     ret, stdout, stderr = _run_cmd(cmd, timeout=120)
     # 如果 ruff 命令未找到但可通过 python -m ruff 运行
     if ret == -2:
         ret, stdout, stderr = _run_cmd(
-            [sys.executable, "-m", "ruff", "check", "src", "tools", "tests", "scripts"],
+            [sys.executable, "-m", "ruff", "check", "src", "tests", "scripts"],
             timeout=120,
         )
     elapsed = time.time() - start
@@ -142,7 +142,7 @@ def _run_ruff(report: GateReport) -> None:
     if ret == 0:
         report.add(GateItem(
             name="ruff",
-            description="全仓 ruff lint 检查 (src+tools+tests+scripts)",
+            description="全仓 ruff lint 检查 (src+tests+scripts)",
             status="passed",
             detail="All checks passed",
             duration_sec=elapsed,
@@ -162,7 +162,7 @@ def _run_mypy_production(report: GateReport) -> None:
     import time
     start = time.time()
     ret, stdout, stderr = _run_cmd(
-        [sys.executable, "-m", "mypy", "src/whale/shared/source", "src/whale/ingest", "tools/source_lab"],
+        [sys.executable, "-m", "mypy", "src/whale/shared/source", "src/whale/ingest", "src/starfish", "src/seahorse"],
         timeout=300,
     )
     elapsed = time.time() - start
@@ -220,7 +220,7 @@ def _run_mypy_tests_debt(report: GateReport) -> None:
 
 
 def _run_import_boundary(report: GateReport) -> None:
-    """执行 import boundary 检查：生产路径不得导入 tools.source_lab。"""
+    """执行 import boundary 检查：生产路径不得导入 tools.source_lab（tools 目录已删除，此检查为遗留门禁保留）。"""
     import time
     start = time.time()
 
@@ -232,6 +232,8 @@ def _run_import_boundary(report: GateReport) -> None:
                 "tools.source_lab",
                 os.path.join(REPO_ROOT, "src", "whale", "ingest"),
                 os.path.join(REPO_ROOT, "src", "whale", "shared", "source"),
+                os.path.join(REPO_ROOT, "src", "starfish"),
+                os.path.join(REPO_ROOT, "src", "seahorse"),
             ],
             capture_output=True,
             text=True,
@@ -242,9 +244,9 @@ def _run_import_boundary(report: GateReport) -> None:
         if result.returncode == 1:  # grep 无匹配
             report.add(GateItem(
                 name="import-boundary",
-                description="生产路径 import boundary: 零 tools.source_lab 导入",
+                description="生产路径 import boundary: 零 tools.source_lab 导入（含 starfish/seahorse 全仓扫描）",
                 status="passed",
-                detail="src/whale/ingest 和 src/whale/shared/source 无 tools.source_lab 导入",
+                detail="全仓生产代码无 tools.source_lab 导入",
                 duration_sec=elapsed,
             ))
         elif result.returncode == 0:  # grep 有匹配
@@ -280,8 +282,8 @@ def _run_core_pytest(report: GateReport) -> None:
     start = time.time()
 
     test_files = [
-        "tools/source_lab/tests/access/test_protocol_production_readiness_gate.py",
-        "tools/source_lab/tests/access/test_source_lab_final_protocol_matrix.py",
+        # Round 11: tools/source_lab 测试随目录物理删除
+        # "tools/source_lab/tests/...",
         "tests/unit/test_source_acquisition_port_registry.py",
         "tests/unit/test_source_write_port_registry.py",
         "tests/unit/test_ingest_composition_injection.py",

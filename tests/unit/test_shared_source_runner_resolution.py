@@ -1,4 +1,8 @@
-"""shared_source native runner path resolution boundary tests."""
+"""shared_source native runner path resolution boundary tests.
+
+Round 12: updated to reflect starfish native bin path (replacing deleted
+tools/source_lab/native/build).
+"""
 
 from __future__ import annotations
 
@@ -6,12 +10,13 @@ from pathlib import Path
 
 from whale.shared.source.runner_resolution import (
     build_runner_unavailable_message,
+    is_source_lab_dev_runner_path,
     resolve_native_runner_path,
 )
 
 
 def test_resolve_native_runner_uses_production_runner_dir(monkeypatch, tmp_path: Path) -> None:
-    """默认应先走生产 runner 目录，而不是 source_lab build 目录。"""
+    """默认应先走生产 runner 目录，而不是 starfish native bin 目录。"""
     monkeypatch.delenv("WHALE_OPEN62541_CLIENT_RUNNER_PATH", raising=False)
     monkeypatch.setenv("WHALE_SHARED_SOURCE_RUNNER_DIR", str(tmp_path / "prod-runners"))
     monkeypatch.delenv("WHALE_SHARED_SOURCE_ALLOW_DEV_RUNNER_FALLBACK", raising=False)
@@ -28,7 +33,7 @@ def test_resolve_native_runner_uses_production_runner_dir(monkeypatch, tmp_path:
 
 
 def test_resolve_native_runner_allows_explicit_dev_fallback(monkeypatch) -> None:
-    """显式开启时才允许落回 source_lab native build。"""
+    """显式开启时才允许落回 starfish native bin。"""
     monkeypatch.delenv("WHALE_MODBUS_CLIENT_RUNNER_PATH", raising=False)
     monkeypatch.delenv("WHALE_SHARED_SOURCE_RUNNER_DIR", raising=False)
     monkeypatch.setenv("WHALE_SHARED_SOURCE_ALLOW_DEV_RUNNER_FALLBACK", "1")
@@ -40,11 +45,11 @@ def test_resolve_native_runner_allows_explicit_dev_fallback(monkeypatch) -> None
 
     assert resolution.used_dev_fallback is True
     assert resolution.evidence_level == "dev_test_fallback"
-    assert "source_lab/native/build" in str(resolution.path)
+    assert "starfish/native/bin" in str(resolution.path)
 
 
-def test_resolve_native_runner_without_dev_fallback_does_not_point_to_source_lab(monkeypatch) -> None:
-    """未显式开启 fallback 时，默认路径不能再指向 source_lab build。"""
+def test_resolve_native_runner_without_dev_fallback_does_not_point_to_starfish(monkeypatch) -> None:
+    """未显式开启 fallback 时，默认路径不能再指向 starfish native bin。"""
     monkeypatch.delenv("WHALE_IEC104_CLIENT_RUNNER_PATH", raising=False)
     monkeypatch.delenv("WHALE_SHARED_SOURCE_RUNNER_DIR", raising=False)
     monkeypatch.delenv("WHALE_SHARED_SOURCE_ALLOW_DEV_RUNNER_FALLBACK", raising=False)
@@ -55,7 +60,7 @@ def test_resolve_native_runner_without_dev_fallback_does_not_point_to_source_lab
     )
 
     assert resolution.used_dev_fallback is False
-    assert "tools/source_lab/native/build" not in str(resolution.path)
+    assert "src/starfish/native/bin" not in str(resolution.path)
     assert str(resolution.path).endswith("/opt/whale/shared-source/bin/iec104_client_runner")
 
 
@@ -77,7 +82,7 @@ def test_runner_unavailable_message_marks_dev_fallback_as_non_production(monkeyp
 
     assert "dev/test fallback" in message
     assert "does not count as a production runner artifact" in message
-    assert "source_lab native build" in message
+    assert "starfish native bin" in message
 
 
 def test_runner_unavailable_message_without_fallback_guides_to_production_install(monkeypatch) -> None:
@@ -99,3 +104,14 @@ def test_runner_unavailable_message_without_fallback_guides_to_production_instal
     assert "WHALE_IEC61850_REPORT_RUNNER_PATH" in message
     assert "WHALE_SHARED_SOURCE_RUNNER_DIR" in message
     assert "dev/test only" in message
+
+
+def test_is_source_lab_dev_runner_path_detects_starfish(monkeypatch) -> None:
+    """is_source_lab_dev_runner_path 正确识别 starfish native bin 路径。"""
+    assert is_source_lab_dev_runner_path(
+        Path("/home/user/project/src/starfish/native/bin/open62541")
+    ), "should detect starfish native bin path"
+
+    assert not is_source_lab_dev_runner_path(
+        Path("/opt/whale/shared-source/bin/open62541")
+    ), "production path should not be detected as dev"

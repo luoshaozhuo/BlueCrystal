@@ -9,9 +9,13 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
-DEFAULT_NODESET_PATH = PROJECT_ROOT / "tools" / "opcua_sim" / "templates" / "OPCUANodeSet.xml"
+# Round 12: old tools/opcua_sim/ templates deleted.  E2E tests that need
+# NodeSet / connection fixtures must be explicitly supplied at call time.
+# These constants are kept as sentinels pointing to the starfish native
+# directory; production E2E is expected to provide real configuration.
+DEFAULT_NODESET_PATH = PROJECT_ROOT / "src" / "starfish" / "native" / "bin" / "OPCUANodeSet.xml"
 DEFAULT_CONNECTIONS_PATH = (
-    PROJECT_ROOT / "tools" / "opcua_sim" / "templates" / "OPCUA_client_connections.yaml"
+    PROJECT_ROOT / "src" / "starfish" / "native" / "bin" / "OPCUA_client_connections.yaml"
 )
 
 # Infrastructure constants (match docker-compose.ingest-dev.yaml)

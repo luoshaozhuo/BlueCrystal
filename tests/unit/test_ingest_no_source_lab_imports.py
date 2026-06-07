@@ -1,4 +1,4 @@
-"""Ensure ingest production code does not import tools.source_lab."""
+"""确保 ingest 生产代码不引入 tools.source_lab（目录已物理删除，此检查为历史门禁保留）。"""
 
 from __future__ import annotations
 
