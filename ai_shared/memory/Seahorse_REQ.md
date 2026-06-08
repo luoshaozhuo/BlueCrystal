@@ -1,7 +1,7 @@
 # Seahorse Requirements
 
 > Seahorse — 样例场站生成器。面向平台调试、演示、联调、数字孪生前置验证和测试数据准备。
-> 最后更新: 2026-06-07 (Round 21: **Starfish 能力增强阶段总收口** — Seahorse 侧文档同步。**Seahorse `test_curve_daily_power_preset` 根因已修复**（**不**再列 pre-existing flaky）：`src/seahorse/strategies/curve_generation.py` `daily_power_curve` 在 noise 叠加后强制 `min(values) >= floor_ratio * baseline = 0.2 * 1500.0 = 300.0`，从根因消除 `min(values)=90.952 < 100 阈值` 的统计噪声；`tests/unit/seahorse/test_strategies.py` 新增 5 个 daily_power 稳定性测试（`test_daily_power_preset_min_floor_enforced` / `test_daily_power_preset_cross_run_consistency` / `test_daily_power_preset_high_noise_compatible` / `test_other_curves_have_no_floor_behavior` / `test_daily_power_preset_stable_5x_runs`）；test-validator 独立验证**连续 12 次 0 flaky**（独立 Python 20 次复现 min(values)=300.00）；Seahorse 总数 181 → 186（**180 stable + 5 新 daily_power 稳定性测试 + 1 原 daily_power_preset**）；Round 19 baseline 181 passed 不回退；third_party 零新增；import boundary 清洁；**不是**任何 skip/xfail/删除测试/扩大阈值——为**根因**（noise model stdev=50 + floor_ratio=0.2 钳制后 min(values) >= 300.0）；本仓库项目名为 Whale，**BlueOcean_REQ_*.md 在仓库中不存在**，本轮沿用 Whale_REQ_*.md 体系，**不新建 BlueOcean_REQ_*.md**；20→21 轮总收口完成)
+> 最后更新: 2026-06-07 (Round 21: **Starfish 能力增强阶段总收口** — Seahorse 侧文档同步。**Seahorse `test_curve_daily_power_preset` 根因已修复**（**不**再列 pre-existing flaky）：`src/seahorse/strategies/curve_generation.py` `daily_power_curve` 在 noise 叠加后强制 `min(values) >= floor_ratio * baseline = 0.2 * 1500.0 = 300.0`，从根因消除 `min(values)=90.952 < 100 阈值` 的统计噪声；`tests/unit/seahorse/test_strategies.py` 新增 5 个 daily_power 稳定性测试（`test_daily_power_preset_min_floor_enforced` / `test_daily_power_preset_cross_run_consistency` / `test_daily_power_preset_high_noise_compatible` / `test_other_curves_have_no_floor_behavior` / `test_daily_power_preset_stable_5x_runs`）；test-validator 独立验证**连续 12 次 0 flaky**（独立 Python 20 次复现 min(values)=300.00）；Seahorse 总数 181 → 186（**180 stable + 5 新 daily_power 稳定性测试 + 1 原 daily_power_preset**）；Round 19 baseline 181 passed 不回退；third_party 零新增；import boundary 清洁；**不是**任何 skip/xfail/删除测试/扩大阈值——为**根因**（noise model stdev=50 + floor_ratio=0.2 钳制后 min(values) >= 300.0）；本仓库项目名为 BlueCrystal，**BlueOcean_REQ_*.md 在仓库中不存在**，本轮沿用 BlueCrystal_REQ_*.md 体系（已通过 git mv 从原 Whale_REQ_*.md 改名，保留 git 历史），**不新建 BlueOcean_REQ_*.md**；20→21 轮总收口完成)
 
 ## 1. 模块定位
 
@@ -17,7 +17,7 @@ Seahorse 负责：
 支持随机数据、曲线数据、CSV/JSONL replay、离散模型和外部仿真接入的统一策略接口
 管理协议参数模板、样例数据规格、GB/T 30966 字段定义和协议查询视图参考数据
 生成可供 Starfish 启动协议 server 的 ServerPlan
-生成可导入 Whale ingest 的配置包或样例数据库
+生成可导入 whale.ingest 的配置包或样例数据库
 ```
 
 Seahorse 不负责：
@@ -37,7 +37,7 @@ Starfish 的具体协议 server 实现
 禁止：Seahorse -> whale ingest runtime
 禁止：Seahorse / Starfish 冒充现场生产环境验证
 允许：Seahorse -> Starfish
-允许：Seahorse -> Whale ORM / seed writer / storage contract（后续）
+允许：Seahorse -> whale ORM / seed writer / storage contract（后续）
 ```
 
 ## 2. 需求编号规则

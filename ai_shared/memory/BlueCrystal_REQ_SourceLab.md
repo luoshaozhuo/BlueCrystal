@@ -1,8 +1,8 @@
-# Whale_REQ_SourceLab
+# BlueCrystal_REQ_SourceLab
 
 ## 一、文件定位
 
-本文件描述 Whale `tools/source_lab` 模块承担的 simulator、probe、profile、capacity、协议验证和本地开发测试需求。
+本文件描述 BlueCrystal `tools/source_lab` 模块承担的 simulator、probe、profile、capacity、协议验证和本地开发测试需求。
 
 本文件不描述 ingest 生产 use case，不描述 shared_source production client 内部实现。
 

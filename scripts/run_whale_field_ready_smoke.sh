@@ -165,7 +165,7 @@ check_level_pollution() {
             log_fail "发现 L6 引用: $line"
             l6_found=true
         fi
-    done < <(grep -Rn "L6" "${REPO_ROOT}/ai_shared/memory/Whale_REQ_"*.md "${REPO_ROOT}/ai_shared/reports/" 2>/dev/null | grep -v "L6 | 不存在" || true)
+    done < <(grep -Rn "L6" "${REPO_ROOT}/ai_shared/memory/BlueCrystal_REQ_"*.md "${REPO_ROOT}/ai_shared/reports/" 2>/dev/null | grep -v "L6 | 不存在" || true)
 
     if $l6_found; then
         log_fail "仓库中存在 L6 引用（非确认行）"
@@ -183,7 +183,7 @@ check_level_pollution() {
             log_fail "L5 定义可能回退为现场环境验证: $line"
             def_reverted=true
         fi
-    done < <(grep -Rn "现场环境验证通过" "${REPO_ROOT}/ai_shared/memory/Whale_REQ_"*.md "${REPO_ROOT}/ai_shared/reports/" 2>/dev/null | grep -v "whale_l5_definition_req_cleanup_round4" | grep -v "修正为" | grep -v "移除" || true)
+    done < <(grep -Rn "现场环境验证通过" "${REPO_ROOT}/ai_shared/memory/BlueCrystal_REQ_"*.md "${REPO_ROOT}/ai_shared/reports/" 2>/dev/null | grep -v "whale_l5_definition_req_cleanup_round4" | grep -v "修正为" | grep -v "移除" || true)
 
     if $def_reverted; then
         log_fail "L5 定义存在回退风险"

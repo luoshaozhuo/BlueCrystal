@@ -1,6 +1,6 @@
 """starfish — 多协议 server simulator 工具层。
 
-starfish 是 Whale 平台的协议 server 模拟运行时，负责根据 Seahorse 导出的
+starfish 是 BlueCrystal 平台的协议 server 模拟运行时，负责根据 Seahorse 导出的
 starfish_server_plan.json 契约文件启动多协议模拟服务端，供平台调试、联调和
 数字孪生前置验证使用。
 
@@ -17,7 +17,7 @@ starfish_server_plan.json 契约文件启动多协议模拟服务端，供平台
 - starfish 不得 import whale.ingest。
 - starfish 不得 import whale.shared.source。
 - starfish 与 Seahorse 的交互仅通过读入纯 JSON 文件完成。
-- starfish 不进入 Whale 生产采集链路，所有数据标识 synthetic=True。
+- starfish 不进入 BlueCrystal 生产采集链路，所有数据标识 synthetic=True。
 
 当前能力声明（Round 14 更新）：
 - SF-FR-001: JSON 契约加载与校验（loader）。

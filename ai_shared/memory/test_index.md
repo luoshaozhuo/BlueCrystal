@@ -1,8 +1,8 @@
-# Whale 测试索引
+# BlueCrystal 测试索引
 
-本文件是 Whale 项目唯一测试索引。不另建其他回归索引文件（如 `issue_regression_index.md`）。
+本文件是 BlueCrystal 项目唯一测试索引。不另建其他回归索引文件（如 `issue_regression_index.md`）。
 
-> 最后更新: 2026-06-07 (Round 21: **Starfish 能力增强阶段总收口** — 第 21 轮文档定版与剩余项清理。**本轮核心动作**：修复 test-validator 识别的 6 处文档与代码不一致（见 §6 一致性扫描）+ 建立最终测试统计（**1416 stable passed / 0 failed / 0 flaky**）+ 记录 Seahorse **186 passed（180 stable + 5 新 daily_power 稳定性测试 + 1 原 daily_power_preset）**——`test_curve_daily_power_preset` **根因已修复**（**不**再列 pre-existing flaky；连续 10+ 次 0 flaky）+ **Starfish 1215 + Architecture 15** + IEC101 codec 600+；**协议能力矩阵 12 协议最终态**：HTTP_REST -> real；MODBUS_TCP -> real + register_encoding typed helper；MODBUS_RTU -> rtu-lightweight + register_encoding typed helper；MQTT -> lightweight real + subscribe；OPC_UA -> native runner real-mode / env-dependent；IEC104 -> native runner real-mode / env-dependent；IEC61850_MMS -> native runner real-mode / env-dependent；IEC61850_Report -> native runner real-mode + ReportQueue / env-dependent；IEC101 -> codec-enhanced-plus + LinkLayer runtime skeleton，非 server；Beckhoff_ADS -> codebase-pending / dependency probe；GOOSE -> environment-pending；SV -> environment-pending。**显式边界声明**：`supports_server=false` / `supports_serial_runtime=false` / `supports_write_runtime=false` / `register_encoding_runtime=false`。**已清理 legacy 清单**（Round 19/20 已收口，本轮仅做文档同步）：Seahorse `test_curve_daily_power_preset` flaky（**根因已修复**）；IEC101 LinkLayer timer skeleton（**已实现**）；balanced FCB auto flip（**已实现**）；retry ERROR（**已实现**）；ShortFloat duck typing（**已实现**，不引入 numpy 硬依赖）；Modbus facade register_encoding 接入（**已实现**）；IEC101 C_SE_TA_1/TB_1/TC_1（**已实现**于 Round 19）。**真实剩余项**（**不**得高估为已实现）：真实 IEC101 server / 真实串口 / 完整 balanced/unbalanced runtime / GOOSE/SV L2 / Beckhoff_ADS 真实环境 / Modbus 真实设备 / 现场部署。本仓库项目名为 Whale，**BlueOcean_REQ_*.md 在仓库中不存在**，本轮沿用 Whale_REQ_*.md 体系，**不新建 BlueOcean_REQ_*.md**；20→21 轮总收口完成)
+> 最后更新: 2026-06-07 (Round 21: **Starfish 能力增强阶段总收口** — 第 21 轮文档定版与剩余项清理。**本轮核心动作**：修复 test-validator 识别的 6 处文档与代码不一致（见 §6 一致性扫描）+ 建立最终测试统计（**1416 stable passed / 0 failed / 0 flaky**）+ 记录 Seahorse **186 passed（180 stable + 5 新 daily_power 稳定性测试 + 1 原 daily_power_preset）**——`test_curve_daily_power_preset` **根因已修复**（**不**再列 pre-existing flaky；连续 10+ 次 0 flaky）+ **Starfish 1215 + Architecture 15** + IEC101 codec 600+；**协议能力矩阵 12 协议最终态**：HTTP_REST -> real；MODBUS_TCP -> real + register_encoding typed helper；MODBUS_RTU -> rtu-lightweight + register_encoding typed helper；MQTT -> lightweight real + subscribe；OPC_UA -> native runner real-mode / env-dependent；IEC104 -> native runner real-mode / env-dependent；IEC61850_MMS -> native runner real-mode / env-dependent；IEC61850_Report -> native runner real-mode + ReportQueue / env-dependent；IEC101 -> codec-enhanced-plus + LinkLayer runtime skeleton，非 server；Beckhoff_ADS -> codebase-pending / dependency probe；GOOSE -> environment-pending；SV -> environment-pending。**显式边界声明**：`supports_server=false` / `supports_serial_runtime=false` / `supports_write_runtime=false` / `register_encoding_runtime=false`。**已清理 legacy 清单**（Round 19/20 已收口，本轮仅做文档同步）：Seahorse `test_curve_daily_power_preset` flaky（**根因已修复**）；IEC101 LinkLayer timer skeleton（**已实现**）；balanced FCB auto flip（**已实现**）；retry ERROR（**已实现**）；ShortFloat duck typing（**已实现**，不引入 numpy 硬依赖）；Modbus facade register_encoding 接入（**已实现**）；IEC101 C_SE_TA_1/TB_1/TC_1（**已实现**于 Round 19）。**真实剩余项**（**不**得高估为已实现）：真实 IEC101 server / 真实串口 / 完整 balanced/unbalanced runtime / GOOSE/SV L2 / Beckhoff_ADS 真实环境 / Modbus 真实设备 / 现场部署。本仓库项目名为 BlueCrystal，**BlueOcean_REQ_*.md 在仓库中不存在**，本轮沿用 BlueCrystal_REQ_*.md 体系（已通过 git mv 从原 Whale_REQ_*.md 改名，保留 git 历史），**不新建 BlueOcean_REQ_*.md**；20→21 轮总收口完成)
 
 初版为目录级完整、关键链路文件级。不追求全仓逐文件穷尽。
 
@@ -80,7 +80,7 @@
 
 ## 3. 测试资产索引
 
-### 3.1 Whale 主平台测试 (tests/)
+### 3.1 BlueCrystal 主平台测试 (tests/)
 
 #### 开发期验证 (unit)
 

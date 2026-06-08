@@ -1,10 +1,10 @@
-# Whale_REQ_ServingAggregation
+# BlueCrystal_REQ_ServingAggregation
 
 ## 一、文件定位
 
-本文件描述 Whale 中面向查询、数仓和数据集市的聚合能力需求。
+本文件描述 BlueCrystal 中面向查询、数仓和数据集市的聚合能力需求。
 
-`aggregation` 不再作为 Whale 一级架构模块存在。它应归入 `serving`、`storage.warehouse`、`storage.mart` 或后续 Dolphin 业务能力服务的内部能力，用于构建实时聚合、周期聚合和业务主题聚合结果。
+`aggregation` 不再作为 BlueCrystal 一级架构模块存在。它应归入 `serving`、`storage.warehouse`、`storage.mart` 或后续 Dolphin 业务能力服务的内部能力，用于构建实时聚合、周期聚合和业务主题聚合结果。
 
 本文件不描述 source 接入，不描述 raw 写入，不描述基础清洗逻辑，不描述 Dolphin 业务服务的完整实现。
 

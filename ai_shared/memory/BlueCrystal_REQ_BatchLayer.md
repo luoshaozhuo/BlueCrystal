@@ -1,8 +1,8 @@
-# Whale_REQ_BatchLayer
+# BlueCrystal_REQ_BatchLayer
 
 ## 一、文件定位
 
-本文件描述 Whale batch layer 需求。batch layer 负责任务调度、raw 读取、processing 编排、standard 写入和任务状态管理。
+本文件描述 BlueCrystal batch layer 需求。batch layer 负责任务调度、raw 读取、processing 编排、standard 写入和任务状态管理。
 
 本文件不描述 processing 规则细节，不描述实时 speed layer。
 

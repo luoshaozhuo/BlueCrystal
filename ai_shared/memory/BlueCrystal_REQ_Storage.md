@@ -1,8 +1,8 @@
-# Whale_REQ_Storage
+# BlueCrystal_REQ_Storage
 
 ## 一、文件定位
 
-本文件描述 Whale 存储层需求，包括 raw layer、standard layer、warehouse/mart layer 和 serving cache。
+本文件描述 BlueCrystal 存储层需求，包括 raw layer、standard layer、warehouse/mart layer 和 serving cache。
 
 本文件不描述 source 协议采集，不描述 processing 的清洗算法。
 

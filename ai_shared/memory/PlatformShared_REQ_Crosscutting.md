@@ -2,9 +2,9 @@
 
 ## 一、文件定位
 
-本文件描述 `src/platform_shared` 全系统公共基础库需求。`platform_shared` 为 Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta 提供可复用、无业务归属、无运行状态或弱状态的基础代码能力。
+本文件描述 `src/platform_shared` 全系统公共基础库需求。`platform_shared` 为 BlueCrystal、Turtle、Octopus、Dolphin、Jellyfish、Manta 提供可复用、无业务归属、无运行状态或弱状态的基础代码能力。
 
-本文件不描述 Whale 数据底座内部 source/persistence 能力，不描述 Turtle 的治理、安全、审计、合规策略，不描述 Octopus 的监控平台、告警平台、部署执行和自动化恢复实现。
+本文件不描述 BlueCrystal 数据底座内部 source/persistence 能力，不描述 Turtle 的治理、安全、审计、合规策略，不描述 Octopus 的监控平台、告警平台、部署执行和自动化恢复实现。
 
 `src/whale/shared/crosscutting` 应删除，不再作为公共横切能力入口。
 
@@ -71,7 +71,7 @@
   - `platform_shared.messaging` 应提供跨组件消息 envelope、correlation、schema_version 基础模型。
 - 验收要点：
   - 不包含 Kafka/Pulsar 具体 adapter。
-  - 具体 broker 适配仍归 Whale message_pipeline。
+  - 具体 broker 适配仍归 BlueCrystal message_pipeline。
 
 ### PS-FR-006 security primitives
 
@@ -113,7 +113,7 @@
 - 类型：架构约束
 - 优先级：高
 - 需求描述：
-  - Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta 可以依赖 platform_shared；platform_shared 不得依赖它们。
+  - BlueCrystal、Turtle、Octopus、Dolphin、Jellyfish、Manta 可以依赖 platform_shared；platform_shared 不得依赖它们。
 - 验收要点：
   - import boundary gate 覆盖该约束。
 
@@ -140,7 +140,7 @@
   - ruff 通过。
   - mypy 通过。
   - 全仓旧路径 import 扫描通过。
-  - Whale ingest、message_pipeline、speed_layer、storage 关键测试不回退。
+  - BlueCrystal ingest、message_pipeline、speed_layer、storage 关键测试不回退。
 
 ## 七、禁止事项
 

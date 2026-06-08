@@ -1,8 +1,8 @@
-# Whale_REQ_SharedSource
+# BlueCrystal_REQ_SharedSource
 
 ## 一、文件定位
 
-本文件描述 Whale `src/whale/shared/source` 模块承担的 production source client 需求。
+本文件描述 BlueCrystal `src/whale/shared/source` 模块承担的 production source client 需求。
 
 本文件不描述 ingest use case 编排，不描述 source_lab simulator 内部实现。
 

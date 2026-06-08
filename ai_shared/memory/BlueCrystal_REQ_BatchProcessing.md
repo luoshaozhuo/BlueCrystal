@@ -1,10 +1,10 @@
-# Whale_REQ_BatchProcessing
+# BlueCrystal_REQ_BatchProcessing
 
 ## 一、文件定位
 
-本文件描述 Whale `batch_layer` 内部的 `processing` 能力需求。
+本文件描述 BlueCrystal `batch_layer` 内部的 `processing` 能力需求。
 
-`processing` 不再作为 Whale 一级架构模块存在。它是 `batch_layer` 内部能力，用于从 `raw_archive` 读取数据，执行清洗、标准化、质量处理、时间对齐、规则版本管理和回灌重算，并将结果写入 `standardized` 数据层。
+`processing` 不再作为 BlueCrystal 一级架构模块存在。它是 `batch_layer` 内部能力，用于从 `raw_archive` 读取数据，执行清洗、标准化、质量处理、时间对齐、规则版本管理和回灌重算，并将结果写入 `standardized` 数据层。
 
 本文件不描述实时消费、不描述 `speed_layer` 的轻量处理、不描述 `ingest` 采集、不描述 `storage` 后端实现细节。
 

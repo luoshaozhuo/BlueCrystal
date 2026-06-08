@@ -1,4 +1,4 @@
-# Whale - 能源数据统一平台
+# BlueCrystal - 能源数据统一平台
 
 ## 项目概述
 渐进式开发的能源数据平台，从Level 0数据流开始，逐步构建统一数据底座。
@@ -36,8 +36,8 @@ pytest
 
 ## 项目结构
 ```
-Whale/
-├── src/whale/          # 核心代码
+BlueCrystal/
+├── src/whale/          # 核心代码（whale 模块名保留）
 ├── tests/              # 测试
 ├── docs/               # 文档
 └── config/             # 配置

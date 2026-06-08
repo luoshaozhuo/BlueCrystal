@@ -1,8 +1,8 @@
-# Whale_REQ_Ingest
+# BlueCrystal_REQ_Ingest
 
 ## 一、文件定位
 
-本文件描述 Whale `src/whale/ingest` 模块承担的生产级采集编排、运行时调度、配置管理、状态缓存、消息发布、写入控制、异常恢复、部署形态和验收需求。
+本文件描述 BlueCrystal `src/whale/ingest` 模块承担的生产级采集编排、运行时调度、配置管理、状态缓存、消息发布、写入控制、异常恢复、部署形态和验收需求。
 
 本文件不描述 `source_lab` simulator 内部实现，不描述 `shared_source` production client 内部实现，不描述 speed layer、storage、batch layer 和 processing 的内部实现。
 
@@ -602,7 +602,7 @@ Docker / Docker Compose
   - 支持 api、worker、api-worker、migrate、import-bundle、export-bundle 等 entrypoint 的独立启动。
   - 支持 healthz、readyz、migrate 和模块级 smoke 验收。
   - 明确 runtime DB、cache、message publisher、audit sink、access policy、shared_source production client 的最小可用条件。
-  - 单个 ingest 模块部署成功不等于完整 Whale 系统部署完成。
+  - 单个 ingest 模块部署成功不等于完整 BlueCrystal 系统部署完成。
   - ingest 不承担完整系统安装、版本发布、售后、许可证、完整运维平台等管理层职责。
 
 ### I-READY-002 ingest 外部依赖准入矩阵
@@ -690,7 +690,7 @@ Docker / Docker Compose
   - import boundary gate 通过：`src/whale/ingest` 与 `src/whale/shared/source` 不得 import `tools.source_lab`。
   - skipped、mock、fake、contract 不得作为生产完成证据。
   - mypy 未清零不得写质量门禁收口。
-  - 质量门禁只证明 ingest 模块工程质量，不证明完整 Whale 系统投产。
+  - 质量门禁只证明 ingest 模块工程质量，不证明完整 BlueCrystal 系统投产。
 
 ## 十二、需求跟踪表
 
@@ -728,7 +728,7 @@ Docker / Docker Compose
 | I-FR-014 | P-FR-001 | 文件接入 Adapter | FR | 中 | ingest.file_ingest | P3 / P5 FAIL (TDengine waveform, MISSING_ENVIRONMENT) | 测试通过 (P3) / P5 部分通过 | `src/whale/ingest/file_ingest/` (6 files: models/detector/decoder/repository/service); `src/whale/storage/waveform.py` (真实 REST API adapter); `tests/integration/test_storage_waveform_tdengine_integration.py` (4 tests P5); `scripts/run_whale_p5_external_dependency_regression.sh` (P5 回归) | `pytest tests/unit/test_ingest_file_ingest_*.py tests/unit/test_storage_waveform.py -q` -> 82 passed; `pytest tests/integration/test_ingest_file_ingest_integration.py -q` -> 6 passed; `pytest tests/integration/test_storage_waveform_tdengine_integration.py -q` -> 3 FAIL (MISSING_ENVIRONMENT: taosAdapter not available), 1 PASS (contract-only) | 文件完成检测、raw_archive、解码、波形写入、fault_event 闭环通过（P3 InMemory）；decode-before-resolve 约束保持；TdengineStandardizedWaveformSink 真实 REST API adapter 已实现但当前环境 taosAdapter 不可用（3 FAIL 均为环境缺失，非代码缺陷）；P5 回归脚本 TDengine 波形部分 2 FAIL；fault_event ORM 留到后续 | 恢复 TDengine taosAdapter 后 waveform P5 回归 + fault_event ORM | 2026-06-04 |
 | I-TEST-003 | I-FR-014 | 文件接入开发期/模块集成期验证 | TEST | 中 | ingest.file_ingest | P3 / P5 FAIL (TDengine waveform, MISSING_ENVIRONMENT) | P3 测试通过 / P5 部分通过 | 5 file_ingest unit test files + 1 integration test file + 1 TDengine waveform P5 integration test file + P5 regression script; compileall/ruff/mypy all PASS | 82 unit tests passed (models/detector/decoder/repository/service/waveform: 12); 6 integration tests passed (file_ingest); 4 TDengine waveform integration tests: 3 FAIL (MISSING_ENVIRONMENT: taosAdapter /rest/sql 404), 1 PASS (contract-only); P5 回归脚本: waveform TDengine 2 FAIL (MISSING_ENVIRONMENT); compileall PASS; ruff PASS; mypy PASS; production path 无 tools/experimental 导入 | TdengineStandardizedWaveformSink P5 FAIL (MISSING_ENVIRONMENT: taosAdapter 不可用)；PostgreSQL file_ingest NOT_RUN (MISSING_ENVIRONMENT) | 恢复 TDengine taosAdapter 后 P5 回归 + PostgreSQL P5 验证 | 2026-06-04 |
 
-| I-READY-001 | P-NFR-003/P-AR-001 | ingest 独立部署准入 | READY | 高 | ingest_deployment | P4 | 部分实现 | `Dockerfile`; `src/whale/ingest/runtime/entrypoint.py`; `src/whale/ingest/runtime/cli.py`; `docker-compose.ingest-dev.yaml`; `docker-compose.ingest-prodlike.yaml`; `scripts/run_ingest_runtime_compose_smoke.sh` | 已有 image/entrypoint/compose smoke；以当前测试报告为准 | 单模块部署准入已具备部分证据，但不等于完整 Whale 系统投产；graceful shutdown、长稳和生产配置矩阵仍需补证 | 补模块级 deployment readiness gate 与生产配置矩阵核验 | 待更新 |
+| I-READY-001 | P-NFR-003/P-AR-001 | ingest 独立部署准入 | READY | 高 | ingest_deployment | P4 | 部分实现 | `Dockerfile`; `src/whale/ingest/runtime/entrypoint.py`; `src/whale/ingest/runtime/cli.py`; `docker-compose.ingest-dev.yaml`; `docker-compose.ingest-prodlike.yaml`; `scripts/run_ingest_runtime_compose_smoke.sh` | 已有 image/entrypoint/compose smoke；以当前测试报告为准 | 单模块部署准入已具备部分证据，但不等于完整 BlueCrystal 系统投产；graceful shutdown、长稳和生产配置矩阵仍需补证 | 补模块级 deployment readiness gate 与生产配置矩阵核验 | 待更新 |
 | I-READY-002 | P-NFR-003/P-NFR-005 | ingest 外部依赖准入矩阵 | READY | 高 | ingest_runtime | P6 | 部分实现 | `src/whale/ingest/api/readyz.py`; `ai_shared/reports/ingest_external_dependency_readiness_matrix_round11.md`; `scripts/run_ingest_prodlike_dependency_smoke.sh`; `scripts/run_ingest_compose_readyz_e2e.sh`; runtime DB / Redis / Kafka / audit / access policy / shared_source 相关源码与测试 | Round 14: compose readyz E2E 8/8 组件聚合 PASS（runtime_db/redis/kafka/audit/access_policy/shared_source/adapter_registry/config），敏感数据脱敏正确，degraded 语义正确；redis_state_cache 和 source_adapter_registry 在 compose 中 not_ready（测试环境预期）；Kafka/Redis 等待超时已修复（120s->240s） | compose 中 redis_state_cache 和 source_adapter_registry 因测试环境无真实 Redis/adapter 而 degraded，不影响模块级准入 | 补生产环境 Redis/adapter registry 就绪后的 full-health E2E 回归 | 2026-05-30 |
 | I-READY-003 | P-NFR-004/P-NFR-005 | ingest 横切能力接入准入 | READY | 高 | ingest_observability_security | P4 | 接入完毕 | `ai_shared/reports/ingest_crosscutting_integration_matrix_round13.md`; `src/whale/ingest/api/audit_middleware.py`; `src/whale/ingest/composition.py`; audit/metrics/auth/retry/health 全链路 decorator/middleware/composition | Round 13: 形成 8/8 crosscutting 接入矩阵 (CT-FR-001~005, CT-NFR-001, CT-SCR-001, CT-TEST-001)，覆盖 P3 contract 至 P4 integration；ingest 已通过 decorator/middleware/composition 接入全部 8 类横切能力 | compose 级 readyz/crosscutting E2E 验证仍 environment-pending，但不阻塞代码级接入证据 | 补 docker compose 级 readyz E2E 与生产环境 crosscutting 回归 | 2026-05-30 |
 | I-READY-004 | P-SCR-001 | ingest 安全分区部署约束 | READY | 高 | ingest_security | P3/P4 | 部分实现 | `ai_shared/reports/ingest_module_deployment_topology_port_matrix_round11.md`; `config/ingest/security_partition.example.yaml`; bundle one-way flow; external access/audit contract | 已补 ingest 模块级部署拓扑、端口矩阵、通信方向矩阵；并明确 source_lab 不进入 production runtime path | 真实 IAM/SIEM / 现场平台联调和跨区 write/control 仍 pending | 保持模块边界，后续补现场平台联调证据 | 2026-05-30 |
@@ -804,7 +804,7 @@ ingest 当前状态：prodlike-ready / production-ready blocked by P5 field read
 
 P5 外部依赖环境验证（Round 4 更新）：
   - ai_shared/field_readback/ 目录已删除（Round 4，P5 定义从"现场环境验证"修正为"准生产真实外部依赖环境验证"）
-  - 真实设备/网关环境 P5 验证不在本项目需求跟踪表验证等级范围内（见 Whale_REQ_README.md 维护规则）
+  - 真实设备/网关环境 P5 验证不在本项目需求跟踪表验证等级范围内（见 BlueCrystal_REQ_README.md 维护规则）
   - 环境预检脚本就绪: scripts/check_l5_field_readback_env.py, check_serial_env.py, check_ads_env.py, check_l2_goose_sv_env.py
   - CI 质量门禁聚合: scripts/run_quality_gate.py
 

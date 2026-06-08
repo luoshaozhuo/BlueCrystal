@@ -1,8 +1,8 @@
-# Whale_REQ_SpeedLayer
+# BlueCrystal_REQ_SpeedLayer
 
 ## 一、文件定位
 
-本文件描述 Whale 速度层需求。速度层消费 message pipeline 的实时数据，写入 raw storage，并更新业务侧 serving cache。
+本文件描述 BlueCrystal 速度层需求。速度层消费 message pipeline 的实时数据，写入 raw storage，并更新业务侧 serving cache。
 
 本文件不描述 ingest 采集，不描述批处理层复杂重算。
 

@@ -1,6 +1,6 @@
 """seahorse — 样例场站生成器。
 
-seahorse 是 Whale 平台的模拟场景生成组件，负责根据场景配置生成确定性
+seahorse 是 BlueCrystal 平台的模拟场景生成组件，负责根据场景配置生成确定性
 的种子计划（seed plan）、信号值序列、告警事件与控制回写结果。
 
 架构分层：

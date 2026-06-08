@@ -1,4 +1,4 @@
-# Whale 项目目录树
+# BlueCrystal 项目目录树
 
 > 最后更新: 2026-06-07 (Round 20 扩展：src/starfish/protocols/iec101/link_layer.py **LinkLayerTimerService 抽象 + Default (threading.Timer) + Fake 三实现 + send/receive/on_timeout 完整状态机 + balanced FCB auto flip + retry ERROR**；src/starfish/protocols/iec101/information_elements.py **ShortFloat 兼容扩展**（int/numbers.Real/`__float__` duck typing 统一入口，**不引入 numpy 硬依赖**）；src/seahorse/strategies/curve_generation.py **Seahorse flaky 根因修复**（`daily_power_curve` 在 noise 叠加后强制 `min(values) >= floor_ratio * baseline = 0.2 * 1500.0 = 300.0`，从根因消除 `min(values)=90.952 < 100 阈值` 的统计噪声；**未使用 skip/xfail/删除测试/扩大阈值**）；src/starfish/facade/iec101_facade.py 扩展 codec_capabilities 3 个新 capabilities（`supports_link_layer_timers=true` / `supports_balanced_fcb_auto_flip=true` / `supports_retry_skeleton=true`）+ health() reason_text 7 强制要点同步；tests/unit/seahorse/test_strategies.py 新增 5 个 daily_power 稳定性测试（min_floor_enforced / cross_run_consistency / high_noise_compatible / 其它曲线无 floor 行为 / 5x 稳定性；test-validator 独立验证连续 **12 次 0 flaky**）；tests/unit/starfish/test_iec101_link_layer.py 新增 8 个 test classes（LinkLayerTimerService 抽象 + Default + Fake + balanced FCB auto flip + retry ERROR + sequence 状态机）；tests/unit/starfish/test_iec101_information_elements.py 新增 TestShortFloatRound20Compat（int / Decimal / Fraction / `__float__` duck typing 4 路输入 + NaN/Inf 仍严格拒绝）；tests/unit/starfish/test_iec101_codec.py 新增 TestIec101CodecRound20（3 新 capabilities 数字断言 + 7 强制要点 reason_text 验证）；tests/unit/starfish/test_probe_profile_capacity.py 新增 TestIec101Round20Capabilities（codec_capabilities 显式声明）；600+ IEC101 codec tests + 1215 starfish total + 15 architecture + 186 seahorse（**180 stable + 5 新 daily_power 稳定性测试 + 1 原 daily_power_preset**）= **1416 stable passed（+77 net 增量 vs Round 19 1339）**；third_party 零新增；import boundary 清洁；**LinkLayer runtime skeleton 仍不是真实 IEC101 server**（默认 `enable_timers=False` + 零 socket/pty/serial + `supports_server=false` / `supports_serial_runtime=false` 维持）；20 轮递进建设完成)
 
@@ -8,7 +8,7 @@
 ## 根目录
 
 ```text
-/ (Whale)
+/ (BlueCrystal)
 ├── CLAUDE.md                        — Claude Code / Codex 共用执行入口
 ├── AGENTS.md                        — Codex 自动读取入口，指向 CLAUDE.md
 ├── README.md                        — 项目简介与快速开始
@@ -31,7 +31,7 @@
 ├── .flake8                          — flake8 代码检查配置
 ├── .gitignore                       — Git 忽略规则
 ├── .env.ingest.example              — ingest 环境变量模板
-├── .env.whale.field.example         — Whale 现场部署完整环境变量模板
+├── .env.whale.field.example         — BlueCrystal 现场部署完整环境变量模板
 ├── .env.p5.example                  — P5 环境变量模板（无真实密钥）
 ├── .vscode/settings.json            — VSCode 编辑器配置
 ├── .vscode/claude-wrapper.sh        — VSCode Claude CLI 包装脚本
@@ -39,13 +39,13 @@
 ├── .source_lab_runtime/             — 旧 source_lab 运行时残留（已弃用，gitignore）
 ├── config/                          — 运行时配置
 │   ├── ingest/                      — ingest 配置（access_policy / performance / audit / endurance / security_partition）
-│   └── whale/                       — Whale 现场部署配置模板（P5 准生产依赖验证期 MISSING_ENVIRONMENT 标记）
+│   └── whale/                       — BlueCrystal 现场部署配置模板（P5 准生产依赖验证期 MISSING_ENVIRONMENT 标记）
 ├── src/                             — 主源码根目录
 ├── tests/                           — 项目级测试根目录
 ├── ai_shared/                       — AI 配置、规则与记忆
 ├── docs/                            — 项目文档
 ├── scripts/                         — 运维与开发脚本
-├── deploy/                          — Whale / Turtle / Octopus 部署配置
+├── deploy/                          — BlueCrystal / Turtle / Octopus 部署配置
 ├── .claude/                         — Claude Code 配置与技能
 ├── .agents/                         — Codex agent 配置（skills 软链至 .claude/skills）
 ├── .codex/                          — OpenAI Codex 适配配置
@@ -582,7 +582,7 @@ src/starfish/
 tests/
 ├── __init__.py
 ├── conftest.py                      — 全局 pytest 夹具
-├── TESTING.md                       — Whale 主平台测试指南（P1-P7 生命周期阶段）
+├── TESTING.md                       — BlueCrystal 主平台测试指南（P1-P7 生命周期阶段）
 │
 ├── unit/                            — P1 单元测试
 │   ├── seahorse/                    — Seahorse 测试（8 个）
@@ -755,7 +755,7 @@ tests/
 ├── e2e/                             — P4 端到端测试
 │   ├── conftest.py
 │   ├── helpers.py
-│   ├── test_whale_field_minimal_smoke.py — Whale 现场最小数据链路 P4 smoke
+│   ├── test_whale_field_minimal_smoke.py — BlueCrystal 现场最小数据链路 P4 smoke
 │   ├── test_whale_l5_kafka_pipeline_e2e.py — P5 Kafka pipeline E2E
 │   └── test_whale_l5_storage_e2e.py   — P5 storage E2E（S3 / TDengine / Redis）
 │
@@ -816,17 +816,17 @@ ai_shared/
 │   ├── test_index.md                 — 测试资产索引与回归测试唯一索引
 │   ├── 业务目标与价值愿景.md           — 项目白皮书
 │   ├── 总体逻辑设计.md                — 项目白皮书
-│   ├── Whale_REQ_README.md           — 需求文档规范说明
-│   ├── Whale_REQ_Project.md          — 项目层面需求说明
-│   ├── Whale_REQ_Ingest.md           — 采集模块需求
-│   ├── Whale_REQ_SourceLab.md        — source_lab 需求
-│   ├── Whale_REQ_SharedSource.md     — 共享源层需求
-│   ├── Whale_REQ_Storage.md          — 存储模块需求
-│   ├── Whale_REQ_MessagePipeline.md  — 消息管道需求
-│   ├── Whale_REQ_BatchLayer.md       — 批处理层需求
-│   ├── Whale_REQ_BatchProcessing.md  — 批处理模块需求
-│   ├── Whale_REQ_SpeedLayer.md       — 速度层需求
-│   ├── Whale_REQ_ServingAggregation.md — 服务聚合模块需求
+│   ├── BlueCrystal_REQ_README.md           — 需求文档规范说明
+│   ├── BlueCrystal_REQ_Project.md          — 项目层面需求说明
+│   ├── BlueCrystal_REQ_Ingest.md           — 采集模块需求
+│   ├── BlueCrystal_REQ_SourceLab.md        — source_lab 需求
+│   ├── BlueCrystal_REQ_SharedSource.md     — 共享源层需求
+│   ├── BlueCrystal_REQ_Storage.md          — 存储模块需求
+│   ├── BlueCrystal_REQ_MessagePipeline.md  — 消息管道需求
+│   ├── BlueCrystal_REQ_BatchLayer.md       — 批处理层需求
+│   ├── BlueCrystal_REQ_BatchProcessing.md  — 批处理模块需求
+│   ├── BlueCrystal_REQ_SpeedLayer.md       — 速度层需求
+│   ├── BlueCrystal_REQ_ServingAggregation.md — 服务聚合模块需求
 │   ├── PlatformShared_REQ_Crosscutting.md — 全系统公共基础库需求
 │   ├── Turtle_REQ.md                 — Turtle 治理控制面需求
 │   ├── Octopus_REQ.md                — Octopus 运维执行面需求
@@ -891,7 +891,7 @@ docs/
 ```text
 scripts/
 ├── cleanup_root_logs.sh              — 清理根目录日志
-├── whale_test.sh                     — Whale 测试统一入口（dry-run 默认 + --execute 显式）
+├── whale_test.sh                     — BlueCrystal 测试统一入口（dry-run 默认 + --execute 显式）
 ├── check_ads_env.py                  — Beckhoff ADS 环境预检
 ├── check_l2_goose_sv_env.py          — GOOSE / SV L2 环境预检
 ├── check_l5_field_readback_env.py    — P5 外部依赖环境预检
@@ -910,10 +910,10 @@ scripts/
 ├── ci_ingest_runtime_gate.sh         — CI 门禁脚本（7 个门禁组）
 ├── validate_shared_source_production_runner.sh — shared_source runner 路径解析契约验证
 ├── test_ingest_write_readback_smoke_contract.sh — write-readback smoke 入口 CLI 契约自检
-├── run_whale_field_minimal_smoke.sh  — Whale 现场最小数据链路 smoke
-├── run_whale_field_quality_gate.sh   — Whale 现场质量门禁聚合
-├── run_whale_field_ready_smoke.sh    — Whale 一键预检验证（8-step）
-├── run_whale_writer_switchover.sh    — Whale writer 主备切换验证
+├── run_whale_field_minimal_smoke.sh  — BlueCrystal 现场最小数据链路 smoke
+├── run_whale_field_quality_gate.sh   — BlueCrystal 现场质量门禁聚合
+├── run_whale_field_ready_smoke.sh    — BlueCrystal 一键预检验证（8-step）
+├── run_whale_writer_switchover.sh    — BlueCrystal writer 主备切换验证
 ├── run_whale_l5_external_dependency_probe.sh — P5 外部依赖探测（16 probes）
 ├── start_whale_p5_dependencies.sh    — P5 外部依赖启动（Docker 不可用时 NOT_RUN）
 ├── stop_whale_p5_dependencies.sh     — P5 外部依赖停止 / 清理
@@ -925,9 +925,9 @@ scripts/
 
 ```text
 deploy/
-├── whale/                            — Whale 现场部署
-│   ├── README.md                     — Whale 部署总览（MISSING_ENVIRONMENT 标记）
-│   ├── ingest/README.md              — Whale Ingest 部署
+├── whale/                            — BlueCrystal 现场部署
+│   ├── README.md                     — BlueCrystal 部署总览（MISSING_ENVIRONMENT 标记）
+│   ├── ingest/README.md              — BlueCrystal Ingest 部署
 │   ├── message_pipeline/README.md    — Kafka P5 准生产验证通过；Pulsar MISSING_ENVIRONMENT
 │   ├── speed_layer/README.md         — InMemory 生产就绪；Flink MISSING_ENVIRONMENT
 │   └── storage/README.md             — TDengine / S3 / Redis P5 准生产验证通过；HDFS MISSING_ENVIRONMENT

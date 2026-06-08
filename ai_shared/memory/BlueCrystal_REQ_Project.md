@@ -1,8 +1,8 @@
-# Whale_REQ_Project
+# BlueCrystal_REQ_Project
 
 ## 一、文件定位
 
-本文件描述 Whale 项目的项目级功能需求、非功能需求、架构约束、数据治理需求和安全合规需求。
+本文件描述 BlueCrystal 项目的项目级功能需求、非功能需求、架构约束、数据治理需求和安全合规需求。
 
 本文件不展开模块内部实现细节。模块级需求以对应模块需求文件为准。
 
@@ -168,7 +168,7 @@
   - 平台应设置 `platform_shared` 作为全系统公共基础库。
   - Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta 可以依赖 `platform_shared`。
   - `platform_shared` 不得依赖任何上层组件。
-  - `whale.shared` 只服务 Whale 数据底座内部，不得作为全系统公共库。
+  - `whale.shared` 只服务 BlueCrystal 数据底座内部，不得作为全系统公共库。
 - 验收要点：
   - `src/whale/shared/crosscutting` 删除。
   - `debug/observability/resilience` 迁入 `src/platform_shared/crosscutting`。

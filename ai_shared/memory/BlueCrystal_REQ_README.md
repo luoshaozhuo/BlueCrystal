@@ -1,8 +1,8 @@
-# Whale Requirements
+# BlueCrystal Requirements
 
 ## 1. 目录定位
 
-本目录维护 Whale 数据底座及其关联平台组件的项目级和模块级功能/非功能需求。
+本目录维护 BlueCrystal 数据底座及其关联平台组件的项目级和模块级功能/非功能需求。
 
 业务目标与价值愿景以《业务目标与价值愿景.md》为准；总体逻辑边界以《总体逻辑设计.md》为准。本目录保存可验收需求、模块承接关系和需求跟踪表。
 
@@ -10,17 +10,17 @@
 
 ```text
 ai_shared/requirements/
-├── Whale_REQ_README.md
-├── Whale_REQ_Project.md
-├── Whale_REQ_Ingest.md
-├── Whale_REQ_SourceLab.md
-├── Whale_REQ_SharedSource.md
-├── Whale_REQ_MessagePipeline.md
-├── Whale_REQ_SpeedLayer.md
-├── Whale_REQ_Storage.md
-├── Whale_REQ_Processing.md
-├── Whale_REQ_BatchLayer.md
-├── Whale_REQ_Aggregation.md
+├── BlueCrystal_REQ_README.md
+├── BlueCrystal_REQ_Project.md
+├── BlueCrystal_REQ_Ingest.md
+├── BlueCrystal_REQ_SourceLab.md
+├── BlueCrystal_REQ_SharedSource.md
+├── BlueCrystal_REQ_MessagePipeline.md
+├── BlueCrystal_REQ_SpeedLayer.md
+├── BlueCrystal_REQ_Storage.md
+├── BlueCrystal_REQ_BatchProcessing.md
+├── BlueCrystal_REQ_BatchLayer.md
+├── BlueCrystal_REQ_ServingAggregation.md
 ├── PlatformShared_REQ_Crosscutting.md
 ├── Turtle_REQ.md
 ├── Octopus_REQ.md
@@ -28,22 +28,22 @@ ai_shared/requirements/
 ├── Starfish_REQ.md
 ```
 
-`Whale_REQ_Crosscutting.md` 已废止，应删除，不再维护。原 `whale.shared.crosscutting` 中的 `debug / observability / resilience` 迁入 `platform_shared.crosscutting`；原 `auth / security / compliance / audit / policy` 归入 `Turtle`；监控、告警、诊断执行、自动化恢复归入 `Octopus`。
+原 `Whale_REQ_Crosscutting.md` 已废止，应删除，不再维护。原 `whale.shared.crosscutting` 中的 `debug / observability / resilience` 迁入 `platform_shared.crosscutting`；原 `auth / security / compliance / audit / policy` 归入 `Turtle`；监控、告警、诊断执行、自动化恢复归入 `Octopus`。
 
 ## 3. 文件职责
 
 | 文件 | 职责 |
 |---|---|
-| Whale_REQ_Project.md | Whale 数据底座项目级需求、总体架构、模块承接关系 |
-| Whale_REQ_Ingest.md | source 接入、状态缓存、消息发布、写入控制 |
-| Whale_REQ_SourceLab.md | （已废弃）simulator、probe、profile、capacity、协议验证工具 — 功能已迁至 Starfish |
-| Whale_REQ_SharedSource.md | production source client、协议 backend |
-| Whale_REQ_MessagePipeline.md | 消息主题、schema、分区、回放、DLQ、consumer group |
-| Whale_REQ_SpeedLayer.md | 消费消息、写 raw、更新 serving cache、实时轻处理 |
-| Whale_REQ_Storage.md | raw_archive、raw_index、standardized、warehouse/mart、serving cache 等存储层 |
-| Whale_REQ_Processing.md | 清洗、标准化、质量处理、时间对齐 |
-| Whale_REQ_BatchLayer.md | 周期调度、raw -> standardized 批处理、回灌 |
-| Whale_REQ_Aggregation.md | 实时聚合、周期聚合、业务主题聚合 |
+| BlueCrystal_REQ_Project.md | BlueCrystal 数据底座项目级需求、总体架构、模块承接关系 |
+| BlueCrystal_REQ_Ingest.md | source 接入、状态缓存、消息发布、写入控制 |
+| BlueCrystal_REQ_SourceLab.md | （已废弃）simulator、probe、profile、capacity、协议验证工具 — 功能已迁至 Starfish |
+| BlueCrystal_REQ_SharedSource.md | production source client、协议 backend |
+| BlueCrystal_REQ_MessagePipeline.md | 消息主题、schema、分区、回放、DLQ、consumer group |
+| BlueCrystal_REQ_SpeedLayer.md | 消费消息、写 raw、更新 serving cache、实时轻处理 |
+| BlueCrystal_REQ_Storage.md | raw_archive、raw_index、standardized、warehouse/mart、serving cache 等存储层 |
+| BlueCrystal_REQ_Processing.md | 清洗、标准化、质量处理、时间对齐 |
+| BlueCrystal_REQ_BatchLayer.md | 周期调度、raw -> standardized 批处理、回灌 |
+| BlueCrystal_REQ_Aggregation.md | 实时聚合、周期聚合、业务主题聚合 |
 | PlatformShared_REQ_Crosscutting.md | 全系统公共基础库：observability、debug、resilience、context、contracts、kernel、messaging、security_primitives |
 | Turtle_REQ.md | 治理、安全、审计、合规、策略、部署准入、变更控制 |
 | Octopus_REQ.md | 运维观测、统一部署编排、监控、告警、诊断、自动化恢复、回滚和运行报告 |

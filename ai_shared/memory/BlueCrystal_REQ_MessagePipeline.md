@@ -1,8 +1,8 @@
-# Whale_REQ_MessagePipeline
+# BlueCrystal_REQ_MessagePipeline
 
 ## 一、文件定位
 
-本文件描述 Whale 消息管道需求。消息管道承担 ingest 与 speed layer/downstream consumers 之间的异步解耦。
+本文件描述 BlueCrystal 消息管道需求。消息管道承担 ingest 与 speed layer/downstream consumers 之间的异步解耦。
 
 本文件不描述 source 协议采集，不描述 speed layer 的业务处理逻辑。
 
