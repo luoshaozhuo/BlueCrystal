@@ -23,7 +23,7 @@
 # 使用方式：
 #   bash scripts/diagnose_whale_p5_dependencies.sh
 #
-# 环境变量覆盖默认配置（同 .env.p5.example）：
+# 环境变量覆盖默认配置（同 deploy/whale/speed_layer/.env.p5.example）：
 #   WHALE_TEST_POSTGRES_DSN        (默认 postgresql://whale:whale@localhost:5432/whale_test)
 #   WHALE_KAFKA_BOOTSTRAP_SERVERS  (默认 localhost:9092)
 #   WHALE_REDIS_URL                (默认 localhost:16379)

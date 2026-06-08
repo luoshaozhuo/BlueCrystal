@@ -18,7 +18,7 @@ DEFAULT_CONNECTIONS_PATH = (
     PROJECT_ROOT / "src" / "starfish" / "native" / "bin" / "OPCUA_client_connections.yaml"
 )
 
-# Infrastructure constants (match docker-compose.ingest-dev.yaml)
+# Infrastructure constants (match deploy/whale/ingest/docker-compose.ingest-dev.yaml)
 PG_HOST = "127.0.0.1"
 PG_PORT = 5432
 PG_DB = "whale_ingest"
@@ -183,7 +183,7 @@ def wait_for_redis(redis_client, timeout_seconds: float = 20.0) -> None:
         time.sleep(0.2)
     pytest.fail(
         f"Redis backend is not ready at {REDIS_HOST}:{REDIS_PORT}. "
-        "Run `docker compose -f docker-compose.ingest-dev.yaml up -d` first."
+        "Run `docker compose -f deploy/whale/ingest/docker-compose.ingest-dev.yaml up -d` first."
     )
 
 
@@ -214,5 +214,5 @@ def wait_for_kafka(timeout_seconds: float = 30.0) -> None:
                 consumer.close()
     pytest.fail(
         f"Kafka backend is not ready at {KAFKA_BOOTSTRAP_SERVER}. "
-        "Run `docker compose -f docker-compose.ingest-dev.yaml up -d` first."
+        "Run `docker compose -f deploy/whale/ingest/docker-compose.ingest-dev.yaml up -d` first."
     )

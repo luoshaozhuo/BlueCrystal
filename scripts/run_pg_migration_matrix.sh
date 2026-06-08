@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.ingest-dev.yaml}"
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/whale/ingest/docker-compose.ingest-dev.yaml}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-whale-pg-matrix}"
 PG_DSN="${WHALE_INGEST_TEST_PG_DSN:-postgresql+psycopg://whale:whale@127.0.0.1:5432/whale_ingest}"
 TEARDOWN=true

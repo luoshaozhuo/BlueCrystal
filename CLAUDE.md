@@ -42,7 +42,7 @@ handoff 指定文件
 当前相关源码、测试、配置、schema
 ```
 
-只有涉及项目目标、长期需求、安全合规、架构边界、部署形态时，才读取项目说明、ADR 或历史 reports。
+只有涉及项目目标、长期需求、安全合规、架构边界、部署形态时，才读取项目说明或历史 reports。
 
 `ai_shared/memory/project_tree.md` 只用于定位和导航，不能替代当前源码读取；定位后必须二次读取真实源码、测试、配置和 schema。
 
@@ -77,15 +77,18 @@ Agent handoff:
 `code-implementer` 必须完成：
 
 1. 使用 `changed-files-gate` 获取编码前变更范围。
-2. 读取 handoff 指定背景资料、需求、报告或 ADR。
+2. 读取 handoff 指定背景资料、需求、报告或设计资料。
 3. 必要时读取 `ai_shared/memory/project_tree.md` 定位候选文件；该读取是普通导航动作，不使用 skill。
-4. 读取当前相关源码、测试、配置、schema，二次确认，不得只依赖 project_tree。
-5. 读取 `ai_shared/rules/routing.md`，并按 routing 读取编码、测试、验证、注释相关规则。
-6. 使用 `code-quality-gate` 判断注释、文档注释、类型、测试和验证要求。
-7. 编码、必要注释、语言惯用文档注释、相关测试修改同轮完成。
-8. 执行可负担的初步验证。
-9. 使用 `changed-files-gate` 输出编码后真实变更范围。
-10. 按统一 `Agent result` 格式返回。
+4. 在修改前识别目标路径或模块是否已有稳定的分层方式、依赖方向、扩展缝和职责切分，并判断本轮是否只是既有架构中的局部扩展。
+5. 若属于既有架构中的局部扩展，默认沿用当前模式、边界和装配方式；只有用户 prompt 明确要求，或现有实现已与任务约束冲突时，才改变设计方式，并在结果中说明原因。
+6. 涉及目录归属或新文件落点时，先判断该内容属于运行时代码还是部署交付资产；运行时代码留在既有源码目录，部署清单、样例配置、环境模板、发布/回滚 runbook 等落入 `deploy/`，不得为了集中管理把运行时代码迁入 `deploy/`。
+7. 读取当前相关源码、测试、配置、schema，二次确认，不得只依赖 project_tree。
+8. 读取 `ai_shared/rules/routing.md`，并按 routing 读取编码、测试、验证、注释相关规则。
+9. 使用 `code-quality-gate` 判断注释、文档注释、类型、测试和验证要求。
+10. 编码、必要注释、语言惯用文档注释、相关测试修改同轮完成。
+11. 执行可负担的初步验证。
+12. 使用 `changed-files-gate` 输出编码后真实变更范围。
+13. 按统一 `Agent result` 格式返回。
 
 ### 4.2 委派验证
 
@@ -104,21 +107,20 @@ Agent handoff:
 
 `test-validator` 不得修改源码、测试或文档。若验证失败，主会话必须再次使用 `code-implementer` 修复，并再次使用 `test-validator` 验证。
 
-### 4.3 委派文档、目录树、ADR、需求追踪和报告
+### 4.3 委派文档、目录树、需求追踪和报告
 
-验证通过或明确存在未验证项后，主会话必须使用 `project-steward` 处理文档、目录树、ADR、需求跟踪和报告。
+验证通过或明确存在未验证项后，主会话必须使用 `project-steward` 处理文档、目录树、需求跟踪和报告。
 
 `project-steward` 必须完成：
 
 1. 使用 `changed-files-gate` 获取当前真实变更范围。
 2. 读取 `ai_shared/rules/documentation.md` 和 `reporting.md`。
 3. 新增、删除、移动、重命名文件，或文件职责变化时，使用 `project-tree-update`。
-4. 影响长期架构、接口契约、schema、部署策略或 rejected option 时，判断是否使用 `adr-upsert`。
-5. 需求状态变化时，使用 `requirement-trace`。
-6. 需要归档报告时，直接按 `reporting.md` 写入 `ai_shared/reports/`，不再使用 report-archive skill。
-7. 规则体系变化时，使用 `rule-update`。
-8. 只根据已验证证据更新状态，不得把 skipped、mock、fake、health check、TCP connect、脚本存在、环境 pending 写成真实通过。
-9. 按统一 `Agent result` 格式返回。
+4. 需求状态变化时，使用 `requirement-trace`。
+5. 需要归档报告时，直接按 `reporting.md` 写入 `ai_shared/reports/`，不再使用 report-archive skill。
+6. 规则体系变化时，使用 `rule-update`。
+7. 只根据已验证证据更新状态，不得把 skipped、mock、fake、health check、TCP connect、脚本存在、环境 pending 写成真实通过。
+8. 按统一 `Agent result` 格式返回。
 
 `project-steward` 不得修改源码和测试，除非 handoff 明确授权。
 
@@ -159,13 +161,12 @@ Agent result:
 project-tree-reset
 heavy-regression
 commit-message
-adr-upsert
 rule-update
 全量测试、长测、发布前完整验证
 commit / push / reset / clean
 ```
 
-如果流程中需要判断是否执行 `adr-upsert`、`requirement-trace`、`project-tree-update`，由 `project-steward` 按规则判断；真正创建或修改 ADR、规则文件时，必须有 handoff 或用户 prompt 支持。
+如果流程中需要判断是否执行 `requirement-trace`、`project-tree-update`，由 `project-steward` 按规则判断；真正创建或修改规则文件时，必须有 handoff 或用户 prompt 支持。
 
 ## 8. 禁止事项
 

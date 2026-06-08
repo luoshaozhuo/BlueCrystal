@@ -190,7 +190,7 @@ main() {
     # ---- Phase 2: 配置与路径 ----
     log_info "Phase 2: 配置文件检查"
     check_file "$REPO_ROOT/pyproject.toml" "pyproject.toml"
-    check_file "$REPO_ROOT/.env.whale.field.example" ".env.whale.field.example"
+    check_file "$REPO_ROOT/deploy/whale/.env.whale.field.example" "deploy/whale/.env.whale.field.example"
 
     # 检查 whale 配置目录
     local config_dir="$REPO_ROOT/config/whale"

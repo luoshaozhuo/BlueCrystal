@@ -64,9 +64,16 @@ logs/
 .env
 .env.local
 .env.*.local
+/deploy/whale/.env.whale.field
+/deploy/whale/ingest/.env.ingest.local
+/deploy/whale/speed_layer/.env.p5
 
 # Local runtime data
 /.data/
 
 # coding agent reports
 /ai_shared/reports/
+
+# Frontend workspace artifacts
+/src/manta/node_modules/
+/src/manta/dist/

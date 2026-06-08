@@ -1,4 +1,3 @@
-import Mock from 'mockjs';
 import type {
   BootstrapMetricEvidence,
   DistributionShiftGroup,
@@ -22,8 +21,6 @@ import {
   turbineProfiles,
   windFrequencyRayleighParameters,
 } from './fixtures';
-
-const { Random } = Mock;
 
 function round(value: number, digits = 3) {
   return Number(value.toFixed(digits));
@@ -94,11 +91,14 @@ function computeMean(values: number[]) {
 }
 
 function resample(values: number[]) {
-  return Array.from({ length: values.length }, () => values[Random.integer(0, values.length - 1)] ?? values[0] ?? 0);
+  return Array.from(
+    { length: values.length },
+    () => values[randomInteger(0, values.length - 1)] ?? values[0] ?? 0,
+  );
 }
 
 function createTailRiskSampleSet(metric: VolatilityMetricName) {
-  const size = Random.integer(32, 38);
+  const size = randomInteger(32, 38);
   const config = {
     Peak: { baselineMean: 4.84, optimizedMean: 4.33, baselineStd: 0.28, optimizedStd: 0.20, tailWeight: 0.24 },
     P95: { baselineMean: 4.26, optimizedMean: 3.93, baselineStd: 0.18, optimizedStd: 0.14, tailWeight: 0.16 },
@@ -110,7 +110,9 @@ function createTailRiskSampleSet(metric: VolatilityMetricName) {
       Array.from({ length: size }, (_, index) => {
         const base = randomNormal(mean, stdDev);
         const tailBoost =
-          index > size * (1 - tailWeight) ? Random.float(0.08 + shiftBias, 0.28 + shiftBias, 2, 3) : 0;
+          index > size * (1 - tailWeight)
+            ? randomFloat(0.08 + shiftBias, 0.28 + shiftBias, 3)
+            : 0;
         return round(Math.max(base + tailBoost, 3.2), 3);
       }),
     );
@@ -532,9 +534,9 @@ export function createGustActiveWindowMock(time: number[], mean: number[]): Gust
 
 export function createGustTemplateMock(): GustTemplateData {
   const time = createTimeAxis();
-  const baselineLevel = Random.float(0.02, 0.05, 2, 2);
-  const amplitude = Random.float(1.42, 1.58, 2, 2);
-  const plateauBump = Random.float(0.08, 0.16, 2, 2);
+  const baselineLevel = randomFloat(0.02, 0.05, 2);
+  const amplitude = randomFloat(1.42, 1.58, 2);
+  const plateauBump = randomFloat(0.08, 0.16, 2);
 
   const mean = time.map((t) => {
     const rise = createSmoothStep(t, 6, 14);
@@ -613,6 +615,15 @@ function formatSigned(value: number, digits: number, unit: string) {
   const rounded = Number(value.toFixed(digits));
   if (rounded === 0) return `0.0${unit}`;
   return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}${unit}`;
+}
+
+function randomInteger(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomFloat(min: number, max: number, digits: number) {
+  const value = min + Math.random() * (max - min);
+  return Number(value.toFixed(digits));
 }
 
 function createResponseComparisonFeatures(

@@ -2,7 +2,7 @@
 
 Usage::
 
-    docker compose -f docker-compose.ingest-dev.yaml up -d
+    docker compose -f deploy/whale/ingest/docker-compose.ingest-dev.yaml up -d
     python -m pytest tests/e2e/ -m e2e -v
 """
 

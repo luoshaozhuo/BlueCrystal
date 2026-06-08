@@ -29,13 +29,13 @@ ingest -> Kafka -> speed_layer -> S3/TDengine/Redis
 ### 1. 复制环境变量模板
 
 ```bash
-cp .env.whale.field.example .env.whale.field
+cp deploy/whale/.env.whale.field.example deploy/whale/.env.whale.field
 ```
 
 ### 2. 编辑环境变量
 
 ```bash
-vim .env.whale.field
+vim deploy/whale/.env.whale.field
 ```
 
 关键变量：`WHALE_KAFKA_BOOTSTRAP_SERVERS`、`WHALE_REDIS_URL`、`WHALE_S3_ENDPOINT`、
@@ -45,10 +45,10 @@ vim .env.whale.field
 
 ```bash
 # 启动 P0 服务 (Kafka + Redis + MinIO + TDengine + PostgreSQL)
-docker compose -f docker-compose.whale-l5.yaml up -d
+docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml up -d
 
 # 验证所有服务健康
-docker compose -f docker-compose.whale-l5.yaml ps
+docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml ps
 ```
 
 ### 4. 安装 Python 驱动
@@ -136,8 +136,8 @@ pytest tests/e2e/test_whale_field_minimal_smoke.py -v
 | S3/MinIO raw_archive | `config/whale/storage.raw_archive.example.yaml` |
 | TDengine raw_index/standardized | `config/whale/storage.tdengine.example.yaml` |
 | Redis serving_cache | `config/whale/storage.serving_cache.example.yaml` |
-| 环境变量模板 | `.env.whale.field.example` |
-| Docker compose | `docker-compose.whale-l5.yaml` |
+| 环境变量模板 | `deploy/whale/.env.whale.field.example` |
+| Docker compose | `deploy/whale/message_pipeline/docker-compose.whale-l5.yaml` |
 
 所有配置示例使用环境变量占位符 `${VAR_NAME}`，不硬编码敏感凭据。
 

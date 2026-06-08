@@ -40,7 +40,7 @@ cd "$ROOT_DIR"
 # ── 配置参数 ────────────────────────────────────────────────────────────────
 
 PG_MODE="${PG_MODE:-auto}"          # auto | docker | dsn | sqlite-only
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.ingest-prodlike.yaml}"
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/whale/ingest/docker-compose.ingest-prodlike.yaml}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-whale-pg-lease-test}"
 PG_DSN="${WHALE_INGEST_TEST_PG_DSN:-}"
 PYTEST_EXTRA_ARGS="${PYTEST_EXTRA_ARGS:-}"

@@ -87,7 +87,7 @@ mark_result() {
 check_docker_env() {
     log_info "Step 1/8: Docker compose 环境检查"
 
-    local compose_file="${REPO_ROOT}/docker-compose.whale-l5.yaml"
+    local compose_file="${REPO_ROOT}/deploy/whale/message_pipeline/docker-compose.whale-l5.yaml"
     if [[ ! -f "$compose_file" ]]; then
         log_fail "docker-compose.whale-l5.yaml 不存在"
         mark_result "docker-env" "failed" "compose file missing"
@@ -122,10 +122,10 @@ check_docker_env() {
             log_ok "Docker compose L5 容器: ${running_count} 个运行中 (kafka, redis, minio, tdengine, postgres)"
             mark_result "docker-env" "ok" "${running_count} containers running"
         elif [[ "$running_count" -gt 0 ]]; then
-            log_warn "Docker compose L5 容器: ${running_count}/${total_count} 运行中，建议 docker compose -f docker-compose.whale-l5.yaml up -d"
+            log_warn "Docker compose L5 容器: ${running_count}/${total_count} 运行中，建议 docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml up -d"
             mark_result "docker-env" "warn" "${running_count}/${total_count} running"
         else
-            log_warn "Docker compose L5 容器: 无运行中容器，运行 'docker compose -f docker-compose.whale-l5.yaml up -d' 启动"
+            log_warn "Docker compose L5 容器: 无运行中容器，运行 'docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml up -d' 启动"
             mark_result "docker-env" "warn" "no containers running"
         fi
     else
@@ -529,7 +529,7 @@ print_summary() {
             echo -e " ${GREEN}[OK]${NC}   所有步骤通过，可交付基线就绪"
         fi
         echo ""
-        echo " 环境启动:  docker compose -f docker-compose.whale-l5.yaml up -d"
+        echo " 环境启动:  docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml up -d"
         echo " 重新验证:  bash scripts/run_whale_field_ready_smoke.sh"
         echo "============================================================"
     fi

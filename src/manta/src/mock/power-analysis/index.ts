@@ -5,12 +5,10 @@ import {
   volatilityEvidence,
   powerCurveSeries,
   summaryMetrics,
-} from './rules';
-import {
   turbineOptions,
   turbineProfiles,
   windFrequencyRayleighParameters,
-} from './fixtures';
+} from '@/api/local-data/power-analysis';
 
 setupMock({
   setup() {

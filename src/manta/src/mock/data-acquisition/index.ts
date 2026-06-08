@@ -1,6 +1,6 @@
 import Mock from 'mockjs';
 import setupMock, { successResponseWrap } from '@/utils/setup-mock';
-import { getDataCollectionMock } from './rules';
+import { getDataCollectionMock } from '@/api/local-data/data-acquisition';
 
 let dataAcquisitionStep = 0;
 

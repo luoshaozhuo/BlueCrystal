@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COMPOSE_FILE="${1:-docker-compose.ingest-dev.yaml}"
+COMPOSE_FILE="${1:-deploy/whale/ingest/docker-compose.ingest-dev.yaml}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:18000}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-whale-ingest-smoke}"
 SERVICE_NAME="ingest-runtime"

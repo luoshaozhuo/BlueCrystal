@@ -1,6 +1,6 @@
 import Mock from 'mockjs';
 import setupMock, { successResponseWrap } from '@/utils/setup-mock';
-import { createLoadMitigationPageMock } from './rules';
+import { createLoadMitigationPageMock } from '@/api/local-data/load-mitigation';
 
 setupMock({
   setup() {

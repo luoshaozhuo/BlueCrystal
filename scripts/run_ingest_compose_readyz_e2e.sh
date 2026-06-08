@@ -96,9 +96,9 @@ main() {
   # ── 选择 compose 文件 ─────────────────────────────────────────────────
   local COMPOSE_FILE
   if [[ "${COMPOSE_MODE}" == "dev" ]]; then
-    COMPOSE_FILE="${ROOT_DIR}/docker-compose.ingest-dev.yaml"
+    COMPOSE_FILE="${ROOT_DIR}/deploy/whale/ingest/docker-compose.ingest-dev.yaml"
   else
-    COMPOSE_FILE="${ROOT_DIR}/docker-compose.ingest-prodlike.yaml"
+    COMPOSE_FILE="${ROOT_DIR}/deploy/whale/ingest/docker-compose.ingest-prodlike.yaml"
   fi
 
   # ── 设置陷阱 ──────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 ---
 name: project-steward
-description: 根据已验证证据更新文档、报告、目录树、ADR、需求跟踪表和规则；不得修改源码和测试。
+description: 根据已验证证据更新文档、报告、目录树、需求跟踪表和规则；不得修改源码和测试。
 tools: Read, Grep, Glob, Edit, MultiEdit, Write, Bash
 ---
 
@@ -8,7 +8,7 @@ tools: Read, Grep, Glob, Edit, MultiEdit, Write, Bash
 
 ## 职责
 
-根据已验证证据更新文档、报告、目录树、ADR、需求跟踪表和规则。不得修改源码和测试，除非 handoff 明确授权。
+根据已验证证据更新文档、报告、目录树、需求跟踪表和规则。不得修改源码和测试，除非 handoff 明确授权。
 
 ## 必须先执行
 
@@ -26,7 +26,7 @@ git diff --cached --name-only
 ai_shared/rules/documentation.md
 ai_shared/rules/reporting.md
 ai_shared/memory/project_tree.md
-handoff 指定需求文档、报告、ADR、测试结果
+handoff 指定需求文档、报告、测试结果
 ```
 
 如涉及规则体系变化，还必须读取相关 `ai_shared/rules/*.md`。
@@ -37,7 +37,6 @@ handoff 指定需求文档、报告、ADR、测试结果
 changed-files-gate
 project-tree-update
 requirement-trace
-adr-upsert
 rule-update
 ```
 
@@ -46,11 +45,10 @@ rule-update
 ## 必须判断
 
 1. 新增、删除、移动、重命名文件，或文件职责变化：执行 `project-tree-update`。
-2. 长期架构、接口契约、schema、部署策略、rejected option、证据等级规则变化：判断 `adr-upsert`。
-3. 需求实现状态变化：执行 `requirement-trace`。
-4. 需要归档报告：按 `reporting.md` 写入 `ai_shared/reports/`。
-5. 规则体系变化：执行 `rule-update`。
-6. 规则更新必须保持单一规则源、多语言通用，不得形成 Python-only 或项目专用旁路规则。
+2. 需求实现状态变化：执行 `requirement-trace`。
+3. 需要归档报告：按 `reporting.md` 写入 `ai_shared/reports/`。
+4. 规则体系变化：执行 `rule-update`。
+5. 规则更新必须保持单一规则源、多语言通用，不得形成 Python-only 或项目专用旁路规则。
 
 ## 状态判定规则
 

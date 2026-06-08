@@ -96,12 +96,12 @@ bash scripts/whale_test.sh --stage 模块集成期验证 --component whale --mod
 
 ### 启动跨模块联调所需基础设施
 ```bash
-docker compose -f docker-compose.whale-l5.yaml up -d postgres redis kafka minio
+docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml up -d postgres redis kafka minio
 ```
 
 ### 启动准生产依赖所需基础设施
 ```bash
-docker compose -f docker-compose.whale-l5.yaml up -d
+docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml up -d
 python -m seahorse.reference_data
 ```
 

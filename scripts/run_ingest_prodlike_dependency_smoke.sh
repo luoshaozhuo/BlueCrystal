@@ -13,7 +13,7 @@ set -euo pipefail
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.ingest-prodlike.yaml}"
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/whale/ingest/docker-compose.ingest-prodlike.yaml}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-whale-prodlike-smoke}"
 export WHALE_INGEST_PRODLIKE_PG_USER="${WHALE_INGEST_PRODLIKE_PG_USER:-whale}"
 export WHALE_INGEST_PRODLIKE_PG_PASSWORD="${WHALE_INGEST_PRODLIKE_PG_PASSWORD:-$(python - <<'PY'

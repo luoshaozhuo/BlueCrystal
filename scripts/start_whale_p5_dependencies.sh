@@ -11,7 +11,7 @@
 #   bash scripts/start_whale_p5_dependencies.sh
 #
 # 自定义 compose 文件：
-#   export WHALE_P5_COMPOSE_FILE=docker-compose.p5.yml
+#   export WHALE_P5_COMPOSE_FILE=deploy/whale/speed_layer/docker-compose.p5.yml   # 仓库迁移后真实路径，脚本默认 COMPOSE_FILE 已是此值
 #
 # 注意：
 #   - 此脚本仅用于本地 P5 集成测试，不是生产部署工具。
@@ -26,7 +26,7 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPOSE_FILE="${WHALE_P5_COMPOSE_FILE:-docker-compose.p5.yml}"
+COMPOSE_FILE="${WHALE_P5_COMPOSE_FILE:-deploy/whale/speed_layer/docker-compose.p5.yml}"
 COMPOSE_PATH="$REPO_ROOT/$COMPOSE_FILE"
 
 echo "=========================================="

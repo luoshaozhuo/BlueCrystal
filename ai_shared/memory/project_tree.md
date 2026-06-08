@@ -12,7 +12,7 @@
 ├── CLAUDE.md                        — Claude Code / Codex 共用执行入口
 ├── AGENTS.md                        — Codex 自动读取入口，指向 CLAUDE.md
 ├── README.md                        — 项目简介与快速开始
-├── Dockerfile                       — ingest 统一 runtime 镜像
+├── Dockerfile                       — 已迁移到 deploy/whale/ingest/Dockerfile
 ├── alembic.ini                      — Alembic 主配置
 ├── pyproject.toml                   — 项目元数据、依赖与 ruff/mypy/pytest 工具配置
 ├── requirements.txt                 — Python 依赖声明
@@ -24,19 +24,10 @@
 │       ├── 20260527_000002_add_audit_index_and_job_stagger.py
 │       ├── 20260527_000003_add_idempotency_record.py
 │       └── 20260527_000004_add_model_asset_tables.py
-├── docker-compose.ingest-dev.yaml   — ingest 开发环境 Docker 编排
-├── docker-compose.ingest-prodlike.yaml — ingest prodlike 环境 Docker 编排（PG + Redis + Kafka）
-├── docker-compose.whale-l5.yaml     — P5 外部依赖 5-service Docker 环境
-├── docker-compose.p5.yml            — 最小 P5 本地编排（PG+Redis+Kafka/MinIO+TDengine+taosAdapter）
-├── .flake8                          — flake8 代码检查配置
 ├── .gitignore                       — Git 忽略规则
-├── .env.ingest.example              — ingest 环境变量模板
-├── .env.whale.field.example         — BlueCrystal 现场部署完整环境变量模板
-├── .env.p5.example                  — P5 环境变量模板（无真实密钥）
 ├── .vscode/settings.json            — VSCode 编辑器配置
 ├── .vscode/claude-wrapper.sh        — VSCode Claude CLI 包装脚本
 ├── .data/                           — 运行时数据（SQLite 开发/测试 DB，gitignore）
-├── .source_lab_runtime/             — 旧 source_lab 运行时残留（已弃用，gitignore）
 ├── config/                          — 运行时配置
 │   ├── ingest/                      — ingest 配置（access_policy / performance / audit / endurance / security_partition）
 │   └── whale/                       — BlueCrystal 现场部署配置模板（P5 准生产依赖验证期 MISSING_ENVIRONMENT 标记）
@@ -785,22 +776,13 @@ tests/
 
 ```text
 ai_shared/
-├── adr/                              — 架构决策记录
-│   ├── ADR索引.md                    — ADR 索引
-│   ├── 0000-template.md              — ADR 模板
-│   ├── ADR-20260523-001 ~ 009        — 9 个 Round 1 ADR（source-lab / source / protocol / cache / facade）
-│   ├── ADR-20260530-010               — shared-source production runner
-│   ├── ADR-20260602-011 ~ 015        — 5 个系统组件 / crosscutting / message-pipeline / speed-layer / storage
-│   ├── ADR-20260604-016               — ingest file-ingest waveform
-│   └── ADR-20260604-017               — model-asset simulation metadata
 ├── agent_config/                     — AI Agent 共享配置
 │   ├── hooks/                        — 共享 hook 脚本（4 个）
 │   │   ├── block-dangerous-bash.py   — 危险命令拦截
 │   │   ├── docstring-cn-gate.py      — 中文 docstring 门禁
 │   │   ├── no-source-lab-import-gate.sh — source_lab 导入门禁
 │   │   └── comment-doc-gate.py        — 注释文档门禁
-│   └── skills/                       — 规范源 skill 定义（9 个）
-│       ├── adr-upsert/               — 架构决策记录管理
+│   └── skills/                       — 规范源 skill 定义（8 个）
 │       ├── changed-files-gate/       — 变更范围门禁
 │       ├── code-quality-gate/        — 代码质量门禁
 │       ├── commit-message/           — 提交信息生成
@@ -927,9 +909,20 @@ scripts/
 deploy/
 ├── whale/                            — BlueCrystal 现场部署
 │   ├── README.md                     — BlueCrystal 部署总览（MISSING_ENVIRONMENT 标记）
-│   ├── ingest/README.md              — BlueCrystal Ingest 部署
-│   ├── message_pipeline/README.md    — Kafka P5 准生产验证通过；Pulsar MISSING_ENVIRONMENT
-│   ├── speed_layer/README.md         — InMemory 生产就绪；Flink MISSING_ENVIRONMENT
+│   ├── .env.whale.field.example      — 现场部署完整环境变量模板
+│   ├── ingest/                       — BlueCrystal Ingest 部署
+│   │   ├── .env.ingest.example       — ingest 环境变量模板
+│   │   ├── README.md                 — Ingest 部署说明
+│   │   ├── Dockerfile                — ingest 统一 runtime 镜像（build context = repo 根）
+│   │   ├── docker-compose.ingest-dev.yaml      — ingest 开发栈（PG + Redis + Kafka + ingest-runtime）
+│   │   └── docker-compose.ingest-prodlike.yaml — ingest 准生产栈（PG + Redis + Kafka + api + workers）
+│   ├── message_pipeline/             — Kafka P5 准生产验证通过；Pulsar MISSING_ENVIRONMENT
+│   │   ├── README.md                 — 消息管道部署说明
+│   │   └── docker-compose.whale-l5.yaml        — L5 端到端外部依赖栈
+│   ├── speed_layer/                  — InMemory 生产就绪；Flink MISSING_ENVIRONMENT
+│   │   ├── README.md                 — 速度层 writers 部署说明
+│   │   ├── .env.p5.example           — P5 环境变量模板（无真实密钥）
+│   │   └── docker-compose.p5.yml               — P5 最小外部依赖栈
 │   └── storage/README.md             — TDengine / S3 / Redis P5 准生产验证通过；HDFS MISSING_ENVIRONMENT
 ├── turtle/README.md                  — Turtle 部署说明
 └── octopus/README.md                 — Octopus 部署说明

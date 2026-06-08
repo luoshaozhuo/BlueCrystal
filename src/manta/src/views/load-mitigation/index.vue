@@ -99,7 +99,7 @@
     loadMitigationTurbineOptions,
     type LoadMetricKey,
     type LoadMitigationMetricConfig,
-  } from '@/mock/load-mitigation';
+  } from '@/api/local-data/load-mitigation';
   import AmplitudeStructureComparison from './components/AmplitudeStructureComparison.vue';
   import EnergySpectrumComparison from './components/EnergySpectrumComparison.vue';
   import HighAmplitudeRiskComparison from './components/HighAmplitudeRiskComparison.vue';

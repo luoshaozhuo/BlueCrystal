@@ -24,8 +24,41 @@
 
 <script setup lang="ts">
   import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+  import {
+    CameraEventType,
+    Cartesian2,
+    Cartesian3,
+    Cartographic,
+    CesiumTerrainProvider,
+    Color,
+    ConstantProperty,
+    Credit,
+    DistanceDisplayCondition,
+    Ellipsoid,
+    Entity,
+    HeadingPitchRoll,
+    HorizontalOrigin,
+    ImageryLayer,
+    JulianDate,
+    LabelStyle,
+    Material,
+    Math as CesiumMath,
+    NearFarScalar,
+    NodeTransformationProperty,
+    PropertyBag,
+    Quaternion,
+    Rectangle,
+    sampleTerrainMostDetailed,
+    ScreenSpaceEventHandler,
+    ScreenSpaceEventType,
+    TerrainProvider,
+    Transforms,
+    UrlTemplateImageryProvider,
+    VerticalOrigin,
+    Viewer,
+    WebMercatorTilingScheme,
+  } from 'cesium';
   import { useI18n } from 'vue-i18n';
-  import * as Cesium from 'cesium';
   import axios from 'axios';
   import {
     getTurbineBaseInfo,
@@ -68,8 +101,8 @@
   const el = ref<HTMLDivElement | null>(null);
   const mousePositionText = ref(t('viewer.mousePositionDefault'));
   const hoveredTurbineInfo = ref<HoveredTurbineInfo | null>(null);
-  let viewer: Cesium.Viewer | undefined;
-  let mouseMoveHandler: Cesium.ScreenSpaceEventHandler | undefined;
+  let viewer: Viewer | undefined;
+  let mouseMoveHandler: ScreenSpaceEventHandler | undefined;
   let mouseHeightSampleToken = 0;
   let lastMouseTerrainSampleAtMs = 0;
   let removeCameraPreRenderListener: (() => void) | undefined;
@@ -84,9 +117,9 @@
   const contourUniforms = {
     width: 1,
     spacing: 20,
-    color: Cesium.Color.fromCssColorString('#FFFFFF').withAlpha(0.25),
+    color: Color.fromCssColorString('#FFFFFF').withAlpha(0.25),
   };
-  const contourMaterial = Cesium.Material.fromType(
+  const contourMaterial = Material.fromType(
     'ElevationContour',
     contourUniforms,
   );
@@ -107,9 +140,9 @@
   // 相机最大高度（米）
   const maximumCameraHeightMeters = 6000;
   const initialOrientation = {
-    heading: Cesium.Math.toRadians(initialHeadingDegrees),
-    pitch: Cesium.Math.toRadians(initialPitchDegrees),
-    roll: Cesium.Math.toRadians(initialRollDegrees),
+    heading: CesiumMath.toRadians(initialHeadingDegrees),
+    pitch: CesiumMath.toRadians(initialPitchDegrees),
+    roll: CesiumMath.toRadians(initialRollDegrees),
   };
 
   // 离线影像可见层级范围
@@ -123,8 +156,8 @@
   const turbineModelScale = 1.0;
   const turbineModelMinimumPixelSize = 20;
   const turbineModelMaximumScale = 80;
-  const turbineModelColor = Cesium.Color.WHITE;
-  const turbineModelSilhouetteColor = Cesium.Color.CYAN;
+  const turbineModelColor = Color.WHITE;
+  const turbineModelSilhouetteColor = Color.CYAN;
   const turbineModelSilhouetteSize = 0.2;
   const turbineLabelFont =
     '50 10px "Orbitron", "Rajdhani", "JetBrains Mono", "SFMono-Regular", Consolas, monospace';
@@ -141,9 +174,9 @@
 
   type TurbineEntityBundle = {
     baseInfo: TurbineBaseInfo;
-    modelEntity: Cesium.Entity;
-    markerEntity: Cesium.Entity;
-    labelEntity: Cesium.Entity;
+    modelEntity: Entity;
+    markerEntity: Entity;
+    labelEntity: Entity;
     targetRotorAngleDegrees: number;
     currentRotorAngleDegrees: number;
     targetRotorSpeedRpm: number;
@@ -163,7 +196,7 @@
 
   type ViewerBootstrapData = {
     windFarmInfo: WindFarmInfo;
-    terrainProvider: Cesium.TerrainProvider;
+    terrainProvider: TerrainProvider;
     terrainBounds: LayerBounds;
     turbineBaseInfo: TurbineBaseInfo[];
   };
@@ -171,9 +204,9 @@
   type ViewerRuntimeContext = {
     centerLon: number;
     centerLat: number;
-    terrainDisplayRectangle: Cesium.Rectangle;
-    panLimitRectangle: Cesium.Rectangle;
-    offlineImageryProvider?: Cesium.UrlTemplateImageryProvider;
+    terrainDisplayRectangle: Rectangle;
+    panLimitRectangle: Rectangle;
+    offlineImageryProvider?: UrlTemplateImageryProvider;
     initialCameraHeight: number;
     minimumZoomDistance: number;
     maximumZoomDistance: number;
@@ -314,7 +347,7 @@
     const entityId =
       typeof entity === 'string'
         ? entity
-        : entity instanceof Cesium.Entity && typeof entity.id === 'string'
+        : entity instanceof Entity && typeof entity.id === 'string'
           ? entity.id
           : undefined;
     if (!entityId) return null;
@@ -335,13 +368,13 @@
     radiusMeters: number,
   ) {
     const earthRadius = 6378137;
-    const centerLon = Cesium.Math.toRadians(centerLonDeg);
-    const centerLat = Cesium.Math.toRadians(centerLatDeg);
+    const centerLon = CesiumMath.toRadians(centerLonDeg);
+    const centerLat = CesiumMath.toRadians(centerLatDeg);
     const safeCos = Math.max(1e-6, Math.abs(Math.cos(centerLat)));
     const deltaLat = radiusMeters / earthRadius;
     const deltaLon = radiusMeters / (earthRadius * safeCos);
 
-    return Cesium.Rectangle.fromRadians(
+    return Rectangle.fromRadians(
       centerLon - deltaLon,
       centerLat - deltaLat,
       centerLon + deltaLon,
@@ -412,7 +445,7 @@
     const terrainRootUrl = resolvePublicAssetUrl('terrain/');
     const terrainLayerUrl = resolvePublicAssetUrl('terrain/layer.json');
     const [terrainProvider, layerResponse] = await Promise.all([
-      Cesium.CesiumTerrainProvider.fromUrl(terrainRootUrl, {
+      CesiumTerrainProvider.fromUrl(terrainRootUrl, {
         requestVertexNormals: true,
         requestWaterMask: false,
         requestMetadata: true,
@@ -440,13 +473,13 @@
    * 批量创建风机模型、中心点与标签实体，并初始化运行时状态容器。
    */
   async function addTurbineModelsToScene(
-    viewerInstance: Cesium.Viewer,
+    viewerInstance: Viewer,
     turbines: TurbineBaseInfo[],
   ): Promise<TurbineEntityBundleMap> {
     const turbineEntities = new Map<string, TurbineEntityBundle>();
 
     turbines.forEach((turbine) => {
-      const modelPosition = Cesium.Cartesian3.fromDegrees(
+      const modelPosition = Cartesian3.fromDegrees(
         turbine.lon,
         turbine.lat,
         turbine.height,
@@ -467,25 +500,25 @@
 
       const markerEntity = viewerInstance.entities.add({
         id: `turbine-marker-${turbine.id}`,
-        position: Cesium.Cartesian3.fromDegrees(
+        position: Cartesian3.fromDegrees(
           turbine.lon,
           turbine.lat,
           turbine.height + turbineHubMarkerHeightOffsetMeters,
         ),
         point: {
           pixelSize: turbineHubMarkerPixelSize,
-          color: Cesium.Color.fromCssColorString('#00E5FF').withAlpha(0.95),
+          color: Color.fromCssColorString('#00E5FF').withAlpha(0.95),
           outlineColor:
-            Cesium.Color.fromCssColorString('#022A3A').withAlpha(0.95),
+            Color.fromCssColorString('#022A3A').withAlpha(0.95),
           outlineWidth: 2.5,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scaleByDistance: new Cesium.NearFarScalar(300, 1.2, 12000, 0.8),
+          scaleByDistance: new NearFarScalar(300, 1.2, 12000, 0.8),
         },
       });
 
       const labelEntity = viewerInstance.entities.add({
         id: `turbine-label-${turbine.id}`,
-        position: Cesium.Cartesian3.fromDegrees(
+        position: Cartesian3.fromDegrees(
           turbine.lon,
           turbine.lat,
           turbine.height + turbineLabelHeightOffsetMeters,
@@ -493,20 +526,20 @@
         label: {
           text: `#${turbine.id}`,
           font: turbineLabelFont,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          fillColor: Cesium.Color.fromCssColorString('#7DF9FF').withAlpha(0.95),
+          style: LabelStyle.FILL_AND_OUTLINE,
+          fillColor: Color.fromCssColorString('#7DF9FF').withAlpha(0.95),
           outlineColor:
-            Cesium.Color.fromCssColorString('#00E5FF').withAlpha(0.75),
+            Color.fromCssColorString('#00E5FF').withAlpha(0.75),
           outlineWidth: 2,
           showBackground: true,
           backgroundColor:
-            Cesium.Color.fromCssColorString('#091524').withAlpha(0.65),
-          backgroundPadding: new Cesium.Cartesian2(8, 5),
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-          pixelOffset: new Cesium.Cartesian2(0, -8),
+            Color.fromCssColorString('#091524').withAlpha(0.65),
+          backgroundPadding: new Cartesian2(8, 5),
+          verticalOrigin: VerticalOrigin.BOTTOM,
+          horizontalOrigin: HorizontalOrigin.CENTER,
+          pixelOffset: new Cartesian2(0, -8),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(
+          distanceDisplayCondition: new DistanceDisplayCondition(
             0,
             12000,
           ),
@@ -540,34 +573,34 @@
   function applyRotorNodeTransformations(bundle: TurbineEntityBundle) {
     if (!bundle.modelEntity.model) return;
 
-    const hubRotation = Cesium.Quaternion.fromAxisAngle(
-      Cesium.Cartesian3.UNIT_X,
-      Cesium.Math.toRadians(bundle.currentRotorAngleDegrees),
+    const hubRotation = Quaternion.fromAxisAngle(
+      Cartesian3.UNIT_X,
+      CesiumMath.toRadians(bundle.currentRotorAngleDegrees),
     );
-    const blade1PitchRotation = Cesium.Quaternion.fromAxisAngle(
-      Cesium.Cartesian3.UNIT_X,
-      Cesium.Math.toRadians(bundle.currentBladePitchDegrees[0]),
+    const blade1PitchRotation = Quaternion.fromAxisAngle(
+      Cartesian3.UNIT_X,
+      CesiumMath.toRadians(bundle.currentBladePitchDegrees[0]),
     );
-    const blade2PitchRotation = Cesium.Quaternion.fromAxisAngle(
-      Cesium.Cartesian3.UNIT_X,
-      Cesium.Math.toRadians(bundle.currentBladePitchDegrees[1]),
+    const blade2PitchRotation = Quaternion.fromAxisAngle(
+      Cartesian3.UNIT_X,
+      CesiumMath.toRadians(bundle.currentBladePitchDegrees[1]),
     );
-    const blade3PitchRotation = Cesium.Quaternion.fromAxisAngle(
-      Cesium.Cartesian3.UNIT_X,
-      Cesium.Math.toRadians(bundle.currentBladePitchDegrees[2]),
+    const blade3PitchRotation = Quaternion.fromAxisAngle(
+      Cartesian3.UNIT_X,
+      CesiumMath.toRadians(bundle.currentBladePitchDegrees[2]),
     );
 
-    bundle.modelEntity.model.nodeTransformations = new Cesium.PropertyBag({
-      WT_Hub: new Cesium.NodeTransformationProperty({
+    bundle.modelEntity.model.nodeTransformations = new PropertyBag({
+      WT_Hub: new NodeTransformationProperty({
         rotation: hubRotation,
       }),
-      WT_Blade1: new Cesium.NodeTransformationProperty({
+      WT_Blade1: new NodeTransformationProperty({
         rotation: blade1PitchRotation,
       }),
-      WT_Blade2: new Cesium.NodeTransformationProperty({
+      WT_Blade2: new NodeTransformationProperty({
         rotation: blade2PitchRotation,
       }),
-      WT_Blade3: new Cesium.NodeTransformationProperty({
+      WT_Blade3: new NodeTransformationProperty({
         rotation: blade3PitchRotation,
       }),
     });
@@ -597,16 +630,16 @@
     bundle: TurbineEntityBundle,
     yawAngleDegrees: number,
   ) {
-    const modelPosition = Cesium.Cartesian3.fromDegrees(
+    const modelPosition = Cartesian3.fromDegrees(
       bundle.baseInfo.lon,
       bundle.baseInfo.lat,
       bundle.baseInfo.height,
     );
-    const orientation = Cesium.Transforms.headingPitchRollQuaternion(
+    const orientation = Transforms.headingPitchRollQuaternion(
       modelPosition,
-      new Cesium.HeadingPitchRoll(Cesium.Math.toRadians(yawAngleDegrees), 0, 0),
+      new HeadingPitchRoll(CesiumMath.toRadians(yawAngleDegrees), 0, 0),
     );
-    bundle.modelEntity.orientation = new Cesium.ConstantProperty(orientation);
+    bundle.modelEntity.orientation = new ConstantProperty(orientation);
   }
 
   /**
@@ -649,7 +682,7 @@
    * 启动风机实时轮询与动画插值更新，返回停止函数。
    */
   function startTurbineRealtimePolling(
-    viewerInstance: Cesium.Viewer,
+    viewerInstance: Viewer,
     turbineEntityMap: TurbineEntityBundleMap,
     hoveredInfoRef: { value: HoveredTurbineInfo | null },
   ) {
@@ -791,8 +824,8 @@
    * 将相机立即飞到目标位置（duration=0）。
    */
   function flyToInitialView(
-    viewerInstance: Cesium.Viewer | undefined,
-    destination: Cesium.Cartesian3,
+    viewerInstance: Viewer | undefined,
+    destination: Cartesian3,
     orientation: { heading: number; pitch: number; roll: number },
   ) {
     if (!viewerInstance) return;
@@ -807,15 +840,15 @@
    * 创建鼠标移动监听：实时显示经纬度与地形高程。
    */
   function createMouseMoveHandler(
-    viewerInstance: Cesium.Viewer,
+    viewerInstance: Viewer,
     mouseTextRef: { value: string },
     turbineEntityMap: TurbineEntityBundleMap,
     hoveredInfoRef: { value: HoveredTurbineInfo | null },
   ) {
-    const handler = new Cesium.ScreenSpaceEventHandler(
+    const handler = new ScreenSpaceEventHandler(
       viewerInstance.scene.canvas,
     );
-    handler.setInputAction((movement: { endPosition: Cesium.Cartesian2 }) => {
+    handler.setInputAction((movement: { endPosition: Cartesian2 }) => {
       // [步骤1] 先处理风机悬停命中与信息面板显示
       const pickedObject = viewerInstance.scene.pick(movement.endPosition);
       const hoveredTurbineId = resolveHoveredTurbineId(
@@ -848,9 +881,9 @@
         return;
       }
 
-      const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
-      const longitude = Cesium.Math.toDegrees(cartographic.longitude);
-      const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+      const cartographic = Cartographic.fromCartesian(cartesian);
+      const longitude = CesiumMath.toDegrees(cartographic.longitude);
+      const latitude = CesiumMath.toDegrees(cartographic.latitude);
       const terrainHeight = viewerInstance.scene.globe.getHeight(cartographic);
       if (Number.isFinite(terrainHeight ?? NaN)) {
         mouseTextRef.value = formatMousePositionText(
@@ -874,9 +907,9 @@
       lastMouseTerrainSampleAtMs = nowMs;
 
       const requestToken = ++mouseHeightSampleToken;
-      const samplePoint = Cesium.Cartographic.clone(cartographic);
+      const samplePoint = Cartographic.clone(cartographic);
 
-      void Cesium.sampleTerrainMostDetailed(viewerInstance.terrainProvider, [
+      void sampleTerrainMostDetailed(viewerInstance.terrainProvider, [
         samplePoint,
       ])
         .then((updated) => {
@@ -904,7 +937,7 @@
             t('viewer.mousePositionUnavailable'),
           );
         });
-    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    }, ScreenSpaceEventType.MOUSE_MOVE);
 
     return handler;
   }
@@ -918,13 +951,13 @@
     if (!enableOfflineImagery) return undefined;
 
     const [west, south, east, north] = bounds;
-    return new Cesium.UrlTemplateImageryProvider({
+    return new UrlTemplateImageryProvider({
       url: resolvePublicAssetUrl('imagery/{z}/{x}/{y}.jpg'),
       minimumLevel: offlineImageryMinZoom,
       maximumLevel: offlineImageryMaxZoom,
-      tilingScheme: new Cesium.WebMercatorTilingScheme(),
-      rectangle: Cesium.Rectangle.fromDegrees(west, south, east, north),
-      credit: new Cesium.Credit(t('viewer.offlineImageryCredit')),
+      tilingScheme: new WebMercatorTilingScheme(),
+      rectangle: Rectangle.fromDegrees(west, south, east, north),
+      credit: new Credit(t('viewer.offlineImageryCredit')),
     });
   }
 
@@ -935,13 +968,13 @@
    */
   function createGeoSceneViewer(
     container: HTMLDivElement,
-    terrainProvider: Cesium.TerrainProvider,
-    offlineImageryProvider?: Cesium.UrlTemplateImageryProvider,
+    terrainProvider: TerrainProvider,
+    offlineImageryProvider?: UrlTemplateImageryProvider,
   ) {
-    return new Cesium.Viewer(container, {
+    return new Viewer(container, {
       terrainProvider,
       baseLayer: offlineImageryProvider
-        ? new Cesium.ImageryLayer(offlineImageryProvider)
+        ? new ImageryLayer(offlineImageryProvider)
         : false,
       useBrowserRecommendedResolution: false,
       requestRenderMode: true,
@@ -964,7 +997,7 @@
    */
   function setupViewerResizeTracking(
     container: HTMLDivElement,
-    viewerInstance: Cesium.Viewer,
+    viewerInstance: Viewer,
   ) {
     if (typeof ResizeObserver === 'undefined') {
       const onResize = () => {
@@ -1000,7 +1033,7 @@
   /**
    * 配置渲染相关参数（像素比、FXAA、版权信息隐藏）。
    */
-  function configureViewerRendering(viewerInstance: Cesium.Viewer) {
+  function configureViewerRendering(viewerInstance: Viewer) {
     const devicePixelRatio =
       typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     viewerInstance.resolutionScale = Math.min(
@@ -1021,12 +1054,12 @@
    * 配置地球场景与地形显示范围。
    */
   function configureGlobeScene(
-    viewerInstance: Cesium.Viewer,
-    terrainDisplayRectangle: Cesium.Rectangle,
+    viewerInstance: Viewer,
+    terrainDisplayRectangle: Rectangle,
   ) {
     Object.assign(viewerInstance.scene.globe, {
       enableLighting: true,
-      baseColor: Cesium.Color.fromCssColorString('#808080'),
+      baseColor: Color.fromCssColorString('#808080'),
       showGroundAtmosphere: true,
       dynamicAtmosphereLighting: true,
       dynamicAtmosphereLightingFromSun: true,
@@ -1043,11 +1076,11 @@
    * 配置相机控制器（缩放、俯仰、惯性、事件类型）。
    */
   function configureCameraController(
-    viewerInstance: Cesium.Viewer,
+    viewerInstance: Viewer,
     minimumZoomDistance: number,
     maximumZoomDistance: number,
   ) {
-    const maximumTiltAngle = Cesium.Math.toRadians(maximumTiltAngleDegrees);
+    const maximumTiltAngle = CesiumMath.toRadians(maximumTiltAngleDegrees);
     Object.assign(viewerInstance.scene.screenSpaceCameraController, {
       zoomFactor: wheelZoomFactor,
       maximumZoomDistance,
@@ -1056,22 +1089,22 @@
       inertiaZoom: 0,
       inertiaTranslate: 0,
       zoomEventTypes: [
-        Cesium.CameraEventType.WHEEL,
-        Cesium.CameraEventType.PINCH,
+        CameraEventType.WHEEL,
+        CameraEventType.PINCH,
       ],
     });
-    viewerInstance.camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z;
+    viewerInstance.camera.constrainedAxis = Cartesian3.UNIT_Z;
   }
 
   /**
    * 配置天空/雾效与固定时间，用于统一画面亮度与氛围。
    */
-  function configureSkyAndClock(viewerInstance: Cesium.Viewer) {
+  function configureSkyAndClock(viewerInstance: Viewer) {
     viewerInstance.scene.verticalExaggeration = verticalExaggeration;
     viewerInstance.scene.verticalExaggerationRelativeHeight = 0.0;
     viewerInstance.scene.globe.enableLighting = true;
     viewerInstance.scene.skyBox = undefined as any;
-    viewerInstance.scene.backgroundColor = new Cesium.Color(
+    viewerInstance.scene.backgroundColor = new Color(
       0.75,
       0.85,
       0.95,
@@ -1086,7 +1119,7 @@
       viewerInstance.scene.skyAtmosphere.brightnessShift = 0.05;
     }
 
-    const afternoonTime = Cesium.JulianDate.fromDate(
+    const afternoonTime = JulianDate.fromDate(
       new Date(Date.UTC(2024, 5, 1, 7, 0)),
     );
     viewerInstance.clock.currentTime = afternoonTime;
@@ -1097,8 +1130,8 @@
    * 绑定 Home 行为并设置初始视角。
    */
   function setupHomeAndInitialView(
-    viewerInstance: Cesium.Viewer,
-    centerCartesian: Cesium.Cartesian3,
+    viewerInstance: Viewer,
+    centerCartesian: Cartesian3,
   ) {
     viewerInstance.homeButton?.viewModel.command.beforeExecute.addEventListener(
       (event) => {
@@ -1113,8 +1146,8 @@
    * 在 preRender 中限制相机平移范围，超出时回拉到允许区域。
    */
   function setupPanLimitClamp(
-    viewerInstance: Cesium.Viewer,
-    panLimitRectangle: Cesium.Rectangle,
+    viewerInstance: Viewer,
+    panLimitRectangle: Rectangle,
   ) {
     if (!restrictCameraToTerrainBounds) return undefined;
 
@@ -1125,17 +1158,17 @@
       // [步骤1] 避免递归回调触发
       if (isApplyingPanClamp) return;
 
-      const cameraCartographic = Cesium.Cartographic.fromCartesian(
+      const cameraCartographic = Cartographic.fromCartesian(
         camera.position,
       );
       if (!cameraCartographic) return;
 
-      const clampedLon = Cesium.Math.clamp(
+      const clampedLon = CesiumMath.clamp(
         cameraCartographic.longitude,
         panLimitRectangle.west,
         panLimitRectangle.east,
       );
-      const clampedLat = Cesium.Math.clamp(
+      const clampedLat = CesiumMath.clamp(
         cameraCartographic.latitude,
         panLimitRectangle.south,
         panLimitRectangle.north,
@@ -1151,7 +1184,7 @@
       // [步骤3] 越界后保持朝向不变，仅回拉位置
       isApplyingPanClamp = true;
       camera.setView({
-        destination: Cesium.Cartesian3.fromRadians(
+        destination: Cartesian3.fromRadians(
           clampedLon,
           clampedLat,
           cameraCartographic.height,
@@ -1199,7 +1232,7 @@
     const centerLat = windFarmInfo.centerLat;
     const radiusMeters = Math.max(1, windFarmInfo.radiusMeters);
     const [west, south, east, north] = terrainBounds;
-    const terrainDisplayRectangle = Cesium.Rectangle.fromDegrees(
+    const terrainDisplayRectangle = Rectangle.fromDegrees(
       west,
       south,
       east,
@@ -1211,7 +1244,7 @@
       radiusMeters,
     );
     const panLimitRectangle =
-      Cesium.Rectangle.intersection(
+      Rectangle.intersection(
         radiusPanLimitRectangle,
         terrainDisplayRectangle,
       ) ?? radiusPanLimitRectangle;
@@ -1253,10 +1286,10 @@
 
     // [步骤2] 计算中心点并校验地形可用性
     try {
-      const [sampledCenter] = await Cesium.sampleTerrainMostDetailed(
+      const [sampledCenter] = await sampleTerrainMostDetailed(
         terrainProvider,
         [
-          Cesium.Cartographic.fromDegrees(
+          Cartographic.fromDegrees(
             runtimeContext.centerLon,
             runtimeContext.centerLat,
           ),
@@ -1268,13 +1301,13 @@
     } catch (error) {
       console.warn(t('viewer.terrainCenterSampleFailed'), error);
     }
-    const centerCartographic = Cesium.Cartographic.fromDegrees(
+    const centerCartographic = Cartographic.fromDegrees(
       runtimeContext.centerLon,
       runtimeContext.centerLat,
       runtimeContext.initialCameraHeight,
     );
     const centerCartesian =
-      Cesium.Ellipsoid.WGS84.cartographicToCartesian(centerCartographic);
+      Ellipsoid.WGS84.cartographicToCartesian(centerCartographic);
 
     // [步骤3] 配置场景、挂载实体与启动实时更新
     setupHomeAndInitialView(viewer, centerCartesian);

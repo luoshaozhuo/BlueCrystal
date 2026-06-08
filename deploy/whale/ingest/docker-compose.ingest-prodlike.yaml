@@ -63,9 +63,11 @@ services:
 
   # ── Ingest runtime services ──────────────────────────────────────────
   ingest-api:
+    # compose 相对基准是 deploy/whale/ingest/；context: ../.. 解析为 deploy/，
+    # 因此 dockerfile 需以 deploy/ 为基准重写为 whale/ingest/Dockerfile，真实文件在 deploy/whale/ingest/Dockerfile。
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: whale/ingest/Dockerfile
     container_name: whale-prodlike-api
     restart: "no"
     command: ["api"]
@@ -96,7 +98,9 @@ services:
       WHALE_INGEST_LEASE_TTL_SECONDS: ${WHALE_INGEST_LEASE_TTL_SECONDS:-10}
       WHALE_INGEST_PULL_MAX_IN_FLIGHT: ${WHALE_INGEST_PULL_MAX_IN_FLIGHT:-8}
     volumes:
-      - ./config/ingest/access_policy.prodlike.yaml:/app/config/access_policy.prodlike.yaml:ro
+      # bind mount 相对基准同样是 compose 文件所在目录 deploy/whale/ingest/，需上溯 3 级（../../../）
+      # 才能到达 repo 根，再下行到 config/ingest/；原 ../../ 仅到 deploy/，与迁移后真实路径不符。
+      - ../../../config/ingest/access_policy.prodlike.yaml:/app/config/access_policy.prodlike.yaml:ro
       - audit-data:/audit
     depends_on:
       postgres:
@@ -113,9 +117,11 @@ services:
       start_period: 30s
 
   ingest-worker-a:
+    # compose 相对基准是 deploy/whale/ingest/；context: ../.. 解析为 deploy/，
+    # 因此 dockerfile 需以 deploy/ 为基准重写为 whale/ingest/Dockerfile，真实文件在 deploy/whale/ingest/Dockerfile。
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: whale/ingest/Dockerfile
     container_name: whale-prodlike-worker-a
     restart: "no"
     command: ["worker", "--runtime-mode", "dual_active_partitioned", "--node-key", "worker-a"]
@@ -139,9 +145,11 @@ services:
         condition: service_healthy
 
   ingest-worker-b:
+    # compose 相对基准是 deploy/whale/ingest/；context: ../.. 解析为 deploy/，
+    # 因此 dockerfile 需以 deploy/ 为基准重写为 whale/ingest/Dockerfile，真实文件在 deploy/whale/ingest/Dockerfile。
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: whale/ingest/Dockerfile
     container_name: whale-prodlike-worker-b
     restart: "no"
     command: ["worker", "--runtime-mode", "dual_active_partitioned", "--node-key", "worker-b"]

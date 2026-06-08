@@ -85,7 +85,7 @@
     turbineProfiles,
     volatilityEvidence,
     windFrequencyRayleighParameters,
-  } from '@/mock/power-analysis';
+  } from '@/api/local-data/power-analysis';
 
   const summaryMetricCopy: Record<
     string,

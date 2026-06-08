@@ -28,7 +28,7 @@ from whale.shared.persistence.orm.ingest_runtime import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-COMPOSE_FILE = PROJECT_ROOT / "docker-compose.ingest-prodlike.yaml"
+COMPOSE_FILE = PROJECT_ROOT / "deploy" / "whale" / "ingest" / "docker-compose.ingest-prodlike.yaml"
 COMPOSE_PROJECT_NAME = os.environ.get("COMPOSE_PROJECT_NAME", "whale-prodlike-tests")
 POSTGRES_USER = os.environ.get("WHALE_INGEST_PRODLIKE_PG_USER", "whale")
 POSTGRES_PASSWORD = os.environ.get("WHALE_INGEST_PRODLIKE_PG_PASSWORD", "whale-prodlike-test")

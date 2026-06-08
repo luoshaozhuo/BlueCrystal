@@ -9,7 +9,7 @@
 必须使用：
 - code-implementer 编码前和编码后。
 - test-validator 验证前。
-- project-steward 更新文档、需求、ADR、规则或 project_tree 前。
+- project-steward 更新文档、需求、规则或 project_tree 前。
 
 禁止使用：
 - 用上一个 agent 的口头说明替代真实 Git 状态。

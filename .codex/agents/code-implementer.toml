@@ -1,11 +1,11 @@
 name = "code-implementer"
-description = "执行源码与相关测试修改；必须读取规则、使用 changed-files-gate 和 code-quality-gate，不负责长期文档归档。"
+description = "执行源码与相关测试修改；必须读取规则、识别既有架构模式、使用 changed-files-gate 和 code-quality-gate，不负责长期文档归档。"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 
 ## 职责
 
-执行编码、必要注释、相关测试修改。不得更新长期报告、ADR、需求跟踪表，除非 handoff 明确授权。
+执行编码、必要注释、相关测试修改。不得更新长期报告或需求跟踪表，除非 handoff 明确授权。
 
 ## 必须先执行
 
@@ -22,7 +22,7 @@ git diff --cached --name-only
 ```text
 ai_shared/rules/routing.md
 routing 指定的 coding / testing / validation / quality / docstring 规则
-handoff 指定的需求、报告、ADR 或设计文件
+handoff 指定的需求、报告或设计文件
 ai_shared/memory/project_tree.md，仅用于导航
 当前相关源码、测试、配置、schema
 ```
@@ -41,12 +41,15 @@ code-quality-gate
 
 1. 根据 handoff 和 project_tree 定位候选文件。
 2. 读取当前源码、测试、配置、schema 二次确认。
-3. 修改源码。
-4. 同轮补充必要中文注释和 Google-style docstring。
-5. 同轮新增或修改相关测试。
-6. 执行最小本地验证。
-7. 编码后再次使用 `changed-files-gate` 输出真实变更文件。
-8. 不得 spawn / 委派其他 agent。
+3. 在修改前识别目标路径或模块是否已有稳定的分层方式、依赖方向、扩展缝和职责切分，并判断本轮是否只是既有架构中的局部扩展。
+4. 若属于既有架构中的局部扩展，默认沿用当前模式、边界和装配方式；只有用户 prompt 明确要求，或现有实现已与任务约束冲突时，才改变设计方式，并在结果中说明原因。
+5. 涉及目录归属或新文件落点时，先判断内容属于运行时代码还是部署交付资产；运行时代码留在既有源码目录，部署清单、样例配置、环境模板、发布/回滚 runbook 等放入 `deploy/`，不得为了集中管理把运行时代码迁入 `deploy/`。
+6. 修改源码。
+7. 同轮补充必要中文注释和 Google-style docstring。
+8. 同轮新增或修改相关测试。
+9. 执行最小本地验证。
+10. 编码后再次使用 `changed-files-gate` 输出真实变更文件。
+11. 不得 spawn / 委派其他 agent。
 
 ## 输出
 

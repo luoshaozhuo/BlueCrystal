@@ -18,12 +18,16 @@
 ## 2. 架构与边界
 
 1. 生产路径、工具路径、测试路径必须边界清楚；工具或实验模块不得被生产路径直接依赖，除非已有明确决策允许。
-2. 用例、应用服务或 orchestrator 负责业务编排，不应包含协议细节、数据库细节、CLI 解析或测试专用分支。
-3. adapter、runner、repository、provider、gateway、driver 负责外部系统差异，不应泄漏到领域层或核心业务层。
-4. composition root / bootstrap / wiring 负责依赖装配；默认装配不得缺失必要的安全、审计、指标、租约、熔断、重试等生产横切能力。
-5. API / CLI / CRUD 层不得绕过权限、审计、dry_run、幂等、乐观并发、事务和输入校验要求。
-6. scheduler、worker、lease、fencing、retry、backpressure 等运行时能力必须明确失败语义和恢复语义。
-7. 运行时能力声明必须区分 declared capability、actual runtime availability、validated evidence。
+2. 修改前先识别目标路径或模块既有的分层方式、依赖方向、扩展缝和职责切分；若本轮只是既有架构中的局部扩展，应优先沿用当前模式与边界，而不是平移出第二套实现。
+3. 涉及目录归属时，先区分“运行时代码”和“部署交付资产”：被应用在运行时直接 import、调用或依赖的实现，仍属于源码；用于环境装配、发布、启动、回滚、巡检或部署说明的资产，才属于部署范围。
+4. `deploy/` 只承载部署落地资产，例如部署清单、环境变量模板、样例配置、compose/helm/k8s/ansible/terraform 资产、拓扑说明、发布与回滚 runbook；不用于承载业务运行时代码、通用运维框架实现、需求文档、验证报告或与部署无关的长期说明。
+5. 若某模块同时包含运行时实现和部署资料，应将运行时实现保留在 `src/` 或其既有源码目录，将部署资料放入 `deploy/<module>/`，而不是为了“集中”把运行时代码搬进 `deploy/`。
+6. 用例、应用服务或 orchestrator 负责业务编排，不应包含协议细节、数据库细节、CLI 解析或测试专用分支。
+7. adapter、runner、repository、provider、gateway、driver 负责外部系统差异，不应泄漏到领域层或核心业务层。
+8. composition root / bootstrap / wiring 负责依赖装配；默认装配不得缺失必要的安全、审计、指标、租约、熔断、重试等生产横切能力。
+9. API / CLI / CRUD 层不得绕过权限、审计、dry_run、幂等、乐观并发、事务和输入校验要求。
+10. scheduler、worker、lease、fencing、retry、backpressure 等运行时能力必须明确失败语义和恢复语义。
+11. 运行时能力声明必须区分 declared capability、actual runtime availability、validated evidence。
 
 ## 3. 接口、类型与契约
 

@@ -26,13 +26,13 @@ IEC 101、IEC 61850 MMS/GOOSE/SV 等），将采集到的原始数据通过 mess
 
 ## 环境变量
 
-参考 `.env.whale.field.example` 中 `WHALE_INGEST_*` 前缀的变量。
+参考 `deploy/whale/.env.whale.field.example` 中 `WHALE_INGEST_*` 前缀的变量。
 
 ## 启动命令
 
 ```bash
 # 方式 1: docker compose (prodlike)
-docker compose -f docker-compose.ingest-prodlike.yaml up -d
+docker compose -f deploy/whale/ingest/docker-compose.ingest-prodlike.yaml up -d
 
 # 方式 2: 直接运行 (dev)
 WHALE_INGEST_DATABASE_BACKEND=sqlite \

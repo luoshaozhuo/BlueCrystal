@@ -831,7 +831,7 @@ main() {
         fi
         echo ""
         log_info "本地可验证链路 (L4): ingest → speed_layer → storage (InMemory)"
-        log_info "启动 L5 环境:         docker compose -f docker-compose.whale-l5.yaml up -d"
+        log_info "启动 L5 环境:         docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml up -d"
         echo "============================================================"
     fi
 }

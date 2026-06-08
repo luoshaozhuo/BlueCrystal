@@ -214,6 +214,6 @@ else
     echo "  - 如需诊断外部依赖状态:"
     echo "      bash scripts/diagnose_whale_p5_dependencies.sh"
     echo "  - 环境变量参考:"
-    echo "      cat .env.p5.example"
+    echo "      cat deploy/whale/speed_layer/.env.p5.example"
     exit 0
 fi

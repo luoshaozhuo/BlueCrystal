@@ -1,19 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./secrets/**)",
-      "Read(./**/*id_rsa*)",
-      "Read(./**/*private_key*)",
-      "Bash(rm -rf *)",
-      "Bash(git reset --hard *)",
-      "Bash(git clean *)",
-      "Bash(git push *)",
-      "Bash(sudo *)",
-      "Bash(chmod -R 777 *)"
-    ],
     "allow": [
       "Bash(git status *)",
       "Bash(git diff *)",
@@ -27,7 +14,31 @@
       "Bash(python -m pytest *)",
       "Bash(docker compose * config)",
       "Bash(docker compose * ps)",
-      "Bash(docker compose * logs *)"
+      "Bash(docker compose * logs *)",
+      "Bash(command -v docker)",
+      "Bash(docker compose *)",
+      "Bash(echo \"dev=$?\")",
+      "Bash(echo \"prodlike=$?\")",
+      "Bash(echo \"p5=$?\")",
+      "Bash(echo \"whale-l5=$?\")",
+      "Bash(python -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
+      "Bash(PYTHONPATH=src python -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(PYTHONPATH=src python3 -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
+      "Bash(python3 -c ' *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./**/*id_rsa*)",
+      "Read(./**/*private_key*)",
+      "Bash(rm -rf *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(git push *)",
+      "Bash(sudo *)",
+      "Bash(chmod -R 777 *)"
     ]
   },
   "hooks": {

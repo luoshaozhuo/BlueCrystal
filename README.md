@@ -20,7 +20,7 @@ source .venv/bin/activate  # Linux/Mac
 pip install -e ".[dev]"
 
 # 运行代码检查
-flake8 src/
+ruff check src/
 black --check src/
 mypy src/
 
@@ -57,7 +57,7 @@ PYTHONPATH=src python -m whale.shared.persistence.template.sample_data
 本仓库提供了一套本地开发/测试用的基础设施编排：
 
 ```bash
-docker compose -f docker-compose.ingest-dev.yaml up -d
+docker compose -f deploy/whale/ingest/docker-compose.ingest-dev.yaml up -d
 ```
 
 它会启动：
@@ -69,7 +69,7 @@ docker compose -f docker-compose.ingest-dev.yaml up -d
 建议先复制环境变量模板，再按需要调整：
 
 ```bash
-cp .env.ingest.example .env.ingest.local
+cp deploy/whale/ingest/.env.ingest.example deploy/whale/ingest/.env.ingest.local
 ```
 
 如果想一键重建开发基础设施、初始化数据库并写入样本数据、再启动 ingest：
@@ -80,7 +80,7 @@ bash scripts/run_ingest_dev.sh
 
 这个脚本会按顺序执行：
 
-- 加载 `.env.ingest.local`（不存在时回退到 `.env.ingest.example`）
+- 加载 `deploy/whale/ingest/.env.ingest.local`（不存在时回退到 `deploy/whale/ingest/.env.ingest.example`）
 - 删除旧的开发容器和 volume（统一 recreate）
 - 根据 `database/state_cache/message` 后端组合按需启动容器
 	- `sqlite` 不启动容器（使用本地文件数据库）
@@ -95,7 +95,7 @@ bash scripts/run_ingest_dev.sh
 
 ```bash
 set -a
-source .env.ingest.local
+source deploy/whale/ingest/.env.ingest.local
 set +a
 PYTHONPATH=src python -m whale.ingest
 ```
@@ -103,5 +103,5 @@ PYTHONPATH=src python -m whale.ingest
 如果要停止本地基础设施：
 
 ```bash
-docker compose -f docker-compose.ingest-dev.yaml down
+docker compose -f deploy/whale/ingest/docker-compose.ingest-dev.yaml down
 ```

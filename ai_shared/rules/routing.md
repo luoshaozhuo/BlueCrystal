@@ -63,7 +63,6 @@ ai_shared/rules/validation-routing.md
 ```
 
 如涉及需求状态，必须结合 `requirement-trace` skill。
-如涉及 ADR，必须结合 `adr-upsert` skill。
 如涉及 project_tree 更新，必须结合 `project-tree-update` skill。
 如涉及规则体系变化，必须结合 `rule-update` skill。
 
@@ -77,6 +76,6 @@ ai_shared/rules/validation-routing.md
 
 ## 5. 上下文节省
 
-默认不读取全部项目说明、全部 ADR、全部 reports、完整 project_tree 或全仓源码。
+默认不读取全部项目说明、全部 reports、完整 project_tree 或全仓源码。
 
 `project_tree.md` 只用于导航，不能替代二次读取真实源码、测试、配置和 schema。

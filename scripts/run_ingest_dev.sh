@@ -6,8 +6,8 @@
 #   在本地开发环境中，完整地启动 Whale Ingest 服务所依赖的基础设施
 #   并运行 Ingest 运行时。整个流程按以下步骤执行：
 #
-#   1. 确定环境变量文件：优先使用 .env.ingest.local，
-#      若不存在则回退到 .env.ingest.example；两者均缺失时报错退出。
+#   1. 确定环境变量文件：优先使用 deploy/whale/ingest/.env.ingest.local，
+#      若不存在则回退到 deploy/whale/ingest/.env.ingest.example；两者均缺失时报错退出。
 #   2. 加载环境变量文件，并根据 database/state_cache/message 三个
 #      backend 选择计算需要的容器集合。
 #   3. 执行统一 recreate：删除旧容器与卷。
@@ -22,13 +22,20 @@
 # 依赖：
 #   - Docker（含 Compose 插件）
 #   - Python 环境已激活（conda 或 venv）
-#   - 项目根目录下存在 .env.ingest.local 或 .env.ingest.example
+#   - deploy/whale/ingest/ 下存在 .env.ingest.local 或 .env.ingest.example
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILE="${ROOT_DIR}/docker-compose.ingest-dev.yaml"
-ENV_FILE="${ROOT_DIR}/.env.ingest.example"
+COMPOSE_FILE="${ROOT_DIR}/deploy/whale/ingest/docker-compose.ingest-dev.yaml"
+ENV_DIR="${ROOT_DIR}/deploy/whale/ingest"
+LOCAL_ENV_FILE="${ENV_DIR}/.env.ingest.local"
+EXAMPLE_ENV_FILE="${ENV_DIR}/.env.ingest.example"
+ENV_FILE="${LOCAL_ENV_FILE}"
+
+if [[ ! -f "${ENV_FILE}" ]]; then
+  ENV_FILE="${EXAMPLE_ENV_FILE}"
+fi
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing ingest environment file: ${ENV_FILE}" >&2

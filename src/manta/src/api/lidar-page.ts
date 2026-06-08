@@ -22,7 +22,7 @@ import {
   resetTopRealtimeWindWave,
   generateTransferFunctionData,
   generateWindRoseTiStats,
-} from '@/mock/lidar';
+} from '@/api/local-data/lidar';
 
 let activeLidarTurbineId = 'WT-07';
 

@@ -5,12 +5,13 @@
   "private": true,
   "author": "ArcoDesign Team",
   "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite --config ./config/vite.config.dev.ts",
     "build": "vue-tsc --noEmit && vite build --config ./config/vite.config.prod.ts",
     "api:generate": "rm -rf ./src/api/generated/openapi && openapi-ts --input ./docs/openapi/showtime.openapi.yaml --output ./src/api/generated/openapi --client @hey-api/client-axios",
-    "report": "cross-env REPORT=true npm run build",
-    "preview": "npm run build && vite preview --host",
+    "report": "cross-env REPORT=true pnpm run build",
+    "preview": "pnpm run build && vite preview --host",
     "type:check": "vue-tsc --noEmit --skipLibCheck",
     "lint-staged": "npx lint-staged",
     "prepare": "husky install"
@@ -95,7 +96,18 @@
     "vue-tsc": "^3.2.5"
   },
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": "^20.19.0 || >=22.12.0",
+    "pnpm": "10.33.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "cwebp-bin",
+      "gifsicle",
+      "jpegtran-bin",
+      "mozjpeg",
+      "optipng-bin",
+      "pngquant-bin"
+    ]
   },
   "resolutions": {
     "bin-wrapper": "npm:bin-wrapper-china",

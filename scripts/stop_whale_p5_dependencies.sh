@@ -12,7 +12,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPOSE_FILE="${WHALE_P5_COMPOSE_FILE:-docker-compose.p5.yml}"
+COMPOSE_FILE="${WHALE_P5_COMPOSE_FILE:-deploy/whale/speed_layer/docker-compose.p5.yml}"
 COMPOSE_PATH="$REPO_ROOT/$COMPOSE_FILE"
 CLEAN_VOLUMES=false
 

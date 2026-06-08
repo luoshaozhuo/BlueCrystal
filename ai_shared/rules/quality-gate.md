@@ -21,7 +21,7 @@
 实际命令以仓库配置为准：
 
 ```text
-Python: py_compile/compileall, ruff/flake8/pylint, mypy/pyright, pytest
+Python: py_compile/compileall, ruff/pylint, mypy/pyright, pytest
 TypeScript/JavaScript: tsc --noEmit, eslint, npm/pnpm/yarn test
 Go: go test ./..., go vet ./..., golangci-lint
 Java/Kotlin: mvn/gradle test, checkstyle/spotbugs/PMD/detekt

@@ -11,7 +11,7 @@ import {
   generateTopRealtimeWindWave,
   generateTransferFunctionData,
   generateWindRoseTiStats,
-} from './rules';
+} from '@/api/local-data/lidar';
 
 setupMock({
   setup() {

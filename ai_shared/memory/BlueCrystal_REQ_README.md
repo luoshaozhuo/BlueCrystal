@@ -124,7 +124,7 @@ NOT_RUN 原因码（MISSING_ENVIRONMENT、OUT_OF_SCOPE 等）适用，
 - 需求正文只描述系统必须具备的能力和验收标准。
 - 实现状态、当前差距、下一步动作只写入需求跟踪表。
 - 不得在需求描述中写“当前建议”“后续可以”“可能需要”。
-- 修改实现状态必须读取源码、测试、报告或 ADR。
+- 修改实现状态必须读取源码、测试、报告或其他稳定证据。
 - skipped 测试不得作为完成证据。
 - failed 必须明确处理。
 - `platform_shared` 不得依赖 Whale、Turtle、Octopus、Dolphin、Jellyfish、Manta。

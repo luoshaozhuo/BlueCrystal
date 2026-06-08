@@ -85,8 +85,10 @@
   import DataQualityAnalysisCard from './components/DataQualityAnalysisCard.vue';
   import DeviceCommStatusCard from './components/DeviceCommStatusCard.vue';
   import StorageResourceCard from './components/StorageResourceCard.vue';
-  import { getDataCollectionMock } from '@/mock/data-acquisition';
-  import type { DataAcquisitionTopMetricKey } from '@/mock/data-acquisition';
+  import {
+    getDataCollectionMock,
+    type DataAcquisitionTopMetricKey,
+  } from '@/api/local-data/data-acquisition';
 
   const pageLoading = ref(true);
   const pageData = ref(getDataCollectionMock(0));

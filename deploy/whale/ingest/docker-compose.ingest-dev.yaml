@@ -1,8 +1,10 @@
 services:
   ingest-runtime:
     build:
-      context: .
-      dockerfile: Dockerfile
+      # compose 相对基准是 compose 文件所在目录 deploy/whale/ingest/；context: ../.. 解析为 deploy/，
+      # 因此 dockerfile 需以 deploy/ 为基准重写为 whale/ingest/Dockerfile，真实文件在 deploy/whale/ingest/Dockerfile。
+      context: ../..
+      dockerfile: whale/ingest/Dockerfile
     container_name: whale-ingest-runtime
     restart: "no"
     healthcheck:
