@@ -1,3 +1,8 @@
+---
+name: requirement-trace
+description: Use when requirement status or evidence level needs to be updated from real source code, tests, configs, schemas, reports, and validation evidence, without overstating unverified results.
+---
+
 # requirement-trace
 
 ## 1. 目的

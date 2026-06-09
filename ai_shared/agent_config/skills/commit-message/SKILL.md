@@ -1,3 +1,8 @@
+---
+name: commit-message
+description: Use when the user explicitly asks for a commit message based on the current staged diff and you should generate the message without running git commit.
+---
+
 # commit-message
 
 ## 1. 目的

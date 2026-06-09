@@ -1,3 +1,8 @@
+---
+name: project-tree-update
+description: Use when files are added, removed, moved, renamed, or change responsibility and ai_shared/memory/project_tree.md needs an incremental update based on real file changes.
+---
+
 # project-tree-update
 
 ## 1. 目的

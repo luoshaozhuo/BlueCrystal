@@ -1,3 +1,8 @@
+---
+name: changed-files-gate
+description: Use when you need the real changed-file set from the current Git workspace before or after implementation, validation, or project stewardship work, and when Git status must not be inferred from another agent's summary.
+---
+
 # changed-files-gate
 
 ## 1. 目的

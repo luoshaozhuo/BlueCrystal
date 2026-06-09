@@ -1,3 +1,8 @@
+---
+name: project-tree-reset
+description: Use when the user explicitly requests a full rebuild of ai_shared/memory/project_tree.md from the real repository contents instead of an incremental update.
+---
+
 # project-tree-reset
 
 ## 1. 目的

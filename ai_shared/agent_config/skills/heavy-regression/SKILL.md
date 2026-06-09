@@ -1,3 +1,8 @@
+---
+name: heavy-regression
+description: Use when the user explicitly requests heavy regression, long-running validation, or release-style verification, and you need to present the validation matrix, cost, environment needs, and result classification.
+---
+
 # heavy-regression
 
 ## 1. 目的

@@ -1,3 +1,8 @@
+---
+name: rule-update
+description: Use when the user explicitly asks to update shared rules or when rules, agents, skills, hooks, or templates have a semantic conflict and the single rule source must be adjusted with minimal scope.
+---
+
 # rule-update
 
 ## 1. 目的

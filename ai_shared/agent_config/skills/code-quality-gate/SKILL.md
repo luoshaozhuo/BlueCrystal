@@ -1,3 +1,8 @@
+---
+name: code-quality-gate
+description: Use when you need to decide the required comment, docstring, type, schema, test, and validation gates for the current changed files based on repository rules and actual impact.
+---
+
 # code-quality-gate
 
 ## 1. 目的
