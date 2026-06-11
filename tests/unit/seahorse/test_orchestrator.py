@@ -15,7 +15,7 @@ from __future__ import annotations
 from seahorse.models.scenario import ScenarioConfig
 from seahorse.models.plan import (
     SeedPlan,
-    ServerPlan,
+    ServerConfig,
     SignalProfileItemPlan,
 )
 from seahorse.orchestration import SeahorseGenerator
@@ -49,15 +49,15 @@ def test_generator_deterministic_seed_in_metadata_snapshot() -> None:
 
 
 def test_generate_returns_minimal_plans() -> None:
-    """generate() 应返回 SeedPlan 和 ServerPlan。"""
+    """generate() 应返回 SeedPlan 和 ServerConfig。"""
     cfg = ScenarioConfig(scenario_id="gen_min", asset_count=3, protocol_targets=["OPC_UA"])
     gen = SeahorseGenerator(cfg)
-    seed_plan, server_plan, *_ = gen.generate()
+    seed_plan, server_config, *_ = gen.generate()
 
     assert isinstance(seed_plan, SeedPlan)
-    assert isinstance(server_plan, ServerPlan)
+    assert isinstance(server_config, ServerConfig)
     assert seed_plan.scenario_id == "gen_min"
-    assert server_plan.scenario_id == "gen_min"
+    assert server_config.scenario_id == "gen_min"
 
 
 def test_generate_asset_count_matches_entities() -> None:
@@ -89,12 +89,14 @@ def test_generate_protocol_targets_default() -> None:
     """不指定 protocol_targets 时默认使用 OPC_UA。"""
     cfg = ScenarioConfig(scenario_id="default_proto", asset_count=1)
     gen = SeahorseGenerator(cfg)
-    seed_plan, server_plan, *_ = gen.generate()
+    seed_plan, server_config, *_ = gen.generate()
+    server = server_config.servers[0]
 
     assert len(seed_plan.endpoints) == 1
     assert seed_plan.endpoints[0].application_protocol == "OPC_UA"
-    assert len(server_plan.endpoints) == 1
-    assert server_plan.endpoints[0].protocol == "OPC_UA"
+    assert len(server_config.servers) == 1
+    assert len(server.endpoints) == 1
+    assert server.endpoints[0].protocol == "OPC_UA"
 
 
 def test_generate_entity_ids_are_unique() -> None:
@@ -166,26 +168,28 @@ def test_generator_does_not_access_database() -> None:
     assert offenders == [], f"orchestrator imports database-related modules: {offenders}"
 
 
-def test_server_plan_endpoints_match_protocol_targets() -> None:
-    """ServerPlan endpoints 应与 protocol_targets 数量和协议一致。"""
+def test_server_config_endpoints_match_protocol_targets() -> None:
+    """ServerConfig endpoints 应与 protocol_targets 数量和协议一致。"""
     protocols = ["OPC_UA", "IEC104", "MQTT"]
     cfg = ScenarioConfig(scenario_id="srv_test", asset_count=1, protocol_targets=protocols)
     gen = SeahorseGenerator(cfg)
-    _, server_plan, *_ = gen.generate()
+    _, server_config, *_ = gen.generate()
+    server = server_config.servers[0]
 
-    assert len(server_plan.endpoints) == len(protocols)
-    server_protocols = {ep.protocol for ep in server_plan.endpoints}
+    assert len(server.endpoints) == len(protocols)
+    server_protocols = {ep.protocol for ep in server.endpoints}
     assert server_protocols == set(protocols)
 
 
-def test_server_plan_points_match_asset_count() -> None:
-    """ServerPlan points 应与 asset_count 一致。"""
+def test_server_config_points_match_asset_count() -> None:
+    """ServerConfig points 应与 asset_count 一致。"""
     cfg = ScenarioConfig(scenario_id="pts_test", asset_count=4, protocol_targets=["OPC_UA"])
     gen = SeahorseGenerator(cfg)
-    _, server_plan, *_ = gen.generate()
+    _, server_config, *_ = gen.generate()
+    server = server_config.servers[0]
 
-    assert len(server_plan.points) == 4
-    point_ids = {p.point_id for p in server_plan.points}
+    assert len(server.points) == 4
+    point_ids = {p.point_id for p in server.points}
     assert len(point_ids) == 4
 
 
@@ -193,15 +197,15 @@ def test_server_plan_points_match_asset_count() -> None:
 
 
 def test_generate_returns_5_tuple() -> None:
-    """expand generate() 应返回 (SeedPlan, ServerPlan, signals, alarms, controls)。"""
+    """expand generate() 应返回 (SeedPlan, ServerConfig, signals, alarms, controls)。"""
     cfg = ScenarioConfig(scenario_id="expanded", asset_count=1, protocol_targets=["OPC_UA"])
     gen = SeahorseGenerator(cfg)
-    seed_plan, server_plan, signals, alarms, controls = gen.generate()
+    seed_plan, server_config, signals, alarms, controls = gen.generate()
 
-    from seahorse.models.plan import SeedPlan, ServerPlan
+    from seahorse.models.plan import SeedPlan, ServerConfig
 
     assert isinstance(seed_plan, SeedPlan)
-    assert isinstance(server_plan, ServerPlan)
+    assert isinstance(server_config, ServerConfig)
     assert isinstance(signals, list)
     assert isinstance(alarms, list)
     assert isinstance(controls, list)
@@ -253,11 +257,11 @@ def test_generate_minimal_backward_compatible() -> None:
     """generate_minimal() 应与 Round 1 __init__ 行为一致（返回 2 元组）。"""
     cfg = ScenarioConfig(scenario_id="minimal_bw", asset_count=2)
     gen = SeahorseGenerator(cfg)
-    seed_plan, server_plan = gen.generate_minimal()
+    seed_plan, server_config = gen.generate_minimal()
 
-    from seahorse.models.plan import SeedPlan, ServerPlan
+    from seahorse.models.plan import SeedPlan, ServerConfig
     assert isinstance(seed_plan, SeedPlan)
-    assert isinstance(server_plan, ServerPlan)
+    assert isinstance(server_config, ServerConfig)
     assert len(seed_plan.entities) == 2
 
 

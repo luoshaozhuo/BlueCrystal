@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from starfish.domain import (
-    StarfishServerPlan,
+    StarfishServerMemberConfig,
     UnsupportedOperation,
 )
 
@@ -36,14 +36,14 @@ class ServerSimulatorFacade:
     不负责：真实协议 server 启动、网络 I/O、协议帧编解码。
 
     Attributes:
-        _plan: 加载的 StarfishServerPlan。
+        _plan: 加载的 StarfishServerMemberConfig。
         _started: 是否已调用 start()。
         _values: 内存点位值存储 (point_id -> value)。
         _started_at: start() 调用时间。
     """
 
     def __init__(self) -> None:
-        self._plan: StarfishServerPlan | None = None
+        self._plan: StarfishServerMemberConfig | None = None
         self._started: bool = False
         self._values: dict[str, Any] = {}
         self._started_at: datetime | None = None
@@ -95,14 +95,14 @@ class ServerSimulatorFacade:
             "synthetic": self._plan.synthetic if self._plan else True,
         }
 
-    def load_points(self, plan: StarfishServerPlan) -> None:
-        """从 StarfishServerPlan 加载点位定义和初始值。
+    def load_points(self, plan: StarfishServerMemberConfig) -> None:
+        """从 StarfishServerMemberConfig 加载点位定义和初始值。
 
         使用 plan.initial_values 填充内存存储。
         已存在的值会被覆盖。
 
         Args:
-            plan: 已加载并校验的 StarfishServerPlan 实例。
+            plan: 已加载并校验的 StarfishServerMemberConfig 实例。
         """
         self._plan = plan
         self._values = dict(plan.initial_values)

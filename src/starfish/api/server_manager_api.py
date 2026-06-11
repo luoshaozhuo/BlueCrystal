@@ -1,43 +1,46 @@
-"""starfish 高层运行时 API。
+"""starfish 高层 server manager API。
 
-本模块为 CLI 和其他消费者提供统一运行时对象，外部只需要操作
-`StarfishRuntime`，无需直接感知底层协议实现、注册表或配置加载细节。
+本模块为 CLI 和其他消费者提供统一 manager 对象，外部只需要操作
+`StarfishServerManager`，无需直接感知底层协议实现、注册表或配置加载细节。
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from starfish.application import BuiltRuntime, LoadedPlan, StarfishRuntimeService
+from starfish.application import BuiltManager, LoadedConfig, StarfishServerManagerService
+from starfish.domain import DriverEntry
 
 
-class StarfishRuntime:
-    """Starfish 统一运行时对象。"""
+class StarfishServerManager:
+    """Starfish 对外 server 管理对象。"""
 
-    def __init__(self, built_runtime: BuiltRuntime) -> None:
-        self._built_runtime = built_runtime
+    def __init__(self, built_manager: BuiltManager) -> None:
+        self._built_manager = built_manager
         self._started_entries: list[Any] = []
 
     @property
-    def plan(self) -> Any:
-        """返回当前运行时绑定的计划。"""
-        return self._built_runtime.plan
+    def config(self) -> Any:
+        """返回当前 manager 绑定的服务端配置。"""
+        return self._built_manager.config
 
     @property
     def registry(self) -> Any:
         """返回底层驱动注册表。"""
-        return self._built_runtime.registry
+        return self._built_manager.registry
 
     def describe(self) -> dict[str, Any]:
-        """返回运行时结构描述。"""
+        """返回当前 manager 管理的 servers 结构描述。"""
         return {
-            "scenario_id": self.plan.scenario_id,
-            "server_name": self.plan.server_name,
-            "synthetic": self.plan.synthetic,
-            "capabilities": list(self.plan.capabilities),
+            "scenario_id": self.config.scenario_id,
+            "config_name": self.config.config_name,
+            "synthetic": self.config.synthetic,
+            "server_count": len(self.config.servers),
             "endpoints": [
                 {
+                    "server_id": entry.server.server_id,
+                    "server_name": entry.server.server_name,
                     "endpoint_id": entry.endpoint.endpoint_id,
                     "protocol": entry.endpoint.protocol,
                     "mode": entry.mode,
@@ -78,9 +81,10 @@ class StarfishRuntime:
     def status(self) -> dict[str, Any]:
         """返回聚合运行状态。"""
         return {
-            "scenario_id": self.plan.scenario_id,
-            "server_name": self.plan.server_name,
-            "synthetic": self.plan.synthetic,
+            "scenario_id": self.config.scenario_id,
+            "config_name": self.config.config_name,
+            "synthetic": self.config.synthetic,
+            "server_count": len(self.config.servers),
             "endpoints": self.registry.health_all(),
         }
 
@@ -88,7 +92,14 @@ class StarfishRuntime:
         """查询健康状态。"""
         if endpoint_id is None:
             return self.status()
-        return self._resolve_entry(endpoint_id).driver.health()
+        # DriverEntry.driver 字段类型为 `ServerDriver | Any`（见
+        # starfish.domain.driver），调用 .health() 时 mypy 推导出 Any。
+        # ServerDriver.health() 实际返回 dict[str, Any]，此处 cast 仅做
+        # 类型显式声明，不影响运行时行为。
+        return cast(
+            "dict[str, Any]",
+            self._resolve_entry(endpoint_id).driver.health(),
+        )
 
     def read(
         self,
@@ -98,7 +109,13 @@ class StarfishRuntime:
     ) -> dict[str, Any]:
         """读取当前点位值。"""
         if endpoint_id is not None:
-            return self._resolve_entry(endpoint_id).driver.read(point_ids)
+            # 同 health()：DriverEntry.driver 字段类型为 `ServerDriver | Any`，
+            # 推导为 Any；ServerDriver.read() 实际返回 dict[str, Any]，
+            # 此处 cast 仅做类型显式声明，不影响运行时行为。
+            return cast(
+                "dict[str, Any]",
+                self._resolve_entry(endpoint_id).driver.read(point_ids),
+            )
 
         return {
             entry.endpoint.endpoint_id: entry.driver.read(point_ids)
@@ -115,13 +132,13 @@ class StarfishRuntime:
         """向单个 endpoint 写值。"""
         self._resolve_entry(endpoint_id).driver.write(point_id, value)
 
-    def _iter_available_entries(self) -> list[Any]:
+    def _iter_available_entries(self) -> list[DriverEntry]:
         return [
             entry for entry in self.registry.entries
             if entry.available and entry.driver is not None
         ]
 
-    def _resolve_entry(self, endpoint_id: str | None) -> Any:
+    def _resolve_entry(self, endpoint_id: str | None) -> DriverEntry:
         available_entries = self._iter_available_entries()
         if endpoint_id is None:
             if len(available_entries) != 1:
@@ -142,10 +159,10 @@ class StarfishRuntime:
                 continue
 
 
-class StarfishRuntimeApi:
-    """Starfish 高层运行时 API。"""
+class StarfishServerManagerApi:
+    """Starfish 高层 server manager API。"""
 
-    def __init__(self, service: StarfishRuntimeService) -> None:
+    def __init__(self, service: StarfishServerManagerService) -> None:
         """初始化高层 API。
 
         Args:
@@ -153,40 +170,40 @@ class StarfishRuntimeApi:
         """
         self._service = service
 
-    def load_plan(self, input_path: Path) -> LoadedPlan:
-        """加载并校验计划。
+    def load_config(self, input_path: Path) -> LoadedConfig:
+        """加载并校验服务端配置。
 
         Args:
-            input_path: `starfish_server_plan.json` 文件路径。
+            input_path: server config JSON 文件路径。
 
         Returns:
-            `LoadedPlan` 结果。
+            `LoadedConfig` 结果。
         """
-        return self._service.load_plan(input_path)
+        return self._service.load_config(input_path)
 
-    def build_runtime(self, input_path: Path) -> BuiltRuntime:
-        """构建运行时。
+    def build_manager(self, input_path: Path) -> BuiltManager:
+        """构建 server manager。
 
         Args:
-            input_path: `starfish_server_plan.json` 文件路径。
+            input_path: server config JSON 文件路径。
 
         Returns:
-            `BuiltRuntime` 结果。
+            `BuiltManager` 结果。
         """
-        return self._service.build_runtime(input_path)
+        return self._service.build_manager(input_path)
 
-    def open_runtime(self, input_path: Path) -> StarfishRuntime:
-        """构建并返回统一高层运行时对象。"""
-        return StarfishRuntime(self.build_runtime(input_path))
+    def open_manager(self, input_path: Path) -> StarfishServerManager:
+        """构建并返回统一高层 manager 对象。"""
+        return StarfishServerManager(self.build_manager(input_path))
 
 
-def create_default_runtime_api() -> StarfishRuntimeApi:
-    """创建默认运行时 API。
+def create_default_server_manager_api() -> StarfishServerManagerApi:
+    """创建默认 server manager API。
 
     Returns:
-        绑定默认应用服务实现的 `StarfishRuntimeApi`。
+        绑定默认应用服务实现的 `StarfishServerManagerApi`。
     """
-    return StarfishRuntimeApi(service=StarfishRuntimeService())
+    return StarfishServerManagerApi(service=StarfishServerManagerService())
 
 
-__all__ = ["StarfishRuntime", "StarfishRuntimeApi", "create_default_runtime_api"]
+__all__ = ["StarfishServerManager", "StarfishServerManagerApi", "create_default_server_manager_api"]

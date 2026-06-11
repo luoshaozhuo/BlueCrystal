@@ -25,8 +25,8 @@ from pathlib import Path
 
 import pytest
 
-from starfish.drivers import load_server_plan
-from starfish.domain.server_plan import LoadResult, ValidationResult
+from starfish.drivers import load_server_config
+from starfish.domain.server_config import LoadResult, ValidationResult
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────
@@ -115,22 +115,22 @@ class TestLoadServerPlanSuccess:
         """加载完全有效的 ServerPlan JSON 应成功。"""
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, _make_valid_payload("load_ok"))
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
-            assert result.plan is not None
-            assert result.plan.scenario_id == "load_ok"
-            assert len(result.plan.endpoints) == 1
-            assert len(result.plan.points) == 1
-            assert result.plan.synthetic is True
-            assert result.plan.capabilities == ["READ"]
+            assert result.config is not None
+            assert result.config.scenario_id == "load_ok"
+            assert len(result.config.endpoints) == 1
+            assert len(result.config.points) == 1
+            assert result.config.synthetic is True
+            assert result.config.capabilities == ["READ"]
             assert result.validation.is_valid
             assert len(result.validation.errors) == 0
 
     def test_load_returns_load_result_type(self) -> None:
-        """load_server_plan 应返回 LoadResult 实例。"""
+        """load_server_config 应返回 LoadResult 实例。"""
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, _make_valid_payload("type_check"))
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
             assert isinstance(result, LoadResult)
             assert isinstance(result.validation, ValidationResult)
 
@@ -144,15 +144,15 @@ class TestLoadServerPlanSuccess:
             "host": "127.0.0.1",
             "port": 502,
         })
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
-            assert result.plan is not None
-            assert len(result.plan.endpoints) == 2
+            assert result.config is not None
+            assert len(result.config.endpoints) == 2
             assert result.validation.is_valid
 
     def test_load_with_multiple_points(self) -> None:
@@ -167,30 +167,30 @@ class TestLoadServerPlanSuccess:
             "access_mode": "RO",
             "data_type": "INT32",
         })
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
-            assert result.plan is not None
-            assert len(result.plan.points) == 2
+            assert result.config is not None
+            assert len(result.config.points) == 2
             assert result.validation.is_valid
 
     def test_load_preserves_update_policy(self) -> None:
         """update_policy 应正确保留在加载结果中。"""
         payload = _make_valid_payload("up_policy")
         payload["update_policy"] = {"mode": "push", "batch_size": 10}
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
-            assert result.plan is not None
-            assert result.plan.update_policy == {"mode": "push", "batch_size": 10}
+            assert result.config is not None
+            assert result.config.update_policy == {"mode": "push", "batch_size": 10}
 
     def test_load_preserves_initial_values(self) -> None:
         """initial_values 应正确保留在加载结果中，含多种数据类型。"""
@@ -205,15 +205,15 @@ class TestLoadServerPlanSuccess:
             "int_pt": 42,
             "bool_pt": True,
         }
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
-            assert result.plan is not None
-            assert result.plan.initial_values == {
+            assert result.config is not None
+            assert result.config.initial_values == {
                 "float_pt": 3.14,
                 "int_pt": 42,
                 "bool_pt": True,
@@ -233,7 +233,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("scenario_id" in e for e in result.validation.errors)
@@ -245,7 +245,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("schema_version" in e for e in result.validation.errors)
@@ -257,7 +257,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("endpoints" in e for e in result.validation.errors)
@@ -269,7 +269,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("endpoints" in e.lower() for e in result.validation.errors)
@@ -281,7 +281,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("points" in e for e in result.validation.errors)
@@ -293,7 +293,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("points" in e.lower() for e in result.validation.errors)
@@ -305,7 +305,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("protocol" in e for e in result.validation.errors)
@@ -317,7 +317,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("endpoint_id" in e for e in result.validation.errors)
@@ -329,7 +329,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("point_id" in e for e in result.validation.errors)
@@ -341,7 +341,7 @@ class TestLoadServerPlanValidationErrors:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("payload_hash" in e for e in result.validation.errors)
@@ -363,22 +363,22 @@ class TestLoadServerPlanValidationWarnings:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert result.validation.is_valid  # 警告不阻止通过
-            assert result.plan is not None
+            assert result.config is not None
             assert any("schema_version" in w for w in result.validation.warnings)
 
     def test_load_synthetic_false_warning(self) -> None:
         """synthetic=False 应产生警告。"""
         payload = _make_valid_payload("syn_false")
         payload["synthetic"] = False
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert result.validation.is_valid
             assert any("synthetic" in w.lower() for w in result.validation.warnings)
@@ -390,11 +390,11 @@ class TestLoadServerPlanValidationWarnings:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert any("payload_hash" in w.lower() for w in result.validation.warnings)
             # plan 仍然应该被构建
-            assert result.plan is not None
+            assert result.config is not None
 
 
 # ── payload_hash 校验 ───────────────────────────────────────────────────────────
@@ -408,7 +408,7 @@ class TestPayloadHashVerification:
         payload = _make_valid_payload("hash_match")
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert result.validation.is_valid
             assert any("payload_hash" in p for p in result.validation.passed_checks)
@@ -420,7 +420,7 @@ class TestPayloadHashVerification:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_json(tmpdir, payload)
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
 
             assert not result.validation.is_valid
             assert any("payload_hash" in e.lower() for e in result.validation.errors)
@@ -429,7 +429,7 @@ class TestPayloadHashVerification:
         """相同内容应产生相同 payload_hash。"""
         payload1 = _make_valid_payload("hash_det")
         payload1["generated_at"] = "2024-01-01T00:00:00+00:00"
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         hash1 = _compute_payload_hash(payload1)
 
         payload2 = _make_valid_payload("hash_det")
@@ -442,7 +442,7 @@ class TestPayloadHashVerification:
     def test_payload_hash_differs_by_content(self) -> None:
         """不同 scenario_id 应产生不同 payload_hash。"""
         payload1 = _make_valid_payload("hash_a")
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         hash1 = _compute_payload_hash(payload1)
 
         payload2 = _make_valid_payload("hash_b")
@@ -453,7 +453,7 @@ class TestPayloadHashVerification:
     def test_payload_hash_64_char_hex(self) -> None:
         """payload_hash 应为 64 字符十六进制字符串。"""
         payload = _make_valid_payload("hash_fmt")
-        from starfish.drivers.server_plan_loader import _compute_payload_hash
+        from starfish.drivers.server_config_loader import _compute_payload_hash
         computed = _compute_payload_hash(payload)
 
         assert len(computed) == 64
@@ -469,7 +469,7 @@ class TestLoadServerPlanErrorBoundaries:
     def test_file_not_found(self) -> None:
         """不存在的文件应抛出 FileNotFoundError。"""
         with pytest.raises(FileNotFoundError):
-            load_server_plan("/nonexistent/path/not_a_file.json")
+            load_server_config("/nonexistent/path/not_a_file.json")
 
     def test_invalid_json(self) -> None:
         """无效 JSON 文件应抛出 json.JSONDecodeError。"""
@@ -477,7 +477,7 @@ class TestLoadServerPlanErrorBoundaries:
             path = Path(tmpdir) / "bad.json"
             path.write_text("this is not json", encoding="utf-8")
             with pytest.raises(json.JSONDecodeError):
-                load_server_plan(path)
+                load_server_config(path)
 
     def test_top_level_not_dict(self) -> None:
         """JSON 顶层不是 dict 应抛出 ValueError。"""
@@ -485,7 +485,7 @@ class TestLoadServerPlanErrorBoundaries:
             path = Path(tmpdir) / "list.json"
             path.write_text('[{"key": "value"}]', encoding="utf-8")
             with pytest.raises(ValueError, match="dict"):
-                load_server_plan(path)
+                load_server_config(path)
 
     def test_empty_file(self) -> None:
         """空文件应抛出 JSON 解析错误。"""
@@ -493,7 +493,7 @@ class TestLoadServerPlanErrorBoundaries:
             path = Path(tmpdir) / "empty.json"
             path.write_text("", encoding="utf-8")
             with pytest.raises(json.JSONDecodeError):
-                load_server_plan(path)
+                load_server_config(path)
 
 
 # ── LoadResult 模型 ─────────────────────────────────────────────────────────────
@@ -534,7 +534,7 @@ class TestLoadResult:
     def test_load_result_defaults(self) -> None:
         """LoadResult 默认值应合理。"""
         lr = LoadResult()
-        assert lr.plan is None
+        assert lr.config is None
         assert lr.validation.is_valid
         assert lr.file_path == ""
 
@@ -574,15 +574,15 @@ class TestSeahorseStarfishContract:
             plan_path = Path(tmpdir) / "sf_contract_test_server_plan.json"
             plan_path.write_text(json_str, encoding="utf-8")
 
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
             assert result.validation.is_valid, (
                 f"Starfish 应能加载 Seahorse 导出的 JSON: {result.validation.errors}"
             )
-            assert result.plan is not None
-            assert result.plan.scenario_id == "sf_contract_test"
-            assert len(result.plan.endpoints) >= 1
-            assert len(result.plan.points) >= 1
-            assert result.plan.synthetic is True
+            assert result.config is not None
+            assert result.config.scenario_id == "sf_contract_test"
+            assert len(result.config.endpoints) >= 1
+            assert len(result.config.points) >= 1
+            assert result.config.synthetic is True
 
     def test_starfish_loads_seahorse_with_modbus(self) -> None:
         """Seahorse MODBUS_TCP 导出产物应被 Starfish loader 消费。"""
@@ -608,15 +608,15 @@ class TestSeahorseStarfishContract:
             plan_path = Path(tmpdir) / "sf_modbus_test_server_plan.json"
             plan_path.write_text(json_str, encoding="utf-8")
 
-            result = load_server_plan(plan_path)
+            result = load_server_config(plan_path)
             assert result.validation.is_valid, (
                 f"MODBUS_TCP plan 加载失败: {result.validation.errors}"
             )
-            assert result.plan is not None
-            assert result.plan.scenario_id == "sf_modbus_test"
+            assert result.config is not None
+            assert result.config.scenario_id == "sf_modbus_test"
             # MODBUS_TCP 端点应有合法 port（SeahorseGenerator 默认使用 4840）
-            assert result.plan.endpoints[0].protocol == "MODBUS_TCP"
-            assert result.plan.endpoints[0].port > 0  # port 应合法
+            assert result.config.endpoints[0].protocol == "MODBUS_TCP"
+            assert result.config.endpoints[0].port > 0  # port 应合法
 
     def test_starfish_loads_seahorse_with_initial_values(self) -> None:
         """Seahorse 导出的 initial_values 应被 Starfish 正确读取。"""
@@ -642,11 +642,11 @@ class TestSeahorseStarfishContract:
             plan_path = Path(tmpdir) / "sf_iv_test_server_plan.json"
             plan_path.write_text(json_str, encoding="utf-8")
 
-            result = load_server_plan(plan_path)
-            assert result.plan is not None
+            result = load_server_config(plan_path)
+            assert result.config is not None
             # initial_values 应非空（SeahorseGenerator 为每个 point 生成初始值）
-            if result.plan.initial_values:
+            if result.config.initial_values:
                 # 确保所有 initial_values key 都是合法的 point_id
-                point_ids = {pt.point_id for pt in result.plan.points}
-                for key in result.plan.initial_values:
+                point_ids = {pt.point_id for pt in result.config.points}
+                for key in result.config.initial_values:
                     assert key in point_ids, f"initial_values key {key} 不是合法 point_id"

@@ -6,10 +6,10 @@
 
 from __future__ import annotations
 
-from starfish.api.runtime_api import (
-    StarfishRuntime,
-    StarfishRuntimeApi,
-    create_default_runtime_api,
+from starfish.api.server_manager_api import (
+    StarfishServerManager,
+    StarfishServerManagerApi,
+    create_default_server_manager_api,
 )
 
-__all__ = ["StarfishRuntime", "StarfishRuntimeApi", "create_default_runtime_api"]
+__all__ = ["StarfishServerManager", "StarfishServerManagerApi", "create_default_server_manager_api"]

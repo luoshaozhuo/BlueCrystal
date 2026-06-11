@@ -29,13 +29,13 @@ from starfish.drivers.modbus_rtu_facade import ModbusRtuFacade, probe_modbus_rtu
 from starfish.drivers.modbus_tcp_facade import ModbusTcpFacade
 from starfish.drivers.mqtt_facade import MqttFacade, SubscriptionQueue
 from starfish.drivers.opcua_facade import OpcUaFacade, probe_opcua_binary
-from starfish.drivers.runtime_registry import (
+from starfish.drivers.server_registry import (
     DriverEntry,
-    RuntimeRegistry,
+    ServerRegistry,
     create_driver_for_endpoint,
-    create_drivers,
+    create_server_registry,
 )
-from starfish.drivers.server_plan_loader import load_server_plan
+from starfish.drivers.server_config_loader import load_server_config
 from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
 from starfish.drivers.sv_facade import SvFacade, probe_sv_binary
 
@@ -53,13 +53,13 @@ __all__ = [
     "ModbusTcpFacade",
     "OpcUaFacade",
     "ReportQueue",
-    "RuntimeRegistry",
+    "ServerRegistry",
     "ServerSimulatorFacade",
     "SubscriptionQueue",
     "SvFacade",
     "create_driver_for_endpoint",
-    "create_drivers",
-    "load_server_plan",
+    "create_server_registry",
+    "load_server_config",
     "probe_ads_binary",
     "probe_goose_binary",
     "probe_iec101_binary",

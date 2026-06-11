@@ -6,23 +6,25 @@
 
 from __future__ import annotations
 
-from starfish.domain.server_plan import (
+from starfish.domain.server_config import (
     LoadResult,
-    StarfishEndpointPlan,
-    StarfishPointPlan,
-    StarfishServerPlan,
+    StarfishEndpointConfig,
+    StarfishPointConfig,
+    StarfishServerConfig,
+    StarfishServerMemberConfig,
     UnsupportedOperation,
     ValidationResult,
 )
-from starfish.domain.runtime import DriverEntry, RuntimeDriver
+from starfish.domain.driver import DriverEntry, ServerDriver
 
 __all__ = [
-    "StarfishServerPlan",
-    "StarfishEndpointPlan",
-    "StarfishPointPlan",
+    "StarfishServerConfig",
+    "StarfishServerMemberConfig",
+    "StarfishEndpointConfig",
+    "StarfishPointConfig",
     "LoadResult",
     "ValidationResult",
     "UnsupportedOperation",
-    "RuntimeDriver",
+    "ServerDriver",
     "DriverEntry",
 ]

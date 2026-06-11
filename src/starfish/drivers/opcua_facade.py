@@ -40,7 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from starfish.domain import StarfishServerPlan, UnsupportedOperation
+from starfish.domain import StarfishServerMemberConfig, UnsupportedOperation
 from starfish.drivers.native_runtime import (
     native_runner_env,
     probe_native_binary,
@@ -130,10 +130,10 @@ def _escape_tsv_field(value: str) -> str:
 def _generate_opcua_tsv(
     host: str,
     port: int,
-    plan: StarfishServerPlan,
+    plan: StarfishServerMemberConfig,
     namespace_uri: str | None = None,
 ) -> str:
-    """根据 StarfishServerPlan 生成 open62541 C runner 的最小 TSV 配置。
+    """根据 StarfishServerMemberConfig 生成 open62541 C runner 的最小 TSV 配置。
 
     输出格式（制表符分隔）：::
 
@@ -146,7 +146,7 @@ def _generate_opcua_tsv(
     Args:
         host: OPC UA 服务器监听地址。
         port: OPC UA 服务器监听端口。
-        plan: StarfishServerPlan，包含点位定义和初始值。
+        plan: StarfishServerMemberConfig，包含点位定义和初始值。
         namespace_uri: 可选命名空间 URI，默认为 "urn:starfish:opcua"。
 
     Returns:
@@ -252,7 +252,7 @@ class OpcUaFacade:
             bind_host: 绑定地址。
             port: 监听端口（0 表示自动分配）。
         """
-        self._plan: StarfishServerPlan | None = None
+        self._plan: StarfishServerMemberConfig | None = None
         self._started: bool = False
         self._values: dict[str, Any] = {}
         self._started_at: datetime | None = None
@@ -440,11 +440,11 @@ class OpcUaFacade:
 
     # ── 数据操作 ──────────────────────────────────────────────────────────────
 
-    def load_points(self, plan: StarfishServerPlan) -> None:
+    def load_points(self, plan: StarfishServerMemberConfig) -> None:
         """加载点位定义和初始值到内存存储。
 
         Args:
-            plan: 已校验的 StarfishServerPlan 实例。
+            plan: 已校验的 StarfishServerMemberConfig 实例。
         """
         self._plan = plan
         self._values = dict(plan.initial_values)

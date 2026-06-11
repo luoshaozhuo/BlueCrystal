@@ -1,7 +1,7 @@
 """starfish CLI 测试。
 
 验证：
-1. validate-plan 正常加载和校验输出。
+1. validate-config 正常加载和校验输出。
 2. describe 展示 plan 与 facade 装配结果。
 3. health 可查询未启动/已启动 facade 状态。
 4. read 可启动 simulator 并读取当前值。
@@ -30,6 +30,8 @@ import pytest
 
 import starfish.__main__ as starfish_cli
 from starfish.__main__ import main
+from starfish.application import ServerManagerBuildError
+from starfish.domain import ValidationResult
 
 
 def _write_valid_json(
@@ -161,19 +163,19 @@ def _write_invalid_json_payload(tmpdir: str, name: str) -> Path:
 
 
 class TestValidatePlanCLI:
-    """validate-plan CLI 测试。"""
+    """validate-config CLI 测试。"""
 
-    def test_validate_plan_routes_through_runtime_api(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_validate_plan_routes_through_server_api(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """CLI 应通过 `starfish.api` 高层入口触发计划加载。"""
 
         class _FakeApi:
             def __init__(self) -> None:
                 self.called_with: Path | None = None
 
-            def load_plan(self, input_path: Path) -> object:
+            def load_config(self, input_path: Path) -> object:
                 self.called_with = input_path
                 return SimpleNamespace(
-                    plan=SimpleNamespace(
+                    config=SimpleNamespace(
                         scenario_id="api_cli",
                         server_name="api_cli server",
                         endpoints=[],
@@ -190,39 +192,39 @@ class TestValidatePlanCLI:
                 )
 
         fake_api = _FakeApi()
-        monkeypatch.setattr(starfish_cli, "create_default_runtime_api", lambda: fake_api)
+        monkeypatch.setattr(starfish_cli, "create_default_server_manager_api", lambda: fake_api)
         plan_path = Path("/tmp/runtime_api_plan.json")
 
-        assert main(["validate-plan", "--input", str(plan_path)]) == 0
+        assert main(["validate-config", "--input", str(plan_path)]) == 0
         assert fake_api.called_with == plan_path
 
     @pytest.mark.smoke
     def test_help(self) -> None:
-        assert main(["validate-plan", "--help"]) == 0
+        assert main(["validate-config", "--help"]) == 0
 
     @pytest.mark.smoke
     def test_load_valid_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_valid_json(tmpdir, "cli_validate_ok")
-            assert main(["validate-plan", "--input", str(plan_path)]) == 0
+            assert main(["validate-config", "--input", str(plan_path)]) == 0
 
     def test_invalid_file_reports_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = _write_invalid_json_payload(tmpdir, "bad_validate")
-            assert main(["validate-plan", "--input", str(path)]) != 0
+            assert main(["validate-config", "--input", str(path)]) != 0
 
     def test_missing_file(self) -> None:
-        assert main(["validate-plan", "--input", "/nonexistent/file.json"]) != 0
+        assert main(["validate-config", "--input", "/nonexistent/file.json"]) != 0
 
     def test_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "bad.json"
             path.write_text("not valid json {{{", encoding="utf-8")
-            assert main(["validate-plan", "--input", str(path)]) != 0
+            assert main(["validate-config", "--input", str(path)]) != 0
 
     def test_requires_input(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            main(["validate-plan"])
+            main(["validate-config"])
         assert exc_info.value.code != 0
 
 
@@ -250,6 +252,35 @@ class TestDescribeCLI:
         with pytest.raises(SystemExit) as exc_info:
             main(["describe"])
         assert exc_info.value.code != 0
+
+    def test_describe_uses_runtime_build_error_details_without_reloading_plan(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """open_manager 失败时应直接使用异常内的校验明细。"""
+
+        class _FakeApi:
+            def open_manager(self, input_path: Path) -> object:
+                del input_path
+                raise ServerManagerBuildError(
+                    "校验失败 (2 个错误)",
+                    validation=ValidationResult(
+                        errors=["缺少 endpoints", "缺少 points"],
+                    ),
+                )
+
+            def load_config(self, input_path: Path) -> object:
+                del input_path
+                raise AssertionError("不应在 open_manager 失败后再次调用 load_config")
+
+        monkeypatch.setattr(starfish_cli, "create_default_server_manager_api", lambda: _FakeApi())
+
+        assert main(["describe", "--input", "/tmp/invalid.json"]) == 1
+        captured = capsys.readouterr()
+        assert "错误：校验失败 (2 个错误)" in captured.out
+        assert "[ERROR] 缺少 endpoints" in captured.out
+        assert "[ERROR] 缺少 points" in captured.out
 
 
 class TestHealthCLI:
@@ -384,7 +415,7 @@ class TestSeahorseStarfishCLIIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "cli_integration_server_plan.json"
             plan_path.write_text(json_str, encoding="utf-8")
-            assert main(["validate-plan", "--input", str(plan_path)]) == 0
+            assert main(["validate-config", "--input", str(plan_path)]) == 0
 
     def test_cli_runs_seahorse_exported_json(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))

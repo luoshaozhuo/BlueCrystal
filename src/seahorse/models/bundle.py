@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from seahorse.models.scenario import ScenarioConfig, ScenarioMetadata
-from seahorse.models.plan import SeedPlan, ServerPlan
+from seahorse.models.plan import SeedPlan, ServerConfig
 from seahorse.models.generation import (
     GeneratedAlarmEvent,
     GeneratedControlResult,
@@ -43,7 +43,7 @@ class ScenarioBundle:
         scenario_config: 场景配置完整快照。
         scenario_metadata: 生成器运行时元数据。
         seed_plan: 种子计划，包含资产、点表、端点和采集任务。
-        server_plan: 服务端计划，包含协议端点与点位配置。
+        server_config: 服务端配置，包含一组 server members 的端点与点位配置。
         generated_timeseries_sample: 生成的信号值采样序列，按时间排序。
         alarm_events: 生成的告警事件列表，按触发时间排序。
         control_results: 生成的控制回写结果列表。
@@ -62,7 +62,7 @@ class ScenarioBundle:
     scenario_config: ScenarioConfig | None = None
     scenario_metadata: ScenarioMetadata | None = None
     seed_plan: SeedPlan | None = None
-    server_plan: ServerPlan | None = None
+    server_config: ServerConfig | None = None
     generated_timeseries_sample: list[GeneratedSignalValue] = field(default_factory=list)
     alarm_events: list[GeneratedAlarmEvent] = field(default_factory=list)
     control_results: list[GeneratedControlResult] = field(default_factory=list)

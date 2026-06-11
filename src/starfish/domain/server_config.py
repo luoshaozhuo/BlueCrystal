@@ -1,22 +1,18 @@
 """starfish 领域契约模型。
 
-本模块定义 Starfish runtime 消费 ServerPlan JSON 后的内存模型，
-镜像 Seahorse 导出的 JSON 契约结构。所有模型为纯 @dataclass，
+本模块定义 Starfish 消费 server 配置 JSON 后的内存模型，
+镜像 Seahorse 导出的 handoff 契约结构。所有模型为纯 @dataclass，
 不 import seahorse Python 类型。
 
-StarfisServerPlan 的 JSON 契约 schema:
+当前 server config 的 JSON 契约 schema:
     - schema_version: 契约版本号 ("1.0.0")
     - scenario_id: 场景唯一标识
     - synthetic: 合成数据标识（始终为 True）
     - generator_version: Seahorse 生成器版本
     - generated_at: 生成时间 (ISO 8601)
-    - server_name: 服务端名称
+    - config_name: 配置名称
     - strategy_id: 生成策略标识
-    - endpoints: 端点列表
-    - points: 点位列表
-    - capabilities: 能力声明列表 (READ/WRITE/SUBSCRIBE/REPORT)
-    - update_policy: 点位更新策略
-    - initial_values: 初始值映射 (point_id -> value)
+    - servers: server member 列表
     - payload_hash: SHA256 内容哈希
 
 安全边界：
@@ -31,7 +27,7 @@ from typing import Any
 
 
 @dataclass
-class StarfishEndpointPlan:
+class StarfishEndpointConfig:
     """服务端点契约模型 —— 描述单个协议端点的连接信息。
 
     不负责：实际 socket 监听、协议握手、TLS 配置。
@@ -57,7 +53,7 @@ class StarfishEndpointPlan:
 
 
 @dataclass
-class StarfishPointPlan:
+class StarfishPointConfig:
     """点位契约模型 —— 描述单个数据点的标识与访问属性。
 
     不负责：信号值生成、协议帧编解码、数据断言。
@@ -83,11 +79,31 @@ class StarfishPointPlan:
 
 
 @dataclass
-class StarfishServerPlan:
-    """服务端计划契约模型 —— Starfish runtime 启动的核心数据载体。
+class StarfishServerMemberConfig:
+    """单个 server member 契约模型。
 
-    从 Seahorse 导出的 starfish_server_plan.json 文件反序列化得到。
-    包含完整的端点、点位、能力声明和初始值信息。
+    表达一个可被 Starfish 独立装配、启动和读写的逻辑 server。
+    每个 member 可包含一个或多个 endpoint，并拥有自己的点位与初始值集。
+    """
+
+    server_id: str = ""
+    server_name: str = ""
+    source_name: str = ""
+    logical_device_name: str = ""
+    endpoints: list[StarfishEndpointConfig] = field(default_factory=list)
+    points: list[StarfishPointConfig] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    update_policy: dict[str, Any] = field(default_factory=dict)
+    initial_values: dict[str, Any] = field(default_factory=dict)
+    synthetic: bool = True
+
+
+@dataclass(init=False)
+class StarfishServerConfig:
+    """服务端配置契约模型 —— Starfish 启动一组 servers 的核心数据载体。
+
+    从 Seahorse 导出的 server config JSON 文件反序列化得到。
+    包含完整的 server members、能力声明和元数据。
 
     不负责：实际协议 server 启动、网络 I/O、数据持久化。
     仅作为契约数据的结构化内存表示。
@@ -98,13 +114,9 @@ class StarfishServerPlan:
         generator_version: Seahorse 生成器组件版本。
         generated_at: ISO 8601 生成时间字符串。
         synthetic: 合成数据标识，始终为 True。
-        server_name: 服务端可读名称。
+        config_name: 配置可读名称。
         strategy_id: 生成策略标识。
-        endpoints: 服务端点列表。
-        points: 服务点位列表。
-        capabilities: 服务能力声明列表。
-        update_policy: 点位更新策略 dict。
-        initial_values: 初始值映射（point_id -> 初始值）。
+        servers: server member 列表。
         payload_hash: 内容 SHA256 哈希值，用于完整性校验。
     """
 
@@ -113,21 +125,105 @@ class StarfishServerPlan:
     generator_version: str = ""
     generated_at: str = ""
     synthetic: bool = True
-    server_name: str = ""
+    config_name: str = ""
     strategy_id: str = ""
-    endpoints: list[StarfishEndpointPlan] = field(default_factory=list)
-    points: list[StarfishPointPlan] = field(default_factory=list)
-    capabilities: list[str] = field(default_factory=list)
-    update_policy: dict[str, Any] = field(default_factory=dict)
-    initial_values: dict[str, Any] = field(default_factory=dict)
+    servers: list[StarfishServerMemberConfig] = field(default_factory=list)
     payload_hash: str = ""
+
+    def __init__(
+        self,
+        schema_version: str = "1.0.0",
+        scenario_id: str = "",
+        generator_version: str = "",
+        generated_at: str = "",
+        synthetic: bool = True,
+        config_name: str = "",
+        strategy_id: str = "",
+        servers: list[StarfishServerMemberConfig] | None = None,
+        payload_hash: str = "",
+        *,
+        server_name: str = "",
+        endpoints: list[StarfishEndpointConfig] | None = None,
+        points: list[StarfishPointConfig] | None = None,
+        capabilities: list[str] | None = None,
+        update_policy: dict[str, Any] | None = None,
+        initial_values: dict[str, Any] | None = None,
+    ) -> None:
+        """初始化 StarfishServerConfig，并兼容旧的单 server 扁平构造方式。"""
+        normalized_servers = list(servers or [])
+        if not normalized_servers and (
+            server_name
+            or endpoints is not None
+            or points is not None
+            or capabilities is not None
+            or update_policy is not None
+            or initial_values is not None
+        ):
+            normalized_servers = [
+                StarfishServerMemberConfig(
+                    server_id=f"{scenario_id}_server" if scenario_id else "",
+                    server_name=server_name or config_name,
+                    endpoints=list(endpoints or []),
+                    points=list(points or []),
+                    capabilities=list(capabilities or []),
+                    update_policy=dict(update_policy or {}),
+                    initial_values=dict(initial_values or {}),
+                    synthetic=synthetic,
+                )
+            ]
+
+        self.schema_version = schema_version
+        self.scenario_id = scenario_id
+        self.generator_version = generator_version
+        self.generated_at = generated_at
+        self.synthetic = synthetic
+        self.config_name = config_name or server_name
+        self.strategy_id = strategy_id
+        self.servers = normalized_servers
+        self.payload_hash = payload_hash
+
+    def _single_server(self) -> StarfishServerMemberConfig:
+        """返回单 server 兼容视图；多 server 配置下拒绝扁平访问。"""
+        if len(self.servers) != 1:
+            raise ValueError("该配置包含多个 servers，不能使用扁平单 server 视图。")
+        return self.servers[0]
+
+    @property
+    def server_name(self) -> str:
+        """兼容旧代码的单 server 名称访问。"""
+        return self._single_server().server_name
+
+    @property
+    def endpoints(self) -> list[StarfishEndpointConfig]:
+        """兼容旧代码的单 server endpoints 访问。"""
+        return self._single_server().endpoints
+
+    @property
+    def points(self) -> list[StarfishPointConfig]:
+        """兼容旧代码的单 server points 访问。"""
+        return self._single_server().points
+
+    @property
+    def capabilities(self) -> list[str]:
+        """兼容旧代码的单 server capabilities 访问。"""
+        return self._single_server().capabilities
+
+    @property
+    def update_policy(self) -> dict[str, Any]:
+        """兼容旧代码的单 server update_policy 访问。"""
+        return self._single_server().update_policy
+
+    @property
+    def initial_values(self) -> dict[str, Any]:
+        """兼容旧代码的单 server initial_values 访问。"""
+        return self._single_server().initial_values
 
 
 @dataclass
 class ValidationResult:
     """加载或校验结果模型。
 
-    用于 ServerPlan 加载器返回结构化校验明细，
+    用于 server config 加载器返回结构化校验明细，
     支持 errors/warnings/passed_checks 三通道。
 
     Attributes:
@@ -172,15 +268,15 @@ class ValidationResult:
 
 @dataclass
 class LoadResult:
-    """JSON 加载结果 —— 包含解析出的 ServerPlan 和校验结论。
+    """JSON 加载结果 —— 包含解析出的 server config 和校验结论。
 
     Attributes:
-        plan: 加载成功的 StarfishServerPlan，加载失败时为 None。
+        config: 加载成功的 StarfishServerConfig，加载失败时为 None。
         validation: 加载过程中的校验结果。
         file_path: 已加载的 JSON 文件路径。
     """
 
-    plan: StarfishServerPlan | None = None
+    config: StarfishServerConfig | None = None
     validation: ValidationResult = field(default_factory=ValidationResult)
     file_path: str = ""
 
@@ -214,9 +310,10 @@ class UnsupportedOperation(Exception):
 
 
 __all__ = [
-    "StarfishServerPlan",
-    "StarfishEndpointPlan",
-    "StarfishPointPlan",
+    "StarfishServerConfig",
+    "StarfishServerMemberConfig",
+    "StarfishEndpointConfig",
+    "StarfishPointConfig",
     "LoadResult",
     "ValidationResult",
     "UnsupportedOperation",

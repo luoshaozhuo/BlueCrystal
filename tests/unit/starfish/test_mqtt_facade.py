@@ -27,10 +27,10 @@ import socket
 
 import pytest
 
-from starfish.domain.server_plan import (
-    StarfishServerPlan,
-    StarfishEndpointPlan,
-    StarfishPointPlan,
+from starfish.domain.server_config import (
+    StarfishServerConfig,
+    StarfishEndpointConfig,
+    StarfishPointConfig,
     UnsupportedOperation,
 )
 from starfish.drivers.mqtt_facade import MqttFacade, SubscriptionQueue
@@ -42,26 +42,26 @@ from starfish.drivers.mqtt_facade import MqttFacade, SubscriptionQueue
 def _make_mqtt_plan(
     scenario_id: str = "mqtt_facade_test",
     initial_values: dict | None = None,
-) -> StarfishServerPlan:
-    """构造 MQTT 测试用 StarfishServerPlan。
+) -> StarfishServerConfig:
+    """构造 MQTT 测试用 StarfishServerConfig。
 
     Args:
         scenario_id: 场景标识。
         initial_values: 初始值 dict。
 
     Returns:
-        测试用 StarfishServerPlan。
+        测试用 StarfishServerConfig。
     """
     if initial_values is None:
         initial_values = {"sensor_temp": 25.5, "sensor_humidity": 60.0, "sensor_pressure": 101.3}
 
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_mqtt_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol="MQTT",
                 host="127.0.0.1",
@@ -69,21 +69,21 @@ def _make_mqtt_plan(
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="sensor_temp",
                 point_name="Temperature Sensor",
                 node_key="/sensors/temperature",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="sensor_humidity",
                 point_name="Humidity Sensor",
                 node_key="/sensors/humidity",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="sensor_pressure",
                 point_name="Pressure Sensor",
                 node_key="/sensors/pressure",

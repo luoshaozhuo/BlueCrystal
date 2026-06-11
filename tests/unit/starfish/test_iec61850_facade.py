@@ -4,7 +4,7 @@
 - Iec61850MmsFacade: IEC61850 MMS 协议门面（C runner 子进程）。
 - Iec61850ReportFacade: IEC61850 Report 协议门面（C runner + ReportQueue 事件队列）。
 - ReportQueue: 事件队列封装。
-- RuntimeRegistry dispatch: IEC61850_MMS / IEC61850_REPORT 协议分发。
+- ServerRegistry dispatch: IEC61850_MMS / IEC61850_REPORT 协议分发。
 - probe/profile/capacity: IEC61850 协议探测/采样/容量扫描。
 
 测试阶段：P1 开发期验证。
@@ -42,13 +42,13 @@ from starfish.drivers.iec61850_report_facade import (
     probe_iec61850_report_binary,
     resolve_iec61850_report_runner_path,
 )
-from starfish.domain.server_plan import (
-    StarfishEndpointPlan,
-    StarfishPointPlan,
-    StarfishServerPlan,
+from starfish.domain.server_config import (
+    StarfishEndpointConfig,
+    StarfishPointConfig,
+    StarfishServerConfig,
     UnsupportedOperation,
 )
-from starfish.drivers.runtime_registry import (
+from starfish.drivers.server_registry import (
     create_driver_for_endpoint,
     get_supported_protocols,
     get_native_runner_protocols,
@@ -62,12 +62,12 @@ from whale.ingest.diagnostics.capacity import capacity_scan
 
 
 def _make_plan(
-    endpoints: list[StarfishEndpointPlan] | None = None,
-    points: list[StarfishPointPlan] | None = None,
+    endpoints: list[StarfishEndpointConfig] | None = None,
+    points: list[StarfishPointConfig] | None = None,
     initial_values: dict[str, object] | None = None,
     capabilities: list[str] | None = None,
-) -> StarfishServerPlan:
-    """创建最小 StarfishServerPlan 用于测试。
+) -> StarfishServerConfig:
+    """创建最小 StarfishServerConfig 用于测试。
 
     Args:
         endpoints: 端点列表。
@@ -76,9 +76,9 @@ def _make_plan(
         capabilities: 能力声明。
 
     Returns:
-        已填充的 StarfishServerPlan 实例。
+        已填充的 StarfishServerConfig 实例。
     """
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id="test-iec61850",
         synthetic=True,
@@ -87,7 +87,7 @@ def _make_plan(
         server_name="test-iec61850-server",
         strategy_id="test-strategy",
         endpoints=endpoints or [
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-mms-1",
                 protocol="IEC61850_MMS",
                 host="127.0.0.1",
@@ -95,9 +95,9 @@ def _make_plan(
             ),
         ],
         points=points or [
-            StarfishPointPlan(point_id="temp", point_name="Temperature"),
-            StarfishPointPlan(point_id="press", point_name="Pressure"),
-            StarfishPointPlan(point_id="status", point_name="Status"),
+            StarfishPointConfig(point_id="temp", point_name="Temperature"),
+            StarfishPointConfig(point_id="press", point_name="Pressure"),
+            StarfishPointConfig(point_id="status", point_name="Status"),
         ],
         capabilities=capabilities or ["read", "report"],
         initial_values=initial_values or {
@@ -760,16 +760,16 @@ class TestIec61850ReportFacadeNotImplemented:
         assert "mode" in result
 
 
-# ── RuntimeRegistry dispatch tests ──────────────────────────────────────────────
+# ── ServerRegistry dispatch tests ──────────────────────────────────────────────
 
 
 class TestRuntimeRegistryDispatch:
-    """RuntimeRegistry IEC61850 协议分发测试。"""
+    """ServerRegistry IEC61850 协议分发测试。"""
 
     def test_dispatch_iec61850_mms_returns_real_or_unavailable(self) -> None:
         """IEC61850_MMS 协议分发返回 Iec61850MmsFacade。"""
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-mms",
                 protocol="IEC61850_MMS",
                 host="127.0.0.1",
@@ -785,7 +785,7 @@ class TestRuntimeRegistryDispatch:
     def test_dispatch_iec61850_report_returns_real_or_report_lightweight(self) -> None:
         """IEC61850_REPORT 协议分发返回 Iec61850ReportFacade。"""
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-report",
                 protocol="IEC61850_REPORT",
                 host="127.0.0.1",
@@ -824,7 +824,7 @@ class TestRuntimeRegistryDispatch:
         """
         for protocol in ("GOOSE", "SV"):
             plan = _make_plan(endpoints=[
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id=f"ep-{protocol}",
                     protocol=protocol,
                     host="127.0.0.1",
@@ -838,7 +838,7 @@ class TestRuntimeRegistryDispatch:
     def test_unknown_protocol_stub(self) -> None:
         """未知协议返回 stub mode。"""
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-unknown",
                 protocol="UNKNOWN_PROTOCOL_XYZ",
                 host="127.0.0.1",
@@ -1050,7 +1050,7 @@ class TestGooseSvNotRun:
         并标记 environment-pending。
         """
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-goose",
                 protocol="GOOSE",
                 host="127.0.0.1",
@@ -1068,7 +1068,7 @@ class TestGooseSvNotRun:
         并标记 environment-pending。
         """
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-sv",
                 protocol="SV",
                 host="127.0.0.1",
@@ -1085,7 +1085,7 @@ class TestGooseSvNotRun:
         现在有专用 GooseFacade 并标记 environment-pending。
         """
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-goose",
                 protocol="GOOSE",
                 host="127.0.0.1",
@@ -1148,7 +1148,7 @@ class TestExistingProtocolsUnaffected:
     def test_opcua_facade_dispatch_still_works(self) -> None:
         """OPC_UA dispatch 不受影响。"""
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-opcua",
                 protocol="OPC_UA",
                 host="127.0.0.1",
@@ -1161,7 +1161,7 @@ class TestExistingProtocolsUnaffected:
     def test_iec104_facade_dispatch_still_works(self) -> None:
         """IEC104 dispatch 不受影响。"""
         plan = _make_plan(endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="ep-iec104",
                 protocol="IEC104",
                 host="127.0.0.1",

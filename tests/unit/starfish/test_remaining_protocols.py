@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from starfish.domain.server_plan import StarfishServerPlan, StarfishEndpointPlan, StarfishPointPlan, UnsupportedOperation
+from starfish.domain.server_config import StarfishServerConfig, StarfishEndpointConfig, StarfishPointConfig, UnsupportedOperation
 from starfish.drivers.iec101_facade import Iec101Facade, probe_iec101_binary
 from starfish.drivers.modbus_rtu_facade import ModbusRtuFacade, probe_modbus_rtu_binary
 from starfish.drivers.ads_facade import AdsFacade, probe_ads_binary
@@ -27,22 +27,22 @@ from starfish.drivers.sv_facade import SvFacade, probe_sv_binary
 # ── 共享 fixtures ────────────────────────────────────────────────────────────────
 
 
-def _make_minimal_plan(scenario_id: str = "test") -> StarfishServerPlan:
-    """构造最小测试用 StarfishServerPlan。
+def _make_minimal_plan(scenario_id: str = "test") -> StarfishServerConfig:
+    """构造最小测试用 StarfishServerConfig。
 
     Args:
         scenario_id: 场景标识。
 
     Returns:
-        包含 2 个浮点点位和 READ 能力的 StarfishServerPlan。
+        包含 2 个浮点点位和 READ 能力的 StarfishServerConfig。
     """
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol="STUB",
                 host="127.0.0.1",
@@ -50,14 +50,14 @@ def _make_minimal_plan(scenario_id: str = "test") -> StarfishServerPlan:
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="point_a",
                 point_name="Point A",
                 node_key="/points/a",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="point_b",
                 point_name="Point B",
                 node_key="/points/b",

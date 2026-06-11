@@ -26,10 +26,10 @@ from urllib.request import ProxyHandler, build_opener
 
 import pytest
 
-from starfish.domain.server_plan import (
-    StarfishServerPlan,
-    StarfishEndpointPlan,
-    StarfishPointPlan,
+from starfish.domain.server_config import (
+    StarfishServerConfig,
+    StarfishEndpointConfig,
+    StarfishPointConfig,
     UnsupportedOperation,
 )
 from starfish.drivers.http_rest_facade import HttpRestFacade
@@ -41,9 +41,9 @@ from starfish.drivers.modbus_rtu_facade import ModbusRtuFacade
 from starfish.drivers.ads_facade import AdsFacade
 from starfish.drivers.goose_facade import GooseFacade
 from starfish.drivers.sv_facade import SvFacade
-from starfish.drivers.runtime_registry import (
+from starfish.drivers.server_registry import (
     create_driver_for_endpoint,
-    create_drivers,
+    create_server_registry,
     get_supported_protocols,
     get_real_protocols,
     get_lightweight_protocols,
@@ -61,26 +61,26 @@ _no_proxy_opener = build_opener(ProxyHandler({}))
 def _make_http_plan(
     scenario_id: str = "http_facade_test",
     initial_values: dict | None = None,
-) -> StarfishServerPlan:
-    """构造 HTTP REST 测试用 StarfishServerPlan。
+) -> StarfishServerConfig:
+    """构造 HTTP REST 测试用 StarfishServerConfig。
 
     Args:
         scenario_id: 场景标识。
         initial_values: 初始值 dict。
 
     Returns:
-        测试用 StarfishServerPlan。
+        测试用 StarfishServerConfig。
     """
     if initial_values is None:
         initial_values = {"temp_sensor_1": 25.5, "pressure_1": 101.3}
 
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_http_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol="HTTP_REST",
                 host="127.0.0.1",
@@ -88,14 +88,14 @@ def _make_http_plan(
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="temp_sensor_1",
                 point_name="Temperature Sensor 1",
                 node_key="/points/temp_sensor_1",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="pressure_1",
                 point_name="Pressure Sensor 1",
                 node_key="/points/pressure_1",
@@ -111,8 +111,8 @@ def _make_http_plan(
 def _make_modbus_plan(
     scenario_id: str = "modbus_facade_test",
     initial_values: dict | None = None,
-) -> StarfishServerPlan:
-    """构造 Modbus TCP 测试用 StarfishServerPlan。
+) -> StarfishServerConfig:
+    """构造 Modbus TCP 测试用 StarfishServerConfig。
 
     注意：initial_values 的 key 按字典序排序后分配寄存器地址。
     例如 {"a": 100, "b": 200} -> "a"=reg0, "b"=reg1。
@@ -122,18 +122,18 @@ def _make_modbus_plan(
         initial_values: 初始值 dict（key 按字典序确定寄存器地址）。
 
     Returns:
-        测试用 StarfishServerPlan。
+        测试用 StarfishServerConfig。
     """
     if initial_values is None:
         initial_values = {"reg_valve_1": 42, "reg_valve_2": 100}
 
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_modbus_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol="MODBUS_TCP",
                 host="127.0.0.1",
@@ -141,14 +141,14 @@ def _make_modbus_plan(
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="reg_valve_1",
                 point_name="Valve Register 1",
                 node_key="modbus://127.0.0.1:0/1",
                 value_type="UInt16",
                 access_mode="RW",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="reg_valve_2",
                 point_name="Valve Register 2",
                 node_key="modbus://127.0.0.1:0/2",
@@ -707,11 +707,11 @@ class TestFacadeSmokeFlow:
         assert facade.health()["running"] is False
 
 
-# ── RuntimeRegistry 工厂 dispatch 测试 ──────────────────────────────────────────
+# ── ServerRegistry 工厂 dispatch 测试 ──────────────────────────────────────────
 
 
 class TestRegistryFactoryDispatch:
-    """RuntimeRegistry 工厂 dispatch 测试。"""
+    """ServerRegistry 工厂 dispatch 测试。"""
 
     def test_http_rest_dispatches_to_http_rest_facade(self) -> None:
         """HTTP_REST 协议应 dispatch 到 HttpRestFacade。"""
@@ -738,7 +738,7 @@ class TestRegistryFactoryDispatch:
     def test_unknown_protocol_dispatches_to_stub(self) -> None:
         """未知协议应 dispatch 到 in-memory stub。"""
         plan = _make_http_plan("dispatch_unknown")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="unknown_ep",
             protocol="IEC_61850_MMS",
             host="127.0.0.1",
@@ -753,31 +753,31 @@ class TestRegistryFactoryDispatch:
 
     def test_create_drivers_multiple_endpoints(self) -> None:
         """多 endpoint 时应为每个创建正确类型的 facade。"""
-        plan = StarfishServerPlan(
+        plan = StarfishServerConfig(
             schema_version="1.0.0",
             scenario_id="multi_dispatch",
             synthetic=True,
             server_name="multi_server",
             endpoints=[
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="http_ep",
                     protocol="HTTP_REST",
                     host="127.0.0.1",
                     port=0,
                 ),
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="modbus_ep",
                     protocol="MODBUS_TCP",
                     host="127.0.0.1",
                     port=0,
                 ),
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="mqtt_ep",
                     protocol="MQTT",
                     host="127.0.0.1",
                     port=0,
                 ),
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="iec61850_ep",
                     protocol="IEC_61850_MMS",
                     host="127.0.0.1",
@@ -788,7 +788,7 @@ class TestRegistryFactoryDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_drivers(plan)
+        registry = create_server_registry(plan)
 
         assert len(registry.entries) == 4
 
@@ -818,7 +818,7 @@ class TestRegistryFactoryDispatch:
     def test_mqtt_dispatches_to_mqtt_facade(self) -> None:
         """MQTT 协议应 dispatch 到 MqttFacade（mqtt-lightweight mode）。"""
         plan = _make_http_plan("dispatch_mqtt")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="mqtt_ep",
             protocol="MQTT",
             host="127.0.0.1",
@@ -836,7 +836,7 @@ class TestRegistryFactoryDispatch:
         """MQTT 协议名大小写变体应正确归一化。"""
         plan = _make_http_plan("dispatch_mqtt_norm")
         for variant in ["mqtt", "MQTT", "Mqtt", "m q t t"]:
-            ep = StarfishEndpointPlan(
+            ep = StarfishEndpointConfig(
                 endpoint_id=f"mqtt_norm_{variant}",
                 protocol=variant,
                 host="127.0.0.1",
@@ -883,7 +883,7 @@ class TestPendingProtocolDispatch:
         （mode 可能为 codec-enhanced/codec-enhanced-plus/codec-skeleton/
         environment-pending/codebase-pending）。"""
         plan = _make_http_plan("dispatch_iec101")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="iec101_ep",
             protocol="IEC101",
             host="127.0.0.1",
@@ -906,7 +906,7 @@ class TestPendingProtocolDispatch:
         （mode 可能为 codec-enhanced/codec-enhanced-plus/codec-skeleton/
         environment-pending/codebase-pending）。"""
         plan = _make_http_plan("dispatch_iec_101")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="iec_101_ep",
             protocol="IEC_101",
             host="127.0.0.1",
@@ -926,7 +926,7 @@ class TestPendingProtocolDispatch:
         """MODBUS_RTU 协议应 dispatch 到 ModbusRtuFacade
         （PTY 可用时 rtu-lightweight，不可用时 codebase-pending）。"""
         plan = _make_http_plan("dispatch_modbus_rtu")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="modbus_rtu_ep",
             protocol="MODBUS_RTU",
             host="127.0.0.1",
@@ -944,7 +944,7 @@ class TestPendingProtocolDispatch:
     def test_beckhoff_ads_dispatches_to_ads_facade(self) -> None:
         """BECKHOFF_ADS 协议应 dispatch 到 AdsFacade（codebase-pending）。"""
         plan = _make_http_plan("dispatch_ads")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="ads_ep",
             protocol="BECKHOFF_ADS",
             host="127.0.0.1",
@@ -959,7 +959,7 @@ class TestPendingProtocolDispatch:
     def test_ads_short_name_dispatches_to_ads_facade(self) -> None:
         """ADS 短名协议应 dispatch 到 AdsFacade（codebase-pending）。"""
         plan = _make_http_plan("dispatch_ads_short")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="ads_short_ep",
             protocol="ADS",
             host="127.0.0.1",
@@ -972,7 +972,7 @@ class TestPendingProtocolDispatch:
     def test_goose_dispatches_to_goose_facade(self) -> None:
         """GOOSE 协议应 dispatch 到 GooseFacade（environment-pending）。"""
         plan = _make_http_plan("dispatch_goose")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="goose_ep",
             protocol="GOOSE",
             host="127.0.0.1",
@@ -987,7 +987,7 @@ class TestPendingProtocolDispatch:
     def test_sv_dispatches_to_sv_facade(self) -> None:
         """SV 协议应 dispatch 到 SvFacade（environment-pending）。"""
         plan = _make_http_plan("dispatch_sv")
-        ep = StarfishEndpointPlan(
+        ep = StarfishEndpointConfig(
             endpoint_id="sv_ep",
             protocol="SV",
             host="127.0.0.1",
@@ -1001,31 +1001,31 @@ class TestPendingProtocolDispatch:
 
     def test_multi_endpoint_with_pending_protocols(self) -> None:
         """多 endpoint 中含 pending 协议时应正确 dispatch。"""
-        plan = StarfishServerPlan(
+        plan = StarfishServerConfig(
             schema_version="1.0.0",
             scenario_id="multi_pending",
             synthetic=True,
             server_name="multi_pending_server",
             endpoints=[
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="http_ep",
                     protocol="HTTP_REST",
                     host="127.0.0.1",
                     port=0,
                 ),
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="iec101_ep",
                     protocol="IEC101",
                     host="127.0.0.1",
                     port=2404,
                 ),
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="goose_ep",
                     protocol="GOOSE",
                     host="127.0.0.1",
                     port=0,
                 ),
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="sv_ep",
                     protocol="SV",
                     host="127.0.0.1",
@@ -1036,7 +1036,7 @@ class TestPendingProtocolDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_drivers(plan)
+        registry = create_server_registry(plan)
         assert len(registry.entries) == 4
 
         modes = {e.endpoint.endpoint_id: e.mode for e in registry.entries}
@@ -1104,23 +1104,23 @@ class TestPendingProtocolDispatch:
 
 
 class TestRegistryStartStopAll:
-    """RuntimeRegistry start_all/stop_all 集成测试。"""
+    """ServerRegistry start_all/stop_all 集成测试。"""
 
     def test_start_all_starts_all_available(self) -> None:
         """start_all 应启动所有可用的 facade。"""
-        plan = StarfishServerPlan(
+        plan = StarfishServerConfig(
             schema_version="1.0.0",
             scenario_id="start_all_test",
             synthetic=True,
             server_name="start_all_server",
             endpoints=[
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="http_ep",
                     protocol="HTTP_REST",
                     host="127.0.0.1",
                     port=0,
                 ),
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="modbus_ep",
                     protocol="MODBUS_TCP",
                     host="127.0.0.1",
@@ -1131,7 +1131,7 @@ class TestRegistryStartStopAll:
             capabilities=["READ"],
             initial_values={"a": 1},
         )
-        registry = create_drivers(plan)
+        registry = create_server_registry(plan)
 
         try:
             registry.start_all()
@@ -1145,13 +1145,13 @@ class TestRegistryStartStopAll:
 
     def test_health_all_aggregates(self) -> None:
         """health_all 应聚合所有 facade 的健康信息。"""
-        plan = StarfishServerPlan(
+        plan = StarfishServerConfig(
             schema_version="1.0.0",
             scenario_id="health_all_test",
             synthetic=True,
             server_name="health_all_server",
             endpoints=[
-                StarfishEndpointPlan(
+                StarfishEndpointConfig(
                     endpoint_id="http_ep",
                     protocol="HTTP_REST",
                     host="127.0.0.1",
@@ -1162,7 +1162,7 @@ class TestRegistryStartStopAll:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_drivers(plan)
+        registry = create_server_registry(plan)
 
         health = registry.health_all()
         assert "http_ep" in health
@@ -1310,15 +1310,15 @@ class TestModbusTcpFacadeRegisterEncoding:
         assert "supports_register_encoding=true" in reg_caps
 
 
-def _make_modbus_tcp_plan() -> StarfishServerPlan:
+def _make_modbus_tcp_plan() -> StarfishServerConfig:
     """构造最小 Modbus TCP 测试 plan。"""
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id="modbus_tcp_reg_enc_test",
         synthetic=True,
         server_name="modbus_tcp_reg_enc_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="modbus_tcp_ep",
                 protocol="MODBUS_TCP",
                 host="127.0.0.1",
@@ -1326,7 +1326,7 @@ def _make_modbus_tcp_plan() -> StarfishServerPlan:
             ),
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="point_a",
                 point_name="Point A",
                 node_key="/points/a",

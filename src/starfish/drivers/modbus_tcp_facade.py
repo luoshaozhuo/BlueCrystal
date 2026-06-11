@@ -47,7 +47,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
-from starfish.domain import StarfishServerPlan, UnsupportedOperation
+from starfish.domain import StarfishServerMemberConfig, UnsupportedOperation
 
 
 class ModbusTcpFacade:
@@ -58,7 +58,7 @@ class ModbusTcpFacade:
     通过 MBAP 头部 + PDU 结构解析 Modbus TCP 帧。
 
     点位映射策略：
-        由于 StarfishServerPlan 的 StarfishPointPlan 不含寄存器地址字段，
+        由于 StarfishServerMemberConfig 的 StarfishPointConfig 不含寄存器地址字段，
         本 facade 在 load_points 时将 plan.initial_values 的 key 按字典序
         排序，按索引分配连续的寄存器地址（0-based）。此映射是确定性的，
         只要 initial_values 的 key 集合不变，映射关系就稳定。
@@ -67,7 +67,7 @@ class ModbusTcpFacade:
     浮点/32-bit 寄存器编解码、多单元 ID 支持。
 
     Attributes:
-        _plan: 已加载的 StarfishServerPlan。
+        _plan: 已加载的 StarfishServerMemberConfig。
         _started: 是否已调用 start()。
         _values: 内存点位值存储 (point_id -> value)。
         _started_at: start() 调用时间。
@@ -79,7 +79,7 @@ class ModbusTcpFacade:
     """
 
     def __init__(self, bind_host: str = "127.0.0.1", port: int = 0) -> None:
-        self._plan: StarfishServerPlan | None = None
+        self._plan: StarfishServerMemberConfig | None = None
         self._started: bool = False
         self._values: dict[str, Any] = {}
         self._started_at: datetime | None = None
@@ -197,21 +197,21 @@ class ModbusTcpFacade:
 
     # ── 数据操作 ──────────────────────────────────────────────────────────────
 
-    def load_points(self, plan: StarfishServerPlan) -> None:
-        """从 StarfishServerPlan 加载点位定义和初始值。
+    def load_points(self, plan: StarfishServerMemberConfig) -> None:
+        """从 StarfishServerMemberConfig 加载点位定义和初始值。
 
         同时构建 point_id -> register_address 映射：
         将 initial_values 的 key 按字典序排序后按索引分配寄存器地址。
 
         Args:
-            plan: 已加载并校验的 StarfishServerPlan。
+            plan: 已加载并校验的 StarfishServerMemberConfig。
         """
         self._plan = plan
         with self._lock:
             self._values = dict(plan.initial_values)
         self._build_register_map(plan)
 
-    def _build_register_map(self, plan: StarfishServerPlan) -> None:
+    def _build_register_map(self, plan: StarfishServerMemberConfig) -> None:
         """构建 point_id <-> register_address 双向映射。
 
         按 initial_values key 字典序排序，索引即为寄存器地址。

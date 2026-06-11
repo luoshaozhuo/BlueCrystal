@@ -1,6 +1,6 @@
-"""starfish 驱动注册表 —— 协议运行时工厂。
+"""starfish server 注册表 —— 协议驱动工厂。
 
-本模块提供工厂函数，根据 ServerPlan 端点的 protocol 字段
+本模块提供工厂函数，根据 server 配置中 endpoint 的 protocol 字段
 创建对应的 ServerSimulatorFacade。支持以下模式：
 
 - real:              已实现的协议专用真实 facade（HTTP_REST、MODBUS_TCP）。
@@ -47,22 +47,22 @@ from typing import Any
 
 from dataclasses import dataclass, field
 
-from starfish.domain import DriverEntry, StarfishEndpointPlan, StarfishServerPlan
+from starfish.domain import DriverEntry, StarfishEndpointConfig, StarfishServerConfig, StarfishServerMemberConfig
 
 
 @dataclass
-class RuntimeRegistry:
-    """运行时注册表 —— 管理一个 ServerPlan 对应的全部 facade。
+class ServerRegistry:
+    """Server 注册表 —— 管理一份 server 配置对应的全部 facade。
 
-    根据 ServerPlan 的每个 endpoint 创建对应的 facade，
+    根据 server 配置中的每个 endpoint 创建对应的 facade，
     提供统一的 start/stop/health 查询入口。
 
     Attributes:
-        plan: 关联的 StarfishServerPlan。
+        config: 关联的 StarfishServerConfig。
         entries: 每个 endpoint 对应的 facade 条目列表。
     """
 
-    plan: StarfishServerPlan
+    config: StarfishServerConfig
     entries: list[DriverEntry] = field(default_factory=list)
 
     def start_all(self) -> None:
@@ -157,8 +157,8 @@ _ENVIRONMENT_PENDING_PROTOCOLS: frozenset[str] = frozenset({
 
 
 def create_driver_for_endpoint(
-    endpoint: StarfishEndpointPlan,
-    plan: StarfishServerPlan,
+    server_or_endpoint: StarfishServerMemberConfig | StarfishEndpointConfig,
+    endpoint_or_config: StarfishEndpointConfig | StarfishServerConfig | StarfishServerMemberConfig,
 ) -> DriverEntry:
     """为单个端点创建对应的协议 facade。
 
@@ -168,19 +168,36 @@ def create_driver_for_endpoint(
     其他协议使用 in-memory stub（mode="stub"）。
 
     Args:
-        endpoint: 端点契约信息。
-        plan: 完整的 ServerPlan（用于 load_points）。
+        server_or_endpoint: 新签名下为 server member；旧签名下为 endpoint。
+        endpoint_or_config: 新签名下为 endpoint；旧签名下为顶层 config 或单 member。
 
     Returns:
         包含驱动实例、可用性状态和运行模式的 DriverEntry。
     """
+    if isinstance(server_or_endpoint, StarfishEndpointConfig):
+        endpoint = server_or_endpoint
+        config = endpoint_or_config
+        if isinstance(config, StarfishServerConfig):
+            server = config.servers[0]
+        elif isinstance(config, StarfishServerMemberConfig):
+            server = config
+        else:
+            raise TypeError("create_driver_for_endpoint 第二个参数必须是 StarfishServerConfig 或 StarfishServerMemberConfig")
+    else:
+        server = server_or_endpoint
+        candidate_endpoint = endpoint_or_config
+        if not isinstance(candidate_endpoint, StarfishEndpointConfig):
+            raise TypeError("create_driver_for_endpoint 第二个参数必须是 StarfishEndpointConfig")
+        endpoint = candidate_endpoint
+
     protocol = _normalize_protocol(endpoint.protocol or "")
 
     if protocol == "HTTP_REST":
         from starfish.drivers.http_rest_facade import HttpRestFacade
         facade: Any = HttpRestFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -191,8 +208,9 @@ def create_driver_for_endpoint(
     if protocol == "MODBUS_TCP":
         from starfish.drivers.modbus_tcp_facade import ModbusTcpFacade
         facade = ModbusTcpFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -203,8 +221,9 @@ def create_driver_for_endpoint(
     if protocol == "MQTT":
         from starfish.drivers.mqtt_facade import MqttFacade
         facade = MqttFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -219,7 +238,7 @@ def create_driver_for_endpoint(
         from starfish.drivers.opcua_facade import OpcUaFacade, probe_opcua_binary
         binary_ok, binary_reason = probe_opcua_binary()
         facade = OpcUaFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         mode = facade.mode
         available = binary_ok
         if binary_ok:
@@ -233,6 +252,7 @@ def create_driver_for_endpoint(
                 f"{binary_reason}"
             )
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=available,
@@ -246,7 +266,7 @@ def create_driver_for_endpoint(
         from starfish.drivers.iec104_facade import Iec104Facade, probe_iec104_binary
         binary_ok, binary_reason = probe_iec104_binary()
         facade = Iec104Facade()
-        facade.load_points(plan)
+        facade.load_points(server)
         mode = facade.mode
         available = binary_ok
         if binary_ok:
@@ -260,6 +280,7 @@ def create_driver_for_endpoint(
                 f"{binary_reason}"
             )
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=available,
@@ -275,7 +296,7 @@ def create_driver_for_endpoint(
         )
         binary_ok, binary_reason = probe_iec61850_mms_binary()
         facade = Iec61850MmsFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         mode = facade.mode
         available = binary_ok
         if binary_ok:
@@ -289,6 +310,7 @@ def create_driver_for_endpoint(
                 f"{binary_reason}"
             )
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=available,
@@ -304,7 +326,7 @@ def create_driver_for_endpoint(
         )
         binary_ok, binary_reason = probe_iec61850_report_binary()
         facade = Iec61850ReportFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         mode = facade.mode
         available = binary_ok
         if binary_ok:
@@ -319,6 +341,7 @@ def create_driver_for_endpoint(
                 f"真实 runner 标记 environment-pending"
             )
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=available,
@@ -335,7 +358,7 @@ def create_driver_for_endpoint(
     if protocol in ("IEC101", "IEC_101"):
         from starfish.drivers.iec101_facade import Iec101Facade
         facade = Iec101Facade()
-        facade.load_points(plan)
+        facade.load_points(server)
         current_mode = facade.mode
         if current_mode == "codec-enhanced-plus":
             reason = (
@@ -366,6 +389,7 @@ def create_driver_for_endpoint(
                 f"(串口链路环境未就绪，编解码器和 C runner 均不可用)"
             )
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -395,8 +419,9 @@ def create_driver_for_endpoint(
                 f"protocol={protocol} -> Modbus RTU codebase-pending stub "
                 f"(串口/PTY 链路环境未就绪: {pty_reason})"
             )
-        facade.load_points(plan)
+        facade.load_points(server)
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -408,8 +433,9 @@ def create_driver_for_endpoint(
     if protocol in ("BECKHOFF_ADS", "ADS"):
         from starfish.drivers.ads_facade import AdsFacade
         facade = AdsFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -424,8 +450,9 @@ def create_driver_for_endpoint(
     if protocol == "GOOSE":
         from starfish.drivers.goose_facade import GooseFacade
         facade = GooseFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -438,8 +465,9 @@ def create_driver_for_endpoint(
     if protocol == "SV":
         from starfish.drivers.sv_facade import SvFacade
         facade = SvFacade()
-        facade.load_points(plan)
+        facade.load_points(server)
         return DriverEntry(
+            server=server,
             endpoint=endpoint,
             driver=facade,
             available=True,
@@ -451,8 +479,9 @@ def create_driver_for_endpoint(
     # fallback: in-memory stub
     from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
     facade = ServerSimulatorFacade()
-    facade.load_points(plan)
+    facade.load_points(server)
     return DriverEntry(
+        server=server,
         endpoint=endpoint,
         driver=facade,
         available=True,
@@ -629,29 +658,24 @@ def get_environment_pending_protocols() -> list[str]:
     return result
 
 
-def create_drivers(plan: StarfishServerPlan) -> RuntimeRegistry:
-    """根据 ServerPlan 创建完整的运行时注册表。
+def create_server_registry(config: StarfishServerConfig) -> ServerRegistry:
+    """根据 server 配置创建完整的 server 注册表。
 
-    为 plan 中的每个 endpoint 创建对应的 facade。
-
-    Args:
-        plan: 已加载并校验的 StarfishServerPlan。
-
-    Returns:
-        包含所有 facade 条目的 RuntimeRegistry。
+    为每个 server member 下的每个 endpoint 创建对应 facade。
     """
-    registry = RuntimeRegistry(plan=plan)
-    for ep in plan.endpoints:
-        entry = create_driver_for_endpoint(ep, plan)
-        registry.entries.append(entry)
+    registry = ServerRegistry(config=config)
+    for server in config.servers:
+        for ep in server.endpoints:
+            entry = create_driver_for_endpoint(server, ep)
+            registry.entries.append(entry)
     return registry
 
 
 __all__ = [
-    "RuntimeRegistry",
+    "ServerRegistry",
     "DriverEntry",
     "create_driver_for_endpoint",
-    "create_drivers",
+    "create_server_registry",
     "get_supported_protocols",
     "get_real_protocols",
     "get_lightweight_protocols",

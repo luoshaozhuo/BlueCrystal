@@ -26,10 +26,10 @@ import time
 
 import pytest
 
-from starfish.domain.server_plan import (
-    StarfishServerPlan,
-    StarfishEndpointPlan,
-    StarfishPointPlan,
+from starfish.domain.server_config import (
+    StarfishServerConfig,
+    StarfishEndpointConfig,
+    StarfishPointConfig,
     UnsupportedOperation,
 )
 from starfish.drivers.modbus_rtu_facade import (
@@ -53,26 +53,26 @@ from starfish.protocols.modbus.register_encoding import (
 def _make_plan(
     scenario_id: str = "modbus_rtu_test",
     initial_values: dict | None = None,
-) -> StarfishServerPlan:
-    """构造最小测试用 StarfishServerPlan。
+) -> StarfishServerConfig:
+    """构造最小测试用 StarfishServerConfig。
 
     Args:
         scenario_id: 场景标识。
         initial_values: 初始值 dict，None 时使用默认值。
 
     Returns:
-        包含 2 个点位的 StarfishServerPlan。
+        包含 2 个点位的 StarfishServerConfig。
     """
     if initial_values is None:
         initial_values = {"point_a": 1.0, "point_b": 2.0}
 
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol="MODBUS_RTU",
                 host="127.0.0.1",
@@ -80,14 +80,14 @@ def _make_plan(
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="point_a",
                 point_name="Point A",
                 node_key="/points/a",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="point_b",
                 point_name="Point B",
                 node_key="/points/b",
@@ -845,19 +845,19 @@ class TestBitPacking:
 # ── FC01 Read Coils 测试 ────────────────────────────────────────────────────────
 
 
-def _make_plan_with_coils() -> StarfishServerPlan:
-    """构造包含线圈点位和保持寄存器的测试用 StarfishServerPlan。
+def _make_plan_with_coils() -> StarfishServerConfig:
+    """构造包含线圈点位和保持寄存器的测试用 StarfishServerConfig。
 
     Returns:
         包含 2 个线圈点 + 1 个保持寄存器点的 ServerPlan。
     """
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id="modbus_rtu_coils",
         synthetic=True,
         server_name="modbus_rtu_coils_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="modbus_rtu_coils_ep",
                 protocol="MODBUS_RTU",
                 host="127.0.0.1",
@@ -865,7 +865,7 @@ def _make_plan_with_coils() -> StarfishServerPlan:
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="coil_0",
                 point_name="Coil 0",
                 node_key="/coils/0",
@@ -873,7 +873,7 @@ def _make_plan_with_coils() -> StarfishServerPlan:
                 value_type="Bool",
                 access_mode="RW",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="coil_1",
                 point_name="Coil 1",
                 node_key="/coils/1",
@@ -881,7 +881,7 @@ def _make_plan_with_coils() -> StarfishServerPlan:
                 value_type="Bool",
                 access_mode="RW",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="reg_a",
                 point_name="Register A",
                 node_key="/reg/a",
@@ -895,19 +895,19 @@ def _make_plan_with_coils() -> StarfishServerPlan:
     )
 
 
-def _make_plan_with_discrete_inputs() -> StarfishServerPlan:
-    """构造包含离散输入点位的测试用 StarfishServerPlan。
+def _make_plan_with_discrete_inputs() -> StarfishServerConfig:
+    """构造包含离散输入点位的测试用 StarfishServerConfig。
 
     Returns:
         包含 2 个离散输入点的 ServerPlan。
     """
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id="modbus_rtu_di",
         synthetic=True,
         server_name="modbus_rtu_di_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="modbus_rtu_di_ep",
                 protocol="MODBUS_RTU",
                 host="127.0.0.1",
@@ -915,7 +915,7 @@ def _make_plan_with_discrete_inputs() -> StarfishServerPlan:
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="di_0",
                 point_name="DI 0",
                 node_key="/di/0",
@@ -923,7 +923,7 @@ def _make_plan_with_discrete_inputs() -> StarfishServerPlan:
                 value_type="Bool",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="di_1",
                 point_name="DI 1",
                 node_key="/di/1",
@@ -937,19 +937,19 @@ def _make_plan_with_discrete_inputs() -> StarfishServerPlan:
     )
 
 
-def _make_plan_with_input_registers() -> StarfishServerPlan:
-    """构造包含输入寄存器点位的测试用 StarfishServerPlan。
+def _make_plan_with_input_registers() -> StarfishServerConfig:
+    """构造包含输入寄存器点位的测试用 StarfishServerConfig。
 
     Returns:
         包含 2 个输入寄存器点的 ServerPlan。
     """
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id="modbus_rtu_ir",
         synthetic=True,
         server_name="modbus_rtu_ir_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id="modbus_rtu_ir_ep",
                 protocol="MODBUS_RTU",
                 host="127.0.0.1",
@@ -957,7 +957,7 @@ def _make_plan_with_input_registers() -> StarfishServerPlan:
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="ir_0",
                 point_name="Input Reg 0",
                 node_key="/ir/0",
@@ -965,7 +965,7 @@ def _make_plan_with_input_registers() -> StarfishServerPlan:
                 value_type="Int32",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="ir_1",
                 point_name="Input Reg 1",
                 node_key="/ir/1",

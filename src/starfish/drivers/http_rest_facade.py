@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
-from starfish.domain import StarfishServerPlan, UnsupportedOperation
+from starfish.domain import StarfishServerMemberConfig, UnsupportedOperation
 
 
 class _PointsHandler(BaseHTTPRequestHandler):
@@ -85,7 +85,7 @@ class HttpRestFacade:
     不负责：TLS/HTTPS、认证授权、POST/PUT/PATCH 写入端点。
 
     Attributes:
-        _plan: 已加载的 StarfishServerPlan。
+        _plan: 已加载的 StarfishServerMemberConfig。
         _started: 是否已调用 start()。
         _values: 内存点位值存储 (point_id -> value)。
         _started_at: start() 调用时间。
@@ -96,7 +96,7 @@ class HttpRestFacade:
     """
 
     def __init__(self, bind_host: str = "127.0.0.1", port: int = 0) -> None:
-        self._plan: StarfishServerPlan | None = None
+        self._plan: StarfishServerMemberConfig | None = None
         self._started: bool = False
         self._values: dict[str, Any] = {}
         self._started_at: datetime | None = None
@@ -198,11 +198,11 @@ class HttpRestFacade:
 
     # ── 数据操作 ──────────────────────────────────────────────────────────────
 
-    def load_points(self, plan: StarfishServerPlan) -> None:
-        """从 StarfishServerPlan 加载点位定义和初始值。
+    def load_points(self, plan: StarfishServerMemberConfig) -> None:
+        """从 StarfishServerMemberConfig 加载点位定义和初始值。
 
         Args:
-            plan: 已加载并校验的 StarfishServerPlan。
+            plan: 已加载并校验的 StarfishServerMemberConfig。
         """
         self._plan = plan
         self._values = dict(plan.initial_values)

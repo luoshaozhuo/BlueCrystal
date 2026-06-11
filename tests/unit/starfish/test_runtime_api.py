@@ -1,7 +1,7 @@
 """starfish 高层运行时 API 测试。
 
 验证：
-1. `StarfishRuntimeApi.open_runtime()` 可返回统一运行时对象。
+1. `StarfishServerManagerApi.open_manager()` 可返回统一运行时对象。
 2. 单 endpoint runtime 支持 `describe/start/status/read/stop` 基本流程。
 3. 多 endpoint runtime 在未指定 endpoint_id 时，`write()` 会拒绝歧义调用。
 
@@ -19,7 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from starfish.api import StarfishRuntime, create_default_runtime_api
+from starfish.api import StarfishServerManager, create_default_server_manager_api
+from starfish.application import ServerManagerBuildError
 
 
 def _write_plan(
@@ -82,10 +83,10 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = create_default_runtime_api().open_runtime(plan_path)
+            runtime = create_default_server_manager_api().open_manager(plan_path)
 
-            assert isinstance(runtime, StarfishRuntime)
-            assert runtime.plan.scenario_id == "runtime_api_single"
+            assert isinstance(runtime, StarfishServerManager)
+            assert runtime.config.scenario_id == "runtime_api_single"
 
     def test_runtime_supports_basic_stub_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -103,7 +104,7 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = create_default_runtime_api().open_runtime(plan_path)
+            runtime = create_default_server_manager_api().open_manager(plan_path)
             description = runtime.describe()
             assert description["scenario_id"] == "runtime_api_flow"
             assert description["endpoints"][0]["mode"] == "stub"
@@ -143,7 +144,28 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = create_default_runtime_api().open_runtime(plan_path)
+            runtime = create_default_server_manager_api().open_manager(plan_path)
 
             with pytest.raises(ValueError, match="endpoint_id"):
                 runtime.write("runtime_api_multi_point_000", 1.0)
+
+    def test_open_runtime_raises_runtime_build_error_with_validation_details(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            payload = {
+                "schema_version": "1.0.0",
+                "scenario_id": "runtime_api_invalid",
+                "synthetic": True,
+                "endpoints": [],
+                "points": [],
+                "capabilities": [],
+                "initial_values": {},
+                "payload_hash": "",
+            }
+            plan_path = Path(tmpdir) / "runtime_api_invalid.json"
+            plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with pytest.raises(ServerManagerBuildError, match="校验失败") as exc_info:
+                create_default_server_manager_api().open_manager(plan_path)
+
+            assert exc_info.value.validation is not None
+            assert exc_info.value.validation.errors

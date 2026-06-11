@@ -20,9 +20,9 @@ from seahorse.models.plan import (
     EndpointPlan,
     SeedEntity,
     SeedPlan,
-    ServerEndpointPlan,
-    ServerPlan,
-    ServerPointPlan,
+    ServerEndpointConfig,
+    ServerConfig,
+    ServerPointConfig,
     SignalProfileItemPlan,
     SignalProfilePlan,
 )
@@ -164,21 +164,20 @@ def test_endpoint_plan_params() -> None:
     assert ep.endpoint_params["topic_prefix"] == "whale/wtg"
 
 
-# ── ServerPlan & sub-models ───────────────────────────────────────────────────
+# ── ServerConfig & sub-models ───────────────────────────────────────────────────
 
 
-def test_server_plan_minimal() -> None:
-    """ServerPlan 最小实例化正常。"""
-    plan = ServerPlan(server_id="srv_001", scenario_id="sc_001")
-    assert plan.server_id == "srv_001"
-    assert plan.server_name == ""
-    assert plan.endpoints == []
-    assert plan.points == []
+def test_server_config_minimal() -> None:
+    """ServerConfig 最小实例化正常。"""
+    plan = ServerConfig(config_id="cfg_001", scenario_id="sc_001")
+    assert plan.config_id == "cfg_001"
+    assert plan.config_name == ""
+    assert plan.servers == []
 
 
 def test_server_endpoint_plan() -> None:
-    """ServerEndpointPlan 可正常创建。"""
-    ep = ServerEndpointPlan(endpoint_name="OPC_UA_SRV", protocol="OPC_UA", bind_port=4840)
+    """ServerEndpointConfig 可正常创建。"""
+    ep = ServerEndpointConfig(endpoint_name="OPC_UA_SRV", protocol="OPC_UA", bind_port=4840)
     assert ep.endpoint_name == "OPC_UA_SRV"
     assert ep.protocol == "OPC_UA"
     assert ep.bind_host == "0.0.0.0"
@@ -186,8 +185,8 @@ def test_server_endpoint_plan() -> None:
 
 
 def test_server_point_plan() -> None:
-    """ServerPointPlan 可正常创建。"""
-    pt = ServerPointPlan(
+    """ServerPointConfig 可正常创建。"""
+    pt = ServerPointConfig(
         point_id="pt_001",
         point_name="ActivePower",
         access_mode="RO",

@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from starfish.domain import StarfishServerPlan, UnsupportedOperation
+from starfish.domain import StarfishServerMemberConfig, UnsupportedOperation
 from starfish.drivers.native_runtime import (
     native_runner_env,
     probe_native_binary,
@@ -133,7 +133,7 @@ class Iec104Facade:
             bind_host: 绑定地址。
             port: 监听端口（0 表示自动分配）。
         """
-        self._plan: StarfishServerPlan | None = None
+        self._plan: StarfishServerMemberConfig | None = None
         self._started: bool = False
         self._values: dict[str, Any] = {}
         self._started_at: datetime | None = None
@@ -328,11 +328,11 @@ class Iec104Facade:
 
     # ── 数据操作 ──────────────────────────────────────────────────────────────
 
-    def load_points(self, plan: StarfishServerPlan) -> None:
+    def load_points(self, plan: StarfishServerMemberConfig) -> None:
         """加载点位定义和初始值到内存存储。
 
         Args:
-            plan: 已校验的 StarfishServerPlan 实例。
+            plan: 已校验的 StarfishServerMemberConfig 实例。
         """
         self._plan = plan
         self._values = dict(plan.initial_values)

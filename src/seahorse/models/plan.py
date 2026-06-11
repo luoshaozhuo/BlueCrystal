@@ -143,8 +143,8 @@ class SeedPlan:
 
 
 @dataclass
-class ServerEndpointPlan:
-    """服务端点规划 —— 描述服务端对外暴露的端点。
+class ServerEndpointConfig:
+    """服务端点配置 —— 描述单个 server member 对外暴露的端点。
 
     同时表达绑定层信息和 Starfish 契约层信息。bind_host/bind_port 描述
     服务端实际监听地址；host/port 描述 Starfish runtime 感知的连接地址；
@@ -170,8 +170,8 @@ class ServerEndpointPlan:
 
 
 @dataclass
-class ServerPointPlan:
-    """服务点位规划 —— 描述服务端暴露的单个点位。
+class ServerPointConfig:
+    """服务点位配置 —— 描述单个 server member 暴露的点位。
 
     同时包含 Seahorse 内部信号关联信息和 Starfish 契约层的
     node_key/variable_key/value_type 字段，确保点位的完整契约可导出。
@@ -198,35 +198,50 @@ class ServerPointPlan:
 
 
 @dataclass
-class ServerPlan:
-    """服务端计划 —— 描述模拟服务端的完整配置。
+class ServerMemberConfig:
+    """单个 server member 配置。
 
-    是交付 Starfish runtime 启动协议 server 的核心数据载体。
-    通过 JSON 契约导出，Starfish 无需 import seahorse 即可解析。
+    对应 Starfish 运行期内一个可被统一启动/停止/读写的逻辑 server，
+    语义上更接近 whale ORM 中的 `LDInstance + CommunicationEndpoint + SignalProfile`
+    组合，而不是单个裸 endpoint。
 
     Attributes:
-        server_id: 服务端唯一标识。
-        scenario_id: 关联的场景 ID。
-        server_name: 服务端名称。
-        endpoints: 服务端点规划列表。
-        points: 服务点位规划列表。
-        synthetic: True 表示计划由合成生成器产出，非真实现场配置。
-        strategy_id: 生成策略标识，用于 Starfish 运行时行为调整。
-        capabilities: 能力声明列表，如 ``["READ", "WRITE", "SUBSCRIBE"]``。
-            与 points 中声明相近能力后的 access_mode 不得冲突。
-        update_policy: 点位更新策略，用于 Starfish 运行时决定数据推进方式。
-            key 为策略名，value 为策略参数 dict。
-        initial_values: 初始值映射，key 为 point_id，value 为初始值。
-            每个 key 必须可追溯到 points 中的某个 point_id。
+        server_id: server member 唯一标识。
+        server_name: server member 可读名称。
+        source_name: 上游源名称，可映射到 IED 名称。
+        logical_device_name: 逻辑设备名称，可映射到 LDInstance.ld_name。
+        endpoints: 该 member 暴露的端点列表。
+        points: 该 member 使用的点位配置列表。
+        capabilities: 能力声明列表。
+        update_policy: 点位更新策略。
+        initial_values: 初始值映射，key 为 point_id。
+        synthetic: 合成数据标记，通常沿用顶层 ServerConfig.synthetic。
     """
 
     server_id: str
-    scenario_id: str = ""
     server_name: str = ""
-    endpoints: list[ServerEndpointPlan] = field(default_factory=list)
-    points: list[ServerPointPlan] = field(default_factory=list)
-    synthetic: bool = True
-    strategy_id: str = ""
+    source_name: str = ""
+    logical_device_name: str = ""
+    endpoints: list[ServerEndpointConfig] = field(default_factory=list)
+    points: list[ServerPointConfig] = field(default_factory=list)
     capabilities: list[str] = field(default_factory=list)
     update_policy: dict[str, Any] = field(default_factory=dict)
     initial_values: dict[str, Any] = field(default_factory=dict)
+    synthetic: bool = True
+
+
+@dataclass
+class ServerConfig:
+    """服务端配置 —— 描述一组模拟服务端的完整配置。
+
+    顶层不再假设“一个 server_name + 多 endpoint + 一套共享点位”，而是
+    明确表达一组 server members。每个 member 可拥有独立 endpoint 和点位集，
+    也可在上游生成阶段复用同构点位内容。
+    """
+
+    config_id: str
+    scenario_id: str = ""
+    config_name: str = ""
+    servers: list[ServerMemberConfig] = field(default_factory=list)
+    synthetic: bool = True
+    strategy_id: str = ""

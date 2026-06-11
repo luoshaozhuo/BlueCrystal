@@ -6,8 +6,8 @@
 3. 确定性校验和计算（相同内容相同 hash，不同内容不同 hash）。
 4. JSON bundle 导出与回读。
 5. JSONL 时序导出格式正确。
-6. Bundle 校验器（schema_version、scenario_id 一致性、seed_plan/server_plan 存在性、
-   synthetic 标记、checksum 可复算、server_plan 结构检查）。
+6. Bundle 校验器（schema_version、scenario_id 一致性、seed_plan/server_config 存在性、
+   synthetic 标记、checksum 可复算、server_config 结构检查）。
 7. CLI 子命令（generate-scenario、export-bundle、validate-bundle）基本可用性。
 8. SeahorseGenerator 集成：生成 bundle 并通过校验。
 
@@ -29,9 +29,10 @@ from seahorse.models.scenario import ScenarioConfig, ScenarioMetadata
 from seahorse.models.plan import (
     SeedPlan,
     SeedEntity,
-    ServerPlan,
-    ServerEndpointPlan,
-    ServerPointPlan,
+    ServerConfig,
+    ServerEndpointConfig,
+    ServerMemberConfig,
+    ServerPointConfig,
     SignalProfileItemPlan,
     SignalProfilePlan,
     EndpointPlan,
@@ -121,21 +122,28 @@ def _make_minimal_bundle(
             )
         ],
     )
-    server_plan = ServerPlan(
-        server_id=f"server_{scenario_id}",
+    server_config = ServerConfig(
+        config_id=f"server_config_{scenario_id}",
         scenario_id=scenario_id,
-        endpoints=[
-            ServerEndpointPlan(
-                endpoint_name="OPC_UA_server_ep",
-                protocol="OPC_UA",
-                bind_port=4840,
-            )
-        ],
-        points=[
-            ServerPointPlan(
-                point_id=f"{scenario_id}_entity_000_active_power",
-                point_name="ActivePower",
-                associated_signal_id=f"{scenario_id}_entity_000_ActivePower",
+        config_name=f"{scenario_id}_config",
+        servers=[
+            ServerMemberConfig(
+                server_id=f"server_{scenario_id}",
+                server_name=f"{scenario_id}_server",
+                endpoints=[
+                    ServerEndpointConfig(
+                        endpoint_name="OPC_UA_server_ep",
+                        protocol="OPC_UA",
+                        bind_port=4840,
+                    )
+                ],
+                points=[
+                    ServerPointConfig(
+                        point_id=f"{scenario_id}_entity_000_active_power",
+                        point_name="ActivePower",
+                        associated_signal_id=f"{scenario_id}_entity_000_ActivePower",
+                    )
+                ],
             )
         ],
     )
@@ -175,7 +183,7 @@ def _make_minimal_bundle(
         scenario_config=config,
         scenario_metadata=metadata,
         seed_plan=seed_plan,
-        server_plan=server_plan,
+        server_config=server_config,
         generated_timeseries_sample=[signal],
         alarm_events=[alarm],
         control_results=[control],
@@ -196,7 +204,7 @@ def test_scenario_bundle_defaults() -> None:
     assert bundle.synthetic is True
     assert bundle.checksum == ""
     assert bundle.seed_plan is None
-    assert bundle.server_plan is None
+    assert bundle.server_config is None
     assert bundle.generated_timeseries_sample == []
     assert bundle.alarm_events == []
     assert bundle.control_results == []
@@ -210,7 +218,7 @@ def test_scenario_bundle_field_assignment() -> None:
     assert bundle.deterministic_seed == 42
     assert bundle.synthetic is True
     assert bundle.seed_plan is not None
-    assert bundle.server_plan is not None
+    assert bundle.server_config is not None
     assert len(bundle.generated_timeseries_sample) == 1
     assert len(bundle.alarm_events) == 1
     assert len(bundle.control_results) == 1
@@ -353,7 +361,7 @@ def test_export_bundle_to_json_contains_all_fields() -> None:
         "schema_version", "scenario_version", "generator_version",
         "created_at", "scenario_id", "name", "deterministic_seed",
         "synthetic", "scenario_config", "scenario_metadata",
-        "seed_plan", "server_plan", "generated_timeseries_sample",
+        "seed_plan", "server_config", "generated_timeseries_sample",
         "alarm_events", "control_results", "checksum",
     ]
     for field in required_fields:
@@ -488,13 +496,13 @@ def test_validate_bundle_missing_seed_plan() -> None:
     assert any("seed_plan" in e for e in result.errors)
 
 
-def test_validate_bundle_missing_server_plan() -> None:
-    """缺少 server_plan 应报错。"""
+def test_validate_bundle_missing_server_config() -> None:
+    """缺少 server_config 应报错。"""
     bundle = _make_minimal_bundle("no_srv")
-    bundle.server_plan = None
+    bundle.server_config = None
     result = validate_bundle(bundle)
     assert not result.is_valid
-    assert any("server_plan" in e for e in result.errors)
+    assert any("server_config" in e for e in result.errors)
 
 
 def test_validate_bundle_non_synthetic_signal() -> None:
@@ -531,14 +539,16 @@ def test_validate_bundle_checksum_mismatch() -> None:
     assert any("checksum" in e for e in result.errors)
 
 
-def test_validate_bundle_server_plan_structure() -> None:
-    """server_plan 缺少 endpoint_name 或 point_id 应产生警告（非错误）。"""
+def test_validate_bundle_server_config_structure() -> None:
+    """server_config 缺少 endpoint_name 或 point_id 应产生警告（非错误）。"""
     bundle = _make_minimal_bundle("srv_struct")
-    if bundle.server_plan and bundle.server_plan.endpoints:
-        bundle.server_plan.endpoints[0].endpoint_name = ""
-        bundle.server_plan.endpoints[0].protocol = ""
-    if bundle.server_plan and bundle.server_plan.points:
-        bundle.server_plan.points[0].point_id = ""
+    if bundle.server_config and bundle.server_config.servers:
+        server = bundle.server_config.servers[0]
+        if server.endpoints:
+            server.endpoints[0].endpoint_name = ""
+            server.endpoints[0].protocol = ""
+        if server.points:
+            server.points[0].point_id = ""
     result = validate_bundle(bundle)
     # endpoint_name/protocol 缺失是警告不是错误
     assert result.warnings, "应产生警告"
@@ -600,7 +610,7 @@ def test_generator_to_bundle_integration() -> None:
         protocol_targets=["OPC_UA"],
     )
     generator = SeahorseGenerator(config)
-    seed_plan, server_plan, signals, alarms, controls = generator.generate()
+    seed_plan, server_config, signals, alarms, controls = generator.generate()
 
     bundle = ScenarioBundle(
         schema_version="1.0.0",
@@ -610,7 +620,7 @@ def test_generator_to_bundle_integration() -> None:
         scenario_config=config,
         scenario_metadata=generator.metadata,
         seed_plan=seed_plan,
-        server_plan=server_plan,
+        server_config=server_config,
         generated_timeseries_sample=signals,
         alarm_events=alarms,
         control_results=controls,
@@ -636,7 +646,7 @@ def test_generator_bundle_deterministic() -> None:
             protocol_targets=["OPC_UA"],
         )
         generator = SeahorseGenerator(config)
-        seed_plan, server_plan, signals, alarms, controls = generator.generate()
+        seed_plan, server_config, signals, alarms, controls = generator.generate()
         bundle = ScenarioBundle(
             schema_version="1.0.0",
             scenario_id="det_bundle",
@@ -645,7 +655,7 @@ def test_generator_bundle_deterministic() -> None:
             scenario_config=config,
             scenario_metadata=generator.metadata,
             seed_plan=seed_plan,
-            server_plan=server_plan,
+            server_config=server_config,
             generated_timeseries_sample=signals,
             alarm_events=alarms,
             control_results=controls,

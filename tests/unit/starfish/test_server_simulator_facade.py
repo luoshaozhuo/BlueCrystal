@@ -10,7 +10,7 @@
 7. capabilities 返回已加载的 plan 能力。
 
 测试阶段：开发期验证 (P1)。
-使用的替身：使用 StarfishServerPlan fixture 构造本地数据。
+使用的替身：使用 StarfishServerConfig fixture 构造本地数据。
 外部依赖：无（纯内存测试）。
 不能证明：真实协议 server 启动、网络 I/O。
 NOT_RUN 条件：无。
@@ -20,10 +20,10 @@ from __future__ import annotations
 
 import pytest
 
-from starfish.domain.server_plan import (
-    StarfishServerPlan,
-    StarfishEndpointPlan,
-    StarfishPointPlan,
+from starfish.domain.server_config import (
+    StarfishServerConfig,
+    StarfishEndpointConfig,
+    StarfishPointConfig,
     UnsupportedOperation,
 )
 from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
@@ -36,8 +36,8 @@ def _make_test_plan(
     scenario_id: str = "facade_test",
     capabilities: list[str] | None = None,
     initial_values: dict | None = None,
-) -> StarfishServerPlan:
-    """构造一个最小测试用 StarfishServerPlan。
+) -> StarfishServerConfig:
+    """构造一个最小测试用 StarfishServerConfig。
 
     Args:
         scenario_id: 场景标识。
@@ -45,20 +45,20 @@ def _make_test_plan(
         initial_values: 初始值 dict，默认包含两个点位。
 
     Returns:
-        测试用 StarfishServerPlan 实例。
+        测试用 StarfishServerConfig 实例。
     """
     if capabilities is None:
         capabilities = ["READ"]
     if initial_values is None:
         initial_values = {"pt_001": 100.5, "pt_002": 42}
 
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol="OPC_UA",
                 host="127.0.0.1",
@@ -66,14 +66,14 @@ def _make_test_plan(
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="pt_001",
                 point_name="Point One",
                 node_key="ns=2;s=pt_001",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="pt_002",
                 point_name="Point Two",
                 node_key="ns=2;s=pt_002",

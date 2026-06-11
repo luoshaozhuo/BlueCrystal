@@ -22,9 +22,10 @@ from seahorse.models.plan import (
     EndpointPlan,
     SeedEntity,
     SeedPlan,
-    ServerEndpointPlan,
-    ServerPlan,
-    ServerPointPlan,
+    ServerConfig,
+    ServerEndpointConfig,
+    ServerMemberConfig,
+    ServerPointConfig,
     SignalProfileItemPlan,
     SignalProfilePlan,
 )
@@ -47,7 +48,7 @@ class SeahorseGenerator:
 
     确定性保证：
     所有生成操作使用 deterministic_seed 初始化的伪随机数生成器，
-    相同 config 产生相同的 seed_plan、server_plan、信号值、告警和控制结果。
+    相同 config 产生相同的 seed_plan、server_config、信号值、告警和控制结果。
 
     Attributes:
         _config: 当前生成使用的场景配置。
@@ -159,17 +160,17 @@ class SeahorseGenerator:
 
     def generate(
         self,
-    ) -> tuple[SeedPlan, ServerPlan, list[GeneratedSignalValue], list[GeneratedAlarmEvent], list[GeneratedControlResult]]:
+    ) -> tuple[SeedPlan, ServerConfig, list[GeneratedSignalValue], list[GeneratedAlarmEvent], list[GeneratedControlResult]]:
         """执行完整场景生成。
 
-        生成顺序：SeedPlan → ServerPlan → 信号值 → 告警事件 → 控制结果。
+        生成顺序：SeedPlan → ServerConfig → 信号值 → 告警事件 → 控制结果。
 
         Returns:
-            (seed_plan, server_plan, signal_values, alarm_events, control_results) 五元组。
+            (seed_plan, server_config, signal_values, alarm_events, control_results) 五元组。
             信号值按时间升序排列，告警按触发时间排序，控制结果按生成序。
         """
         seed_plan = self._build_minimal_seed_plan()
-        server_plan = self._build_minimal_server_plan()
+        server_config = self._build_minimal_server_config()
 
         # 生成信号值序列
         signal_values = self._generate_all_signals(seed_plan)
@@ -191,21 +192,21 @@ class SeahorseGenerator:
             "control_result_count": len(control_results),
         }
 
-        return seed_plan, server_plan, signal_values, alarm_events, control_results
+        return seed_plan, server_config, signal_values, alarm_events, control_results
 
     def generate_minimal(
         self,
-    ) -> tuple[SeedPlan, ServerPlan]:
+    ) -> tuple[SeedPlan, ServerConfig]:
         """执行最小场景生成（仅生成计划容器，不生成信号/告警/控制）。
 
         保持向后兼容，与 Round 1 的行为一致。
 
         Returns:
-            (seed_plan, server_plan) 元组。
+            (seed_plan, server_config) 元组。
         """
         seed_plan = self._build_minimal_seed_plan()
-        server_plan = self._build_minimal_server_plan()
-        return seed_plan, server_plan
+        server_config = self._build_minimal_server_config()
+        return seed_plan, server_config
 
     def _generate_all_signals(
         self,
@@ -393,22 +394,22 @@ class SeahorseGenerator:
             acquisition_tasks=tasks,
         )
 
-    def _build_minimal_server_plan(self) -> ServerPlan:
-        """构建最小服务器计划。
+    def _build_minimal_server_config(self) -> ServerConfig:
+        """构建最小服务端配置。
 
         为每个目标协议创建服务端点，为每个种子实体创建默认点位。
         同时填充 Starfish 契约层字段（endpoint_id、host、port、
         capabilities、update_policy、initial_values 等）。
         """
-        endpoints: list[ServerEndpointPlan] = []
-        points: list[ServerPointPlan] = []
+        endpoints: list[ServerEndpointConfig] = []
+        points: list[ServerPointConfig] = []
 
         for i, protocol in enumerate(self._config.protocol_targets or ["OPC_UA"]):
             base_port = 4840 + i
             ep_name = f"{protocol}_server_ep"
             ep_id = f"{self._config.scenario_id}_{protocol}_server_ep"
             endpoints.append(
-                ServerEndpointPlan(
+                ServerEndpointConfig(
                     endpoint_name=ep_name,
                     endpoint_id=ep_id,
                     protocol=protocol,
@@ -423,7 +424,7 @@ class SeahorseGenerator:
             entity_id = f"{self._config.scenario_id}_entity_{i:03d}"
             point_id = f"{entity_id}_active_power"
             points.append(
-                ServerPointPlan(
+                ServerPointConfig(
                     point_id=point_id,
                     point_name="ActivePower",
                     data_type="FLOAT64",
@@ -436,17 +437,24 @@ class SeahorseGenerator:
             )
 
         server_id = f"server_{self._config.scenario_id}"
-        return ServerPlan(
+        server_member = ServerMemberConfig(
             server_id=server_id,
-            scenario_id=self._config.scenario_id,
             server_name=f"Seahorse Server {self._config.scenario_id}",
+            source_name=self._config.scenario_id,
+            logical_device_name=f"LD_{self._config.scenario_id}",
             endpoints=endpoints,
             points=points,
-            synthetic=True,
-            strategy_id="seahorse_minimal_v1",
             capabilities=["READ"],
             update_policy={"default": {"mode": "poll", "interval_ms": 100}},
             initial_values={point_id: 0.0 for pt in points if (point_id := pt.point_id)},
+        )
+        return ServerConfig(
+            config_id=f"server_config_{self._config.scenario_id}",
+            scenario_id=self._config.scenario_id,
+            config_name=f"Seahorse Server Config {self._config.scenario_id}",
+            servers=[server_member],
+            synthetic=True,
+            strategy_id="seahorse_minimal_v1",
         )
 
     @staticmethod

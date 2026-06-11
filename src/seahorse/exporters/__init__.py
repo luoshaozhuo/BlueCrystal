@@ -1,6 +1,6 @@
 """seahorse 导出器层。
 
-提供场景包的 JSON 导出、JSONL 时序导出、完整性校验和 ServerPlan
+提供场景包的 JSON 导出、JSONL 时序导出、完整性校验和 ServerConfig
 handoff 导出能力。
 
 导出器：
@@ -8,8 +8,8 @@ handoff 导出能力。
     timeseries_exporter: GeneratedSignalValue 序列的 JSONL 导出。
     bundle_validator: 场景包的结构完整性、数据一致性和校验和验证。
     serialization: 通用的 dataclass 到 JSON 可序列化 dict 转换和校验和计算。
-    server_plan_validator: ServerPlan 的 Starfish 契约兼容性校验。
-    server_plan_exporter: ServerPlan 到 starfish_server_plan.json 的 handoff 导出。
+    server_plan_validator: ServerConfig 的 Starfish 契约兼容性校验。
+    server_plan_exporter: ServerConfig 到 starfish server config JSON 的 handoff 导出。
 """
 from __future__ import annotations
 
@@ -25,15 +25,15 @@ from seahorse.exporters.bundle_validator import (
 )
 from seahorse.exporters.serialization import compute_bundle_checksum, bundle_to_serializable
 from seahorse.exporters.server_plan_validator import (
-    validate_server_plan,
-    validate_server_plan_from_dict,
+    validate_server_config,
+    validate_server_config_from_dict,
 )
 from seahorse.exporters.server_plan_exporter import (
-    build_server_plan_payload,
-    export_server_plan_to_json,
-    export_server_plan_from_bundle,
-    save_server_plan,
-    save_server_plan_from_bundle,
+    build_server_config_payload,
+    export_server_config_to_json,
+    export_server_config_from_bundle,
+    save_server_config,
+    save_server_config_from_bundle,
 )
 
 __all__ = [
@@ -46,11 +46,11 @@ __all__ = [
     "validate_bundle_from_dict",
     "compute_bundle_checksum",
     "bundle_to_serializable",
-    "validate_server_plan",
-    "validate_server_plan_from_dict",
-    "build_server_plan_payload",
-    "export_server_plan_to_json",
-    "export_server_plan_from_bundle",
-    "save_server_plan",
-    "save_server_plan_from_bundle",
+    "validate_server_config",
+    "validate_server_config_from_dict",
+    "build_server_config_payload",
+    "export_server_config_to_json",
+    "export_server_config_from_bundle",
+    "save_server_config",
+    "save_server_config_from_bundle",
 ]

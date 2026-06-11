@@ -16,10 +16,10 @@ NOT_RUN 条件：无。
 
 from __future__ import annotations
 
-from starfish.domain.server_plan import (
-    StarfishServerPlan,
-    StarfishEndpointPlan,
-    StarfishPointPlan,
+from starfish.domain.server_config import (
+    StarfishServerConfig,
+    StarfishEndpointConfig,
+    StarfishPointConfig,
 )
 from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
 from starfish.drivers.http_rest_facade import HttpRestFacade
@@ -42,8 +42,8 @@ def _make_minimal_plan(
     scenario_id: str = "tools_test",
     initial_values: dict | None = None,
     protocol_name: str = "OPC_UA",
-) -> StarfishServerPlan:
-    """构造最小测试用 StarfishServerPlan。
+) -> StarfishServerConfig:
+    """构造最小测试用 StarfishServerConfig。
 
     Args:
         scenario_id: 场景标识。
@@ -51,18 +51,18 @@ def _make_minimal_plan(
         protocol_name: 协议名。
 
     Returns:
-        测试用 StarfishServerPlan。
+        测试用 StarfishServerConfig。
     """
     if initial_values is None:
         initial_values = {"point_0": 0.0, "point_1": 1.0}
 
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol=protocol_name,
                 host="127.0.0.1",
@@ -70,14 +70,14 @@ def _make_minimal_plan(
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="point_0",
                 point_name="Point 0",
                 node_key="/points/0",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="point_1",
                 point_name="Point 1",
                 node_key="/points/1",
@@ -428,7 +428,7 @@ class TestCapacityScan:
     def test_capacity_http_rest_pass(self) -> None:
         """HTTP REST facade 容量扫描应 PASS。
 
-        注意: _make_minimal_plan 始终创建 2 个 StarfishPointPlan 条目，
+        注意: _make_minimal_plan 始终创建 2 个 StarfishPointConfig 条目，
         因此 health().point_count 固定为 2，与 initial_values 条目数无关。
         max_tested_points 反映 read() 返回的实际点位数（来自 initial_values）。
         """
@@ -453,7 +453,7 @@ class TestCapacityScan:
             # read() 返回 load_points 后的内存值 (10 项 initial_values)
             assert result.max_tested_points == 10
             assert result.read_count == 5
-            # health().point_count 来自 len(plan.points) = 2 (两个 StarfishPointPlan)
+            # health().point_count 来自 len(plan.points) = 2 (两个 StarfishPointConfig)
             assert result.point_count == 2
         finally:
             facade.stop()

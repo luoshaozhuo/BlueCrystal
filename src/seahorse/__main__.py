@@ -4,7 +4,7 @@
     generate-scenario     根据参数生成场景并保存 bundle JSON 和可选 JSONL 时序文件
     export-bundle         加载已有 bundle JSON 并重新导出
     validate-bundle       校验已有 bundle JSON 的完整性和一致性
-    export-server-plan    从 bundle JSON 或直接生成 ServerPlan 的 Starfish handoff JSON
+    export-server-config  从 bundle JSON 或直接生成 ServerConfig 的 Starfish handoff JSON
 
 安全边界：
 - 不连接生产数据库。
@@ -15,8 +15,8 @@
     python -m seahorse generate-scenario --scenario-id demo --output-dir ./out
     python -m seahorse export-bundle --input ./out/demo_bundle.json --output-dir ./exported
     python -m seahorse validate-bundle --input ./out/demo_bundle.json
-    python -m seahorse export-server-plan --input ./out/demo_bundle.json --output-dir ./out
-    python -m seahorse export-server-plan --scenario-id demo --seed 42 --output-dir ./out
+    python -m seahorse export-server-config --input ./out/demo_bundle.json --output-dir ./out
+    python -m seahorse export-server-config --scenario-id demo --seed 42 --output-dir ./out
 """
 from __future__ import annotations
 
@@ -127,19 +127,19 @@ def _build_validate_parser(subparsers: argparse._SubParsersAction) -> None:
     )
 
 
-def _build_server_plan_export_parser(subparsers: argparse._SubParsersAction) -> None:
-    """注册 export-server-plan 子命令。
+def _build_server_config_export_parser(subparsers: argparse._SubParsersAction) -> None:
+    """注册 export-server-config 子命令。
 
     支持两种模式：
-    1. 从已有 bundle JSON 文件提取 ServerPlan 并导出。
-    2. 直接根据参数生成 ServerPlan 并导出（无需完整 bundle）。
+    1. 从已有 bundle JSON 文件提取 ServerConfig 并导出。
+    2. 直接根据参数生成 ServerConfig 并导出（无需完整 bundle）。
     """
     parser = subparsers.add_parser(
-        "export-server-plan",
-        help="导出 ServerPlan 为 Starfish handoff JSON 文件",
-        description="从已有 ScenarioBundle JSON 中提取 ServerPlan，"
-        "或直接根据参数生成 ServerPlan，并导出为 Starfish runtime "
-        "可解析的 starfish_server_plan.json 文件。",
+        "export-server-config",
+        help="导出 ServerConfig 为 Starfish handoff JSON 文件",
+        description="从已有 ScenarioBundle JSON 中提取 ServerConfig，"
+        "或直接根据参数生成 ServerConfig，并导出为 Starfish runtime "
+        "可解析的 server config JSON 文件。",
     )
     parser.add_argument(
         "--input",
@@ -186,7 +186,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _build_generate_parser(subparsers)
     _build_export_parser(subparsers)
     _build_validate_parser(subparsers)
-    _build_server_plan_export_parser(subparsers)
+    _build_server_config_export_parser(subparsers)
     return parser
 
 
@@ -240,7 +240,7 @@ def _run_generate(args: argparse.Namespace) -> int:
 
     # 生成场景
     generator = SeahorseGenerator(config)
-    seed_plan, server_plan, signals, alarms, controls = generator.generate()
+    seed_plan, server_config, signals, alarms, controls = generator.generate()
 
     # 构建并填充 bundle
     bundle = ScenarioBundle(
@@ -255,7 +255,7 @@ def _run_generate(args: argparse.Namespace) -> int:
         scenario_config=config,
         scenario_metadata=generator.metadata,
         seed_plan=seed_plan,
-        server_plan=server_plan,
+        server_config=server_config,
         generated_timeseries_sample=signals,
         alarm_events=alarms,
         control_results=controls,
@@ -382,12 +382,12 @@ def _run_validate(args: argparse.Namespace) -> int:
         return 1
 
 
-def _run_server_plan_export(args: argparse.Namespace) -> int:
-    """执行 export-server-plan 子命令。
+def _run_server_config_export(args: argparse.Namespace) -> int:
+    """执行 export-server-config 子命令。
 
     支持两种模式：
-    1. 指定 --input 时，从已有 bundle JSON 提取 ServerPlan 并导出。
-    2. 指定 --scenario-id 时，直接生成最小 ServerPlan 并导出。
+    1. 指定 --input 时，从已有 bundle JSON 提取 ServerConfig 并导出。
+    2. 指定 --scenario-id 时，直接生成最小 ServerConfig 并导出。
 
     Args:
         args: 解析后的命令行参数。
@@ -398,14 +398,19 @@ def _run_server_plan_export(args: argparse.Namespace) -> int:
     import json
     from pathlib import Path
 
-    from seahorse.exporters.server_plan_exporter import save_server_plan
-    from seahorse.exporters.server_plan_validator import validate_server_plan
-    from seahorse.models.plan import ServerPlan
+    from seahorse.exporters.server_plan_exporter import save_server_config
+    from seahorse.exporters.server_plan_validator import validate_server_config
+    from seahorse.models.plan import (
+        ServerConfig,
+        ServerEndpointConfig,
+        ServerMemberConfig,
+        ServerPointConfig,
+    )
 
     output_dir = Path(args.output_dir)
 
     if args.input:
-        # 模式 1：从已有 bundle JSON 提取 ServerPlan
+        # 模式 1：从已有 bundle JSON 提取 ServerConfig
         input_path = Path(args.input)
         if not input_path.is_file():
             print(f"错误：输入文件不存在: {input_path}", file=sys.stderr)
@@ -417,51 +422,57 @@ def _run_server_plan_export(args: argparse.Namespace) -> int:
             print(f"错误：JSON 解析失败: {exc}", file=sys.stderr)
             return 1
 
-        server_plan_raw = raw.get("server_plan")
-        if not server_plan_raw:
-            print("错误：输入 bundle JSON 中缺少 server_plan 字段", file=sys.stderr)
+        server_config_raw = raw.get("server_config")
+        if not server_config_raw:
+            print("错误：输入 bundle JSON 中缺少 server_config 字段", file=sys.stderr)
             return 1
 
-        # 从 dict 重建 ServerPlan
-        from seahorse.models.plan import ServerEndpointPlan, ServerPointPlan
-
-        server_plan = ServerPlan(
-            server_id=server_plan_raw.get("server_id", ""),
-            scenario_id=server_plan_raw.get("scenario_id", ""),
-            server_name=server_plan_raw.get("server_name", ""),
-            endpoints=[
-                ServerEndpointPlan(
-                    endpoint_name=ep.get("endpoint_name", ""),
-                    endpoint_id=ep.get("endpoint_id", ep.get("endpoint_name", "")),
-                    protocol=ep.get("protocol", ""),
-                    bind_host=ep.get("bind_host", "0.0.0.0"),
-                    bind_port=ep.get("bind_port", 0),
-                    host=ep.get("host", ep.get("bind_host", "")),
-                    port=ep.get("port", ep.get("bind_port", 0)),
+        server_config = ServerConfig(
+            config_id=server_config_raw.get("config_id", ""),
+            scenario_id=server_config_raw.get("scenario_id", ""),
+            config_name=server_config_raw.get("config_name", ""),
+            servers=[
+                ServerMemberConfig(
+                    server_id=server.get("server_id", ""),
+                    server_name=server.get("server_name", ""),
+                    source_name=server.get("source_name", ""),
+                    logical_device_name=server.get("logical_device_name", ""),
+                    endpoints=[
+                        ServerEndpointConfig(
+                            endpoint_name=ep.get("endpoint_name", ""),
+                            endpoint_id=ep.get("endpoint_id", ep.get("endpoint_name", "")),
+                            protocol=ep.get("protocol", ""),
+                            bind_host=ep.get("bind_host", "0.0.0.0"),
+                            bind_port=ep.get("bind_port", 0),
+                            host=ep.get("host", ep.get("bind_host", "")),
+                            port=ep.get("port", ep.get("bind_port", 0)),
+                        )
+                        for ep in server.get("endpoints", [])
+                    ],
+                    points=[
+                        ServerPointConfig(
+                            point_id=pt.get("point_id", ""),
+                            point_name=pt.get("point_name", ""),
+                            data_type=pt.get("data_type", "FLOAT64"),
+                            access_mode=pt.get("access_mode", "RO"),
+                            associated_signal_id=pt.get("associated_signal_id", ""),
+                            node_key=pt.get("node_key", ""),
+                            variable_key=pt.get("variable_key", ""),
+                            value_type=pt.get("value_type", ""),
+                        )
+                        for pt in server.get("points", [])
+                    ],
+                    capabilities=server.get("capabilities", []),
+                    update_policy=server.get("update_policy", {}),
+                    initial_values=server.get("initial_values", {}),
                 )
-                for ep in server_plan_raw.get("endpoints", [])
+                for server in server_config_raw.get("servers", [])
             ],
-            points=[
-                ServerPointPlan(
-                    point_id=pt.get("point_id", ""),
-                    point_name=pt.get("point_name", ""),
-                    data_type=pt.get("data_type", "FLOAT64"),
-                    access_mode=pt.get("access_mode", "RO"),
-                    associated_signal_id=pt.get("associated_signal_id", ""),
-                    node_key=pt.get("node_key", ""),
-                    variable_key=pt.get("variable_key", ""),
-                    value_type=pt.get("value_type", ""),
-                )
-                for pt in server_plan_raw.get("points", [])
-            ],
-            synthetic=server_plan_raw.get("synthetic", True),
-            strategy_id=server_plan_raw.get("strategy_id", ""),
-            capabilities=server_plan_raw.get("capabilities", []),
-            update_policy=server_plan_raw.get("update_policy", {}),
-            initial_values=server_plan_raw.get("initial_values", {}),
+            synthetic=server_config_raw.get("synthetic", True),
+            strategy_id=server_config_raw.get("strategy_id", ""),
         )
     elif args.scenario_id:
-        # 模式 2：直接生成最小 ServerPlan
+        # 模式 2：直接生成最小 ServerConfig
         from seahorse.models.scenario import ScenarioConfig
         from seahorse.orchestration import SeahorseGenerator
 
@@ -472,7 +483,7 @@ def _run_server_plan_export(args: argparse.Namespace) -> int:
             protocol_targets=args.protocol_targets,
         )
         generator = SeahorseGenerator(config)
-        _, server_plan = generator.generate_minimal()
+        _, server_config = generator.generate_minimal()
     else:
         print(
             "错误：必须指定 --input（从 bundle 提取）或 --scenario-id（直接生成）",
@@ -480,26 +491,26 @@ def _run_server_plan_export(args: argparse.Namespace) -> int:
         )
         return 1
 
-    # 校验 ServerPlan
-    result = validate_server_plan(server_plan)
+    # 校验 ServerConfig
+    result = validate_server_config(server_config)
     if result.errors:
-        print("ServerPlan 校验错误:")
+        print("ServerConfig 校验错误:")
         for err in result.errors:
             print(f"  [ERROR] {err}")
     if result.warnings:
-        print("ServerPlan 校验警告:")
+        print("ServerConfig 校验警告:")
         for warn in result.warnings:
             print(f"  [WARN]  {warn}")
 
     # 校验失败时仍尝试导出（部分场景可能是有意的不完整）
-    saved_path = save_server_plan(server_plan, output_dir)
-    print(f"ServerPlan handoff JSON 已保存: {saved_path}")
+    saved_path = save_server_config(server_config, output_dir)
+    print(f"ServerConfig handoff JSON 已保存: {saved_path}")
 
     if result.is_valid:
-        print("ServerPlan 校验通过")
+        print("ServerConfig 校验通过")
         return 0
     else:
-        print(f"ServerPlan 校验未通过（{len(result.errors)} 个错误），但文件已导出")
+        print(f"ServerConfig 校验未通过（{len(result.errors)} 个错误），但文件已导出")
         return 1
 
 
@@ -523,8 +534,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_export(args)
     elif args.command == "validate-bundle":
         return _run_validate(args)
-    elif args.command == "export-server-plan":
-        return _run_server_plan_export(args)
+    elif args.command == "export-server-config":
+        return _run_server_config_export(args)
     else:
         parser.print_help()
         return 1

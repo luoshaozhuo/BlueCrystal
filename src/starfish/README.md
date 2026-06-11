@@ -2,15 +2,15 @@
 
 `starfish` 的定位现在很简单：
 
-> 读取 `starfish_server_plan.json`，装配成统一的 `StarfishRuntime` 运行时对象，然后由 CLI 或脚本驱动它完成 `start/stop/status/health/read/write`。
+> 读取 `starfish_server_plan.json`（历史文件名），装配成统一的 `StarfishServerManager`，然后由 CLI 或脚本驱动它完成 `start/stop/status/health/read/write`。
 
 ## 正式入口
 
-- 正式 API 入口是 [`api/runtime_api.py`](/home/luosh/BlueCrystal/src/starfish/api/runtime_api.py)
-- 推荐从 `StarfishRuntimeApi.open_runtime(...)` 拿到 `StarfishRuntime`
+- 正式 API 入口是 [`api/server_manager_api.py`](/home/luosh/BlueCrystal/src/starfish/api/server_manager_api.py)
+- 推荐从 `StarfishServerManagerApi.open_manager(...)` 拿到 `StarfishServerManager`
 - 普通调用方不应该直接依赖单个协议 driver
 
-`StarfishRuntime` 当前提供的高层操作包括：
+`StarfishServerManager` 当前提供的高层操作包括：
 
 - `describe()`
 - `start()`
@@ -37,52 +37,47 @@ src/starfish/
 
 各目录边界如下：
 
-- `api/`: 对外统一入口，暴露 `StarfishRuntime` 和装配 API
-- `application/`: usecase / orchestration，负责 plan 加载和运行时装配流程
-- `domain/`: 稳定契约与运行时抽象，不做文件 I/O 和协议分发
-- `drivers/`: 真实实现层，包含 plan loader、runtime registry 和各协议驱动
+- `api/`: 对外统一入口，暴露 `StarfishServerManager` 和装配 API
+- `application/`: usecase / orchestration，负责 server config 加载和 manager 装配流程
+- `domain/`: 稳定契约与驱动抽象，不做文件 I/O 和协议分发
+- `drivers/`: 真实实现层，包含 config loader、server registry 和各协议驱动
 - `native/`: native runner 的探测、路径和进程支撑
 - `protocols/`: 协议编解码与协议内部结构
-
-已经移出 `starfish` 的能力：
-
-- `probe / profile / capacity` 现在位于 `whale.ingest.diagnostics/`
-- 原因是它们本质上是“消费 runtime 的诊断工具”，不是 `starfish` runtime 核心
 
 ## 主链路
 
 主链路现在是：
 
 ```text
-ServerPlan JSON
+Server Config JSON
   -> api
   -> application
-  -> drivers.server_plan_loader
-  -> drivers.runtime_registry
-  -> StarfishRuntime
+  -> drivers.server_config_loader
+  -> drivers.server_registry
+  -> StarfishServerManager
   -> CLI / 外部诊断调用方
 ```
 
 如果你要快速看懂整个模块，推荐按这个顺序读：
 
 1. [`__main__.py`](/home/luosh/BlueCrystal/src/starfish/__main__.py)
-2. [`api/runtime_api.py`](/home/luosh/BlueCrystal/src/starfish/api/runtime_api.py)
-3. [`application/runtime_service.py`](/home/luosh/BlueCrystal/src/starfish/application/runtime_service.py)
-4. [`domain/server_plan.py`](/home/luosh/BlueCrystal/src/starfish/domain/server_plan.py)
-5. [`drivers/server_plan_loader.py`](/home/luosh/BlueCrystal/src/starfish/drivers/server_plan_loader.py)
-6. [`drivers/runtime_registry.py`](/home/luosh/BlueCrystal/src/starfish/drivers/runtime_registry.py)
+2. [`api/server_manager_api.py`](/home/luosh/BlueCrystal/src/starfish/api/server_manager_api.py)
+3. [`application/server_manager_service.py`](/home/luosh/BlueCrystal/src/starfish/application/server_manager_service.py)
+4. [`domain/server_config.py`](/home/luosh/BlueCrystal/src/starfish/domain/server_config.py)
+5. [`drivers/server_config_loader.py`](/home/luosh/BlueCrystal/src/starfish/drivers/server_config_loader.py)
+6. [`drivers/server_registry.py`](/home/luosh/BlueCrystal/src/starfish/drivers/server_registry.py)
 7. 一个代表性协议实现，比如 [`drivers/http_rest_facade.py`](/home/luosh/BlueCrystal/src/starfish/drivers/http_rest_facade.py)
 
-## 运行时理解方式
+## Manager 理解方式
 
 理解 `starfish` 时，不要先从单个协议类开始，而要先抓住两层抽象：
 
-- `StarfishRuntime`: 给上层调用方的统一运行时对象
-- 协议 driver: 运行时内部针对具体 endpoint 装配出来的协议执行单元
+- `StarfishServerManager`: 给上层调用方的统一 server 管理对象
+- 协议 driver: manager 内部针对具体 endpoint 装配出来的协议执行单元
 
 也就是说：
 
-- 外部用户优先面向 `StarfishRuntime`
+- 外部用户优先面向 `StarfishServerManager`
 - 内部装配才面向 `drivers/*_facade.py`
 
 ## mode 比协议名更重要
@@ -113,8 +108,8 @@ ServerPlan JSON
 
 ## 现在最应该记住的 5 件事
 
-1. `StarfishRuntime` 是唯一正式高层入口。
+1. `StarfishServerManager` 是唯一正式高层入口。
 2. `application` 负责编排，`drivers` 负责真实实现。
-3. `runtime_registry.py` 是协议装配中心。
+3. `server_registry.py` 是协议装配中心。
 4. 协议能力必须结合 `mode` 理解。
 5. 先看主链路，再看单协议细节，读源码效率最高。

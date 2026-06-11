@@ -1,7 +1,7 @@
 """Native runner 探查函数 —— probe_native_runner。
 
 根据 NativeRunnerSpec 对二进制文件执行存在性、大小和可读性检查。
-返回 (available, reason) 二元组，供 facade 的 probe 函数和 RuntimeRegistry 使用。
+返回 (available, reason) 二元组，供 facade 的 probe 函数和 ServerRegistry 使用。
 
 不负责：
 - 执行二进制或验证功能正确性。

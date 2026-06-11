@@ -7,10 +7,10 @@
 校验项：
     1. schema_version 字段存在且非空
     2. scenario_id 在各子计划间一致
-    3. seed_plan 和 server_plan 存在且非空
+    3. seed_plan 和 server_config 存在且非空
     4. generated_timeseries_sample 中所有条目的 synthetic=True
     5. checksum 可复算且与存储值一致
-    6. server_plan 中 endpoints 和 points 基本结构存在
+    6. server_config 中 server members / endpoints / points 基本结构存在
 
 安全边界：
 - 不得 import whale.ingest。
@@ -60,11 +60,11 @@ def validate_bundle(bundle: ScenarioBundle) -> ValidationResult:
 
     按顺序执行以下检查，任何错误都不影响后续检查的执行：
     1. schema_version 存在性
-    2. scenario_id 一致性（config、seed_plan、server_plan）
-    3. seed_plan/server_plan 存在性
+    2. scenario_id 一致性（config、seed_plan、server_config）
+    3. seed_plan/server_config 存在性
     4. generated_timeseries_sample 中所有信号值的 synthetic 标记
     5. checksum 可复算（与存储值比较）
-    6. server_plan 的 endpoints 和 points 基本结构
+    6. server_config 的基本结构
 
     Args:
         bundle: 已填充的场景包（可以是 JSON 反序列化后重建的）。
@@ -83,7 +83,7 @@ def validate_bundle(bundle: ScenarioBundle) -> ValidationResult:
     # 2. scenario_id 一致性
     config_id = bundle.scenario_config.scenario_id if bundle.scenario_config else ""
     seed_id = bundle.seed_plan.scenario_id if bundle.seed_plan else ""
-    server_id = bundle.server_plan.scenario_id if bundle.server_plan else ""
+    server_id = bundle.server_config.scenario_id if bundle.server_config else ""
     bundle_id = bundle.scenario_id
 
     ids_to_check: dict[str, str] = {
@@ -93,8 +93,8 @@ def validate_bundle(bundle: ScenarioBundle) -> ValidationResult:
         ids_to_check["scenario_config.scenario_id"] = config_id
     if bundle.seed_plan:
         ids_to_check["seed_plan.scenario_id"] = seed_id
-    if bundle.server_plan:
-        ids_to_check["server_plan.scenario_id"] = server_id
+    if bundle.server_config:
+        ids_to_check["server_config.scenario_id"] = server_id
 
     unique_ids = set(ids_to_check.values())
     if len(unique_ids) > 1:
@@ -104,7 +104,7 @@ def validate_bundle(bundle: ScenarioBundle) -> ValidationResult:
     else:
         result.add_pass(f"scenario_id 一致: {next(iter(unique_ids))}")
 
-    # 3. seed_plan / server_plan 存在性
+    # 3. seed_plan / server_config 存在性
     if bundle.seed_plan is None:
         result.add_error("seed_plan 缺失")
     elif not bundle.seed_plan.entities:
@@ -112,15 +112,18 @@ def validate_bundle(bundle: ScenarioBundle) -> ValidationResult:
     else:
         result.add_pass(f"seed_plan 存在，包含 {len(bundle.seed_plan.entities)} 个实体")
 
-    if bundle.server_plan is None:
-        result.add_error("server_plan 缺失")
+    if bundle.server_config is None:
+        result.add_error("server_config 缺失")
     else:
-        ep_count = len(bundle.server_plan.endpoints) if bundle.server_plan.endpoints else 0
-        pt_count = len(bundle.server_plan.points) if bundle.server_plan.points else 0
-        if ep_count == 0 and pt_count == 0:
-            result.add_warning("server_plan 的 endpoints 和 points 均为空")
+        server_count = len(bundle.server_config.servers) if bundle.server_config.servers else 0
+        ep_count = sum(len(server.endpoints) for server in bundle.server_config.servers)
+        pt_count = sum(len(server.points) for server in bundle.server_config.servers)
+        if server_count == 0:
+            result.add_warning("server_config 的 servers 为空")
         else:
-            result.add_pass(f"server_plan 存在，含 {ep_count} 个端点、{pt_count} 个点位")
+            result.add_pass(
+                f"server_config 存在，含 {server_count} 个 server members、{ep_count} 个端点、{pt_count} 个点位"
+            )
 
     # 4. generated_timeseries_sample 中 synthetic 一致性
     if not bundle.generated_timeseries_sample:
@@ -158,20 +161,18 @@ def validate_bundle(bundle: ScenarioBundle) -> ValidationResult:
         except Exception as exc:
             result.add_error(f"checksum 复算异常: {exc}")
 
-    # 6. server_plan endpoints / points 基本结构
-    if bundle.server_plan is not None:
-        if bundle.server_plan.endpoints:
-            for i, ep in enumerate(bundle.server_plan.endpoints):
+    # 6. server_config 基本结构
+    if bundle.server_config is not None:
+        for server_index, server in enumerate(bundle.server_config.servers):
+            for ep_index, ep in enumerate(server.endpoints):
                 if not getattr(ep, "endpoint_name", ""):
-                    result.add_warning(f"server_plan.endpoints[{i}] 缺少 endpoint_name")
+                    result.add_warning(f"server_config.servers[{server_index}].endpoints[{ep_index}] 缺少 endpoint_name")
                 if not getattr(ep, "protocol", ""):
-                    result.add_warning(f"server_plan.endpoints[{i}] 缺少 protocol")
-            result.add_pass("server_plan endpoints 结构检查完成")
-        if bundle.server_plan.points:
-            for i, pt in enumerate(bundle.server_plan.points):
+                    result.add_warning(f"server_config.servers[{server_index}].endpoints[{ep_index}] 缺少 protocol")
+            for pt_index, pt in enumerate(server.points):
                 if not getattr(pt, "point_id", ""):
-                    result.add_warning(f"server_plan.points[{i}] 缺少 point_id")
-            result.add_pass("server_plan points 结构检查完成")
+                    result.add_warning(f"server_config.servers[{server_index}].points[{pt_index}] 缺少 point_id")
+        result.add_pass("server_config 结构检查完成")
 
     return result
 
@@ -198,9 +199,10 @@ def validate_bundle_from_dict(data: dict[str, Any]) -> ValidationResult:
         EndpointPlan,
         SeedEntity,
         SeedPlan,
-        ServerEndpointPlan,
-        ServerPlan,
-        ServerPointPlan,
+        ServerConfig,
+        ServerEndpointConfig,
+        ServerMemberConfig,
+        ServerPointConfig,
         SignalProfileItemPlan,
         SignalProfilePlan,
     )
@@ -300,44 +302,53 @@ def validate_bundle_from_dict(data: dict[str, Any]) -> ValidationResult:
             acquisition_tasks=acquisition_tasks,
         )
 
-    # 重建 server_plan
-    server_plan = None
-    if data.get("server_plan"):
-        sv_raw = data["server_plan"]
-        server_plan = ServerPlan(
-            server_id=sv_raw.get("server_id", ""),
+    # 重建 server_config
+    server_config = None
+    if data.get("server_config"):
+        sv_raw = data["server_config"]
+        server_config = ServerConfig(
+            config_id=sv_raw.get("config_id", ""),
             scenario_id=sv_raw.get("scenario_id", ""),
-            server_name=sv_raw.get("server_name", ""),
-            endpoints=[
-                ServerEndpointPlan(
-                    endpoint_name=e.get("endpoint_name", ""),
-                    endpoint_id=e.get("endpoint_id", e.get("endpoint_name", "")),
-                    protocol=e.get("protocol", ""),
-                    bind_host=e.get("bind_host", "0.0.0.0"),
-                    bind_port=e.get("bind_port", 0),
-                    host=e.get("host", e.get("bind_host", "")),
-                    port=e.get("port", e.get("bind_port", 0)),
+            config_name=sv_raw.get("config_name", ""),
+            servers=[
+                ServerMemberConfig(
+                    server_id=server.get("server_id", ""),
+                    server_name=server.get("server_name", ""),
+                    source_name=server.get("source_name", ""),
+                    logical_device_name=server.get("logical_device_name", ""),
+                    endpoints=[
+                        ServerEndpointConfig(
+                            endpoint_name=e.get("endpoint_name", ""),
+                            endpoint_id=e.get("endpoint_id", e.get("endpoint_name", "")),
+                            protocol=e.get("protocol", ""),
+                            bind_host=e.get("bind_host", "0.0.0.0"),
+                            bind_port=e.get("bind_port", 0),
+                            host=e.get("host", e.get("bind_host", "")),
+                            port=e.get("port", e.get("bind_port", 0)),
+                        )
+                        for e in server.get("endpoints", [])
+                    ],
+                    points=[
+                        ServerPointConfig(
+                            point_id=p.get("point_id", ""),
+                            point_name=p.get("point_name", ""),
+                            data_type=p.get("data_type", "FLOAT64"),
+                            access_mode=p.get("access_mode", "RO"),
+                            associated_signal_id=p.get("associated_signal_id", ""),
+                            node_key=p.get("node_key", ""),
+                            variable_key=p.get("variable_key", ""),
+                            value_type=p.get("value_type", ""),
+                        )
+                        for p in server.get("points", [])
+                    ],
+                    capabilities=server.get("capabilities", []),
+                    update_policy=server.get("update_policy", {}),
+                    initial_values=server.get("initial_values", {}),
                 )
-                for e in sv_raw.get("endpoints", [])
-            ],
-            points=[
-                ServerPointPlan(
-                    point_id=p.get("point_id", ""),
-                    point_name=p.get("point_name", ""),
-                    data_type=p.get("data_type", "FLOAT64"),
-                    access_mode=p.get("access_mode", "RO"),
-                    associated_signal_id=p.get("associated_signal_id", ""),
-                    node_key=p.get("node_key", ""),
-                    variable_key=p.get("variable_key", ""),
-                    value_type=p.get("value_type", ""),
-                )
-                for p in sv_raw.get("points", [])
+                for server in sv_raw.get("servers", [])
             ],
             synthetic=sv_raw.get("synthetic", True),
             strategy_id=sv_raw.get("strategy_id", ""),
-            capabilities=sv_raw.get("capabilities", []),
-            update_policy=sv_raw.get("update_policy", {}),
-            initial_values=sv_raw.get("initial_values", {}),
         )
 
     # 重建 timeseries, alarms, controls
@@ -411,7 +422,7 @@ def validate_bundle_from_dict(data: dict[str, Any]) -> ValidationResult:
         scenario_config=scenario_config,
         scenario_metadata=scenario_metadata,
         seed_plan=seed_plan,
-        server_plan=server_plan,
+        server_config=server_config,
         generated_timeseries_sample=ts_sample,
         alarm_events=alarm_events,
         control_results=control_results,

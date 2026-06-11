@@ -71,7 +71,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from starfish.domain import StarfishServerPlan, StarfishPointPlan, UnsupportedOperation
+from starfish.domain import StarfishServerMemberConfig, StarfishPointConfig, UnsupportedOperation
 
 
 def _crc16(data: bytes) -> int:
@@ -250,7 +250,7 @@ class ModbusRtuFacade:
         - 仅用于本地功能验证，不能替代真实串口现场测试。
 
     数据区映射策略：
-        通过 StarfishPointPlan.variable_key 字段判定点位所属数据区：
+        通过 StarfishPointConfig.variable_key 字段判定点位所属数据区：
         - "coils" / "coil" -> coils 区
         - "discrete_inputs" / "discrete" -> discrete_inputs 区
         - "input_registers" / "input_reg" -> input_registers 区
@@ -261,7 +261,7 @@ class ModbusRtuFacade:
     广播地址（0x00）处理。
 
     Attributes:
-        _plan: 已加载的 StarfishServerPlan。
+        _plan: 已加载的 StarfishServerMemberConfig。
         _mode: 运行模式 ("rtu-lightweight" 或 "codebase-pending")。
         _started: 是否已调用 start()。
         _values: 内存点位值存储 (point_id -> value)，holding 区。
@@ -285,7 +285,7 @@ class ModbusRtuFacade:
         slave_id: int = 1,
         mode: str = "rtu-lightweight",
     ) -> None:
-        self._plan: StarfishServerPlan | None = None
+        self._plan: StarfishServerMemberConfig | None = None
         self._mode: str = mode
         self._started: bool = False
         self._values: dict[str, Any] = {}
@@ -478,14 +478,14 @@ class ModbusRtuFacade:
 
     # ── 数据操作 ──────────────────────────────────────────────────────────────
 
-    def load_points(self, plan: StarfishServerPlan) -> None:
-        """从 StarfishServerPlan 加载点位定义和初始值。
+    def load_points(self, plan: StarfishServerMemberConfig) -> None:
+        """从 StarfishServerMemberConfig 加载点位定义和初始值。
 
         按 variable_key 判定各点位所属数据区，
         在每个数据区内按 point_id 字典序排序分配从 0 开始的地址。
 
         Args:
-            plan: 已加载并校验的 StarfishServerPlan。
+            plan: 已加载并校验的 StarfishServerMemberConfig。
         """
         self._plan = plan
         with self._lock:
@@ -502,8 +502,8 @@ class ModbusRtuFacade:
             elif area == "discrete_inputs":
                 self._di_states[pid] = bool(val)
 
-    def _classify_point_area(self, point: StarfishPointPlan) -> str:
-        """根据 StarfishPointPlan 的 variable_key 判定点位所属数据区。
+    def _classify_point_area(self, point: StarfishPointConfig) -> str:
+        """根据 StarfishPointConfig 的 variable_key 判定点位所属数据区。
 
         映射规则（大小写不敏感）：
             - variable_key 含 "coils" / "coil" -> coils
@@ -512,7 +512,7 @@ class ModbusRtuFacade:
             - 其他（含空字符串） -> holding_registers（默认，兼容 Round 13）
 
         Args:
-            point: StarfishPointPlan 实例。
+            point: StarfishPointConfig 实例。
 
         Returns:
             数据区名字符串。
@@ -526,7 +526,7 @@ class ModbusRtuFacade:
             return "input_registers"
         return "holding_registers"
 
-    def _build_register_map(self, plan: StarfishServerPlan) -> None:
+    def _build_register_map(self, plan: StarfishServerMemberConfig) -> None:
         """构建全数据区 point_id <-> address 双向映射。
 
         对每个数据区的点按 point_id 字典序排序，索引即为区内地址。

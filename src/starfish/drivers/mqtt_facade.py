@@ -40,7 +40,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
-from starfish.domain import StarfishServerPlan, UnsupportedOperation
+from starfish.domain import StarfishServerMemberConfig, UnsupportedOperation
 
 
 class SubscriptionQueue:
@@ -113,7 +113,7 @@ class MqttFacade:
     遗嘱消息、keep-alive、clean session、TLS 加密。
 
     Attributes:
-        _plan: 已加载的 StarfishServerPlan。
+        _plan: 已加载的 StarfishServerMemberConfig。
         _started: 是否已调用 start()。
         _values: 内存点位值存储 (point_id -> value)。
         _started_at: start() 调用时间。
@@ -125,7 +125,7 @@ class MqttFacade:
     _SUPPORTED_ACTIONS: frozenset[str] = frozenset({"read", "read_all", "publish"})
 
     def __init__(self, bind_host: str = "127.0.0.1", port: int = 0) -> None:
-        self._plan: StarfishServerPlan | None = None
+        self._plan: StarfishServerMemberConfig | None = None
         self._started: bool = False
         self._values: dict[str, Any] = {}
         self._started_at: datetime | None = None
@@ -246,13 +246,13 @@ class MqttFacade:
 
     # ── 数据操作 ──────────────────────────────────────────────────────────────
 
-    def load_points(self, plan: StarfishServerPlan) -> None:
-        """从 StarfishServerPlan 加载点位定义和初始值。
+    def load_points(self, plan: StarfishServerMemberConfig) -> None:
+        """从 StarfishServerMemberConfig 加载点位定义和初始值。
 
         同时清空已有订阅队列（重新加载时旧订阅失效）。
 
         Args:
-            plan: 已加载并校验的 StarfishServerPlan。
+            plan: 已加载并校验的 StarfishServerMemberConfig。
         """
         self._plan = plan
         with self._lock:

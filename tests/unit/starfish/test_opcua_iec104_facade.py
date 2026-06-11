@@ -5,7 +5,7 @@
 2. OpcUaFacade / Iec104Facade 生命周期（start / stop / health / load_points / read / update_values）。
 3. unavailable 模式语义（binary 缺失时的安全回退）。
 4. real 模式生命周期（binary 存在时启动 C runner 子进程）。
-5. RuntimeRegistry dispatch（OPC_UA -> OpcUaFacade, IEC_104 -> Iec104Facade）。
+5. ServerRegistry dispatch（OPC_UA -> OpcUaFacade, IEC_104 -> Iec104Facade）。
 6. probe / profile / capacity 对新协议的处理。
 7. NOT_IMPLEMENTED 能力（write / subscribe / report）验证。
 
@@ -24,10 +24,10 @@ from pathlib import Path
 
 import pytest
 
-from starfish.domain.server_plan import (
-    StarfishServerPlan,
-    StarfishEndpointPlan,
-    StarfishPointPlan,
+from starfish.domain.server_config import (
+    StarfishServerConfig,
+    StarfishEndpointConfig,
+    StarfishPointConfig,
     UnsupportedOperation,
 )
 from starfish.drivers.opcua_facade import (
@@ -42,7 +42,7 @@ from starfish.drivers.iec104_facade import (
     probe_iec104_binary,
     resolve_iec104_runner_path,
 )
-from starfish.drivers.runtime_registry import (
+from starfish.drivers.server_registry import (
     create_driver_for_endpoint,
     get_supported_protocols,
     get_real_protocols,
@@ -88,8 +88,8 @@ def _make_test_plan(
     scenario_id: str = "test_opcua_iec104",
     protocol: str = "OPC_UA",
     initial_values: dict | None = None,
-) -> StarfishServerPlan:
-    """构造测试用 StarfishServerPlan。
+) -> StarfishServerConfig:
+    """构造测试用 StarfishServerConfig。
 
     Args:
         scenario_id: 场景标识。
@@ -97,18 +97,18 @@ def _make_test_plan(
         initial_values: 初始值 dict。
 
     Returns:
-        测试用 StarfishServerPlan。
+        测试用 StarfishServerConfig。
     """
     if initial_values is None:
         initial_values = {"p0": 42.0, "p1": 100.0, "p2": True}
 
-    return StarfishServerPlan(
+    return StarfishServerConfig(
         schema_version="1.0.0",
         scenario_id=scenario_id,
         synthetic=True,
         server_name=f"{scenario_id}_server",
         endpoints=[
-            StarfishEndpointPlan(
+            StarfishEndpointConfig(
                 endpoint_id=f"{scenario_id}_ep",
                 protocol=protocol,
                 host="127.0.0.1",
@@ -116,21 +116,21 @@ def _make_test_plan(
             )
         ],
         points=[
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="p0",
                 point_name="Point 0",
                 node_key="/points/0",
                 value_type="Float",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="p1",
                 point_name="Point 1",
                 node_key="/points/1",
                 value_type="Int32",
                 access_mode="RO",
             ),
-            StarfishPointPlan(
+            StarfishPointConfig(
                 point_id="p2",
                 point_name="Point 2",
                 node_key="/points/2",
@@ -468,11 +468,11 @@ class TestIec104FacadeNotImplemented:
         assert "report" in str(exc.value)
 
 
-# ── RuntimeRegistry dispatch 测试 ────────────────────────────────────────────────
+# ── ServerRegistry dispatch 测试 ────────────────────────────────────────────────
 
 
 class TestRuntimeRegistryDispatch:
-    """RuntimeRegistry OPC_UA / IEC104 协议 dispatch 测试。"""
+    """ServerRegistry OPC_UA / IEC104 协议 dispatch 测试。"""
 
     def test_registry_dispatches_opcua(self) -> None:
         """OPC_UA 协议应 dispatch 到 OpcUaFacade。"""

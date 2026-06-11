@@ -25,7 +25,7 @@ from seahorse.models.bundle import ScenarioBundle, _make_serializable
 def compute_bundle_checksum(bundle: ScenarioBundle) -> str:
     """计算场景包内容的确定性校验和。
 
-    对场景包的核心产出内容（场景配置、种子计划、服务端计划、
+    对场景包的核心产出内容（场景配置、种子计划、服务端配置、
     信号值序列、告警事件和控制结果）进行规范化序列化后计算
     SHA256 哈希。
 
@@ -37,7 +37,7 @@ def compute_bundle_checksum(bundle: ScenarioBundle) -> str:
         - scenario_metadata.generated_at（运行时生成）
 
     校验和覆盖的内容字段（全部由 config + seed 确定）：
-        scenario_config, seed_plan, server_plan,
+        scenario_config, seed_plan, server_config,
         generated_timeseries_sample, alarm_events, control_results,
         scenario_id, deterministic_seed, name, scenario_version.
 
@@ -55,7 +55,7 @@ def compute_bundle_checksum(bundle: ScenarioBundle) -> str:
         "scenario_version": bundle.scenario_version,
         "scenario_config": bundle.scenario_config,
         "seed_plan": bundle.seed_plan,
-        "server_plan": bundle.server_plan,
+        "server_config": bundle.server_config,
         "generated_timeseries_sample": bundle.generated_timeseries_sample,
         "alarm_events": bundle.alarm_events,
         "control_results": bundle.control_results,

@@ -62,6 +62,12 @@ line_length = 100
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
+# 排除 src/whale/：该子包已在 __init__.py 显式声明为 skeleton，
+# 依赖尚未实现的 whale.models（见 src/whale/processing/__init__.py 、
+# src/whale/aggregation/__init__.py），属于远期 roadmap / 非生产链路。
+# 在 whale.models 真正实现、whale 重新接入生产路径前，保留在 mypy 检查范围
+# 之外会反复暴露 import-not-found 噪音；恢复纳入时直接删除此 exclude 即可。
+exclude = ['^src/whale/']
 warn_return_any = true
 warn_unused_configs = true
 check_untyped_defs = true
