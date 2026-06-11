@@ -26,24 +26,24 @@ from urllib.request import ProxyHandler, build_opener
 
 import pytest
 
-from starfish.models.plan import (
+from starfish.domain.server_plan import (
     StarfishServerPlan,
     StarfishEndpointPlan,
     StarfishPointPlan,
     UnsupportedOperation,
 )
-from starfish.facade.http_rest_facade import HttpRestFacade
-from starfish.facade.modbus_tcp_facade import ModbusTcpFacade
-from starfish.facade.mqtt_facade import MqttFacade
-from starfish.facade.server_simulator_facade import ServerSimulatorFacade
-from starfish.facade.iec101_facade import Iec101Facade
-from starfish.facade.modbus_rtu_facade import ModbusRtuFacade
-from starfish.facade.ads_facade import AdsFacade
-from starfish.facade.goose_facade import GooseFacade
-from starfish.facade.sv_facade import SvFacade
-from starfish.registry.runtime_registry import (
-    create_facade_for_endpoint,
-    create_facades,
+from starfish.drivers.http_rest_facade import HttpRestFacade
+from starfish.drivers.modbus_tcp_facade import ModbusTcpFacade
+from starfish.drivers.mqtt_facade import MqttFacade
+from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
+from starfish.drivers.iec101_facade import Iec101Facade
+from starfish.drivers.modbus_rtu_facade import ModbusRtuFacade
+from starfish.drivers.ads_facade import AdsFacade
+from starfish.drivers.goose_facade import GooseFacade
+from starfish.drivers.sv_facade import SvFacade
+from starfish.drivers.runtime_registry import (
+    create_driver_for_endpoint,
+    create_drivers,
     get_supported_protocols,
     get_real_protocols,
     get_lightweight_protocols,
@@ -717,23 +717,23 @@ class TestRegistryFactoryDispatch:
         """HTTP_REST 协议应 dispatch 到 HttpRestFacade。"""
         plan = _make_http_plan("dispatch_http")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
 
         assert entry.mode == "real"
         assert entry.available is True
-        assert isinstance(entry.facade, HttpRestFacade)
-        assert entry.facade.protocol == "HTTP_REST"
+        assert isinstance(entry.driver, HttpRestFacade)
+        assert entry.driver.protocol == "HTTP_REST"
 
     def test_modbus_tcp_dispatches_to_modbus_tcp_facade(self) -> None:
         """MODBUS_TCP 协议应 dispatch 到 ModbusTcpFacade。"""
         plan = _make_modbus_plan("dispatch_modbus")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
 
         assert entry.mode == "real"
         assert entry.available is True
-        assert isinstance(entry.facade, ModbusTcpFacade)
-        assert entry.facade.protocol == "MODBUS_TCP"
+        assert isinstance(entry.driver, ModbusTcpFacade)
+        assert entry.driver.protocol == "MODBUS_TCP"
 
     def test_unknown_protocol_dispatches_to_stub(self) -> None:
         """未知协议应 dispatch 到 in-memory stub。"""
@@ -744,14 +744,14 @@ class TestRegistryFactoryDispatch:
             host="127.0.0.1",
             port=4840,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
 
         assert entry.mode == "stub"
         assert entry.available is True
-        assert isinstance(entry.facade, ServerSimulatorFacade)
+        assert isinstance(entry.driver, ServerSimulatorFacade)
         assert "in-memory stub" in entry.reason
 
-    def test_create_facades_multiple_endpoints(self) -> None:
+    def test_create_drivers_multiple_endpoints(self) -> None:
         """多 endpoint 时应为每个创建正确类型的 facade。"""
         plan = StarfishServerPlan(
             schema_version="1.0.0",
@@ -788,7 +788,7 @@ class TestRegistryFactoryDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_facades(plan)
+        registry = create_drivers(plan)
 
         assert len(registry.entries) == 4
 
@@ -799,10 +799,10 @@ class TestRegistryFactoryDispatch:
         assert modes["iec61850_ep"] == "stub"
 
         # 类型检查
-        assert isinstance(registry.entries[0].facade, HttpRestFacade)
-        assert isinstance(registry.entries[1].facade, ModbusTcpFacade)
-        assert isinstance(registry.entries[2].facade, MqttFacade)
-        assert isinstance(registry.entries[3].facade, ServerSimulatorFacade)
+        assert isinstance(registry.entries[0].driver, HttpRestFacade)
+        assert isinstance(registry.entries[1].driver, ModbusTcpFacade)
+        assert isinstance(registry.entries[2].driver, MqttFacade)
+        assert isinstance(registry.entries[3].driver, ServerSimulatorFacade)
 
     def test_get_supported_protocols(self) -> None:
         """get_supported_protocols 应返回已实现协议列表。"""
@@ -824,12 +824,12 @@ class TestRegistryFactoryDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
 
         assert entry.mode == "mqtt-lightweight"
         assert entry.available is True
-        assert isinstance(entry.facade, MqttFacade)
-        assert entry.facade.protocol == "MQTT"
+        assert isinstance(entry.driver, MqttFacade)
+        assert entry.driver.protocol == "MQTT"
         assert "非完整 MQTT broker" in entry.reason
 
     def test_mqtt_protocol_normalization(self) -> None:
@@ -842,11 +842,11 @@ class TestRegistryFactoryDispatch:
                 host="127.0.0.1",
                 port=0,
             )
-            entry = create_facade_for_endpoint(ep, plan)
+            entry = create_driver_for_endpoint(ep, plan)
             # "m q t t" 归一化后变成 "M_Q_T_T"，不匹配 MQTT
             # 但 "mqtt" 和 "MQTT" 应该都匹配
             if variant in ("mqtt", "MQTT", "Mqtt"):
-                assert isinstance(entry.facade, MqttFacade), (
+                assert isinstance(entry.driver, MqttFacade), (
                     f"变体 '{variant}' 应 dispatch 到 MqttFacade, "
                     f"实际 mode={entry.mode}"
                 )
@@ -866,7 +866,7 @@ class TestRegistryFactoryDispatch:
         protocols = get_lightweight_protocols()
         assert "MQTT" in protocols
         assert "HTTP_REST" not in protocols
-        from starfish.facade.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.drivers.modbus_rtu_facade import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         if pty_ok:
             assert "MODBUS_RTU" in protocols
@@ -889,7 +889,7 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=2404,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode in (
             "codec-enhanced",
             "codec-enhanced-plus",
@@ -898,8 +898,8 @@ class TestPendingProtocolDispatch:
             "codebase-pending",
         )
         assert entry.available is True
-        assert isinstance(entry.facade, Iec101Facade)
-        assert entry.facade.protocol == "IEC101"
+        assert isinstance(entry.driver, Iec101Facade)
+        assert entry.driver.protocol == "IEC101"
 
     def test_iec_101_variant_dispatches_to_iec101_facade(self) -> None:
         """IEC_101 协议变体应 dispatch 到 Iec101Facade
@@ -912,7 +912,7 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=2404,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode in (
             "codec-enhanced",
             "codec-enhanced-plus",
@@ -920,7 +920,7 @@ class TestPendingProtocolDispatch:
             "environment-pending",
             "codebase-pending",
         )
-        assert isinstance(entry.facade, Iec101Facade)
+        assert isinstance(entry.driver, Iec101Facade)
 
     def test_modbus_rtu_dispatches_to_modbus_rtu_facade(self) -> None:
         """MODBUS_RTU 协议应 dispatch 到 ModbusRtuFacade
@@ -932,14 +932,14 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode in ("rtu-lightweight", "codebase-pending"), (
             f"MODBUS_RTU mode 应为 rtu-lightweight 或 codebase-pending，"
             f"实际 {entry.mode}"
         )
         assert entry.available is True
-        assert isinstance(entry.facade, ModbusRtuFacade)
-        assert entry.facade.protocol == "MODBUS_RTU"
+        assert isinstance(entry.driver, ModbusRtuFacade)
+        assert entry.driver.protocol == "MODBUS_RTU"
 
     def test_beckhoff_ads_dispatches_to_ads_facade(self) -> None:
         """BECKHOFF_ADS 协议应 dispatch 到 AdsFacade（codebase-pending）。"""
@@ -950,11 +950,11 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=48898,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "codebase-pending"
         assert entry.available is True
-        assert isinstance(entry.facade, AdsFacade)
-        assert entry.facade.protocol == "BECKHOFF_ADS"
+        assert isinstance(entry.driver, AdsFacade)
+        assert entry.driver.protocol == "BECKHOFF_ADS"
 
     def test_ads_short_name_dispatches_to_ads_facade(self) -> None:
         """ADS 短名协议应 dispatch 到 AdsFacade（codebase-pending）。"""
@@ -965,9 +965,9 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=48898,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "codebase-pending"
-        assert isinstance(entry.facade, AdsFacade)
+        assert isinstance(entry.driver, AdsFacade)
 
     def test_goose_dispatches_to_goose_facade(self) -> None:
         """GOOSE 协议应 dispatch 到 GooseFacade（environment-pending）。"""
@@ -978,11 +978,11 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "environment-pending"
         assert entry.available is True
-        assert isinstance(entry.facade, GooseFacade)
-        assert entry.facade.protocol == "GOOSE"
+        assert isinstance(entry.driver, GooseFacade)
+        assert entry.driver.protocol == "GOOSE"
 
     def test_sv_dispatches_to_sv_facade(self) -> None:
         """SV 协议应 dispatch 到 SvFacade（environment-pending）。"""
@@ -993,11 +993,11 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "environment-pending"
         assert entry.available is True
-        assert isinstance(entry.facade, SvFacade)
-        assert entry.facade.protocol == "SV"
+        assert isinstance(entry.driver, SvFacade)
+        assert entry.driver.protocol == "SV"
 
     def test_multi_endpoint_with_pending_protocols(self) -> None:
         """多 endpoint 中含 pending 协议时应正确 dispatch。"""
@@ -1036,7 +1036,7 @@ class TestPendingProtocolDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_facades(plan)
+        registry = create_drivers(plan)
         assert len(registry.entries) == 4
 
         modes = {e.endpoint.endpoint_id: e.mode for e in registry.entries}
@@ -1052,10 +1052,10 @@ class TestPendingProtocolDispatch:
         assert modes["sv_ep"] == "environment-pending"
 
         # 类型检查
-        assert isinstance(registry.entries[0].facade, HttpRestFacade)
-        assert isinstance(registry.entries[1].facade, Iec101Facade)
-        assert isinstance(registry.entries[2].facade, GooseFacade)
-        assert isinstance(registry.entries[3].facade, SvFacade)
+        assert isinstance(registry.entries[0].driver, HttpRestFacade)
+        assert isinstance(registry.entries[1].driver, Iec101Facade)
+        assert isinstance(registry.entries[2].driver, GooseFacade)
+        assert isinstance(registry.entries[3].driver, SvFacade)
 
     def test_get_supported_protocols_includes_pending(self) -> None:
         """get_supported_protocols 应包含 codebase-pending 和 environment-pending 协议。"""
@@ -1077,13 +1077,13 @@ class TestPendingProtocolDispatch:
         assert "GOOSE" not in protocols
         assert "SV" not in protocols
         # IEC101 在 binary 缺失时应在列表中
-        from starfish.facade.iec101_facade import Iec101Facade
+        from starfish.drivers.iec101_facade import Iec101Facade
         if Iec101Facade().mode == "codebase-pending":
             assert "IEC101" in protocols
         else:
             assert "IEC101" not in protocols
         # MODBUS_RTU 在 PTY 不可用时应在列表中
-        from starfish.facade.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.drivers.modbus_rtu_facade import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         if not pty_ok:
             assert "MODBUS_RTU" in protocols
@@ -1096,7 +1096,7 @@ class TestPendingProtocolDispatch:
         assert "GOOSE" in protocols
         assert "SV" in protocols
         # IEC101 在 binary 已编译时应在列表中
-        from starfish.facade.iec101_facade import Iec101Facade
+        from starfish.drivers.iec101_facade import Iec101Facade
         if Iec101Facade().mode == "environment-pending":
             assert "IEC101" in protocols
         else:
@@ -1131,13 +1131,13 @@ class TestRegistryStartStopAll:
             capabilities=["READ"],
             initial_values={"a": 1},
         )
-        registry = create_facades(plan)
+        registry = create_drivers(plan)
 
         try:
             registry.start_all()
 
             for entry in registry.entries:
-                h = entry.facade.health()
+                h = entry.driver.health()
                 assert h["status"] == "started", f"{entry.endpoint.endpoint_id} 未启动"
                 assert h["running"] is True
         finally:
@@ -1162,7 +1162,7 @@ class TestRegistryStartStopAll:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_facades(plan)
+        registry = create_drivers(plan)
 
         health = registry.health_all()
         assert "http_ep" in health

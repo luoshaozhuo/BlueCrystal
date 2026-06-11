@@ -22,5 +22,5 @@ ai_shared/rules/routing.md
 6. 任何验证结论必须来自真实命令、真实文件、真实测试或明确 evidence。
 7. 不把 skipped、mock、fake、health check、脚本存在、单文件 passed、environment-pending 写成真实通过。
 8. 不把工具/实验模块引入生产路径。
-9. 不自动执行 commit、push、reset、clean。
+9. 不自动执行 commit、push、reset、clean；其他会修改 Git 历史、工作区状态或远端仓库状态的命令也默认禁止自动执行。
 10. 不默认运行重回归或长测。

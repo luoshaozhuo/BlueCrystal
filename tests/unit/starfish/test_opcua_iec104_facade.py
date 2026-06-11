@@ -24,33 +24,33 @@ from pathlib import Path
 
 import pytest
 
-from starfish.models.plan import (
+from starfish.domain.server_plan import (
     StarfishServerPlan,
     StarfishEndpointPlan,
     StarfishPointPlan,
     UnsupportedOperation,
 )
-from starfish.facade.opcua_facade import (
+from starfish.drivers.opcua_facade import (
     OpcUaFacade,
     probe_opcua_binary,
     resolve_open62541_runner_path,
     _generate_opcua_tsv,  # noqa: PLC2701 -- 测试内部 helper
     _map_opcua_type,       # noqa: PLC2701 -- 测试内部 helper
 )
-from starfish.facade.iec104_facade import (
+from starfish.drivers.iec104_facade import (
     Iec104Facade,
     probe_iec104_binary,
     resolve_iec104_runner_path,
 )
-from starfish.registry.runtime_registry import (
-    create_facade_for_endpoint,
+from starfish.drivers.runtime_registry import (
+    create_driver_for_endpoint,
     get_supported_protocols,
     get_real_protocols,
     get_native_runner_protocols,
 )
-from starfish.tools.probe import probe_facade
-from starfish.tools.profile import profile_facade
-from starfish.tools.capacity import capacity_scan
+from whale.ingest.diagnostics.probe import probe_facade
+from whale.ingest.diagnostics.profile import profile_facade
+from whale.ingest.diagnostics.capacity import capacity_scan
 
 
 # ── 环境检测 markers ──────────────────────────────────────────────────────────────
@@ -478,11 +478,11 @@ class TestRuntimeRegistryDispatch:
         """OPC_UA 协议应 dispatch 到 OpcUaFacade。"""
         plan = _make_test_plan("reg_opcua", protocol="OPC_UA")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
 
         assert entry.mode in ("real", "unavailable")
-        assert entry.facade is not None
-        assert entry.facade.protocol == "OPC_UA"
+        assert entry.driver is not None
+        assert entry.driver.protocol == "OPC_UA"
         if entry.mode == "real":
             assert entry.available is True
             assert "real" in entry.reason.lower()
@@ -494,11 +494,11 @@ class TestRuntimeRegistryDispatch:
         """IEC_104 协议应 dispatch 到 Iec104Facade。"""
         plan = _make_test_plan("reg_iec104", protocol="IEC_104")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
 
         assert entry.mode in ("real", "unavailable")
-        assert entry.facade is not None
-        assert entry.facade.protocol == "IEC104"
+        assert entry.driver is not None
+        assert entry.driver.protocol == "IEC104"
         if entry.mode == "real":
             assert entry.available is True
         else:
@@ -508,10 +508,10 @@ class TestRuntimeRegistryDispatch:
         """IEC104（无下划线）协议名应 dispatch 到 Iec104Facade。"""
         plan = _make_test_plan("reg_iec104b", protocol="IEC104")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
 
-        assert entry.facade is not None
-        assert entry.facade.protocol == "IEC104"
+        assert entry.driver is not None
+        assert entry.driver.protocol == "IEC104"
 
     def test_get_supported_protocols_includes_new(self) -> None:
         """get_supported_protocols 应包含 OPC_UA 和 IEC104。"""
@@ -811,7 +811,7 @@ class TestRegressionExistingProtocols:
         """HTTP_REST 仍 dispatch 到 HttpRestFacade (real mode)。"""
         plan = _make_test_plan("reg_http", protocol="HTTP_REST")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "real"
         assert entry.available is True
 
@@ -819,7 +819,7 @@ class TestRegressionExistingProtocols:
         """MODBUS_TCP 仍 dispatch 到 ModbusTcpFacade (real mode)。"""
         plan = _make_test_plan("reg_modbus", protocol="MODBUS_TCP")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "real"
         assert entry.available is True
 
@@ -827,7 +827,7 @@ class TestRegressionExistingProtocols:
         """MQTT 仍 dispatch 到 MqttFacade (mqtt-lightweight mode)。"""
         plan = _make_test_plan("reg_mqtt", protocol="MQTT")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "mqtt-lightweight"
         assert entry.available is True
 
@@ -835,7 +835,7 @@ class TestRegressionExistingProtocols:
         """未知协议仍 dispatch 到 ServerSimulatorFacade (stub mode)。"""
         plan = _make_test_plan("reg_unknown", protocol="IEC_61850_MMS")
         ep = plan.endpoints[0]
-        entry = create_facade_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan)
         assert entry.mode == "stub"
 
 

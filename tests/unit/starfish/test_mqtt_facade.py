@@ -27,13 +27,13 @@ import socket
 
 import pytest
 
-from starfish.models.plan import (
+from starfish.domain.server_plan import (
     StarfishServerPlan,
     StarfishEndpointPlan,
     StarfishPointPlan,
     UnsupportedOperation,
 )
-from starfish.facade.mqtt_facade import MqttFacade, SubscriptionQueue
+from starfish.drivers.mqtt_facade import MqttFacade, SubscriptionQueue
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────

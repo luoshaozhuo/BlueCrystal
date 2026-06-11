@@ -164,6 +164,7 @@ commit-message
 rule-update
 全量测试、长测、发布前完整验证
 commit / push / reset / clean
+其他会修改 Git 历史、工作区状态或远端仓库状态的 Git/GitHub 写操作
 ```
 
 如果流程中需要判断是否执行 `requirement-trace`、`project-tree-update`，由 `project-steward` 按规则判断；真正创建或修改规则文件时，必须有 handoff 或用户 prompt 支持。
@@ -177,6 +178,7 @@ commit / push / reset / clean
 - 不新增未经确认的兼容 shim。
 - 不为了通过测试而降低断言或删除测试。
 - 不自动执行 commit、push、reset、clean。
+- 不自动执行其他会修改 Git 历史、工作区状态或远端仓库状态的 Git/GitHub 写操作。
 - 不默认运行重回归或长测。
 - 不把工具/实验模块引入生产路径。
 

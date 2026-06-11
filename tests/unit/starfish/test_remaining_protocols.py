@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import pytest
 
-from starfish.models.plan import StarfishServerPlan, StarfishEndpointPlan, StarfishPointPlan, UnsupportedOperation
-from starfish.facade.iec101_facade import Iec101Facade, probe_iec101_binary
-from starfish.facade.modbus_rtu_facade import ModbusRtuFacade, probe_modbus_rtu_binary
-from starfish.facade.ads_facade import AdsFacade, probe_ads_binary
-from starfish.facade.goose_facade import GooseFacade, probe_goose_binary
-from starfish.facade.sv_facade import SvFacade, probe_sv_binary
+from starfish.domain.server_plan import StarfishServerPlan, StarfishEndpointPlan, StarfishPointPlan, UnsupportedOperation
+from starfish.drivers.iec101_facade import Iec101Facade, probe_iec101_binary
+from starfish.drivers.modbus_rtu_facade import ModbusRtuFacade, probe_modbus_rtu_binary
+from starfish.drivers.ads_facade import AdsFacade, probe_ads_binary
+from starfish.drivers.goose_facade import GooseFacade, probe_goose_binary
+from starfish.drivers.sv_facade import SvFacade, probe_sv_binary
 
 
 # ── 共享 fixtures ────────────────────────────────────────────────────────────────

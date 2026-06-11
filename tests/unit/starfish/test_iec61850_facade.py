@@ -31,31 +31,31 @@ from unittest.mock import patch
 
 import pytest
 
-from starfish.facade.iec61850_mms_facade import (
+from starfish.drivers.iec61850_mms_facade import (
     Iec61850MmsFacade,
     probe_iec61850_mms_binary,
     resolve_iec61850_mms_simulator_path,
 )
-from starfish.facade.iec61850_report_facade import (
+from starfish.drivers.iec61850_report_facade import (
     Iec61850ReportFacade,
     ReportQueue,
     probe_iec61850_report_binary,
     resolve_iec61850_report_runner_path,
 )
-from starfish.models.plan import (
+from starfish.domain.server_plan import (
     StarfishEndpointPlan,
     StarfishPointPlan,
     StarfishServerPlan,
     UnsupportedOperation,
 )
-from starfish.registry.runtime_registry import (
-    create_facade_for_endpoint,
+from starfish.drivers.runtime_registry import (
+    create_driver_for_endpoint,
     get_supported_protocols,
     get_native_runner_protocols,
 )
-from starfish.tools.probe import probe_facade
-from starfish.tools.profile import profile_facade
-from starfish.tools.capacity import capacity_scan
+from whale.ingest.diagnostics.probe import probe_facade
+from whale.ingest.diagnostics.profile import profile_facade
+from whale.ingest.diagnostics.capacity import capacity_scan
 
 
 # ── Test helpers ─────────────────────────────────────────────────────────────────
@@ -262,7 +262,7 @@ class TestDependencyProbe:
     def test_probe_report_binary_not_found_simulator(self) -> None:
         """Simulator 不存在时返回 False。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.resolve_iec61850_report_simulator_path",
+            "starfish.drivers.iec61850_report_facade.resolve_iec61850_report_simulator_path",
             return_value=Path("/nonexistent/iec61850_simulator_server"),
         ):
             binary_ok, reason = probe_iec61850_report_binary()
@@ -282,7 +282,7 @@ class TestDependencyProbe:
 
         with patch("os.stat", side_effect=mock_stat):
             with patch(
-                "starfish.facade.iec61850_report_facade.resolve_iec61850_report_runner_path",
+                "starfish.drivers.iec61850_report_facade.resolve_iec61850_report_runner_path",
                 return_value=Path("/nonexistent/iec61850_report_runner"),
             ):
                 binary_ok, reason = probe_iec61850_report_binary()
@@ -319,7 +319,7 @@ class TestIec61850MmsFacadeUnavailable:
     def test_mode_is_unavailable_when_binary_missing(self) -> None:
         """binary 不可用时 mode='unavailable'。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "binary not found"),
         ):
             facade = Iec61850MmsFacade()
@@ -330,7 +330,7 @@ class TestIec61850MmsFacadeUnavailable:
     def test_start_noop_when_unavailable(self) -> None:
         """unavailable 时 start 不执行子进程。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850MmsFacade()
@@ -343,7 +343,7 @@ class TestIec61850MmsFacadeUnavailable:
     def test_stop_noop_when_unavailable(self) -> None:
         """unavailable 时 stop 不执行子进程。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850MmsFacade()
@@ -355,7 +355,7 @@ class TestIec61850MmsFacadeUnavailable:
     def test_health_returns_unavailable_reason(self) -> None:
         """health 返回 unavailable 模式和原因。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "binary not found"),
         ):
             facade = Iec61850MmsFacade()
@@ -367,7 +367,7 @@ class TestIec61850MmsFacadeUnavailable:
     def test_read_when_unavailable(self) -> None:
         """unavailable 时 read 返回 in-memory 值。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "test"),
         ):
             plan = _make_plan()
@@ -380,7 +380,7 @@ class TestIec61850MmsFacadeUnavailable:
     def test_update_values_when_unavailable(self) -> None:
         """unavailable 时 update_values 更新内存值。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850MmsFacade()
@@ -540,7 +540,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_mode_is_report_lightweight_when_binary_missing(self) -> None:
         """binary 不可用时 mode='report-lightweight'。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "binaries not found"),
         ):
             facade = Iec61850ReportFacade()
@@ -550,7 +550,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_start_stop_lightweight(self) -> None:
         """report-lightweight 时 start/stop 仅管理内存状态。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850ReportFacade()
@@ -565,7 +565,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_update_values_pushes_to_report_queue(self) -> None:
         """update_values 后 report() 能排空事件。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850ReportFacade()
@@ -586,7 +586,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_report_drains_queue(self) -> None:
         """report 排空后队列为空。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850ReportFacade()
@@ -601,7 +601,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_event_has_type_and_timestamp(self) -> None:
         """事件包含 event_type 和 timestamp。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850ReportFacade()
@@ -618,7 +618,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_health_includes_event_queue_size(self) -> None:
         """health 包含 event_queue_size。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850ReportFacade()
@@ -632,7 +632,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_stop_clears_event_queue(self) -> None:
         """stop 后事件队列清空。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850ReportFacade()
@@ -645,7 +645,7 @@ class TestIec61850ReportFacadeLightweight:
     def test_report_lightweight_not_full_iec61850_report_server(self) -> None:
         """明确声明 report-lightweight 不是完整 IEC61850 Report server。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "binaries not found"),
         ):
             facade = Iec61850ReportFacade()
@@ -776,11 +776,11 @@ class TestRuntimeRegistryDispatch:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
-        from starfish.facade.iec61850_mms_facade import Iec61850MmsFacade
-        assert isinstance(entry.facade, Iec61850MmsFacade)
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
+        from starfish.drivers.iec61850_mms_facade import Iec61850MmsFacade
+        assert isinstance(entry.driver, Iec61850MmsFacade)
         assert entry.mode in ("real", "unavailable")
-        assert entry.facade.protocol == "IEC61850_MMS"
+        assert entry.driver.protocol == "IEC61850_MMS"
 
     def test_dispatch_iec61850_report_returns_real_or_report_lightweight(self) -> None:
         """IEC61850_REPORT 协议分发返回 Iec61850ReportFacade。"""
@@ -792,11 +792,11 @@ class TestRuntimeRegistryDispatch:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
-        from starfish.facade.iec61850_report_facade import Iec61850ReportFacade
-        assert isinstance(entry.facade, Iec61850ReportFacade)
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
+        from starfish.drivers.iec61850_report_facade import Iec61850ReportFacade
+        assert isinstance(entry.driver, Iec61850ReportFacade)
         assert entry.mode in ("real", "report-lightweight")
-        assert entry.facade.protocol == "IEC61850_REPORT"
+        assert entry.driver.protocol == "IEC61850_REPORT"
 
     def test_get_supported_protocols_includes_iec61850(self) -> None:
         """get_supported_protocols 包含 IEC61850_MMS 和 IEC61850_REPORT。"""
@@ -818,7 +818,7 @@ class TestRuntimeRegistryDispatch:
         assert "IEC61850_REPORT" in protocols
 
     def test_goose_sv_stub_fallback(self) -> None:
-        """GOOSE/SV 协议分发返回 environment-pending FacadeEntry（Round 10 更新）。
+        """GOOSE/SV 协议分发返回 environment-pending DriverEntry（Round 10 更新）。
 
         Round 10 前 GOOSE/SV 回退到 stub mode，现在有专用 facade 并标记 environment-pending。
         """
@@ -831,7 +831,7 @@ class TestRuntimeRegistryDispatch:
                     port=0,
                 ),
             ])
-            entry = create_facade_for_endpoint(plan.endpoints[0], plan)
+            entry = create_driver_for_endpoint(plan.endpoints[0], plan)
             assert entry.mode == "environment-pending", f"{protocol} 应为 environment-pending mode"
             assert "environment-pending" in entry.reason
 
@@ -845,7 +845,7 @@ class TestRuntimeRegistryDispatch:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
         assert entry.mode == "stub"
 
 
@@ -861,7 +861,7 @@ class TestProbeIec61850:
         plan = _make_plan()
         # 直接用 facade 测试（不依赖 dispatch 返回值）
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "binary not found"),
         ):
             facade = Iec61850MmsFacade()
@@ -913,7 +913,7 @@ class TestProbeIec61850:
     def test_probe_iec61850_report_lightweight(self) -> None:
         """probe 对 report-lightweight mode（read NOT_IMPLEMENTED）返回 FAIL。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             plan = _make_plan()
@@ -935,7 +935,7 @@ class TestProfileIec61850:
     def test_profile_iec61850_mms_unavailable(self) -> None:
         """unavailable mode 的 IEC61850_MMS facade profile 返回 FAIL（read 可能失败）。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850MmsFacade()
@@ -955,7 +955,7 @@ class TestProfileIec61850:
     def test_profile_iec61850_report_lightweight_read_fails(self) -> None:
         """IEC61850_REPORT facade read 是 NOT_IMPLEMENTED，profile 应 FAIL。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             facade = Iec61850ReportFacade()
@@ -980,7 +980,7 @@ class TestCapacityIec61850:
     def test_capacity_iec61850_mms_when_available(self) -> None:
         """IEC61850_MMS 在 unavailable 模式容量扫描返回 NOT_RUN。"""
         with patch(
-            "starfish.facade.iec61850_mms_facade.probe_iec61850_mms_binary",
+            "starfish.drivers.iec61850_mms_facade.probe_iec61850_mms_binary",
             return_value=(False, "test"),
         ):
             plan = _make_plan()
@@ -1016,7 +1016,7 @@ class TestCapacityIec61850:
     def test_capacity_iec61850_report_unavailable(self) -> None:
         """IEC61850_REPORT unavailable 模式容量扫描返回 NOT_RUN。"""
         with patch(
-            "starfish.facade.iec61850_report_facade.probe_iec61850_report_binary",
+            "starfish.drivers.iec61850_report_facade.probe_iec61850_report_binary",
             return_value=(False, "test"),
         ):
             plan = _make_plan()
@@ -1057,7 +1057,7 @@ class TestGooseSvNotRun:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
         assert entry.mode == "environment-pending"
         assert "environment-pending" in entry.reason.lower()
 
@@ -1075,11 +1075,11 @@ class TestGooseSvNotRun:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
         assert entry.mode == "environment-pending"
 
     def test_goose_probe_not_run(self) -> None:
-        """GOOSE dispatch 返回 environment-pending FacadeEntry（Round 10 更新）。
+        """GOOSE dispatch 返回 environment-pending DriverEntry（Round 10 更新）。
 
         Round 10 前 GOOSE 回退到 ServerSimulatorFacade stub，
         现在有专用 GooseFacade 并标记 environment-pending。
@@ -1092,10 +1092,10 @@ class TestGooseSvNotRun:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
         assert entry.mode == "environment-pending"
-        from starfish.facade.goose_facade import GooseFacade
-        assert isinstance(entry.facade, GooseFacade)
+        from starfish.drivers.goose_facade import GooseFacade
+        assert isinstance(entry.driver, GooseFacade)
 
 
 # ── Regression: existing protocols not impacted ──────────────────────────────────
@@ -1106,7 +1106,7 @@ class TestExistingProtocolsUnaffected:
 
     def test_http_rest_facade_still_works(self) -> None:
         """HTTP_REST facade 不受影响。"""
-        from starfish.facade.http_rest_facade import HttpRestFacade
+        from starfish.drivers.http_rest_facade import HttpRestFacade
         plan = _make_plan()
         facade = HttpRestFacade()
         facade.load_points(plan)
@@ -1121,7 +1121,7 @@ class TestExistingProtocolsUnaffected:
 
     def test_modbus_tcp_facade_still_works(self) -> None:
         """MODBUS_TCP facade 不受影响。"""
-        from starfish.facade.modbus_tcp_facade import ModbusTcpFacade
+        from starfish.drivers.modbus_tcp_facade import ModbusTcpFacade
         plan = _make_plan()
         facade = ModbusTcpFacade()
         facade.load_points(plan)
@@ -1134,7 +1134,7 @@ class TestExistingProtocolsUnaffected:
 
     def test_mqtt_facade_still_works(self) -> None:
         """MQTT facade 不受影响。"""
-        from starfish.facade.mqtt_facade import MqttFacade
+        from starfish.drivers.mqtt_facade import MqttFacade
         plan = _make_plan()
         facade = MqttFacade()
         facade.load_points(plan)
@@ -1155,8 +1155,8 @@ class TestExistingProtocolsUnaffected:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
-        assert entry.facade.protocol == "OPC_UA"
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
+        assert entry.driver.protocol == "OPC_UA"
 
     def test_iec104_facade_dispatch_still_works(self) -> None:
         """IEC104 dispatch 不受影响。"""
@@ -1168,5 +1168,5 @@ class TestExistingProtocolsUnaffected:
                 port=0,
             ),
         ])
-        entry = create_facade_for_endpoint(plan.endpoints[0], plan)
-        assert entry.facade.protocol == "IEC104"
+        entry = create_driver_for_endpoint(plan.endpoints[0], plan)
+        assert entry.driver.protocol == "IEC104"

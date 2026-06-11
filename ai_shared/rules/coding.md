@@ -14,6 +14,7 @@
 10. 不恢复废弃文件，不把实验、测试、诊断能力接入生产路径。
 11. 不把 mock、fake、stub、health check、脚本存在、局部通过伪装成真实闭环。
 12. 修改代码必须同步评估测试、类型、注释、配置、schema、文档、索引和需求状态影响。
+13. 默认禁止自动执行任何会修改 Git 历史、工作区状态或远端仓库状态的命令，除非用户明确要求。
 
 ## 2. 架构与边界
 
@@ -93,3 +94,11 @@
 3. 状态只能基于当前真实证据更新。
 4. mock、contract、simulator 或局部检查不得写成真实生产闭环。
 5. 发现状态高估时，必须降级或改为明确的 NOT_RUN / 未验证说明。
+
+## 9. Git 与远端操作边界
+
+1. 默认允许只读 Git 检查命令，例如 `git status`、`git diff`、`git diff --cached`、`git log`、`git show`、`git rev-parse`。
+2. 默认禁止自动执行任何会修改 Git 历史、工作区状态或远端仓库状态的命令，除非用户明确要求。
+3. `commit`、`push`、`reset`、`clean` 以及等价的 Git/GitHub 写操作都属于默认禁止范围。
+4. `checkout --`、`restore`、`switch`、`merge`、`rebase`、`cherry-pick`、`tag`、`stash pop`、`stash drop`、`remote set-url`、`gh pr merge`、`gh repo rename` 等会修改历史、工作区或远端状态的命令，也属于默认禁止范围。
+5. 任何 Git/GitHub 写操作即使被用户明确要求，也必须在结果中说明执行原因和影响范围。

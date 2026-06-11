@@ -26,13 +26,13 @@ import time
 
 import pytest
 
-from starfish.models.plan import (
+from starfish.domain.server_plan import (
     StarfishServerPlan,
     StarfishEndpointPlan,
     StarfishPointPlan,
     UnsupportedOperation,
 )
-from starfish.facade.modbus_rtu_facade import (
+from starfish.drivers.modbus_rtu_facade import (
     ModbusRtuFacade,
     probe_modbus_rtu_binary,
     _crc16,

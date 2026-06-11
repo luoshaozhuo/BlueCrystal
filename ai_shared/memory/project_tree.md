@@ -1,6 +1,6 @@
 # BlueCrystal 项目目录树
 
-> 最后更新: 2026-06-09
+> 最后更新: 2026-06-10
 > 重建方式: `project-tree-reset`
 > 扫描边界: 基于当前仓库真实纳管文件重建，并纳入本轮未跟踪源码文档 `src/starfish/README.md`
 > 默认排除: `.git`、`.conda`、`__pycache__`、`.mypy_cache`、`.pytest_cache`、`.ruff_cache`、`node_modules`、`dist`、`build`、`third_party`、日志与其他生成产物
@@ -170,6 +170,7 @@ src/whale/
 │   ├── adapters/                    — 审计 / 配置 / 消息 / source / state 适配器
 │   ├── bundle/                      — bundle 导入导出服务
 │   ├── decorators/                  — 采集 / 写入 / 状态装饰器
+│   ├── diagnostics/                 — runtime probe / profile / capacity 诊断工具
 │   ├── domain/                      — 共享领域模型
 │   ├── entities/                    — ingest 领域实体
 │   ├── file_ingest/                 — 文件接入子系统
@@ -330,34 +331,41 @@ src/seahorse/
     └── replay_generation.py         — 回放生成策略
 ```
 
-### `src/starfish/` — 多协议 server simulator 工具层
+### `src/starfish/` — 多协议 server simulator runtime 核心
 
 ```text
 src/starfish/
 ├── README.md                        — Starfish 模块总览、分层职责与 CLI 用法
 ├── __init__.py                      — 包级定位与能力边界说明
-├── __main__.py                      — CLI 入口（load / smoke / probe / profile / capacity）
-├── facade/
-│   ├── __init__.py                  — facade 包入口
-│   ├── ads_facade.py                — ADS facade 占位实现
-│   ├── goose_facade.py              — GOOSE facade 占位实现
-│   ├── http_rest_facade.py          — HTTP REST 真实 facade
-│   ├── iec101_facade.py             — IEC101 facade 与编解码运行时骨架
-│   ├── iec104_facade.py             — IEC104 native facade
-│   ├── iec61850_mms_facade.py       — IEC61850 MMS native facade
-│   ├── iec61850_report_facade.py    — IEC61850 Report facade
-│   ├── modbus_rtu_facade.py         — Modbus RTU facade
-│   ├── modbus_tcp_facade.py         — Modbus TCP facade
-│   ├── mqtt_facade.py               — 轻量 MQTT facade
-│   ├── opcua_facade.py              — OPC UA native facade
-│   ├── server_simulator_facade.py   — 通用 in-memory stub facade
-│   └── sv_facade.py                 — SV facade 占位实现
-├── loader/
-│   ├── __init__.py                  — loader 包入口
-│   └── server_plan_loader.py        — ServerPlan JSON 加载与 9 项校验
-├── models/
-│   ├── __init__.py                  — 模型包入口
-│   └── plan.py                      — ServerPlan / Endpoint / Point / Validation 模型
+├── __main__.py                      — CLI 入口，经 api/application 装配运行时
+├── api/
+│   ├── __init__.py                  — 对外高层 API 导出入口
+│   └── runtime_api.py               — CLI 等消费者使用的统一运行时 API
+├── application/
+│   ├── __init__.py                  — 应用层导出入口
+│   └── runtime_service.py           — plan 加载与驱动装配用例编排
+├── domain/
+│   ├── __init__.py                  — 领域契约导出入口
+│   ├── runtime.py                   — 运行时驱动协议与 DriverEntry 抽象
+│   └── server_plan.py               — ServerPlan 领域契约实现
+├── drivers/
+│   ├── __init__.py                  — 驱动层包入口
+│   ├── runtime_registry.py          — 协议驱动注册与 endpoint 装配工厂
+│   ├── server_plan_loader.py        — ServerPlan 文件加载与校验驱动
+│   ├── server_simulator_facade.py   — 通用 in-memory stub driver
+│   ├── http_rest_facade.py          — HTTP REST 真实 driver
+│   ├── modbus_tcp_facade.py         — Modbus TCP 真实 driver
+│   ├── mqtt_facade.py               — 轻量 MQTT driver
+│   ├── opcua_facade.py              — OPC UA native driver
+│   ├── iec104_facade.py             — IEC104 native driver
+│   ├── iec61850_mms_facade.py       — IEC61850 MMS native driver
+│   ├── iec61850_report_facade.py    — IEC61850 Report driver
+│   ├── iec101_facade.py             — IEC101 driver 与编解码运行时骨架
+│   ├── modbus_rtu_facade.py         — Modbus RTU driver
+│   ├── ads_facade.py                — ADS driver 占位实现
+│   ├── goose_facade.py              — GOOSE driver 占位实现
+│   ├── sv_facade.py                 — SV driver 占位实现
+│   └── native_runtime.py            — native runner 环境与依赖探测辅助
 ├── native/
 │   ├── __init__.py                  — native 支撑包入口
 │   ├── CMakeLists.txt               — native runner 构建脚本
@@ -388,14 +396,6 @@ src/starfish/
 │   └── modbus/
 │       ├── __init__.py              — Modbus 协议工具包入口
 │       └── register_encoding.py     — Modbus 寄存器编解码工具
-├── registry/
-│   ├── __init__.py                  — registry 包入口
-│   └── runtime_registry.py          — protocol -> facade 分发注册表
-└── tools/
-    ├── __init__.py                  — probe / profile / capacity 导出入口
-    ├── capacity.py                  — 轻量容量扫描
-    ├── probe.py                     — 最小可用性探测
-    └── profile.py                   — read 耗时采样
 ```
 
 ## 共享规则与记忆 `ai_shared/`

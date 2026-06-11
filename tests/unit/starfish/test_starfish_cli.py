@@ -1,11 +1,11 @@
 """starfish CLI 测试。
 
 验证：
-1. load-server-plan 正常加载和校验输出。
-2. smoke-server-plan 完整 smoke 流程（含 mode 区分输出）。
-3. probe-server-plan 最小可用性探测。
-4. profile-server-plan read 采样统计。
-5. capacity-server-plan 容量扫描。
+1. validate-plan 正常加载和校验输出。
+2. describe 展示 plan 与 facade 装配结果。
+3. health 可查询未启动/已启动 facade 状态。
+4. read 可启动 simulator 并读取当前值。
+5. run 可作为 simulator 运行入口启动并停止 facade。
 6. 文件不存在时 CLI 返回非零。
 7. 无效 JSON 时 CLI 返回非零。
 8. --help 输出正常。
@@ -13,7 +13,7 @@
 测试阶段：P1 开发期验证 + P2 构建期验证。
 使用的替身：临时 JSON 文件。
 外部依赖：无。
-不能证明：真实协议 server 启动。
+不能证明：真实工业现场部署行为。
 NOT_RUN 条件：无。
 """
 
@@ -24,32 +24,21 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import starfish.__main__ as starfish_cli
 from starfish.__main__ import main
-
-
-# ── Fixtures ────────────────────────────────────────────────────────────────────
 
 
 def _write_valid_json(
     tmpdir: str,
     scenario_id: str = "cli_test",
-    protocol: str = "OPC_UA",
+    protocol: str = "BECKHOFF_ADS",
     initial_values: dict | None = None,
 ) -> Path:
-    """写入最小有效 ServerPlan JSON。
-
-    Args:
-        tmpdir: 临时目录。
-        scenario_id: 场景标识。
-        protocol: 协议名。
-        initial_values: 初始值 dict。
-
-    Returns:
-        JSON 文件 Path。
-    """
+    """写入最小有效 ServerPlan JSON。"""
     if initial_values is None:
         initial_values = {f"{scenario_id}_point_000": 0.0}
 
@@ -96,19 +85,8 @@ def _write_valid_json(
     return path
 
 
-def _write_multi_endpoint_json(
-    tmpdir: str,
-    scenario_id: str = "multi_cli",
-) -> Path:
-    """写入多协议 endpoint 的 ServerPlan JSON。
-
-    Args:
-        tmpdir: 临时目录。
-        scenario_id: 场景标识。
-
-    Returns:
-        JSON 文件 Path。
-    """
+def _write_multi_endpoint_json(tmpdir: str, scenario_id: str = "multi_cli") -> Path:
+    """写入多协议 endpoint 的 ServerPlan JSON。"""
     payload = {
         "schema_version": "1.0.0",
         "scenario_id": scenario_id,
@@ -119,25 +97,25 @@ def _write_multi_endpoint_json(
         "strategy_id": "test",
         "endpoints": [
             {
-                "endpoint_id": f"{scenario_id}_http_ep",
-                "endpoint_name": "HTTP_EP",
-                "protocol": "HTTP_REST",
+                "endpoint_id": f"{scenario_id}_ads_ep",
+                "endpoint_name": "ADS_EP",
+                "protocol": "BECKHOFF_ADS",
                 "host": "127.0.0.1",
                 "port": 0,
             },
             {
-                "endpoint_id": f"{scenario_id}_mqtt_ep",
-                "endpoint_name": "MQTT_EP",
-                "protocol": "MQTT",
+                "endpoint_id": f"{scenario_id}_goose_ep",
+                "endpoint_name": "GOOSE_EP",
+                "protocol": "GOOSE",
                 "host": "127.0.0.1",
                 "port": 0,
             },
             {
-                "endpoint_id": f"{scenario_id}_opcua_ep",
-                "endpoint_name": "OPCUA_EP",
-                "protocol": "OPC_UA",
+                "endpoint_id": f"{scenario_id}_stub_ep",
+                "endpoint_name": "STUB_EP",
+                "protocol": "UNKNOWN_PROTOCOL",
                 "host": "127.0.0.1",
-                "port": 4840,
+                "port": 0,
             },
         ],
         "points": [
@@ -165,312 +143,233 @@ def _write_multi_endpoint_json(
     return path
 
 
-# ── load-server-plan ────────────────────────────────────────────────────────────
+def _write_invalid_json_payload(tmpdir: str, name: str) -> Path:
+    """写入结构无效的 JSON。"""
+    payload = {
+        "schema_version": "1.0.0",
+        "scenario_id": name,
+        "synthetic": True,
+        "endpoints": [],
+        "points": [],
+        "capabilities": [],
+        "initial_values": {},
+        "payload_hash": "",
+    }
+    path = Path(tmpdir) / f"{name}.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
 
 
-class TestLoadServerPlanCLI:
-    """load-server-plan CLI 测试。"""
+class TestValidatePlanCLI:
+    """validate-plan CLI 测试。"""
 
+    def test_validate_plan_routes_through_runtime_api(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CLI 应通过 `starfish.api` 高层入口触发计划加载。"""
+
+        class _FakeApi:
+            def __init__(self) -> None:
+                self.called_with: Path | None = None
+
+            def load_plan(self, input_path: Path) -> object:
+                self.called_with = input_path
+                return SimpleNamespace(
+                    plan=SimpleNamespace(
+                        scenario_id="api_cli",
+                        server_name="api_cli server",
+                        endpoints=[],
+                        points=[],
+                        synthetic=True,
+                        capabilities=[],
+                    ),
+                    validation=SimpleNamespace(
+                        is_valid=True,
+                        errors=[],
+                        warnings=[],
+                        passed_checks=[],
+                    ),
+                )
+
+        fake_api = _FakeApi()
+        monkeypatch.setattr(starfish_cli, "create_default_runtime_api", lambda: fake_api)
+        plan_path = Path("/tmp/runtime_api_plan.json")
+
+        assert main(["validate-plan", "--input", str(plan_path)]) == 0
+        assert fake_api.called_with == plan_path
+
+    @pytest.mark.smoke
     def test_help(self) -> None:
-        """--help 应正常输出并返回 0。"""
-        with pytest.raises(SystemExit) as exc_info:
-            main(["load-server-plan", "--help"])
-        assert exc_info.value.code == 0
+        assert main(["validate-plan", "--help"]) == 0
 
+    @pytest.mark.smoke
     def test_load_valid_file(self) -> None:
-        """加载有效 JSON 文件应成功（返回 0）。"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_load_ok")
-            rc = main(["load-server-plan", "--input", str(plan_path)])
-            assert rc == 0
+            plan_path = _write_valid_json(tmpdir, "cli_validate_ok")
+            assert main(["validate-plan", "--input", str(plan_path)]) == 0
 
-    def test_load_invalid_file_reports_errors(self) -> None:
-        """加载无效 JSON（空 points）应返回非零。"""
+    def test_invalid_file_reports_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            payload = {
-                "schema_version": "1.0.0",
-                "scenario_id": "bad_plan",
-                "synthetic": True,
-                "endpoints": [],
-                "points": [],
-                "capabilities": [],
-                "initial_values": {},
-                "payload_hash": "",
-            }
-            path = Path(tmpdir) / "bad.json"
-            path.write_text(json.dumps(payload), encoding="utf-8")
+            path = _write_invalid_json_payload(tmpdir, "bad_validate")
+            assert main(["validate-plan", "--input", str(path)]) != 0
 
-            rc = main(["load-server-plan", "--input", str(path)])
-            assert rc != 0
+    def test_missing_file(self) -> None:
+        assert main(["validate-plan", "--input", "/nonexistent/file.json"]) != 0
 
-    def test_load_missing_file(self) -> None:
-        """文件不存在时应返回非零。"""
-        rc = main(["load-server-plan", "--input", "/nonexistent/file.json"])
-        assert rc != 0
-
-    def test_load_invalid_json(self) -> None:
-        """无效 JSON 文件应返回非零。"""
+    def test_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "bad.json"
             path.write_text("not valid json {{{", encoding="utf-8")
+            assert main(["validate-plan", "--input", str(path)]) != 0
 
-            rc = main(["load-server-plan", "--input", str(path)])
-            assert rc != 0
-
-    def test_load_requires_input(self) -> None:
-        """未指定 --input 时应报错（argparse 要求必填）。"""
+    def test_requires_input(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            main(["load-server-plan"])
-        # argparse 在缺少必填参数时 exit 2
+            main(["validate-plan"])
         assert exc_info.value.code != 0
 
 
-# ── smoke-server-plan ───────────────────────────────────────────────────────────
+class TestDescribeCLI:
+    """describe CLI 测试。"""
+
+    @pytest.mark.smoke
+    def test_help(self) -> None:
+        assert main(["describe", "--help"]) == 0
+
+    def test_describe_valid_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = _write_valid_json(tmpdir, "cli_describe_ok")
+            assert main(["describe", "--input", str(plan_path)]) == 0
+
+    def test_describe_multi_endpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = _write_multi_endpoint_json(tmpdir, "cli_describe_multi")
+            assert main(["describe", "--input", str(plan_path)]) == 0
+
+    def test_describe_missing_file(self) -> None:
+        assert main(["describe", "--input", "/nonexistent/file.json"]) != 0
+
+    def test_describe_requires_input(self) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            main(["describe"])
+        assert exc_info.value.code != 0
 
 
-class TestSmokeServerPlanCLI:
-    """smoke-server-plan CLI 测试。"""
+class TestHealthCLI:
+    """health CLI 测试。"""
 
     def test_help(self) -> None:
-        """--help 应正常输出并返回 0。"""
+        assert main(["health", "--help"]) == 0
+
+    def test_health_valid_file_without_start(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = _write_valid_json(tmpdir, "cli_health_ok")
+            assert main(["health", "--input", str(plan_path)]) == 0
+
+    def test_health_valid_file_with_start(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = _write_valid_json(tmpdir, "cli_health_start")
+            assert main(["health", "--input", str(plan_path), "--start"]) == 0
+
+    def test_health_missing_file(self) -> None:
+        assert main(["health", "--input", "/nonexistent/file.json"]) != 0
+
+    def test_health_invalid_file_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = _write_invalid_json_payload(tmpdir, "bad_health")
+            assert main(["health", "--input", str(path)]) != 0
+
+    def test_health_requires_input(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            main(["smoke-server-plan", "--help"])
-        assert exc_info.value.code == 0
-
-    def test_smoke_valid_file(self) -> None:
-        """有效 JSON 文件的 smoke 应成功（返回 0）。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_smoke_ok")
-            rc = main(["smoke-server-plan", "--input", str(plan_path)])
-            assert rc == 0
-
-    def test_smoke_with_mqtt_mode(self) -> None:
-        """MQTT 协议的 smoke 应输出 mqtt-lightweight mode。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(
-                tmpdir, "cli_smoke_mqtt", protocol="MQTT",
-            )
-            rc = main(["smoke-server-plan", "--input", str(plan_path)])
-            assert rc == 0
-
-    def test_smoke_with_http_rest_mode(self) -> None:
-        """HTTP_REST 协议的 smoke 应输出 real mode。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(
-                tmpdir, "cli_smoke_http", protocol="HTTP_REST",
-            )
-            rc = main(["smoke-server-plan", "--input", str(plan_path)])
-            assert rc == 0
-
-    def test_smoke_multi_endpoint(self) -> None:
-        """多 endpoint（含 real/mqtt-lightweight/stub）smoke 应成功。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_multi_endpoint_json(tmpdir, "cli_smoke_multi")
-            rc = main(["smoke-server-plan", "--input", str(plan_path)])
-            assert rc == 0
-
-    def test_smoke_invalid_file_fails(self) -> None:
-        """无效 JSON 的 smoke 应返回非零。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            payload = {
-                "schema_version": "1.0.0",
-                "scenario_id": "bad_smoke",
-                "synthetic": True,
-                "endpoints": [],
-                "points": [],
-                "capabilities": [],
-                "initial_values": {},
-                "payload_hash": "",
-            }
-            path = Path(tmpdir) / "bad_smoke.json"
-            path.write_text(json.dumps(payload), encoding="utf-8")
-
-            rc = main(["smoke-server-plan", "--input", str(path)])
-            assert rc != 0
-
-    def test_smoke_missing_file(self) -> None:
-        """文件不存在时应返回非零。"""
-        rc = main(["smoke-server-plan", "--input", "/nonexistent/file.json"])
-        assert rc != 0
-
-    def test_smoke_requires_input(self) -> None:
-        """未指定 --input 时应报错。"""
-        with pytest.raises(SystemExit) as exc_info:
-            main(["smoke-server-plan"])
+            main(["health"])
         assert exc_info.value.code != 0
 
 
-# ── probe-server-plan ───────────────────────────────────────────────────────────
-
-
-class TestProbeServerPlanCLI:
-    """probe-server-plan CLI 测试。"""
+class TestReadCLI:
+    """read CLI 测试。"""
 
     def test_help(self) -> None:
-        """--help 应正常输出并返回 0。"""
+        assert main(["read", "--help"]) == 0
+
+    def test_read_valid_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = _write_valid_json(tmpdir, "cli_read_ok")
+            assert main(["read", "--input", str(plan_path)]) == 0
+
+    def test_read_selected_point(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = _write_valid_json(tmpdir, "cli_read_point")
+            point_id = "cli_read_point_point_000"
+            assert main(["read", "--input", str(plan_path), "--point", point_id]) == 0
+
+    def test_read_missing_file(self) -> None:
+        assert main(["read", "--input", "/nonexistent/file.json"]) != 0
+
+    def test_read_invalid_file_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = _write_invalid_json_payload(tmpdir, "bad_read")
+            assert main(["read", "--input", str(path)]) != 0
+
+    def test_read_requires_input(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            main(["probe-server-plan", "--help"])
-        assert exc_info.value.code == 0
-
-    def test_probe_valid_file(self) -> None:
-        """有效 JSON 文件的 probe 应成功。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_probe_ok")
-            rc = main(["probe-server-plan", "--input", str(plan_path)])
-            assert rc == 0
-
-    def test_probe_with_mqtt(self) -> None:
-        """MQTT 协议的 probe 应成功。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(
-                tmpdir, "cli_probe_mqtt", protocol="MQTT",
-            )
-            rc = main(["probe-server-plan", "--input", str(plan_path)])
-            assert rc == 0
-
-    def test_probe_missing_file(self) -> None:
-        """文件不存在时应返回非零。"""
-        rc = main(["probe-server-plan", "--input", "/nonexistent/file.json"])
-        assert rc != 0
-
-    def test_probe_invalid_file_fails(self) -> None:
-        """无效 JSON 的 probe 应返回非零。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            payload = {
-                "schema_version": "1.0.0",
-                "scenario_id": "bad_probe",
-                "synthetic": True,
-                "endpoints": [],
-                "points": [],
-                "capabilities": [],
-                "initial_values": {},
-                "payload_hash": "",
-            }
-            path = Path(tmpdir) / "bad_probe.json"
-            path.write_text(json.dumps(payload), encoding="utf-8")
-
-            rc = main(["probe-server-plan", "--input", str(path)])
-            assert rc != 0
-
-    def test_probe_requires_input(self) -> None:
-        """未指定 --input 时应报错。"""
-        with pytest.raises(SystemExit) as exc_info:
-            main(["probe-server-plan"])
+            main(["read"])
         assert exc_info.value.code != 0
 
 
-# ── profile-server-plan ─────────────────────────────────────────────────────────
+class TestRunCLI:
+    """run CLI 测试。"""
 
-
-class TestProfileServerPlanCLI:
-    """profile-server-plan CLI 测试。"""
-
+    @pytest.mark.smoke
     def test_help(self) -> None:
-        """--help 应正常输出并返回 0。"""
-        with pytest.raises(SystemExit) as exc_info:
-            main(["profile-server-plan", "--help"])
-        assert exc_info.value.code == 0
+        assert main(["run", "--help"]) == 0
 
-    def test_profile_valid_file(self) -> None:
-        """有效 JSON 文件的 profile 应成功。"""
+    @pytest.mark.smoke
+    def test_run_valid_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_profile_ok")
-            rc = main(["profile-server-plan", "--input", str(plan_path), "--iterations", "10"])
-            assert rc == 0
+            plan_path = _write_valid_json(tmpdir, "cli_run_ok")
+            assert main(["run", "--input", str(plan_path), "--duration", "0"]) == 0
 
-    def test_profile_missing_file(self) -> None:
-        """文件不存在时应返回非零。"""
-        rc = main(["profile-server-plan", "--input", "/nonexistent/file.json"])
-        assert rc != 0
-
-    def test_profile_default_iterations(self) -> None:
-        """未指定 --iterations 时使用默认值。"""
+    def test_run_multi_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_profile_default")
-            rc = main(["profile-server-plan", "--input", str(plan_path)])
-            assert rc == 0
+            plan_path = _write_multi_endpoint_json(tmpdir, "cli_run_multi")
+            assert main(["run", "--input", str(plan_path), "--duration", "0"]) == 0
 
-    def test_profile_requires_input(self) -> None:
-        """未指定 --input 时应报错。"""
+    def test_run_missing_file(self) -> None:
+        assert main(["run", "--input", "/nonexistent/file.json", "--duration", "0"]) != 0
+
+    def test_run_invalid_file_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = _write_invalid_json_payload(tmpdir, "bad_run")
+            assert main(["run", "--input", str(path), "--duration", "0"]) != 0
+
+    def test_run_requires_input(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            main(["profile-server-plan"])
+            main(["run"])
         assert exc_info.value.code != 0
-
-
-# ── capacity-server-plan ────────────────────────────────────────────────────────
-
-
-class TestCapacityServerPlanCLI:
-    """capacity-server-plan CLI 测试。"""
-
-    def test_help(self) -> None:
-        """--help 应正常输出并返回 0。"""
-        with pytest.raises(SystemExit) as exc_info:
-            main(["capacity-server-plan", "--help"])
-        assert exc_info.value.code == 0
-
-    def test_capacity_valid_file(self) -> None:
-        """有效 JSON 文件的 capacity 应成功。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_cap_ok")
-            rc = main(["capacity-server-plan", "--input", str(plan_path), "--point-count", "5"])
-            assert rc == 0
-
-    def test_capacity_missing_file(self) -> None:
-        """文件不存在时应返回非零。"""
-        rc = main(["capacity-server-plan", "--input", "/nonexistent/file.json"])
-        assert rc != 0
-
-    def test_capacity_default_point_count(self) -> None:
-        """未指定 --point-count 时使用默认值。"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_cap_default")
-            rc = main(["capacity-server-plan", "--input", str(plan_path)])
-            assert rc == 0
-
-    def test_capacity_requires_input(self) -> None:
-        """未指定 --input 时应报错。"""
-        with pytest.raises(SystemExit) as exc_info:
-            main(["capacity-server-plan"])
-        assert exc_info.value.code != 0
-
-
-# ── 顶层 CLI ────────────────────────────────────────────────────────────────────
 
 
 class TestTopLevelCLI:
     """顶层 CLI 测试。"""
 
     def test_no_command_prints_help(self) -> None:
-        """无子命令时应打印帮助并返回非零。"""
-        rc = main([])
-        assert rc != 0
+        with pytest.raises(SystemExit) as exc_info:
+            main([])
+        assert exc_info.value.code != 0
 
     def test_unknown_command_fails(self) -> None:
-        """未知子命令应返回非零。"""
         with pytest.raises(SystemExit):
             main(["nonexistent-command"])
 
     def test_top_level_help(self) -> None:
-        """顶层 --help 应正常输出。"""
-        with pytest.raises(SystemExit) as exc_info:
-            main(["--help"])
-        assert exc_info.value.code == 0
-
-
-# ── Seahorse -> Starfish CLI 集成 ───────────────────────────────────────────────
+        assert main(["--help"]) == 0
 
 
 class TestSeahorseStarfishCLIIntegration:
     """验证 Seahorse 导出 JSON 可被 Starfish CLI 直接消费。"""
 
     def test_cli_loads_seahorse_exported_json(self) -> None:
-        """Starfish CLI load-server-plan 应加载 Seahorse exporter 产物。"""
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
+        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
         from seahorse.models.scenario import ScenarioConfig
         from seahorse.orchestration import SeahorseGenerator
-        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
 
         config = ScenarioConfig(
             scenario_id="cli_integration",
@@ -485,32 +384,26 @@ class TestSeahorseStarfishCLIIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "cli_integration_server_plan.json"
             plan_path.write_text(json_str, encoding="utf-8")
+            assert main(["validate-plan", "--input", str(plan_path)]) == 0
 
-            # CLI load
-            rc = main(["load-server-plan", "--input", str(plan_path)])
-            assert rc == 0, "Starfish CLI 应能加载 Seahorse 导出产物"
-
-    def test_cli_smoke_seahorse_exported_json(self) -> None:
-        """Starfish CLI smoke-server-plan 应成功 smoke Seahorse 产物。"""
+    def test_cli_runs_seahorse_exported_json(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
+        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
         from seahorse.models.scenario import ScenarioConfig
         from seahorse.orchestration import SeahorseGenerator
-        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
 
         config = ScenarioConfig(
-            scenario_id="cli_smoke_integration",
+            scenario_id="cli_run_integration",
             deterministic_seed=77,
             asset_count=2,
-            protocol_targets=["OPC_UA", "MODBUS_TCP"],
+            protocol_targets=["BECKHOFF_ADS", "GOOSE"],
         )
         generator = SeahorseGenerator(config)
         _, server_plan = generator.generate_minimal()
         json_str = export_server_plan_to_json(server_plan)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = Path(tmpdir) / "cli_smoke_integration_server_plan.json"
+            plan_path = Path(tmpdir) / "cli_run_integration_server_plan.json"
             plan_path.write_text(json_str, encoding="utf-8")
-
-            rc = main(["smoke-server-plan", "--input", str(plan_path)])
-            assert rc == 0, "Starfish CLI smoke 应通过 Seahorse 导出产物"
+            assert main(["run", "--input", str(plan_path), "--duration", "0"]) == 0

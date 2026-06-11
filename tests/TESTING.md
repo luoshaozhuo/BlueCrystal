@@ -1,16 +1,56 @@
 # Whale 主平台测试指南
 
 本文件面向开发者说明 `tests/` 目录的测试组织、运行方式和规则。术语和生命周期阶段以
-`ai_shared/rules/testing.md` 为准；本文件只做补充说明，不重复定义。
+`ai_shared/rules/testing.md` 为准；本文件只做仓库内落地补充，不重复定义。
 
-## 1. 测试阶段与目录
+## 1. 当前仓库测试视图
 
-物理目录按历史习惯保留为 `unit/`、`integration/`、`e2e/`、`performance/`，
-但物理目录 **不等于** 生命周期测试阶段。测试的实际阶段归属以：
+本仓库采用“三层视图”：
+
+1. 物理视图：测试代码如何放在 `tests/` 下；
+2. 逻辑视图：`smoke` / `regression` 这类集合如何表达；
+3. 执行视图：一次改动后到底跑哪些验证。
+
+### 1.1 物理视图
+
+当前推荐目录：
+
+```text
+tests/unit/
+tests/integration/
+tests/e2e/
+tests/deployment/
+tests/performance/
+tests/support/
+```
+
+说明：
+
+1. `tests/unit/architecture/` 这类构建期门禁测试归在 `unit` 下维护，语义仍以文件头和测试索引为准。
+2. `tests/support/` 仅放共享支持代码，不放独立测试集合。
+3. `smoke`、`regression` 不是一级物理目录；空的历史目录应清理。
+
+### 1.2 逻辑视图
+
+逻辑集合默认只强调两类：
+
+1. `smoke`：快速、低成本、关键路径最小可用验证集合；
+2. `regression`：防止历史问题或关键链路回退的测试集合。
+
+模块维度通过额外 marker 叠加表达，例如：
+
+```bash
+pytest -m "starfish and smoke"
+pytest -m "starfish and regression"
+```
+
+### 1.3 实际阶段归属
+
+测试的实际阶段归属以：
 
 1. `ai_shared/memory/test_index.md`（唯一测试索引）；
 2. 测试文件头的生命周期阶段说明；
-3. pytest marker（辅助选择，非唯一分类来源）
+3. pytest marker（执行选择辅助）
 
 为准。
 
@@ -65,6 +105,10 @@ pytest -m unit                        # 开发期验证
 pytest -m integration                 # 模块集成期 + 部分跨模块联调
 pytest -m e2e                         # 部署前验收 + 跨模块联调
 pytest -m l5                          # 准生产依赖验证期（需外部服务）
+pytest -m smoke                       # 全仓最小冒烟集合
+pytest -m regression                  # 全仓回归集合
+pytest -m "starfish and smoke"        # Starfish 最小冒烟集合
+pytest -m "starfish and regression"   # Starfish 回归集合
 ```
 
 ### 按生命周期阶段（通过脚本）
@@ -120,7 +164,7 @@ python -m seahorse.reference_data
 1. **新增测试文件**：在测试资产索引中添加条目（文件名、测试对象、外部依赖、NOT_RUN 条件）。
 2. **新增回归测试**：在回归测试列表中添加条目，标注回归分类和状态。
 3. **删除测试文件**：从测试资产索引中移除，回归测试状态改为 `RETIRED` 或 `SUPERSEDED`。
-4. 不另建其他回归索引文件（如 `issue_regression_index.md`）。
+4. 问题到测试的映射可维护在 `tests/issue_trace.md`，但它不能替代唯一测试索引。
 5. 测试索引只维护到文件级别（关键链路可维护到类级别）。
 
 ## 7. marker 使用约定
@@ -130,8 +174,12 @@ python -m seahorse.reference_data
 | `unit` | 开发期验证，无外部依赖 | 任何环境 |
 | `integration` | 模块集成或跨模块联调 | SQLite/TestClient 或 docker-compose |
 | `e2e` | 端到端全链路 | 通常需 docker-compose |
+| `deployment` | 部署入口、配置装配、最小部署闭环 | 部署资产或预发环境 |
+| `performance` | 性能、容量、长稳集合 | 专门环境，默认非日常必跑 |
 | `l5` | 准生产依赖验证期，需真实外部服务 | Kafka/PG/Redis/S3/TDengine 就绪 |
 | `smoke` | 最小冒烟验证 | 取决于具体测试 |
+| `regression` | 防回退集合 | 取决于具体测试 |
+| `starfish` | Starfish 工具层 / simulator/runtime | 取决于具体测试 |
 | `slow` | 需 native 二进制或执行时间长 | C build 环境 + native runner 就绪 |
 | `load` | 负载测试 | 专门环境，不在常规 CI 执行 |
 | `stress` | 压力测试 | 专门环境，不在常规 CI 执行 |

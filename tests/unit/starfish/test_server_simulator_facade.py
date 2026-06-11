@@ -20,13 +20,13 @@ from __future__ import annotations
 
 import pytest
 
-from starfish.models.plan import (
+from starfish.domain.server_plan import (
     StarfishServerPlan,
     StarfishEndpointPlan,
     StarfishPointPlan,
     UnsupportedOperation,
 )
-from starfish.facade.server_simulator_facade import ServerSimulatorFacade
+from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────

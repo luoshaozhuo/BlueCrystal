@@ -78,8 +78,12 @@ python_functions = ["test_*"]
 markers = [
     "unit: unit tests — 开发期验证，无外部依赖",
     "smoke: smoke tests — 最小冒烟验证",
+    "regression: regression tests — 防止历史问题、关键链路或高风险行为回退",
     "integration: integration tests — 模块集成期或跨模块联调期验证",
     "e2e: end-to-end tests — 端到端全链路验证",
+    "deployment: deployment tests — 部署入口、配置装配、health/ready、最小部署闭环",
+    "performance: performance tests — 性能、容量、长稳等高成本验证集合",
+    "starfish: tests for the starfish simulator/runtime tool layer",
     "l5: 准生产依赖验证期测试 (历史标签，语义等同准生产依赖验证期；需要真实 Kafka/TDengine/S3/Redis/PG)",
     "external: 需要外部依赖的测试 (真实硬件、外部服务、特殊环境)。在此脚本和 CI 入口中不作为 must-run，默认归入 NOT_RUN: MISSING_ENVIRONMENT。",
     "prodlike: 需要 production-like 环境 (docker-compose 或等效)。执行前必须确认 docker-compose 就绪；未就绪时归入 NOT_RUN: MISSING_ENVIRONMENT。",
