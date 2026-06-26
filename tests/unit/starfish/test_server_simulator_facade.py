@@ -26,7 +26,7 @@ from starfish.domain.server_config import (
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
+from starfish.adapters.drivers.simulator.server_simulator_facade import ServerSimulatorFacade
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────

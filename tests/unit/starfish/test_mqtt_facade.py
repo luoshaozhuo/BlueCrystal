@@ -33,7 +33,7 @@ from starfish.domain.server_config import (
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.drivers.mqtt_facade import MqttFacade, SubscriptionQueue
+from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade, SubscriptionQueue
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────

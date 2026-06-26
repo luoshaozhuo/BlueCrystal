@@ -32,24 +32,26 @@ from starfish.domain.server_config import (
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.drivers.http_rest_facade import HttpRestFacade
-from starfish.drivers.modbus_tcp_facade import ModbusTcpFacade
-from starfish.drivers.mqtt_facade import MqttFacade
-from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
-from starfish.drivers.iec101_facade import Iec101Facade
-from starfish.drivers.modbus_rtu_facade import ModbusRtuFacade
-from starfish.drivers.ads_facade import AdsFacade
-from starfish.drivers.goose_facade import GooseFacade
-from starfish.drivers.sv_facade import SvFacade
-from starfish.drivers.server_registry import (
+from starfish.adapters.drivers.protocol.http.http_rest_facade import HttpRestFacade
+from starfish.adapters.drivers.modbus.modbus_tcp_facade import ModbusTcpFacade
+from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade
+from starfish.adapters.drivers.simulator.server_simulator_facade import ServerSimulatorFacade
+from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
+from starfish.adapters.drivers.modbus.modbus_rtu_facade import ModbusRtuFacade
+from starfish.adapters.drivers.ads.ads_facade import AdsFacade
+from starfish.adapters.drivers.iec.goose_facade import GooseFacade
+from starfish.adapters.drivers.iec.sv_facade import SvFacade
+from starfish.adapters.drivers.factory import (
+    StarfishDriverFactory,
     create_driver_for_endpoint,
-    create_server_registry,
     get_supported_protocols,
     get_real_protocols,
     get_lightweight_protocols,
     get_codebase_pending_protocols,
     get_environment_pending_protocols,
 )
+from starfish.application.orchestration.registry import create_server_registry
+from starfish.application.use_cases import HealthSystemUseCase, StartSystemUseCase, StopSystemUseCase
 
 # 创建无代理 opener，避免环境代理配置干扰 localhost 请求
 _no_proxy_opener = build_opener(ProxyHandler({}))
@@ -788,7 +790,7 @@ class TestRegistryFactoryDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_server_registry(plan)
+        registry = create_server_registry(plan, StarfishDriverFactory())
 
         assert len(registry.entries) == 4
 
@@ -866,7 +868,7 @@ class TestRegistryFactoryDispatch:
         protocols = get_lightweight_protocols()
         assert "MQTT" in protocols
         assert "HTTP_REST" not in protocols
-        from starfish.drivers.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         if pty_ok:
             assert "MODBUS_RTU" in protocols
@@ -1036,7 +1038,7 @@ class TestPendingProtocolDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_server_registry(plan)
+        registry = create_server_registry(plan, StarfishDriverFactory())
         assert len(registry.entries) == 4
 
         modes = {e.endpoint.endpoint_id: e.mode for e in registry.entries}
@@ -1077,13 +1079,13 @@ class TestPendingProtocolDispatch:
         assert "GOOSE" not in protocols
         assert "SV" not in protocols
         # IEC101 在 binary 缺失时应在列表中
-        from starfish.drivers.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
         if Iec101Facade().mode == "codebase-pending":
             assert "IEC101" in protocols
         else:
             assert "IEC101" not in protocols
         # MODBUS_RTU 在 PTY 不可用时应在列表中
-        from starfish.drivers.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         if not pty_ok:
             assert "MODBUS_RTU" in protocols
@@ -1096,18 +1098,18 @@ class TestPendingProtocolDispatch:
         assert "GOOSE" in protocols
         assert "SV" in protocols
         # IEC101 在 binary 已编译时应在列表中
-        from starfish.drivers.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
         if Iec101Facade().mode == "environment-pending":
             assert "IEC101" in protocols
         else:
             assert "IEC101" not in protocols
 
 
-class TestRegistryStartStopAll:
-    """ServerRegistry start_all/stop_all 集成测试。"""
+class TestRuntimeLifecycleUseCases:
+    """Runtime lifecycle usecase 集成测试。"""
 
     def test_start_all_starts_all_available(self) -> None:
-        """start_all 应启动所有可用的 facade。"""
+        """StartSystemUseCase 应启动所有可用的 facade。"""
         plan = StarfishServerConfig(
             schema_version="1.0.0",
             scenario_id="start_all_test",
@@ -1131,20 +1133,21 @@ class TestRegistryStartStopAll:
             capabilities=["READ"],
             initial_values={"a": 1},
         )
-        registry = create_server_registry(plan)
+        registry = create_server_registry(plan, StarfishDriverFactory())
 
+        started_entries = []
         try:
-            registry.start_all()
+            started_entries = StartSystemUseCase().execute(registry)
 
             for entry in registry.entries:
                 h = entry.driver.health()
                 assert h["status"] == "started", f"{entry.endpoint.endpoint_id} 未启动"
                 assert h["running"] is True
         finally:
-            registry.stop_all()
+            StopSystemUseCase().execute(registry, started_entries)
 
     def test_health_all_aggregates(self) -> None:
-        """health_all 应聚合所有 facade 的健康信息。"""
+        """HealthSystemUseCase 应聚合所有 facade 的健康信息。"""
         plan = StarfishServerConfig(
             schema_version="1.0.0",
             scenario_id="health_all_test",
@@ -1162,9 +1165,9 @@ class TestRegistryStartStopAll:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_server_registry(plan)
+        registry = create_server_registry(plan, StarfishDriverFactory())
 
-        health = registry.health_all()
+        health = HealthSystemUseCase().execute(registry)
         assert "http_ep" in health
         assert health["http_ep"]["mode"] == "real"
 
@@ -1176,14 +1179,14 @@ class TestModbusTcpFacadeRegisterEncoding:
     """ModbusTcpFacade 接入 register_encoding 工具的测试（Round 19 新增）。
 
     验证 facade 的 encode_register_value / decode_register_value 方法
-    **真实调用** starfish.protocols.modbus.register_encoding 工具，
+    **真实调用** starfish.domain.protocols.modbus.register_encoding 工具，
     而非仅修改 capabilities 文案。同时验证 Modbus TCP FC03/FC06
     帧行为不因 register_encoding 接入而回退。
     """
 
     def test_encode_register_value_uint16_calls_tool(self) -> None:
         """encode_register_value(UINT16) 应真实调用 register_encoding 工具。"""
-        from starfish.protocols.modbus.register_encoding import (
+        from starfish.domain.protocols.modbus.register_encoding import (
             ModbusRegisterValueType,
         )
         facade = ModbusTcpFacade()
@@ -1195,7 +1198,7 @@ class TestModbusTcpFacadeRegisterEncoding:
 
     def test_encode_register_value_uint32_little_little(self) -> None:
         """encode_register_value(UINT32, little, little) 应与工具结果一致。"""
-        from starfish.protocols.modbus.register_encoding import (
+        from starfish.domain.protocols.modbus.register_encoding import (
             ByteOrder, ModbusRegisterValueType, WordOrder,
             encode_register_value,
         )
@@ -1216,7 +1219,7 @@ class TestModbusTcpFacadeRegisterEncoding:
 
     def test_encode_register_value_float32_roundtrip(self) -> None:
         """encode + decode(FLOAT32) 应真实回得原值。"""
-        from starfish.protocols.modbus.register_encoding import (
+        from starfish.domain.protocols.modbus.register_encoding import (
             ByteOrder, ModbusRegisterValueType, WordOrder,
         )
         facade = ModbusTcpFacade()
@@ -1237,7 +1240,7 @@ class TestModbusTcpFacadeRegisterEncoding:
 
     def test_encode_register_value_int16_roundtrip(self) -> None:
         """encode + decode(INT16) 多种边界值。"""
-        from starfish.protocols.modbus.register_encoding import (
+        from starfish.domain.protocols.modbus.register_encoding import (
             ModbusRegisterValueType,
         )
         facade = ModbusTcpFacade()
@@ -1254,7 +1257,7 @@ class TestModbusTcpFacadeRegisterEncoding:
 
     def test_encode_register_value_rejects_nan(self) -> None:
         """encode_register_value(FLOAT32, NaN) 应抛 ValueError。"""
-        from starfish.protocols.modbus.register_encoding import (
+        from starfish.domain.protocols.modbus.register_encoding import (
             ModbusRegisterValueType,
             RegisterEncodingValueError,
         )

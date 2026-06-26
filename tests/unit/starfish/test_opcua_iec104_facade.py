@@ -30,19 +30,19 @@ from starfish.domain.server_config import (
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.drivers.opcua_facade import (
+from starfish.adapters.drivers.native.opcua.opcua_facade import (
     OpcUaFacade,
     probe_opcua_binary,
     resolve_open62541_runner_path,
     _generate_opcua_tsv,  # noqa: PLC2701 -- 测试内部 helper
     _map_opcua_type,       # noqa: PLC2701 -- 测试内部 helper
 )
-from starfish.drivers.iec104_facade import (
+from starfish.adapters.drivers.native.iec.iec104_facade import (
     Iec104Facade,
     probe_iec104_binary,
     resolve_iec104_runner_path,
 )
-from starfish.drivers.server_registry import (
+from starfish.adapters.drivers.factory import (
     create_driver_for_endpoint,
     get_supported_protocols,
     get_real_protocols,

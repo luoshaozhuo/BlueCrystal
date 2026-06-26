@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import pytest
 
-from starfish.protocols.iec101 import (
+from starfish.domain.protocols.iec101 import (
     T1_DEFAULT_MS,
     T2_DEFAULT_MS,
     T3_DEFAULT_MS,
@@ -50,7 +50,7 @@ from starfish.protocols.iec101 import (
     LinkState,
     VariableFrame,
 )
-from starfish.protocols.iec101.frame import (
+from starfish.domain.protocols.iec101.frame import (
     END_CHAR,
     START_CHAR_FIXED,
 )
@@ -738,8 +738,8 @@ class TestLinkLayerImports:
     """LinkLayer 模块导入边界测试。"""
 
     def test_link_layer_timers_default_import(self) -> None:
-        """LinkLayerTimers / T1/T2/T3 常量可从 starfish.protocols.iec101 导入。"""
-        from starfish.protocols.iec101 import (
+        """LinkLayerTimers / T1/T2/T3 常量可从 starfish.domain.protocols.iec101 导入。"""
+        from starfish.domain.protocols.iec101 import (
             T1_DEFAULT_MS as t1,
             T2_DEFAULT_MS as t2,
             T3_DEFAULT_MS as t3,
@@ -764,7 +764,7 @@ class TestLinkLayerTimerService:
 
     def test_fake_service_start_records(self) -> None:
         """FakeLinkLayerTimerService.start_timer 记录调用不启动线程。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         callback_calls: list[str] = []
         svc.start_timer("t1", 100, lambda n: callback_calls.append(n))
@@ -775,7 +775,7 @@ class TestLinkLayerTimerService:
 
     def test_fake_service_fire_invokes_callback(self) -> None:
         """FakeLinkLayerTimerService.fire 主动触发回调。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         callback_calls: list[str] = []
         svc.start_timer("t1", 100, lambda n: callback_calls.append(n))
@@ -785,7 +785,7 @@ class TestLinkLayerTimerService:
 
     def test_fake_service_cancel(self) -> None:
         """FakeLinkLayerTimerService.cancel_timer 取消活跃 timer。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         svc.start_timer("t1", 100, lambda n: None)
         svc.cancel_timer("t1")
@@ -794,13 +794,13 @@ class TestLinkLayerTimerService:
 
     def test_fake_service_cancel_unknown_safe(self) -> None:
         """FakeLinkLayerTimerService.cancel_timer 对未知 name 幂等。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         svc.cancel_timer("nonexistent")  # 不应抛
 
     def test_fake_service_cancel_all(self) -> None:
         """FakeLinkLayerTimerService.cancel_all 清空所有 timer。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         svc.start_timer("t1", 100, lambda n: None)
         svc.start_timer("t2", 200, lambda n: None)
@@ -809,7 +809,7 @@ class TestLinkLayerTimerService:
 
     def test_fake_service_start_replaces_existing(self) -> None:
         """同一 name 重复 start_timer 取消旧 timer。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         svc.start_timer("t1", 100, lambda n: None)
         svc.start_timer("t1", 200, lambda n: None)
@@ -819,7 +819,7 @@ class TestLinkLayerTimerService:
 
     def test_fake_service_advance_elapsed(self) -> None:
         """FakeLinkLayerTimerService.advance 累加虚拟时间。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         svc.start_timer("t1", 100, lambda n: None)
         assert svc.elapsed_ms("t1") == 0
@@ -828,7 +828,7 @@ class TestLinkLayerTimerService:
 
     def test_fake_service_start_validates(self) -> None:
         """FakeLinkLayerTimerService.start_timer 校验 name 非空 + ms >= 0。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         import pytest
         with pytest.raises(ValueError):
@@ -838,13 +838,13 @@ class TestLinkLayerTimerService:
 
     def test_default_service_can_be_instantiated(self) -> None:
         """DefaultLinkLayerTimerService 可实例化。"""
-        from starfish.protocols.iec101 import DefaultLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import DefaultLinkLayerTimerService
         svc = DefaultLinkLayerTimerService()
         assert svc.active_names() == []
 
     def test_default_service_cancel_all_safe_when_empty(self) -> None:
         """DefaultLinkLayerTimerService.cancel_all 空时安全。"""
-        from starfish.protocols.iec101 import DefaultLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import DefaultLinkLayerTimerService
         svc = DefaultLinkLayerTimerService()
         svc.cancel_all()  # 不应抛
 
@@ -868,7 +868,7 @@ class TestLinkLayerEnableTimers:
 
     def test_enable_timers_uses_service(self) -> None:
         """LinkLayer 启用 timer_service 时 start_timer 透传到 service。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc)
         ll.start_timer("t1", 100, lambda n: None)
@@ -876,7 +876,7 @@ class TestLinkLayerEnableTimers:
 
     def test_send_user_data_starts_t1_when_enabled(self) -> None:
         """send_user_data 启用 timers 时启动 t1。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc)
         ll.send_user_data()
@@ -895,7 +895,7 @@ class TestLinkLayerEnableTimers:
 
     def test_receive_ack_cancels_t1(self) -> None:
         """receive_ack 取消 t1 计时器。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc)
         ll.send_user_data()  # 启动 t1
@@ -905,7 +905,7 @@ class TestLinkLayerEnableTimers:
 
     def test_receive_nack_cancels_t1(self) -> None:
         """receive_nack 取消 t1 计时器。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc)
         ll.send_user_data()
@@ -914,7 +914,7 @@ class TestLinkLayerEnableTimers:
 
     def test_reset_cancels_all_timers(self) -> None:
         """LinkLayer.reset() 取消所有 timer。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc)
         ll.start_timer("t1", 100, lambda n: None)
@@ -929,7 +929,7 @@ class TestLinkLayerOnTimeout:
 
     def test_on_timeout_bumps_retry(self) -> None:
         """on_timeout 调用 bump_retry，retry_count 递增。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc)
         assert ll.retry_count == 0
@@ -938,7 +938,7 @@ class TestLinkLayerOnTimeout:
 
     def test_on_timeout_exceeds_max_goes_to_error(self) -> None:
         """on_timeout 触发 max_retries+1 时 state 置 ERROR。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc, max_retries=2)
         ll.mark_waiting_ack()
@@ -951,7 +951,7 @@ class TestLinkLayerOnTimeout:
 
     def test_on_timeout_records_event(self) -> None:
         """on_timeout 记录 timeout_events 列表。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc)
         ll.on_timeout("t1")
@@ -963,7 +963,7 @@ class TestLinkLayerOnTimeout:
 
     def test_on_timeout_does_not_flip_fcb(self) -> None:
         """on_timeout **不**触发 FCB 翻转（避免错误翻 FCB）。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc, mode=LinkLayerMode.BALANCED)
         ll.fcv = 1
@@ -973,7 +973,7 @@ class TestLinkLayerOnTimeout:
 
     def test_timeout_callback_via_fake_service(self) -> None:
         """完整调度：send_user_data -> fire("t1") -> on_timeout 触发。"""
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc, max_retries=2)
         ll.send_user_data()
@@ -1123,7 +1123,7 @@ class TestLinkLayerRetryExceedsMax:
         on_timeout 是另一条 retry 路径，retry_count > max_retries 才置
         ERROR。
         """
-        from starfish.protocols.iec101 import FakeLinkLayerTimerService
+        from starfish.domain.protocols.iec101 import FakeLinkLayerTimerService
         svc = FakeLinkLayerTimerService()
         ll = LinkLayer(enable_timers=True, timer_service=svc, max_retries=2)
         # 通过 on_timeout 路径：retry_count=1, 2 都不进 ERROR

@@ -21,15 +21,15 @@ from starfish.domain.server_config import (
     StarfishEndpointConfig,
     StarfishPointConfig,
 )
-from starfish.drivers.server_simulator_facade import ServerSimulatorFacade
-from starfish.drivers.http_rest_facade import HttpRestFacade
-from starfish.drivers.modbus_tcp_facade import ModbusTcpFacade
-from starfish.drivers.mqtt_facade import MqttFacade
-from starfish.drivers.iec101_facade import Iec101Facade
-from starfish.drivers.modbus_rtu_facade import ModbusRtuFacade
-from starfish.drivers.ads_facade import AdsFacade
-from starfish.drivers.goose_facade import GooseFacade
-from starfish.drivers.sv_facade import SvFacade
+from starfish.adapters.drivers.simulator.server_simulator_facade import ServerSimulatorFacade
+from starfish.adapters.drivers.protocol.http.http_rest_facade import HttpRestFacade
+from starfish.adapters.drivers.modbus.modbus_tcp_facade import ModbusTcpFacade
+from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade
+from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
+from starfish.adapters.drivers.modbus.modbus_rtu_facade import ModbusRtuFacade
+from starfish.adapters.drivers.ads.ads_facade import AdsFacade
+from starfish.adapters.drivers.iec.goose_facade import GooseFacade
+from starfish.adapters.drivers.iec.sv_facade import SvFacade
 from whale.ingest.diagnostics.probe import ProbeResult, probe_facade
 from whale.ingest.diagnostics.profile import ProfileResult, profile_facade
 from whale.ingest.diagnostics.capacity import CapacityResult, capacity_scan
@@ -207,7 +207,7 @@ class TestProbeFacade:
         （mode 可能为 rtu-lightweight 或 codebase-pending）。"""
         plan = _make_minimal_plan("probe_modbus_rtu", protocol_name="MODBUS_RTU")
         # 根据 PTY 可用性选择模式
-        from starfish.drivers.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         mode = "rtu-lightweight" if pty_ok else "codebase-pending"
         facade = ModbusRtuFacade(mode=mode)
@@ -528,7 +528,7 @@ class TestCapacityScan:
             protocol_name="MODBUS_RTU",
             initial_values={"a": 1, "b": 2},
         )
-        from starfish.drivers.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         mode = "rtu-lightweight" if pty_ok else "codebase-pending"
         facade = ModbusRtuFacade(mode=mode)
@@ -665,7 +665,7 @@ class TestIec101Round20Capabilities:
 
     def test_probe_iec101_round20_still_pass(self) -> None:
         """Round 20：IEC101 probe 仍 PASS（codec-only 模式下 NOT_RUN/CODEC_ONLY 不影响 probe）。"""
-        from starfish.drivers.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
         plan = _make_minimal_plan("probe_iec101_round20", protocol_name="IEC101")
         facade = Iec101Facade()
         result = probe_facade(facade, plan=plan, endpoint_id="iec101_ep_r20")
@@ -682,7 +682,7 @@ class TestIec101Round20Capabilities:
 
     def test_profile_iec101_round20_still_pass(self) -> None:
         """Round 20：IEC101 profile 仍 PASS。"""
-        from starfish.drivers.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
         plan = _make_minimal_plan("profile_iec101_round20", protocol_name="IEC101")
         facade = Iec101Facade()
         facade.load_points(plan)
@@ -692,7 +692,7 @@ class TestIec101Round20Capabilities:
 
     def test_capacity_iec101_round20_still_not_run(self) -> None:
         """Round 20：IEC101 capacity 仍 NOT_RUN（codec 增量不升级 capacity）。"""
-        from starfish.drivers.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
         plan = _make_minimal_plan("capacity_iec101_round20", protocol_name="IEC101")
         facade = Iec101Facade()
         facade.load_points(plan)
@@ -702,7 +702,7 @@ class TestIec101Round20Capabilities:
 
     def test_iec101_health_round20_diagnosis(self) -> None:
         """Round 20：IEC101 health() diagnosis 仍为 codec-enhanced-plus 模式。"""
-        from starfish.drivers.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
         plan = _make_minimal_plan("health_iec101_round20", protocol_name="IEC101")
         facade = Iec101Facade()
         result = probe_facade(facade, plan=plan, endpoint_id="iec101_health_r20")

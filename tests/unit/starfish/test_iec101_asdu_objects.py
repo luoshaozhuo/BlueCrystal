@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import pytest
 
-from starfish.protocols.iec101 import (
+from starfish.domain.protocols.iec101 import (
     Asdu,
     C_SC_NA_1_Object,
     C_SE_NA_1_Object,
@@ -65,8 +65,8 @@ from starfish.protocols.iec101 import (
     decode_asdu,
     encode_asdu,
 )
-from starfish.protocols.iec101.types import TypeId
-from starfish.protocols.iec101.asdu import ASDUHeader
+from starfish.domain.protocols.iec101.types import TypeId
+from starfish.domain.protocols.iec101.asdu import ASDUHeader
 
 
 # ── M_SP_NA_1 信息对象测试 ────────────────────────────────────────────────────
@@ -1274,7 +1274,7 @@ class TestCSCNA1SelectExecute:
 
     def test_pulse_short_long_persistent_constants(self) -> None:
         """CommandPulse 枚举的 ql_value 映射常量正确。"""
-        from starfish.protocols.iec101.information_object import (
+        from starfish.domain.protocols.iec101.information_object import (
             _COMMAND_PULSE_TO_QL,
             _QL_TO_COMMAND_PULSE,
         )

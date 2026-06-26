@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import pytest
 
-from starfish.protocols.iec101 import (
+from starfish.domain.protocols.iec101 import (
     END_CHAR,
     FIXED_FRAME_SIZE,
     FixedFrame,
@@ -338,11 +338,11 @@ class TestFrameAsduIntegration:
 
     def test_variable_frame_carries_asdu(self) -> None:
         """可变帧承载 ASDU：先 encode_asdu，再 encode VariableFrame。"""
-        from starfish.protocols.iec101 import (
+        from starfish.domain.protocols.iec101 import (
             Asdu, M_SP_NA_1_Object, SIQ,
             encode_asdu,
         )
-        from starfish.protocols.iec101.asdu import ASDUHeader
+        from starfish.domain.protocols.iec101.asdu import ASDUHeader
 
         asdu = Asdu(
             header=ASDUHeader(
@@ -363,7 +363,7 @@ class TestFrameAsduIntegration:
         assert result.ok is True
         assert isinstance(result.frame, VariableFrame)
         # 从 VariableFrame.data 重新解析 ASDU
-        from starfish.protocols.iec101 import decode_asdu
+        from starfish.domain.protocols.iec101 import decode_asdu
         decoded_asdu = decode_asdu(result.frame.data)
         assert isinstance(decoded_asdu, Asdu)
         assert decoded_asdu.ioa_list == [100, 101]

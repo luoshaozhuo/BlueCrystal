@@ -24,7 +24,7 @@ python -m starfish run --input <server_config.json> --duration 30
 不负责：
 - 替代 pytest。
 - 生产数据写入、落库或生产链路编排。
-- 协议 frame 编解码实现（由 `starfish.protocols` 负责）。
+- 协议 frame 编解码实现（由 `starfish.domain.protocols` 负责）。
 """
 
 from __future__ import annotations
@@ -36,7 +36,8 @@ from typing import Annotated, Any
 
 import typer
 import typer.main
-from click.exceptions import UsageError
+from click.exceptions import UsageError as ClickUsageError
+from typer._click.exceptions import UsageError as TyperUsageError
 
 from starfish.api import StarfishServerManager, load_config, open_manager
 from starfish.application import ServerManagerBuildError
@@ -159,7 +160,7 @@ def main(argv: list[str]) -> int:
             prog_name=_PROG_NAME,
             standalone_mode=False,
         )
-    except UsageError as exc:
+    except (ClickUsageError, TyperUsageError) as exc:
         raise SystemExit(exc.exit_code) from None
 
     return 0 if rc is None else rc

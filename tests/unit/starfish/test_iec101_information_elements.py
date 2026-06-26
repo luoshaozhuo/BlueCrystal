@@ -25,7 +25,7 @@ from datetime import datetime
 
 import pytest
 
-from starfish.protocols.iec101 import (
+from starfish.domain.protocols.iec101 import (
     CP56TIME2A_LENGTH,
     CP56Time2a,
     QDS,
@@ -890,7 +890,7 @@ class TestShortFloatRound20Compat:
 
     def test_no_numpy_import(self) -> None:
         """information_elements 模块不引入 numpy 硬依赖。"""
-        import starfish.protocols.iec101.information_elements as ie_module
+        import starfish.domain.protocols.iec101.information_elements as ie_module
         # 检查模块全局没有 numpy 名字
         assert not hasattr(ie_module, "np"), (
             "information_elements 不应 import numpy 作为硬依赖"

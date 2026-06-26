@@ -20,9 +20,9 @@ from pathlib import Path
 
 import pytest
 
-from starfish.native.runner_spec import NativeRunnerSpec
-from starfish.native.runner_probe import probe_native_runner
-from starfish.native.process_handle import NativeProcessHandle
+from starfish.infrastructure.native.runner_spec import NativeRunnerSpec
+from starfish.infrastructure.native.runner_probe import probe_native_runner
+from starfish.infrastructure.native.process_handle import NativeProcessHandle
 
 
 # ── NativeRunnerSpec 测试 ──────────────────────────────────────────────────────

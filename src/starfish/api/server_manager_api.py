@@ -7,10 +7,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from starfish.application import BuiltManager, LoadedConfig, StarfishServerManagerService
-from starfish.domain import DriverEntry
+from starfish.application.use_cases import (
+    HealthSystemUseCase,
+    ReadSystemUseCase,
+    StartSystemUseCase,
+    StopSystemUseCase,
+    WriteSystemUseCase,
+)
+from starfish.adapters.config.server_config_loader import ServerConfigJsonLoader
+from starfish.adapters.drivers.factory import StarfishDriverFactory
 
 
 class StarfishServerManager:
@@ -56,26 +64,11 @@ class StarfishServerManager:
         if self._started_entries:
             return
 
-        started_entries: list[Any] = []
-        current_entry: Any | None = None
-        try:
-            for current_entry in self.registry.entries:
-                if not current_entry.available or current_entry.driver is None:
-                    continue
-                current_entry.driver.start()
-                started_entries.append(current_entry)
-        except Exception as exc:
-            self._stop_entries(started_entries)
-            endpoint_id = (
-                current_entry.endpoint.endpoint_id if current_entry is not None else "unknown"
-            )
-            raise RuntimeError(f"启动 endpoint={endpoint_id} 失败: {exc}") from exc
-
-        self._started_entries = started_entries
+        self._started_entries = StartSystemUseCase().execute(self.registry)
 
     def stop(self) -> None:
         """停止已启动 endpoint。"""
-        self._stop_entries(self._started_entries)
+        StopSystemUseCase().execute(self.registry, self._started_entries)
         self._started_entries = []
 
     def status(self) -> dict[str, Any]:
@@ -85,21 +78,14 @@ class StarfishServerManager:
             "config_name": self.config.config_name,
             "synthetic": self.config.synthetic,
             "server_count": len(self.config.servers),
-            "endpoints": self.registry.health_all(),
+            "endpoints": HealthSystemUseCase().execute(self.registry),
         }
 
     def health(self, endpoint_id: str | None = None) -> dict[str, Any]:
         """查询健康状态。"""
         if endpoint_id is None:
             return self.status()
-        # DriverEntry.driver 字段类型为 `ServerDriver | Any`（见
-        # starfish.domain.driver），调用 .health() 时 mypy 推导出 Any。
-        # ServerDriver.health() 实际返回 dict[str, Any]，此处 cast 仅做
-        # 类型显式声明，不影响运行时行为。
-        return cast(
-            "dict[str, Any]",
-            self._resolve_entry(endpoint_id).driver.health(),
-        )
+        return HealthSystemUseCase().execute(self.registry, endpoint_id=endpoint_id)
 
     def read(
         self,
@@ -108,19 +94,11 @@ class StarfishServerManager:
         endpoint_id: str | None = None,
     ) -> dict[str, Any]:
         """读取当前点位值。"""
-        if endpoint_id is not None:
-            # 同 health()：DriverEntry.driver 字段类型为 `ServerDriver | Any`，
-            # 推导为 Any；ServerDriver.read() 实际返回 dict[str, Any]，
-            # 此处 cast 仅做类型显式声明，不影响运行时行为。
-            return cast(
-                "dict[str, Any]",
-                self._resolve_entry(endpoint_id).driver.read(point_ids),
-            )
-
-        return {
-            entry.endpoint.endpoint_id: entry.driver.read(point_ids)
-            for entry in self._iter_available_entries()
-        }
+        return ReadSystemUseCase().execute(
+            self.registry,
+            point_ids,
+            endpoint_id=endpoint_id,
+        )
 
     def write(
         self,
@@ -130,43 +108,34 @@ class StarfishServerManager:
         endpoint_id: str | None = None,
     ) -> None:
         """向单个 endpoint 写值。"""
-        self._resolve_entry(endpoint_id).driver.write(point_id, value)
+        WriteSystemUseCase().execute(
+            self.registry,
+            point_id,
+            value,
+            endpoint_id=endpoint_id,
+        )
 
-    def _iter_available_entries(self) -> list[DriverEntry]:
-        return [
-            entry for entry in self.registry.entries
-            if entry.available and entry.driver is not None
-        ]
 
-    def _resolve_entry(self, endpoint_id: str | None) -> DriverEntry:
-        available_entries = self._iter_available_entries()
-        if endpoint_id is None:
-            if len(available_entries) != 1:
-                raise ValueError("存在多个可用 endpoint，请显式传入 endpoint_id。")
-            return available_entries[0]
+def _default_service() -> StarfishServerManagerService:
+    """创建默认运行时应用服务。
 
-        for entry in available_entries:
-            if entry.endpoint.endpoint_id == endpoint_id:
-                return entry
-        raise ValueError(f"未找到可用 endpoint: {endpoint_id}")
-
-    @staticmethod
-    def _stop_entries(entries: list[Any]) -> None:
-        for entry in reversed(entries):
-            try:
-                entry.driver.stop()
-            except Exception:
-                continue
+    API 层承担 composition root 职责，负责把 adapters 注入 application
+    ports；application 层不直接依赖具体 driver 或文件 I/O 实现。
+    """
+    return StarfishServerManagerService(
+        config_loader=ServerConfigJsonLoader(),
+        driver_factory=StarfishDriverFactory(),
+    )
 
 
 def load_config(input_path: Path) -> LoadedConfig:
     """加载并校验服务端配置。"""
-    return StarfishServerManagerService().load_config(input_path)
+    return _default_service().load_config(input_path)
 
 
 def build_manager(input_path: Path) -> BuiltManager:
     """构建 server manager 装配结果。"""
-    return StarfishServerManagerService().build_manager(input_path)
+    return _default_service().build_manager(input_path)
 
 
 def open_manager(input_path: Path) -> StarfishServerManager:

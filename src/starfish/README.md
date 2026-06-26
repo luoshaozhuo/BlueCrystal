@@ -29,20 +29,18 @@ src/starfish/
 ├── README.md
 ├── api/
 ├── application/
+├── adapters/
 ├── domain/
-├── drivers/
-├── native/
-├── protocols/
+├── infrastructure/
 ```
 
 各目录边界如下：
 
 - `api/`: 对外统一入口，暴露 `StarfishServerManager` 和装配 API
-- `application/`: usecase / orchestration，负责 server config 加载和 manager 装配流程
-- `domain/`: 稳定契约与驱动抽象，不做文件 I/O 和协议分发
-- `drivers/`: 真实实现层，包含 config loader、server registry 和各协议驱动
-- `native/`: native runner 的探测、路径和进程支撑
-- `protocols/`: 协议编解码与协议内部结构
+- `application/`: usecase / orchestration、ports 和 runtime registry，不包含具体 I/O 实现
+- `domain/`: 稳定契约、driver entry 值对象与协议 codec/state machine/frame
+- `adapters/`: config loader、driver factory 和各协议 facade
+- `infrastructure/`: native runner、process runtime、硬件或系统级支撑
 
 ## 主链路
 
@@ -52,8 +50,9 @@ src/starfish/
 Server Config JSON
   -> api
   -> application
-  -> drivers.server_config_loader
-  -> drivers.server_registry
+  -> adapters.config.server_config_loader
+  -> application.orchestration.registry
+  -> adapters.drivers.factory
   -> StarfishServerManager
   -> CLI / 外部诊断调用方
 ```
@@ -62,11 +61,11 @@ Server Config JSON
 
 1. [`__main__.py`](/home/luosh/BlueCrystal/src/starfish/__main__.py)
 2. [`api/server_manager_api.py`](/home/luosh/BlueCrystal/src/starfish/api/server_manager_api.py)
-3. [`application/server_manager_service.py`](/home/luosh/BlueCrystal/src/starfish/application/server_manager_service.py)
+3. [`application/orchestration/service.py`](/home/luosh/BlueCrystal/src/starfish/application/orchestration/service.py)
 4. [`domain/server_config.py`](/home/luosh/BlueCrystal/src/starfish/domain/server_config.py)
-5. [`drivers/server_config_loader.py`](/home/luosh/BlueCrystal/src/starfish/drivers/server_config_loader.py)
-6. [`drivers/server_registry.py`](/home/luosh/BlueCrystal/src/starfish/drivers/server_registry.py)
-7. 一个代表性协议实现，比如 [`drivers/http_rest_facade.py`](/home/luosh/BlueCrystal/src/starfish/drivers/http_rest_facade.py)
+5. [`application/orchestration/registry.py`](/home/luosh/BlueCrystal/src/starfish/application/orchestration/registry.py)
+6. [`adapters/config/server_config_loader.py`](/home/luosh/BlueCrystal/src/starfish/adapters/config/server_config_loader.py)
+7. 一个代表性协议实现，比如 [`adapters/drivers/protocol/http/http_rest_facade.py`](/home/luosh/BlueCrystal/src/starfish/adapters/drivers/protocol/http/http_rest_facade.py)
 
 ## Manager 理解方式
 
@@ -78,7 +77,7 @@ Server Config JSON
 也就是说：
 
 - 外部用户优先面向 `StarfishServerManager`
-- 内部装配才面向 `drivers/*_facade.py`
+- 内部装配通过 `application.orchestration.registry` 和 `adapters.drivers.factory` 绑定具体 facade
 
 ## mode 比协议名更重要
 
@@ -109,7 +108,7 @@ Server Config JSON
 ## 现在最应该记住的 5 件事
 
 1. `StarfishServerManager` 是唯一正式高层入口。
-2. `application` 负责编排，`drivers` 负责真实实现。
-3. `server_registry.py` 是协议装配中心。
+2. `application` 负责编排，`adapters` 负责真实 I/O 和 driver 实现。
+3. `registry.py` 只做 endpoint 绑定编排，协议选择在 `adapters.drivers.factory`。
 4. 协议能力必须结合 `mode` 理解。
 5. 先看主链路，再看单协议细节，读源码效率最高。

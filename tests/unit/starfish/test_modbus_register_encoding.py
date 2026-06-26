@@ -21,7 +21,7 @@ import struct
 
 import pytest
 
-from starfish.protocols.modbus import (
+from starfish.domain.protocols.modbus import (
     INT16_MAX,
     INT16_MIN,
     INT32_MAX,
@@ -685,7 +685,7 @@ class TestNotDeviceValidation:
 
     def test_no_io_operations(self) -> None:
         """register_encoding 模块不应包含 socket/pty/serial IO。"""
-        import starfish.protocols.modbus.register_encoding as enc
+        import starfish.domain.protocols.modbus.register_encoding as enc
 
         # 检查模块内容不含 IO 操作
         for attr_name in dir(enc):

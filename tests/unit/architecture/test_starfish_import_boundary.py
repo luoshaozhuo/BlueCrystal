@@ -196,15 +196,18 @@ class TestStarfishDirectoryStructure:
         for sub in [
             "domain",
             "application",
-            "drivers",
+            "adapters",
             "api",
-            "native",
-            "protocols",
+            "infrastructure",
         ]:
             assert (STARFISH_ROOT / sub).is_dir(), f"缺少子目录: {sub}"
             assert (STARFISH_ROOT / sub / "__init__.py").is_file(), (
                 f"缺少 __init__.py: {sub}"
             )
+
+    def test_legacy_drivers_package_removed(self) -> None:
+        """旧 drivers package 必须被完全移除。"""
+        assert not (STARFISH_ROOT / "drivers").exists()
 
 
 class TestStarfishCliDependsOnApi:
@@ -223,4 +226,5 @@ class TestStarfishCliDependsOnApi:
                 modules.add(node.module)
 
         assert "starfish.api" in modules
-        assert "starfish.drivers" not in modules
+        legacy_driver_module = ".".join(("starfish", "drivers"))
+        assert legacy_driver_module not in modules

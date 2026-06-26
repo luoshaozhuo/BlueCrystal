@@ -32,7 +32,7 @@ from starfish.domain.server_config import (
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.drivers.modbus_rtu_facade import (
+from starfish.adapters.drivers.modbus.modbus_rtu_facade import (
     ModbusRtuFacade,
     probe_modbus_rtu_binary,
     _crc16,
@@ -40,7 +40,7 @@ from starfish.drivers.modbus_rtu_facade import (
     _pack_bits,
     _unpack_bits,
 )
-from starfish.protocols.modbus.register_encoding import (
+from starfish.domain.protocols.modbus.register_encoding import (
     ByteOrder,
     ModbusRegisterValueType,
     WordOrder,
@@ -1631,7 +1631,7 @@ class TestModbusRtuRegisterEncodingIntegration:
     """ModbusRtuFacade 接入 register_encoding 工具的测试（Round 19 新增）。
 
     验证 facade 的 encode_register_value / decode_register_value 方法
-    **真实调用** starfish.protocols.modbus.register_encoding 工具，
+    **真实调用** starfish.domain.protocols.modbus.register_encoding 工具，
     而非仅修改 capabilities 文案。
     """
 
@@ -1655,7 +1655,7 @@ class TestModbusRtuRegisterEncodingIntegration:
             WordOrder.LITTLE,
         )
         # 验证仅检查与工具一致性（不对硬编码值负责）
-        from starfish.protocols.modbus.register_encoding import encode_register_value
+        from starfish.domain.protocols.modbus.register_encoding import encode_register_value
         expected = encode_register_value(
             0x01020304,
             ModbusRegisterValueType.UINT32,
@@ -1698,7 +1698,7 @@ class TestModbusRtuRegisterEncodingIntegration:
 
     def test_encode_register_value_rejects_nan(self) -> None:
         """encode_register_value(FLOAT32, NaN) 应抛 ValueError。"""
-        from starfish.protocols.modbus.register_encoding import (
+        from starfish.domain.protocols.modbus.register_encoding import (
             RegisterEncodingValueError,
         )
         facade = ModbusRtuFacade()
