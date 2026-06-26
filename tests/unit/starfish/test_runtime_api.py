@@ -1,7 +1,7 @@
 """starfish 高层运行时 API 测试。
 
 验证：
-1. `StarfishServerManagerApi.open_manager()` 可返回统一运行时对象。
+1. `open_manager()` 可返回统一运行时对象。
 2. 单 endpoint runtime 支持 `describe/start/status/read/stop` 基本流程。
 3. 多 endpoint runtime 在未指定 endpoint_id 时，`write()` 会拒绝歧义调用。
 
@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from starfish.api import StarfishServerManager, create_default_server_manager_api
+from starfish.api import StarfishServerManager, open_manager
 from starfish.application import ServerManagerBuildError
 
 
@@ -83,7 +83,7 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = create_default_server_manager_api().open_manager(plan_path)
+            runtime = open_manager(plan_path)
 
             assert isinstance(runtime, StarfishServerManager)
             assert runtime.config.scenario_id == "runtime_api_single"
@@ -104,7 +104,7 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = create_default_server_manager_api().open_manager(plan_path)
+            runtime = open_manager(plan_path)
             description = runtime.describe()
             assert description["scenario_id"] == "runtime_api_flow"
             assert description["endpoints"][0]["mode"] == "stub"
@@ -144,7 +144,7 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = create_default_server_manager_api().open_manager(plan_path)
+            runtime = open_manager(plan_path)
 
             with pytest.raises(ValueError, match="endpoint_id"):
                 runtime.write("runtime_api_multi_point_000", 1.0)
@@ -165,7 +165,7 @@ class TestStarfishRuntimeApi:
             plan_path.write_text(json.dumps(payload), encoding="utf-8")
 
             with pytest.raises(ServerManagerBuildError, match="校验失败") as exc_info:
-                create_default_server_manager_api().open_manager(plan_path)
+                open_manager(plan_path)
 
             assert exc_info.value.validation is not None
             assert exc_info.value.validation.errors

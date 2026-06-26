@@ -29,6 +29,6 @@ starfish 是多协议 server simulator/manager 核心。
 
 from __future__ import annotations
 
-from starfish.api import StarfishServerManager, StarfishServerManagerApi, create_default_server_manager_api
+from starfish.api import StarfishServerManager, build_manager, load_config, open_manager
 
-__all__ = ["StarfishServerManager", "StarfishServerManagerApi", "create_default_server_manager_api"]
+__all__ = ["StarfishServerManager", "load_config", "build_manager", "open_manager"]

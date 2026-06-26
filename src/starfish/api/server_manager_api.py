@@ -159,51 +159,19 @@ class StarfishServerManager:
                 continue
 
 
-class StarfishServerManagerApi:
-    """Starfish 高层 server manager API。"""
-
-    def __init__(self, service: StarfishServerManagerService) -> None:
-        """初始化高层 API。
-
-        Args:
-            service: 负责底层用例编排的应用服务。
-        """
-        self._service = service
-
-    def load_config(self, input_path: Path) -> LoadedConfig:
-        """加载并校验服务端配置。
-
-        Args:
-            input_path: server config JSON 文件路径。
-
-        Returns:
-            `LoadedConfig` 结果。
-        """
-        return self._service.load_config(input_path)
-
-    def build_manager(self, input_path: Path) -> BuiltManager:
-        """构建 server manager。
-
-        Args:
-            input_path: server config JSON 文件路径。
-
-        Returns:
-            `BuiltManager` 结果。
-        """
-        return self._service.build_manager(input_path)
-
-    def open_manager(self, input_path: Path) -> StarfishServerManager:
-        """构建并返回统一高层 manager 对象。"""
-        return StarfishServerManager(self.build_manager(input_path))
+def load_config(input_path: Path) -> LoadedConfig:
+    """加载并校验服务端配置。"""
+    return StarfishServerManagerService().load_config(input_path)
 
 
-def create_default_server_manager_api() -> StarfishServerManagerApi:
-    """创建默认 server manager API。
-
-    Returns:
-        绑定默认应用服务实现的 `StarfishServerManagerApi`。
-    """
-    return StarfishServerManagerApi(service=StarfishServerManagerService())
+def build_manager(input_path: Path) -> BuiltManager:
+    """构建 server manager 装配结果。"""
+    return StarfishServerManagerService().build_manager(input_path)
 
 
-__all__ = ["StarfishServerManager", "StarfishServerManagerApi", "create_default_server_manager_api"]
+def open_manager(input_path: Path) -> StarfishServerManager:
+    """构建并返回统一高层 manager 对象。"""
+    return StarfishServerManager(build_manager(input_path))
+
+
+__all__ = ["StarfishServerManager", "load_config", "build_manager", "open_manager"]

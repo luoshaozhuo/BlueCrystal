@@ -165,38 +165,35 @@ def _write_invalid_json_payload(tmpdir: str, name: str) -> Path:
 class TestValidatePlanCLI:
     """validate-config CLI 测试。"""
 
-    def test_validate_plan_routes_through_server_api(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_validate_plan_routes_through_api_function(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """CLI 应通过 `starfish.api` 高层入口触发计划加载。"""
 
-        class _FakeApi:
-            def __init__(self) -> None:
-                self.called_with: Path | None = None
+        called_with: list[Path] = []
 
-            def load_config(self, input_path: Path) -> object:
-                self.called_with = input_path
-                return SimpleNamespace(
-                    config=SimpleNamespace(
-                        scenario_id="api_cli",
-                        server_name="api_cli server",
-                        endpoints=[],
-                        points=[],
-                        synthetic=True,
-                        capabilities=[],
-                    ),
-                    validation=SimpleNamespace(
-                        is_valid=True,
-                        errors=[],
-                        warnings=[],
-                        passed_checks=[],
-                    ),
-                )
+        def fake_load_config(input_path: Path) -> object:
+            called_with.append(input_path)
+            return SimpleNamespace(
+                config=SimpleNamespace(
+                    scenario_id="api_cli",
+                    server_name="api_cli server",
+                    endpoints=[],
+                    points=[],
+                    synthetic=True,
+                    capabilities=[],
+                ),
+                validation=SimpleNamespace(
+                    is_valid=True,
+                    errors=[],
+                    warnings=[],
+                    passed_checks=[],
+                ),
+            )
 
-        fake_api = _FakeApi()
-        monkeypatch.setattr(starfish_cli, "create_default_server_manager_api", lambda: fake_api)
+        monkeypatch.setattr(starfish_cli, "load_config", fake_load_config)
         plan_path = Path("/tmp/runtime_api_plan.json")
 
         assert main(["validate-config", "--input", str(plan_path)]) == 0
-        assert fake_api.called_with == plan_path
+        assert called_with == [plan_path]
 
     @pytest.mark.smoke
     def test_help(self) -> None:
@@ -260,21 +257,16 @@ class TestDescribeCLI:
     ) -> None:
         """open_manager 失败时应直接使用异常内的校验明细。"""
 
-        class _FakeApi:
-            def open_manager(self, input_path: Path) -> object:
-                del input_path
-                raise ServerManagerBuildError(
-                    "校验失败 (2 个错误)",
-                    validation=ValidationResult(
-                        errors=["缺少 endpoints", "缺少 points"],
-                    ),
-                )
+        def fake_open_manager(input_path: Path) -> object:
+            del input_path
+            raise ServerManagerBuildError(
+                "校验失败 (2 个错误)",
+                validation=ValidationResult(
+                    errors=["缺少 endpoints", "缺少 points"],
+                ),
+            )
 
-            def load_config(self, input_path: Path) -> object:
-                del input_path
-                raise AssertionError("不应在 open_manager 失败后再次调用 load_config")
-
-        monkeypatch.setattr(starfish_cli, "create_default_server_manager_api", lambda: _FakeApi())
+        monkeypatch.setattr(starfish_cli, "open_manager", fake_open_manager)
 
         assert main(["describe", "--input", "/tmp/invalid.json"]) == 1
         captured = capsys.readouterr()

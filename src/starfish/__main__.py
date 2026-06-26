@@ -30,15 +30,15 @@ python -m starfish run --input <server_config.json> --duration 30
 from __future__ import annotations
 
 import sys
-import time
+import threading
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 import typer.main
-from typer._click.exceptions import UsageError
+from click.exceptions import UsageError
 
-from starfish.api import StarfishServerManager, StarfishServerManagerApi, create_default_server_manager_api
+from starfish.api import StarfishServerManager, load_config, open_manager
 from starfish.application import ServerManagerBuildError
 
 
@@ -51,16 +51,10 @@ app = typer.Typer(
 )
 
 
-def _server_api() -> StarfishServerManagerApi:
-    """返回默认运行时 API。"""
-    api = create_default_server_manager_api()
-    return api
-
-
 def _load_config_or_exit(input_path: Path) -> tuple[Any | None, Any]:
     """加载并校验 server 配置 JSON。"""
     try:
-        result = _server_api().load_config(input_path)
+        result = load_config(input_path)
     except FileNotFoundError:
         print(f"错误：文件不存在: {input_path}", file=sys.stderr)
         return None, None
@@ -96,10 +90,10 @@ def _print_validation(validation: Any) -> None:
             print(f"  [PASS] {passed}")
 
 
-def _open_manager_or_exit(input_path: Path) -> StarfishServerManager | None:
+def _open_manager_or_print_error(input_path: Path) -> StarfishServerManager | None:
     """加载配置并创建统一 server manager 对象。"""
     try:
-        return _server_api().open_manager(input_path)
+        return open_manager(input_path)
     except FileNotFoundError:
         print(f"错误：文件不存在: {input_path}", file=sys.stderr)
         return None
@@ -200,7 +194,7 @@ def describe_config(
     ],
 ) -> int:
     """展示 server 配置摘要和 facade 装配结果。"""
-    manager = _open_manager_or_exit(input_path)
+    manager = _open_manager_or_print_error(input_path)
     if manager is None:
         return 1
 
@@ -222,7 +216,7 @@ def health_command(
     ] = False,
 ) -> int:
     """查看各 endpoint 当前 health。"""
-    manager = _open_manager_or_exit(input_path)
+    manager = _open_manager_or_print_error(input_path)
     if manager is None:
         return 1
 
@@ -268,7 +262,7 @@ def read_command(
     ] = [],
 ) -> int:
     """启动 simulator，读取当前点位值并停止。"""
-    manager = _open_manager_or_exit(input_path)
+    manager = _open_manager_or_print_error(input_path)
     if manager is None:
         return 1
 
@@ -320,11 +314,11 @@ def run_command(
     ],
     duration: Annotated[
         float | None,
-        typer.Option("--duration", help="运行秒数；不传则持续运行直到 Ctrl+C"),
+        typer.Option("--duration", min=0.0, help="运行秒数；不传则持续运行直到 Ctrl+C"),
     ] = None,
 ) -> int:
     """启动全部可用 simulator facade 并保持运行。"""
-    manager = _open_manager_or_exit(input_path)
+    manager = _open_manager_or_print_error(input_path)
     if manager is None:
         return 1
 
@@ -345,19 +339,11 @@ def run_command(
         ]
     )
     print(f"\n已启动 {started_count} 个 simulator endpoint。")
-    if duration is None:
-        print("按 Ctrl+C 停止。")
-    else:
-        print(f"将运行 {duration:.2f} 秒后自动停止。")
+    print("按 Ctrl+C 停止。" if duration is None else f"将运行 {duration:.2f} 秒后自动停止。")
 
+    stop_event = threading.Event()
     try:
-        if duration is None:
-            while True:
-                time.sleep(0.5)
-        else:
-            deadline = time.monotonic() + max(0.0, duration)
-            while time.monotonic() < deadline:
-                time.sleep(min(0.5, deadline - time.monotonic()))
+        stop_event.wait(duration)
     except KeyboardInterrupt:
         print("\n收到中断信号，正在停止 simulator...")
     finally:

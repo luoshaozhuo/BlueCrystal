@@ -7,7 +7,7 @@
 ## 正式入口
 
 - 正式 API 入口是 [`api/server_manager_api.py`](/home/luosh/BlueCrystal/src/starfish/api/server_manager_api.py)
-- 推荐从 `StarfishServerManagerApi.open_manager(...)` 拿到 `StarfishServerManager`
+- 推荐从 `open_manager(...)` 拿到 `StarfishServerManager`
 - 普通调用方不应该直接依赖单个协议 driver
 
 `StarfishServerManager` 当前提供的高层操作包括：

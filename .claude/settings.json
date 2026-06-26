@@ -25,7 +25,8 @@
       "Bash(PYTHONPATH=src python -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
       "Bash(echo \"EXIT=$?\")",
       "Bash(PYTHONPATH=src python3 -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(codex --version)"
     ],
     "deny": [
       "Read(./.env)",
