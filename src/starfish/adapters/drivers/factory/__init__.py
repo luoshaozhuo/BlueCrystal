@@ -1,46 +1,46 @@
 """Starfish 协议 driver adapter factory。
 
-本模块位于 adapters 层，根据 endpoint.protocol 选择具体 facade，
+本模块位于 adapters 层，根据 endpoint.protocol 选择具体 adapter，
 并完成环境探测、driver 实例化与 load_points。application 层只通过
 DriverFactoryPort 的结构化方法调用本模块，不直接 import concrete driver。
 
 支持以下模式：
 
-- real:              已实现的协议专用真实 facade（HTTP_REST、MODBUS_TCP）。
+- real:              已实现的协议专用真实 adapter（HTTP_REST、MODBUS_TCP）。
 - mqtt-lightweight:   MQTT 轻量级端点（TCP JSON 行协议，非完整 MQTT broker）。
 - real/native:       OPC_UA / IEC104 / IEC61850_MMS / IEC61850_REPORT 的 C runner 子进程模式（binary 可用时）。
 - unavailable:       OPC_UA / IEC104 binary 缺失时的安全回退。
 - report-lightweight: IEC61850_REPORT binary 缺失时的轻量 report shell。
-- codec-enhanced:    IEC101 增强编解码器就绪（Round 15 新增，信息体 + ASDU 列表 + FT1.2 帧）。
-- codec-skeleton:    IEC101 编解码器骨架就绪（Round 14，ASDU/COT/IOA/CA 编解码）。
+- codec-enhanced:    IEC101 增强编解码器就绪（信息体 + ASDU 列表 + FT1.2 帧）。
+- codec-skeleton:    IEC101 编解码器骨架就绪（ASDU/COT/IOA/CA 编解码）。
 - codebase-pending:  MODBUS_RTU / Beckhoff ADS 协议 stub（实现环境未就绪）。
 - environment-pending: GOOSE / SV 协议 stub（网络/硬件环境未就绪）。
 - stub:              未实现协议的 in-memory stub fallback。
 
 工厂 dispatch 规则：
-    - HTTP_REST -> HttpRestFacade（real mode）
-    - MODBUS_TCP -> ModbusTcpFacade（real mode）
-    - MQTT -> MqttFacade（mqtt-lightweight mode）
-    - OPC_UA -> OpcUaFacade（binary 可用时 real，缺失时 unavailable）
-    - IEC_104 / IEC104 -> Iec104Facade（binary 可用时 real，缺失时 unavailable）
-    - IEC61850_MMS -> Iec61850MmsFacade（binary 可用时 real，缺失时 unavailable）
-    - IEC61850_REPORT -> Iec61850ReportFacade（binary 可用时 real，缺失时 report-lightweight）
-    - IEC101 / IEC_101 -> Iec101Facade（codec-enhanced / codec-skeleton / environment-pending / codebase-pending）
-    - MODBUS_RTU -> ModbusRtuFacade（rtu-lightweight / codebase-pending）
-    - BECKHOFF_ADS / ADS -> AdsFacade（codebase-pending mode）
-    - GOOSE -> GooseFacade（environment-pending mode）
-    - SV -> SvFacade（environment-pending mode）
-    - 其他协议 -> ServerSimulatorFacade（stub mode）
+    - HTTP_REST -> HttpRestDriverAdapter（real mode）
+    - MODBUS_TCP -> ModbusTcpDriverAdapter（real mode）
+    - MQTT -> MqttDriverAdapter（mqtt-lightweight mode）
+    - OPC_UA -> OpcUaDriverAdapter（binary 可用时 real，缺失时 unavailable）
+    - IEC_104 / IEC104 -> Iec104DriverAdapter（binary 可用时 real，缺失时 unavailable）
+    - IEC61850_MMS -> Iec61850MmsDriverAdapter（binary 可用时 real，缺失时 unavailable）
+    - IEC61850_REPORT -> Iec61850ReportDriverAdapter（binary 可用时 real，缺失时 report-lightweight）
+    - IEC101 / IEC_101 -> Iec101DriverAdapter（codec-enhanced / codec-skeleton / environment-pending / codebase-pending）
+    - MODBUS_RTU -> ModbusRtuDriverAdapter（rtu-lightweight / codebase-pending）
+    - BECKHOFF_ADS / ADS -> AdsDriverAdapter（codebase-pending mode）
+    - GOOSE -> GooseDriverAdapter（environment-pending mode）
+    - SV -> SvDriverAdapter（environment-pending mode）
+    - 其他协议 -> ServerSimulatorDriverAdapter（stub mode）
 
 职责：
-- 根据 endpoint.protocol 创建 facade。
+- 根据 endpoint.protocol 创建 adapter。
 - OPC_UA / IEC104 / IEC61850_MMS / IEC61850_REPORT 根据环境探测结果返回对应模式。
 - IEC101 根据增强/基础编解码器和 binary 可用性返回对应模式。
 - 不支持协议返回 stub fallback，标记 mode="stub"。
 - 不得调用 Whale shared_source production client。
 
 不负责：
-- runtime registry entries 的生命周期聚合。
+- runtime graph entries 的生命周期聚合。
 - CLI/API/usecase 编排。
 - domain 协议 codec 的定义。
 
@@ -53,6 +53,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from starfish.adapters.drivers.backend_ports import DriverBackendFactory
 from starfish.domain import DriverEntry, StarfishEndpointConfig, StarfishServerConfig, StarfishServerMemberConfig
 
 
@@ -90,20 +91,20 @@ _CODEC_SKELETON_PROTOCOLS: frozenset[str] = frozenset({
     "IEC101", "IEC_101",
 })
 
-# codec-enhanced 协议集合（Round 15 新增，信息体 + ASDU 列表 + FT1.2 帧）
+# codec-enhanced 协议集合（信息体 + ASDU 列表 + FT1.2 帧）
 # IEC101 增强编解码器可用时为 codec-enhanced 模式
 _CODEC_ENHANCED_PROTOCOLS: frozenset[str] = frozenset({
     "IEC101", "IEC_101",
 })
 
-# codec-enhanced-plus 协议集合（Round 16 新增，CP56Time2a + 带时标 TypeID +
+# codec-enhanced-plus 协议集合（CP56Time2a + 带时标 TypeID +
 # C_SC_NA_1 QU 结构化 + link-layer skeleton）
 # IEC101 时间增强编解码器可用时为 codec-enhanced-plus 模式
 _CODEC_ENHANCED_PLUS_PROTOCOLS: frozenset[str] = frozenset({
     "IEC101", "IEC_101",
 })
 
-# codebase-pending 协议集合（有 facade 定义但实现未就绪）
+# codebase-pending 协议集合（有 adapter 定义但实现未就绪）
 # MODBUS_RTU 在 PTY 可用时为 rtu-lightweight 模式，不再是 codebase-pending
 # IEC101 在编解码器或 C binary 可用时不再是 codebase-pending
 _CODABASE_PENDING_PROTOCOLS: frozenset[str] = frozenset({
@@ -119,6 +120,14 @@ _ENVIRONMENT_PENDING_PROTOCOLS: frozenset[str] = frozenset({
 class StarfishDriverFactory:
     """Starfish 默认协议 driver factory adapter。"""
 
+    def __init__(self, backend_factory: DriverBackendFactory) -> None:
+        """接收 infrastructure backend factory。
+
+        Args:
+            backend_factory: 由 composition root 创建并注入的 backend factory。
+        """
+        self._backend_factory = backend_factory
+
     def create_driver_for_endpoint(
         self,
         server: StarfishServerMemberConfig,
@@ -131,19 +140,21 @@ class StarfishDriverFactory:
             endpoint: 待装配的 endpoint。
 
         Returns:
-            包含 facade、mode、available 和 reason 的 DriverEntry。
+            包含 adapter、mode、available 和 reason 的 DriverEntry。
         """
-        return create_driver_for_endpoint(server, endpoint)
+        return create_driver_for_endpoint(server, endpoint, backend_factory=self._backend_factory)
 
 
 def create_driver_for_endpoint(
     server_or_endpoint: StarfishServerMemberConfig | StarfishEndpointConfig,
     endpoint_or_config: StarfishEndpointConfig | StarfishServerConfig | StarfishServerMemberConfig,
+    *,
+    backend_factory: DriverBackendFactory,
 ) -> DriverEntry:
-    """为单个端点创建对应的协议 facade。
+    """为单个端点创建对应的协议 adapter。
 
-    根据 endpoint.protocol 选择真实 facade、轻量级 facade、stub fallback 或
-    unavailable 状态。已实现真实 server 的协议使用协议专用 facade（mode="real"），
+    根据 endpoint.protocol 选择真实 adapter、轻量级 adapter、stub fallback 或
+    unavailable 状态。已实现真实 server 的协议使用协议专用 adapter（mode="real"），
     MQTT 使用轻量级端点（mode="mqtt-lightweight"），
     其他协议使用 in-memory stub（mode="stub"）。
 
@@ -173,39 +184,39 @@ def create_driver_for_endpoint(
     protocol = _normalize_protocol(endpoint.protocol or "")
 
     if protocol == "HTTP_REST":
-        from starfish.adapters.drivers.protocol.http.http_rest_facade import HttpRestFacade
-        facade: Any = HttpRestFacade()
-        facade.load_points(server)
+        from starfish.adapters.drivers.protocol.http.http_rest_driver_adapter import HttpRestDriverAdapter
+        adapter: Any = HttpRestDriverAdapter(backend_factory.create_http_rest_backend())
+        adapter.load_points(server)
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
-            reason=f"protocol={protocol} -> real HTTP REST server (ThreadingHTTPServer)",
+            reason=f"protocol={protocol} -> real HTTP REST server (infrastructure backend)",
             mode="real",
         )
 
     if protocol == "MODBUS_TCP":
-        from starfish.adapters.drivers.modbus.modbus_tcp_facade import ModbusTcpFacade
-        facade = ModbusTcpFacade()
-        facade.load_points(server)
+        from starfish.adapters.drivers.modbus.modbus_tcp_driver_adapter import ModbusTcpDriverAdapter
+        adapter = ModbusTcpDriverAdapter(backend_factory.create_modbus_tcp_backend())
+        adapter.load_points(server)
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
             reason=f"protocol={protocol} -> real Modbus TCP server (FC03/FC06)",
             mode="real",
         )
 
     if protocol == "MQTT":
-        from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade
-        facade = MqttFacade()
-        facade.load_points(server)
+        from starfish.adapters.drivers.protocol.mqtt.mqtt_driver_adapter import MqttDriverAdapter
+        adapter = MqttDriverAdapter(backend_factory.create_mqtt_backend())
+        adapter.load_points(server)
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
             reason=f"protocol={protocol} -> lightweight MQTT-like endpoint "
                    f"(TCP JSON line protocol, subscribe via polling queue; "
@@ -215,11 +226,11 @@ def create_driver_for_endpoint(
 
     # OPC_UA: 依赖 open62541 C runner 子进程
     if protocol == "OPC_UA":
-        from starfish.adapters.drivers.native.opcua.opcua_facade import OpcUaFacade, probe_opcua_binary
-        binary_ok, binary_reason = probe_opcua_binary()
-        facade = OpcUaFacade()
-        facade.load_points(server)
-        mode = facade.mode
+        from starfish.adapters.drivers.native.opcua.opcua_driver_adapter import OpcUaDriverAdapter
+        binary_ok, binary_reason = backend_factory.probe_binary("OPC_UA")
+        adapter = OpcUaDriverAdapter(backend_factory.create_opcua_backend())
+        adapter.load_points(server)
+        mode = adapter.mode
         available = binary_ok
         if binary_ok:
             reason = (
@@ -234,7 +245,7 @@ def create_driver_for_endpoint(
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=available,
             reason=reason,
             mode=mode,
@@ -243,11 +254,11 @@ def create_driver_for_endpoint(
     # IEC104: 依赖 iec104_simulator_server C runner 子进程
     # 归一化：IEC_104 和 IEC104 均视为 IEC104
     if protocol in ("IEC_104", "IEC104"):
-        from starfish.adapters.drivers.native.iec.iec104_facade import Iec104Facade, probe_iec104_binary
-        binary_ok, binary_reason = probe_iec104_binary()
-        facade = Iec104Facade()
-        facade.load_points(server)
-        mode = facade.mode
+        from starfish.adapters.drivers.native.iec.iec104_driver_adapter import Iec104DriverAdapter
+        binary_ok, binary_reason = backend_factory.probe_binary("IEC104")
+        adapter = Iec104DriverAdapter(backend_factory.create_iec104_backend())
+        adapter.load_points(server)
+        mode = adapter.mode
         available = binary_ok
         if binary_ok:
             reason = (
@@ -262,7 +273,7 @@ def create_driver_for_endpoint(
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=available,
             reason=reason,
             mode=mode,
@@ -270,14 +281,13 @@ def create_driver_for_endpoint(
 
     # IEC61850_MMS: 依赖 iec61850_simulator_server C runner 子进程
     if protocol in ("IEC61850_MMS",):
-        from starfish.adapters.drivers.native.iec.iec61850_mms_facade import (
-            Iec61850MmsFacade,
-            probe_iec61850_mms_binary,
+        from starfish.adapters.drivers.native.iec.iec61850_mms_driver_adapter import (
+            Iec61850MmsDriverAdapter,
         )
-        binary_ok, binary_reason = probe_iec61850_mms_binary()
-        facade = Iec61850MmsFacade()
-        facade.load_points(server)
-        mode = facade.mode
+        binary_ok, binary_reason = backend_factory.probe_binary("IEC61850_MMS")
+        adapter = Iec61850MmsDriverAdapter(backend_factory.create_iec61850_mms_backend())
+        adapter.load_points(server)
+        mode = adapter.mode
         available = binary_ok
         if binary_ok:
             reason = (
@@ -292,7 +302,7 @@ def create_driver_for_endpoint(
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=available,
             reason=reason,
             mode=mode,
@@ -300,14 +310,13 @@ def create_driver_for_endpoint(
 
     # IEC61850_REPORT: 依赖 iec61850_simulator_server + iec61850_report_runner
     if protocol in ("IEC61850_REPORT",):
-        from starfish.adapters.drivers.native.iec.iec61850_report_facade import (
-            Iec61850ReportFacade,
-            probe_iec61850_report_binary,
+        from starfish.adapters.drivers.native.iec.iec61850_report_driver_adapter import (
+            Iec61850ReportDriverAdapter,
         )
-        binary_ok, binary_reason = probe_iec61850_report_binary()
-        facade = Iec61850ReportFacade()
-        facade.load_points(server)
-        mode = facade.mode
+        binary_ok, binary_reason = backend_factory.probe_binary("IEC61850_REPORT")
+        adapter = Iec61850ReportDriverAdapter(backend_factory.create_iec61850_report_backend())
+        adapter.load_points(server)
+        mode = adapter.mode
         available = binary_ok
         if binary_ok:
             reason = (
@@ -323,7 +332,7 @@ def create_driver_for_endpoint(
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=available,
             reason=reason,
             mode=mode,
@@ -332,14 +341,14 @@ def create_driver_for_endpoint(
     # ── codebase-pending 协议 ────────────────────────────────────────────────────
 
     # IEC101: 串口链路协议
-    # 模式分级（Round 16 更新）:
+    # 模式分级:
     #   codec-enhanced-plus > codec-enhanced > codec-skeleton >
     #   environment-pending > codebase-pending
     if protocol in ("IEC101", "IEC_101"):
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
-        facade.load_points(server)
-        current_mode = facade.mode
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        adapter = Iec101DriverAdapter(backend_factory.create_iec101_backend())
+        adapter.load_points(server)
+        current_mode = adapter.mode
         if current_mode == "codec-enhanced-plus":
             reason = (
                 f"protocol={protocol} -> IEC101 codec-enhanced-plus "
@@ -371,7 +380,7 @@ def create_driver_for_endpoint(
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
             reason=reason,
             mode=current_mode,
@@ -380,30 +389,29 @@ def create_driver_for_endpoint(
     # MODBUS_RTU: 串口链路协议，与 MODBUS_TCP 不同（无 MBAP 头，使用 CRC）
     # 根据 PTY 可用性选择 rtu-lightweight 或 codebase-pending 模式
     if protocol == "MODBUS_RTU":
-        from starfish.adapters.drivers.modbus.modbus_rtu_facade import (
-            ModbusRtuFacade,
-            probe_modbus_rtu_binary,
+        from starfish.adapters.drivers.modbus.modbus_rtu_driver_adapter import (
+            ModbusRtuDriverAdapter,
         )
-        pty_ok, pty_reason = probe_modbus_rtu_binary()
+        pty_ok, pty_reason = backend_factory.probe_binary("MODBUS_RTU")
         if pty_ok:
             mode = "rtu-lightweight"
-            facade = ModbusRtuFacade(mode="rtu-lightweight")
+            adapter = ModbusRtuDriverAdapter(backend_factory.create_modbus_rtu_backend(mode="rtu-lightweight"))
             reason = (
                 f"protocol={protocol} -> Modbus RTU PTY lightweight mode "
                 f"(local PTY simulation, 不等同真实串口)"
             )
         else:
             mode = "codebase-pending"
-            facade = ModbusRtuFacade(mode="codebase-pending")
+            adapter = ModbusRtuDriverAdapter(backend_factory.create_modbus_rtu_backend(mode="codebase-pending"))
             reason = (
                 f"protocol={protocol} -> Modbus RTU codebase-pending stub "
                 f"(串口/PTY 链路环境未就绪: {pty_reason})"
             )
-        facade.load_points(server)
+        adapter.load_points(server)
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
             reason=reason,
             mode=mode,
@@ -411,13 +419,13 @@ def create_driver_for_endpoint(
 
     # Beckhoff ADS: 需 .NET/TwinCAT runtime
     if protocol in ("BECKHOFF_ADS", "ADS"):
-        from starfish.adapters.drivers.ads.ads_facade import AdsFacade
-        facade = AdsFacade()
-        facade.load_points(server)
+        from starfish.adapters.drivers.ads.ads_driver_adapter import AdsDriverAdapter
+        adapter = AdsDriverAdapter(backend_factory.create_ads_backend())
+        adapter.load_points(server)
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
             reason=f"protocol={protocol} -> Beckhoff ADS codebase-pending stub "
                    f"(.NET/TwinCAT runtime 未就绪，source_lab 有 dotnet 参考实现待迁移)",
@@ -428,13 +436,13 @@ def create_driver_for_endpoint(
 
     # GOOSE: L2 veth 多播协议
     if protocol == "GOOSE":
-        from starfish.adapters.drivers.iec.goose_facade import GooseFacade
-        facade = GooseFacade()
-        facade.load_points(server)
+        from starfish.adapters.drivers.iec.goose_driver_adapter import GooseDriverAdapter
+        adapter = GooseDriverAdapter(backend_factory.create_goose_backend())
+        adapter.load_points(server)
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
             reason=f"protocol={protocol} -> GOOSE environment-pending stub "
                    f"(需 L2 veth 网络环境，不可 localhost 回环)",
@@ -443,13 +451,13 @@ def create_driver_for_endpoint(
 
     # SV (Sampled Values): L2 veth + PTP 时间同步
     if protocol == "SV":
-        from starfish.adapters.drivers.iec.sv_facade import SvFacade
-        facade = SvFacade()
-        facade.load_points(server)
+        from starfish.adapters.drivers.iec.sv_driver_adapter import SvDriverAdapter
+        adapter = SvDriverAdapter(backend_factory.create_sv_backend())
+        adapter.load_points(server)
         return DriverEntry(
             server=server,
             endpoint=endpoint,
-            driver=facade,
+            driver=adapter,
             available=True,
             reason=f"protocol={protocol} -> SV environment-pending stub "
                    f"(需 L2 veth 网络环境 + 硬件 PTP 时间同步)",
@@ -457,15 +465,15 @@ def create_driver_for_endpoint(
         )
 
     # fallback: in-memory stub
-    from starfish.adapters.drivers.simulator.server_simulator_facade import ServerSimulatorFacade
-    facade = ServerSimulatorFacade()
-    facade.load_points(server)
+    from starfish.adapters.drivers.simulator.server_simulator_driver_adapter import ServerSimulatorDriverAdapter
+    adapter = ServerSimulatorDriverAdapter(backend_factory.create_simulator_backend())
+    adapter.load_points(server)
     return DriverEntry(
         server=server,
         endpoint=endpoint,
-        driver=facade,
+        driver=adapter,
         available=True,
-        reason=f"protocol={protocol} -> in-memory stub facade (mode=stub)",
+        reason=f"protocol={protocol} -> in-memory stub adapter (mode=stub)",
         mode="stub",
     )
 
@@ -505,7 +513,7 @@ def get_real_protocols() -> list[str]:
     return sorted(_REAL_PROTOCOLS)
 
 
-def get_lightweight_protocols() -> list[str]:
+def get_lightweight_protocols(backend_factory: DriverBackendFactory | None = None) -> list[str]:
     """返回已实现轻量级端点的协议列表。
 
     MODBUS_RTU 动态决定：PTY 可用时为 rtu-lightweight 模式。
@@ -514,9 +522,9 @@ def get_lightweight_protocols() -> list[str]:
         协议名列表（如 ["MODBUS_RTU", "MQTT"]）。
     """
     result = sorted(_LIGHTWEIGHT_PROTOCOLS - {"MODBUS_RTU"})
-    # 动态判断 MODBUS_RTU 是否在 lightweight 集合中
-    from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
-    pty_ok, _ = probe_modbus_rtu_binary()
+    pty_ok = False
+    if backend_factory is not None:
+        pty_ok, _ = backend_factory.probe_binary("MODBUS_RTU")
     if pty_ok:
         result.append("MODBUS_RTU")
         result.sort()
@@ -534,8 +542,8 @@ def get_native_runner_protocols() -> list[str]:
     return sorted(_NATIVE_RUNNER_PROTOCOLS)
 
 
-def get_codec_skeleton_protocols() -> list[str]:
-    """返回编解码器骨架就绪的协议列表（Round 14 新增）。
+def get_codec_skeleton_protocols(backend_factory: DriverBackendFactory | None = None) -> list[str]:
+    """返回编解码器骨架就绪的协议列表。
 
     这些协议有编解码器骨架实现，但缺少完整 server 能力。
     IEC101 动态决定：基础编解码器可用时（未升级到 codec-enhanced）为
@@ -545,35 +553,45 @@ def get_codec_skeleton_protocols() -> list[str]:
         协议名列表（如 ["IEC101", "IEC_101"]）。
     """
     result: list[str] = []
-    from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-    if Iec101Facade().mode == "codec-skeleton":
+    if backend_factory is not None:
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        adapter = Iec101DriverAdapter(backend_factory.create_iec101_backend())
+        mode = adapter.mode
+    else:
+        mode = "codec-skeleton"
+    if mode == "codec-skeleton":
         result.extend(["IEC101", "IEC_101"])
         result.sort()
     return result
 
 
-def get_codec_enhanced_protocols() -> list[str]:
-    """返回编解码器增强就绪的协议列表（Round 15 新增）。
+def get_codec_enhanced_protocols(backend_factory: DriverBackendFactory | None = None) -> list[str]:
+    """返回编解码器增强就绪的协议列表。
 
     这些协议有增强编解码器实现（信息体 + ASDU 列表 + 链路层帧），
     但缺少完整 server 能力。
     IEC101 动态决定：增强编解码器全部组件可用时为 codec-enhanced 模式。
-    注意：Round 16 引入 codec-enhanced-plus 高阶模式，当处于 plus 时
+    注意：codec-enhanced-plus 是更高阶模式，当处于 plus 时
     仍视为已满足 codec-enhanced 增强基线。
 
     Returns:
         协议名列表（如 ["IEC101", "IEC_101"]）。
     """
     result: list[str] = []
-    from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-    if Iec101Facade().mode in ("codec-enhanced", "codec-enhanced-plus"):
+    if backend_factory is not None:
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        adapter = Iec101DriverAdapter(backend_factory.create_iec101_backend())
+        mode = adapter.mode
+    else:
+        mode = "codec-enhanced-plus"
+    if mode in ("codec-enhanced", "codec-enhanced-plus"):
         result.extend(["IEC101", "IEC_101"])
         result.sort()
     return result
 
 
-def get_codec_enhanced_plus_protocols() -> list[str]:
-    """返回编解码器时间增强就绪的协议列表（Round 16 新增）。
+def get_codec_enhanced_plus_protocols(backend_factory: DriverBackendFactory | None = None) -> list[str]:
+    """返回编解码器时间增强就绪的协议列表。
 
     这些协议有时间增强编解码器（CP56Time2a + 带时标 TypeID +
     C_SC_NA_1 QU 结构化 + link-layer skeleton），但 link-layer 仅为
@@ -585,17 +603,22 @@ def get_codec_enhanced_plus_protocols() -> list[str]:
         协议名列表（如 ["IEC101", "IEC_101"]）。
     """
     result: list[str] = []
-    from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-    if Iec101Facade().mode == "codec-enhanced-plus":
+    if backend_factory is not None:
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        adapter = Iec101DriverAdapter(backend_factory.create_iec101_backend())
+        mode = adapter.mode
+    else:
+        mode = "codec-enhanced-plus"
+    if mode == "codec-enhanced-plus":
         result.extend(["IEC101", "IEC_101"])
         result.sort()
     return result
 
 
-def get_codebase_pending_protocols() -> list[str]:
+def get_codebase_pending_protocols(backend_factory: DriverBackendFactory | None = None) -> list[str]:
     """返回 codebase-pending 状态的协议列表。
 
-    这些协议有 facade 定义，但实现代码（binary 或 Python 原生实现）尚未就绪。
+    这些协议有 adapter 定义，但实现代码（binary 或 Python 原生实现）尚未就绪。
     MODBUS_RTU 动态决定：PTY 可用时为 rtu-lightweight 模式，
     PTY 不可用时为 codebase-pending。
     IEC101 动态决定：编解码器和 binary 均不可用时为 codebase-pending。
@@ -605,21 +628,26 @@ def get_codebase_pending_protocols() -> list[str]:
         含 "MODBUS_RTU" 当 PTY 不可用时，含 "IEC101"/"IEC_101" 当全部不可用时）。
     """
     result = sorted(_CODABASE_PENDING_PROTOCOLS)
-    # 动态判断 MODBUS_RTU
-    from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
-    pty_ok, _ = probe_modbus_rtu_binary()
+    pty_ok = False
+    if backend_factory is not None:
+        pty_ok, _ = backend_factory.probe_binary("MODBUS_RTU")
     if not pty_ok:
         result.append("MODBUS_RTU")
     # 动态判断 IEC101：编解码器和 binary 均不可用时为 codebase-pending
-    from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-    if Iec101Facade().mode == "codebase-pending":
+    if backend_factory is not None:
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        adapter = Iec101DriverAdapter(backend_factory.create_iec101_backend())
+        iec101_mode = adapter.mode
+    else:
+        iec101_mode = ""
+    if iec101_mode == "codebase-pending":
         result.append("IEC101")
         result.append("IEC_101")
     result.sort()
     return result
 
 
-def get_environment_pending_protocols() -> list[str]:
+def get_environment_pending_protocols(backend_factory: DriverBackendFactory | None = None) -> list[str]:
     """返回 environment-pending 状态的协议列表。
 
     这些协议可能有实现代码，但运行环境（L2 网络、硬件等）不满足要求。
@@ -630,8 +658,13 @@ def get_environment_pending_protocols() -> list[str]:
     """
     result = sorted(_ENVIRONMENT_PENDING_PROTOCOLS)
     # 动态判断 IEC101：binary 已编译但编解码器不可用且串口环境缺失时为 environment-pending
-    from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-    if Iec101Facade().mode == "environment-pending":
+    if backend_factory is not None:
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        adapter = Iec101DriverAdapter(backend_factory.create_iec101_backend())
+        iec101_mode = adapter.mode
+    else:
+        iec101_mode = ""
+    if iec101_mode == "environment-pending":
         result.append("IEC101")
         result.append("IEC_101")
         result.sort()

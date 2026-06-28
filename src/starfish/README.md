@@ -37,9 +37,9 @@ src/starfish/
 各目录边界如下：
 
 - `api/`: 对外统一入口，暴露 `StarfishServerManager` 和装配 API
-- `application/`: usecase / orchestration、ports 和 runtime registry，不包含具体 I/O 实现
+- `application/`: 仅包含 use_cases / ports / runtime，不包含具体 I/O 实现
 - `domain/`: 稳定契约、driver entry 值对象与协议 codec/state machine/frame
-- `adapters/`: config loader、driver factory 和各协议 facade
+- `adapters/`: config loader、driver factory 和各协议 backend
 - `infrastructure/`: native runner、process runtime、硬件或系统级支撑
 
 ## 主链路
@@ -50,8 +50,9 @@ src/starfish/
 Server Config JSON
   -> api
   -> application
-  -> adapters.config.server_config_loader
-  -> application.orchestration.registry
+  -> infrastructure.file_loaders.server_config_json_loader
+  -> application.use_cases.workflows.bootstrap
+  -> application.runtime.context
   -> adapters.drivers.factory
   -> StarfishServerManager
   -> CLI / 外部诊断调用方
@@ -61,11 +62,11 @@ Server Config JSON
 
 1. [`__main__.py`](/home/luosh/BlueCrystal/src/starfish/__main__.py)
 2. [`api/server_manager_api.py`](/home/luosh/BlueCrystal/src/starfish/api/server_manager_api.py)
-3. [`application/orchestration/service.py`](/home/luosh/BlueCrystal/src/starfish/application/orchestration/service.py)
+3. [`application/use_cases/workflows/bootstrap.py`](/home/luosh/BlueCrystal/src/starfish/application/use_cases/workflows/bootstrap.py)
 4. [`domain/server_config.py`](/home/luosh/BlueCrystal/src/starfish/domain/server_config.py)
-5. [`application/orchestration/registry.py`](/home/luosh/BlueCrystal/src/starfish/application/orchestration/registry.py)
-6. [`adapters/config/server_config_loader.py`](/home/luosh/BlueCrystal/src/starfish/adapters/config/server_config_loader.py)
-7. 一个代表性协议实现，比如 [`adapters/drivers/protocol/http/http_rest_facade.py`](/home/luosh/BlueCrystal/src/starfish/adapters/drivers/protocol/http/http_rest_facade.py)
+5. [`application/runtime/context.py`](/home/luosh/BlueCrystal/src/starfish/application/runtime/context.py)
+6. [`infrastructure/file_loaders/server_config_json_loader.py`](/home/luosh/BlueCrystal/src/starfish/infrastructure/file_loaders/server_config_json_loader.py)
+7. 一个代表性协议实现，比如 [`infrastructure/drivers/protocol/http/http_rest_server_backend.py`](/home/luosh/BlueCrystal/src/starfish/infrastructure/drivers/protocol/http/http_rest_server_backend.py)
 
 ## Manager 理解方式
 
@@ -77,7 +78,7 @@ Server Config JSON
 也就是说：
 
 - 外部用户优先面向 `StarfishServerManager`
-- 内部装配通过 `application.orchestration.registry` 和 `adapters.drivers.factory` 绑定具体 facade
+- 内部装配通过 `application.use_cases.workflows.bootstrap`、`application.runtime.context` 和 `adapters.drivers.factory` 绑定具体 backend
 
 ## mode 比协议名更重要
 

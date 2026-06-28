@@ -1,10 +1,10 @@
-"""Starfish Beckhoff ADS 协议 facade —— codebase-pending stub。
+"""Starfish Beckhoff ADS 协议 backend —— codebase-pending stub。
 
 Beckhoff ADS 是 Beckhoff TwinCAT runtime 的自动化设备规范通信协议。
 当前无可用 C/Python 原生实现，依赖 .NET runtime 和 TwinCAT ADS 库。
 本模块以 in-memory stub 模式提供基础点位管理能力，mode 恒为 "codebase-pending"。
 
-探针增强说明（Round 13）：
+探针说明：
     probe_ads_binary() 现在会检查 native/bin/ 下 ADS binary、
     探测 .NET runtime 可用性、检查 TwinCAT 相关环境变量。
     但无 Python 原生 ADS 实现，始终返回 (False, reason)。
@@ -87,13 +87,13 @@ def probe_ads_binary() -> tuple[bool, str]:
     return (False, full_reason)
 
 
-class AdsFacade:
+class AdsBackend:
     """Beckhoff ADS 协议 server 模拟门面 —— codebase-pending stub。
 
     ADS（Automation Device Specification）是 Beckhoff 自动化控制器通信协议，
     通常运行在 TwinCAT runtime 环境中，需 .NET framework 支持。
 
-    本 facade 以 in-memory 模式维护点位值，mode="codebase-pending"，
+    本 backend 以 in-memory 模式维护点位值，mode="codebase-pending"，
     表示协议实现处于待开发状态，不等同真实 ADS server。
 
     不负责：TwinCAT runtime 管理、AMS NetId 配置、ADS 路由。
@@ -123,11 +123,11 @@ class AdsFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
-        """启动 ADS facade（in-memory stub）。
+        """启动 ADS backend（in-memory stub）。
 
         仅设置内存状态，不启动任何协议 server。
         重复调用安全（幂等）。
@@ -138,7 +138,7 @@ class AdsFacade:
         self._started_at = datetime.now(timezone.utc)
 
     def stop(self) -> None:
-        """停止 ADS facade。
+        """停止 ADS backend。
 
         重置 in-memory 状态。不删除已加载的 plan 和 values。
         重复调用安全（幂等）。
@@ -150,7 +150,7 @@ class AdsFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态（含 ADS 特定诊断信息）。
+        """返回当前 backend 的可观测健康状态（含 ADS 特定诊断信息）。
 
         包含 .NET runtime 可用性和环境变量诊断信息。
 
@@ -249,7 +249,7 @@ class AdsFacade:
         """
         raise UnsupportedOperation(
             "write",
-            "AdsFacade.write 尚未实现，"
+            "AdsBackend.write 尚未实现，"
             "待 Beckhoff ADS Python 原生实现就绪后实现",
         )
 
@@ -264,7 +264,7 @@ class AdsFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "AdsFacade.subscribe 尚未实现，"
+            "AdsBackend.subscribe 尚未实现，"
             "待 Beckhoff ADS Python 原生实现就绪后实现",
         )
 
@@ -276,9 +276,9 @@ class AdsFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "AdsFacade.report 尚未实现，"
+            "AdsBackend.report 尚未实现，"
             "待 Beckhoff ADS Python 原生实现就绪后实现",
         )
 
 
-__all__ = ["AdsFacade", "probe_ads_binary"]
+__all__ = ["AdsBackend", "probe_ads_binary"]

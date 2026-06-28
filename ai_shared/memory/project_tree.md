@@ -1,672 +1,2358 @@
-# BlueCrystal 项目目录树
+# BlueCrystal Project Tree
 
-> 最后更新: 2026-06-26
-> 重建方式: `project-tree-reset`
-> 扫描边界: 基于当前工作区真实文件系统重建，包含未提交新增文件，不包含已删除旧路径
-> 默认排除: `.git`、`.conda`、`__pycache__`、`.pytest_cache`、`.mypy_cache`、`.ruff_cache`、`node_modules`、`dist`、`build`、`tmp`、日志、`.pyc` 和第三方库
+> 全量重建日期: 2026-06-28
+> 来源: 仓库真实文件扫描。
+> 用途: 导航索引；不能替代读取真实源码、测试、配置和 schema。
 
-本文件只用于导航，不替代读取真实源码、测试、配置、schema 或报告。
-`src/manta/public/imagery/` 等大体量静态瓦片资源以目录级说明记录，不逐个展开图片文件。
+## 扫描口径
 
-## 根目录
+- 原始文件数: 3718
+- 纳入导航文件数: 1936
+- 省略文件数: 1782
+- 省略范围: `.git`、虚拟环境、cache、build/dist/tmp、日志、字节码、egg-info、third_party、系统元数据、锁文件、二进制/图片/字体/压缩包等生成或第三方资产。
 
-```text
-/ (BlueCrystal)
-├── AGENTS.md                        — Codex 自动读取入口
-├── CLAUDE.md                        — Claude / Codex 共用执行规则入口
-├── README.md                        — 项目概览与开发入口
-├── pyproject.toml                   — Python 项目、pytest、ruff、mypy 配置
-├── alembic.ini                      — Alembic 迁移配置
-├── .gitignore                       — Git 忽略规则
-├── .mcp.json                        — MCP 工具配置
-├── .vscode/settings.json            — VS Code 工作区设置
-├── .claude/                         — Claude agent 与本地设置
-├── .codex/                          — Codex agent、hook 与配置
-├── .agents/                         — agent 适配层入口
-├── ai_shared/                       — 共享规则、技能、记忆、模板与报告
-├── alembic/                         — 数据库迁移脚本
-├── config/                          — 运行配置模板
-├── deploy/                          — 部署与环境编排资产
-├── docs/                            — 项目工程与测试文档
-├── scripts/                         — 本地质量门禁、环境探针和运维脚本
-├── src/                             — 主源码根
-└── tests/                           — 单元、集成、e2e、部署和性能测试
-```
-
-## Agent 配置
+## 目录树
 
 ```text
-.claude/
-├── settings.json                    — Claude 默认设置
-├── settings.local.json              — Claude 本地设置
-└── agents/
-    ├── code-implementer.md          — 实现 agent 说明
-    ├── project-steward.md           — 文档 / 目录树 agent 说明
-    └── test-validator.md            — 验证 agent 说明
-
-.codex/
-├── config.toml                      — Codex 配置
-├── hooks.json                       — Codex hook 配置
-└── agents/
-    ├── code-implementer.toml        — 实现 agent 配置
-    ├── project-steward.toml         — 文档 agent 配置
-    └── test-validator.toml          — 验证 agent 配置
-```
-
-## 共享规则、记忆与报告
-
-```text
-ai_shared/
-├── agent_config/
-│   ├── hooks/
-│   │   ├── block-dangerous-bash.py  — 危险 bash 命令阻断
-│   │   ├── block-git-write-ops.py   — Git 写操作阻断
-│   │   ├── comment-doc-gate.py      — 注释与文档门禁
-│   │   ├── docstring-cn-gate.py     — 中文 docstring 门禁
-│   │   └── no-source-lab-import-gate.sh — source_lab import 边界门禁
-│   └── skills/
-│       ├── changed-files-gate/SKILL.md — 真实变更范围门禁
-│       ├── code-quality-gate/SKILL.md — 代码质量门禁
-│       ├── commit-message/SKILL.md  — staged diff commit message 生成
-│       ├── heavy-regression/SKILL.md — 重回归矩阵说明
-│       ├── project-tree-reset/SKILL.md — 全量重建目录树
-│       ├── project-tree-update/SKILL.md — 增量更新目录树
-│       ├── requirement-trace/SKILL.md — 需求证据追踪
-│       └── rule-update/SKILL.md     — 共享规则更新
-├── memory/
-│   ├── BlueCrystal_REQ_README.md    — 需求索引
-│   ├── BlueCrystal_REQ_Project.md   — 项目级需求
-│   ├── BlueCrystal_REQ_Ingest.md    — ingest 需求
-│   ├── BlueCrystal_REQ_MessagePipeline.md — 消息管道需求
-│   ├── BlueCrystal_REQ_Storage.md   — 存储需求
-│   ├── BlueCrystal_REQ_SpeedLayer.md — 速度层需求
-│   ├── BlueCrystal_REQ_BatchLayer.md — batch layer 需求
-│   ├── BlueCrystal_REQ_BatchProcessing.md — batch processing 需求
-│   ├── BlueCrystal_REQ_ServingAggregation.md — serving / aggregation 需求
-│   ├── BlueCrystal_REQ_SharedSource.md — shared source 需求
-│   ├── BlueCrystal_REQ_SourceLab.md — source lab 历史需求
-│   ├── Octopus_REQ.md               — Octopus 需求
-│   ├── PlatformShared_REQ_Crosscutting.md — 平台共享横切需求
-│   ├── Seahorse_REQ.md              — Seahorse 需求
-│   ├── Starfish_REQ.md              — Starfish 需求
-│   ├── Turtle_REQ.md                — Turtle 需求
-│   ├── project_tree.md              — 当前目录树
-│   ├── test_index.md                — 测试资产索引
-│   ├── 总体逻辑设计.md               — 总体逻辑设计
-│   └── 业务目标与价值愿景.md          — 业务目标与价值愿景
-├── report/
-│   ├── dependency_scan_report.md    — Starfish import 边界报告
-│   ├── runtime_v2_refactor_report.md — Starfish Runtime v2 重构事实报告
-│   ├── drivers_removal_report.md    — Starfish drivers 删除报告
-│   ├── observability_v1_report.md   — Starfish runtime 可观测报告
-│   ├── registry_purification_report.md — ServerRegistry 纯化报告
-│   ├── semantic_reorg_report.md    — Starfish 语义分层重组报告
-│   ├── dependency_after_reorg.md    — 重组后依赖扫描报告
-│   ├── module_boundary_report.md    — 模块边界验证报告
-│   ├── usecase_mapping_report.md    — runtime lifecycle 到 usecase 映射
-│   ├── snapshot_example.json        — RuntimeSnapshot 示例
-│   ├── event_sample.log             — RuntimeEvent 示例流
-│   └── test_report.md               — Starfish 测试报告
-├── rules/
-│   ├── coding.md                    — 编码、接口、类型与注释规则
-│   ├── documentation.md             — 文档、目录树与规则维护
-│   ├── python-docstring-cn.md       — 中文注释与 docstring 规则
-│   ├── quality-gate.md              — 质量门禁规则
-│   ├── reporting.md                 — 反馈与报告归档规则
-│   ├── routing.md                   — 规则读取路由
-│   ├── testing.md                   — 测试规则
-│   └── validation-routing.md        — 验证路由规则
-└── templates/
-    └── coding_agent_prompt_template.txt — coding agent prompt 模板
-```
-
-## 迁移、配置、部署与脚本
-
-```text
-alembic/
-├── env.py                           — Alembic 环境入口
-├── script.py.mako                   — Alembic 迁移模板
-└── versions/
-    ├── 20260527_000001_ingest_runtime_initial.py
-    ├── 20260527_000002_add_audit_index_and_job_stagger.py
-    ├── 20260527_000003_add_idempotency_record.py
-    └── 20260527_000004_add_model_asset_tables.py
-
-config/
-├── ingest/
-│   ├── access_policy.external.example.yaml — 外部访问策略示例
-│   ├── access_policy.prodlike.yaml  — 准生产访问策略
-│   ├── audit_sink.external.example.yaml — 外部审计 sink 示例
-│   ├── endurance.prodlike.yaml      — endurance 示例配置
-│   ├── performance.prodlike.yaml    — performance 示例配置
-│   └── security_partition.example.yaml — 安全分区示例
-└── whale/
-    ├── message_pipeline.kafka.example.yaml — Kafka 管道配置示例
-    ├── message_pipeline.pulsar.example.yaml — Pulsar 管道配置示例
-    ├── speed_layer.writers.example.yaml — speed layer writer 示例
-    ├── storage.raw_archive.example.yaml — 原始归档存储示例
-    ├── storage.serving_cache.example.yaml — serving cache 示例
-    └── storage.tdengine.example.yaml — TDengine 存储示例
-
-deploy/
-├── octopus/README.md                — Octopus 部署说明
-├── turtle/README.md                 — Turtle 部署说明
-└── whale/
-    ├── README.md                    — Whale 部署总览
-    ├── .env.whale.field.example     — 现场环境变量模板
-    ├── ingest/
-    │   ├── .env.ingest.example      — ingest 环境变量模板
-    │   ├── Dockerfile               — ingest 镜像构建文件
-    │   ├── README.md                — ingest 部署说明
-    │   ├── docker-compose.ingest-dev.yaml — ingest 开发编排
-    │   └── docker-compose.ingest-prodlike.yaml — ingest 准生产编排
-    ├── message_pipeline/
-    │   ├── README.md                — L5 消息管道部署说明
-    │   └── docker-compose.whale-l5.yaml — L5 消息管道编排
-    ├── speed_layer/
-    │   ├── .env.p5.example          — P5 速度层环境模板
-    │   ├── README.md                — 速度层部署说明
-    │   └── docker-compose.p5.yml    — 速度层编排
-    └── storage/README.md            — 存储层部署说明
-
-docs/
-├── 4+1视图.md                       — 架构视图文档
-├── GIT.md                           — Git 使用说明
-├── clean_architecture.md            — Clean Architecture 说明
-├── opcua_iec61850_guide.md          — OPC UA / IEC61850 指南
-├── 代码质量与注释.md                 — 代码质量说明
-├── 工程管理.md                      — 工程管理说明
-└── 测试策略.md                      — 测试策略说明
-
-scripts/
-├── check_ads_env.py                 — ADS 环境探针
-├── check_l2_goose_sv_env.py         — GOOSE / SV L2 环境探针
-├── check_l5_field_readback_env.py   — L5 读回环境探针
-├── check_serial_env.py              — 串口环境探针
-├── ci_ingest_runtime_gate.sh        — ingest CI 运行时门禁
-├── cleanup_root_logs.sh             — 根目录日志清理
-├── diagnose_whale_p5_dependencies.sh — P5 依赖诊断
-├── run_quality_gate.py              — 本地质量门禁入口
-├── run_ingest_*.sh                  — ingest smoke / compose / fault / performance 脚本
-├── run_pg_migration_matrix.sh       — PG / SQLite 迁移矩阵
-├── run_whale_*.sh                   — Whale 现场、L5、P5、writer 脚本
-├── start_whale_p5_dependencies.sh   — 启动 P5 外部依赖
-├── stop_whale_p5_dependencies.sh    — 停止 P5 外部依赖
-├── test_ingest_write_readback_smoke_contract.sh — 写入读回合约脚本
-├── validate_shared_source_production_runner.sh — shared source runner 校验
-└── whale_test.sh                    — Whale 测试总入口
-```
-
-## 主源码 `src/`
-
-### 包元数据
-
-```text
-src/
-├── bluecrystal.egg-info/            — BlueCrystal 本地包元数据
-└── whale.egg-info/                  — Whale 本地包元数据
-```
-
-### `src/platform_shared/` — 平台共享基础能力
-
-```text
-src/platform_shared/
-├── __init__.py                      — 平台共享包入口
-├── contracts/__init__.py            — 公共契约命名空间
-├── kernel/__init__.py               — kernel 命名空间
-├── messaging/__init__.py            — messaging 命名空间
-├── security_primitives/
-│   ├── __init__.py                  — 安全原语入口
-│   └── masking.py                   — 脱敏工具
-└── crosscutting/
-    ├── __init__.py                  — 横切能力入口
-    ├── context/__init__.py          — 上下文命名空间
-    ├── debug/
-    │   ├── __init__.py              — debug 入口
-    │   ├── diagnostics.py           — 诊断辅助
-    │   ├── ring_buffer.py           — 环形缓冲
-    │   └── trace.py                 — trace 辅助
-    ├── observability/
-    │   ├── __init__.py              — 可观测性入口
-    │   ├── audit.py                 — 审计抽象
-    │   ├── logging.py               — 日志辅助
-    │   └── metrics.py               — 指标抽象
-    └── resilience/
-        ├── __init__.py              — 韧性能力入口
-        ├── backoff.py               — backoff 策略
-        ├── circuit_breaker.py       — 熔断器
-        ├── deadline.py              — deadline 工具
-        ├── error_classifier.py      — 错误分类
-        └── retry.py                 — retry 策略
-```
-
-### `src/seahorse/` — 场景与配置生成
-
-```text
-src/seahorse/
-├── __init__.py                      — Seahorse 包入口
-├── __main__.py                      — Seahorse CLI 入口
-├── exporters/
-│   ├── __init__.py                  — exporter 入口
-│   ├── bundle_exporter.py           — bundle 导出
-│   ├── bundle_validator.py          — bundle 校验
-│   ├── serialization.py             — 序列化工具
-│   ├── server_config_exporter.py    — server config 导出
-│   ├── server_config_validator.py   — server config 校验
-│   ├── server_plan_exporter.py      — server plan 导出兼容
-│   ├── server_plan_validator.py     — server plan 校验兼容
-│   └── timeseries_exporter.py       — 时序数据导出
-├── generators/
-│   ├── __init__.py                  — generator 入口
-│   ├── alarm_generator.py           — 告警生成
-│   └── control_result_generator.py  — 控制结果生成
-├── models/
-│   ├── __init__.py                  — 模型入口
-│   ├── bundle.py                    — bundle 模型
-│   ├── generation.py                — 生成参数模型
-│   ├── plan.py                      — plan 模型
-│   └── scenario.py                  — scenario 模型
-├── orchestration/
-│   ├── __init__.py                  — 编排入口
-│   └── scenario_generator.py        — 场景生成编排
-├── ports/
-│   ├── __init__.py                  — port 入口
-│   └── generation_strategy.py       — 生成策略 port
-├── reference_data/
-│   ├── __init__.py                  — 参考数据入口
-│   ├── gbt_30966_fields.py          — GBT 30966 字段
-│   ├── protocol_param_data.py       — 协议参数数据
-│   ├── protocol_view_defs.py        — 协议视图定义
-│   └── sample_data.py               — 样本数据
-└── strategies/
-    ├── __init__.py                  — 策略入口
-    ├── curve_generation.py          — 曲线生成策略
-    ├── random_generation.py         — 随机生成策略
-    ├── registry.py                  — 策略注册表
-    └── replay_generation.py         — 回放生成策略
-```
-
-### `src/starfish/` — 多协议 server simulator runtime
-
-```text
-src/starfish/
-├── README.md                        — Starfish 模块总览与 CLI 用法
-├── __init__.py                      — Starfish 包入口
-├── __main__.py                      — CLI 入口
-├── api/
-│   ├── __init__.py                  — API 导出入口
-│   └── server_manager_api.py        — 高层运行时 API / composition root
-├── application/
-│   ├── __init__.py                  — application 导出入口
-│   ├── orchestration/
-│   │   ├── __init__.py              — orchestration 导出入口
-│   │   ├── service.py               — config 加载与 manager 装配用例
-│   │   └── registry.py              — RuntimeGraph 构建与 binding 解析
-│   ├── ports/
-│   │   ├── __init__.py              — port 导出入口
-│   │   ├── config_loader.py         — server config 加载 port
-│   │   ├── driver_factory.py        — driver factory port
-│   │   ├── driver_port.py           — Runtime v2 driver port
-│   │   └── registry.py              — RuntimeGraph 构建 port
-│   ├── runtime/
-│   │   ├── __init__.py              — application runtime 导出入口
-│   │   ├── event.py                 — RuntimeEvent 事件模型
-│   │   ├── event_bus.py             — RuntimeEventBus 进程内事件缓冲
-│   │   ├── graph.py                 — RuntimeGraph / DriverInstance 模型
-│   │   ├── snapshot.py              — RuntimeSnapshot 快照模型
-│   │   └── state.py                 — RuntimeState 状态模型
-│   └── use_cases/
-│       ├── __init__.py              — runtime usecase 导出入口
-│       └── runtime_control.py       — start/stop/read/write/hot-swap 编排
-├── adapters/
-│   ├── __init__.py                  — adapters 层入口
-│   ├── config/
-│   │   ├── __init__.py              — config adapter 入口
-│   │   └── server_config_loader.py  — JSON config 加载与校验
-│   └── drivers/
-│       ├── __init__.py              — driver adapter 导出入口
-│       ├── factory/__init__.py      — 协议 dispatch 与 facade factory
-│       ├── ads/ads_facade.py        — ADS driver 占位
-│       ├── iec/iec101_facade.py     — IEC101 driver 与 codec 探测
-│       ├── iec/goose_facade.py      — GOOSE driver 占位
-│       ├── iec/sv_facade.py         — SV driver 占位
-│       ├── modbus/modbus_tcp_facade.py — Modbus TCP driver
-│       ├── modbus/modbus_rtu_facade.py — Modbus RTU driver
-│       ├── native/iec/iec104_facade.py — IEC104 native driver facade
-│       ├── native/iec/iec61850_mms_facade.py — IEC61850 MMS driver facade
-│       ├── native/iec/iec61850_report_facade.py — IEC61850 Report driver facade
-│       ├── native/opcua/opcua_facade.py — OPC UA native driver facade
-│       ├── protocol/http/http_rest_facade.py — HTTP REST driver
-│       ├── protocol/mqtt/mqtt_facade.py — 轻量 MQTT driver
-│       └── simulator/server_simulator_facade.py — 通用 in-memory stub driver
-├── domain/
-│   ├── __init__.py                  — domain 导出入口
-│   ├── driver.py                    — DriverEntry 值对象
-│   ├── server_config.py             — server config 契约模型
-│   └── protocols/
-│       ├── __init__.py              — domain protocol 入口
-│       ├── iec101/
-│       │   ├── __init__.py          — IEC101 编解码入口
-│       │   ├── asdu.py              — ASDU 结构
-│       │   ├── codec.py             — IEC101 codec
-│       │   ├── common_address.py    — 公共地址
-│       │   ├── frame.py             — FT1.2 帧
-│       │   ├── information_elements.py — 信息元素
-│       │   ├── information_object.py — 信息对象
-│       │   ├── ioa.py               — IOA 模型
-│       │   ├── link_layer.py        — 链路层状态机骨架
-│       │   ├── quality.py           — 质量位
-│       │   ├── time.py              — CP56Time2a 时间模型
-│       │   └── types.py             — TypeId / COT 类型
-│       └── modbus/
-│           ├── __init__.py          — Modbus protocol 入口
-│           └── register_encoding.py — Modbus 寄存器编码
-└── infrastructure/
-    ├── __init__.py                  — infrastructure 入口
-    └── native/
-        ├── __init__.py              — native 支撑入口
-        ├── CMakeLists.txt           — native runner 构建脚本
-        ├── README.md                — native runner 说明
-        ├── runtime.py               — native runner 环境定位
-        ├── process_handle.py        — 子进程句柄管理
-        ├── runner_probe.py          — binary 探针
-        ├── runner_spec.py           — runner 元数据模型
-        ├── bin/                     — 预编译 runner / simulator 二进制
-        ├── lib60870/                — IEC101 / IEC104 C runner 源码
-        ├── libiec61850/             — IEC61850 C runner 源码
-        ├── libmodbus/               — Modbus C runner 源码
-        └── open62541/               — OPC UA C runner 源码
-```
-
-### `src/whale/` — 数据采集、消息、存储与速度层
-
-```text
-src/whale/
-├── __init__.py                      — Whale 包入口
-├── aggregation/
-│   ├── __init__.py                  — 聚合入口
-│   ├── ads.py                       — ADS 聚合骨架
-│   ├── periodic.py                  — 周期聚合骨架
-│   └── realtime.py                  — 实时聚合骨架
-├── ingest/
-│   ├── __init__.py                  — ingest 入口
-│   ├── composition.py               — 依赖装配根
-│   ├── config.py                    — ingest 配置
-│   ├── message_pipeline.py          — ingest 消息管道编排
-│   ├── adapters/                    — audit/config/message/observability/security/source/state 适配器
-│   ├── api/                         — FastAPI app、middleware、routes、schemas
-│   ├── bundle/                      — bundle checksum/model/redaction/service
-│   ├── decorators/                  — source acquisition/write/state cache 装饰器
-│   ├── diagnostics/                 — capacity/probe/profile 诊断
-│   ├── docs/                        — ingest 决策与设计说明
-│   ├── domain/                      — audit event 与 write security profile
-│   ├── entities/                    — node/source health state
-│   ├── file_ingest/                 — 文件接入 decoder/detector/model/repository/service
-│   ├── framework/persistence/       — ORM base、init_db、runtime_db、session
-│   ├── ports/                       — audit、diagnostics、message、metrics、runtime、source、state ports
-│   ├── runtime/                     — CLI、entrypoint、scheduler、lease、worker runtime
-│   └── usecases/                    — acquisition、command、state publish use cases
-├── message_pipeline/
-│   ├── __init__.py                  — 消息管道入口
-│   ├── model.py                     — envelope / topic 模型
-│   ├── ports.py                     — pipeline ports
-│   └── adapters/
-│       ├── __init__.py              — adapter 入口
-│       ├── in_memory.py             — 内存消息总线
-│       ├── kafka.py                 — Kafka adapter
-│       └── pulsar.py                — Pulsar adapter
-├── model_asset/
-│   ├── __init__.py                  — 模型资产入口
-│   ├── archive.py                   — 资产归档
-│   ├── detector.py                  — 文件类型探测
-│   ├── models.py                    — DTO / 模型
-│   ├── repository.py                — 仓储
-│   └── service.py                   — 导入服务
-├── processing/
-│   ├── __init__.py                  — processing 入口
-│   ├── cleaner.py                   — 清洗骨架
-│   └── normalizer.py                — 标准化骨架
-├── shared/
-│   ├── __init__.py                  — shared 入口
-│   ├── enums/quality.py             — 质量枚举
-│   ├── persistence/                 — shared ORM、session、模板数据
-│   ├── source/                      — HTTP/IEC/Modbus/MQTT/OPC UA source reader 与 backend
-│   └── utils/time.py                — 时间工具
-├── speed_layer/
-│   ├── __init__.py                  — 速度层入口
-│   ├── light_processor.py           — 轻处理流程
-│   ├── metrics.py                   — 指标抽象
-│   ├── runner.py                    — 本地 / Flink runner
-│   ├── writers.py                   — 写入器
-│   └── preprocessing/
-│       ├── __init__.py              — 预处理入口
-│       ├── models.py                — 预处理模型
-│       ├── operators.py             — 预处理算子
-│       ├── pipeline.py              — 预处理 pipeline
-│       └── registry.py              — 算子注册
-└── storage/
-    ├── __init__.py                  — 存储入口
-    ├── mart.py                      — mart sink
-    ├── raw_archive.py               — 原始归档
-    ├── raw_index.py                 — 原始索引
-    ├── serving_cache.py             — serving cache
-    ├── simulation_result.py         — 仿真结果存储
-    ├── standardized.py              — 标准化存储
-    ├── warehouse.py                 — warehouse sink
-    └── waveform.py                  — 波形存储
-```
-
-### `src/turtle/` — 治理、安全与控制面
-
-```text
-src/turtle/
-├── __init__.py                      — Turtle 包入口
-├── adapters/__init__.py             — adapter 命名空间
-├── api/__init__.py                  — API 命名空间
-├── audit/__init__.py                — audit 命名空间
-├── auth/
-│   ├── __init__.py                  — auth 入口
-│   ├── authorizer.py                — 鉴权器
-│   ├── credential.py                — 凭据模型
-│   ├── identity.py                  — 身份模型
-│   └── policy.py                    — 策略模型
-├── change_control/__init__.py       — 变更控制命名空间
-├── compliance/
-│   ├── __init__.py                  — compliance 入口
-│   ├── audit_policy.py              — 审计策略
-│   ├── data_classification.py       — 数据分级
-│   └── retention.py                 — 保留策略
-├── deployment_policy/__init__.py    — 部署策略命名空间
-├── governance/__init__.py           — 治理命名空间
-├── policy/__init__.py               — policy 命名空间
-├── ports/__init__.py                — port 命名空间
-├── risk/__init__.py                 — risk 命名空间
-├── runtime/__init__.py              — runtime 命名空间
-├── sdk/__init__.py                  — SDK 命名空间
-└── security/
-    ├── __init__.py                  — security 入口
-    ├── certificate.py               — 证书模型
-    ├── model.py                     — 安全模型
-    ├── secret_provider.py           — secret provider
-    └── tls.py                       — TLS 配置
-```
-
-### `src/octopus/` — 运维、部署与自动化命名空间
-
-```text
-src/octopus/
-├── __init__.py                      — Octopus 包入口
-├── adapters/__init__.py             — adapter 命名空间
-├── alerting/__init__.py             — 告警命名空间
-├── automation/__init__.py           — 自动化命名空间
-├── deployment/__init__.py           — 部署命名空间
-├── diagnostics/__init__.py          — 诊断命名空间
-├── monitoring/__init__.py           — 监控命名空间
-├── orchestration/__init__.py        — 编排命名空间
-├── reports/__init__.py              — 报告命名空间
-├── rollback/__init__.py             — 回滚命名空间
-└── runtime/__init__.py              — runtime 命名空间
-```
-
-### `src/manta/` — 前端控制台
-
-```text
-src/manta/
-├── package.json                     — 前端依赖与脚本
-├── pnpm-lock.yaml                   — PNPM 锁文件
-├── babel.config.js                  — Babel 配置
-├── commitlint.config.js             — commitlint 配置
-├── eslint.config.cjs                — ESLint 配置
-├── prettier.config.cjs              — Prettier 配置
-├── tsconfig.json                    — TypeScript 配置
-├── index.html                       — Vite HTML 入口
-├── echarts-gl-debug.html            — ECharts GL 调试页
-├── components.d.ts                  — 组件类型声明
-├── .env.development                 — 开发环境变量
-├── .env.production                  — 生产环境变量
-├── .prettierignore                  — Prettier 忽略规则
-├── .husky/
-│   ├── commit-msg                   — commit-msg hook
-│   └── pre-commit                   — pre-commit hook
-├── config/
-│   ├── vite.config.base.ts          — Vite 基础配置
-│   ├── vite.config.dev.ts           — Vite 开发配置
-│   ├── vite.config.prod.ts          — Vite 生产配置
-│   ├── plugin/                      — Vite 插件配置
-│   └── utils/index.ts               — Vite 工具函数
-├── docs/openapi/
-│   ├── showtime.openapi.yaml        — OpenAPI 汇总文件
-│   ├── paths/                       — data/lidar/load/message/power/user/windfarm 路径
-│   └── schemas/                     — common/data/lidar/load/message/power/user/windfarm schema
-├── public/
-│   ├── imagery/                     — 地图影像瓦片，静态资源按目录级记录
-│   ├── models/WT_10MW.glb           — 风机 3D 模型
-│   └── terrain/layer.json           — 地形 layer 配置
-└── src/
-    ├── main.ts                      — 前端应用启动入口
-    ├── App.vue                      — Vue 根组件
-    ├── env.d.ts                     — 前端环境类型
-    ├── api/                         — generated OpenAPI client、interceptor、本地数据
-    ├── assets/                      — banner、logo、全局样式
-    ├── bootstrap/cesium.ts          — Cesium 初始化
-    ├── components/                  — 面包屑、图表、菜单、导航、指标卡等组件
-    ├── config/                      — chart theme 与前端设置
-    ├── directive/                   — 权限指令
-    ├── hooks/                       — loading、locale、permission、request、theme 等 hooks
-    ├── layout/                      — 默认布局与页面布局
-    ├── locale/                      — en-US / zh-CN 语言包
-    ├── mock/                        — 各业务域 mock 数据与规则
-    ├── router/                      — 菜单、guard、routes、类型
-    ├── store/                       — app、tab-bar、user store
-    ├── types/                       — 全局、mock、lidar、power 类型
-    ├── utils/                       — auth、env、event、mock、route 工具
-    └── views/                       — dashboard、采集、激光雷达、降载、功率、登录、异常、用户视图
-```
-
-## 测试 `tests/`
-
-```text
-tests/
-├── TESTING.md                       — 测试约定
-├── __init__.py                      — 测试包入口
-├── conftest.py                      — 全局测试夹具
-├── issue_trace.md                   — 问题追踪索引
-├── deployment/README.md             — 部署测试说明
-├── architecture/                    — 架构边界测试
-├── e2e/
-│   ├── __init__.py                  — e2e 入口
-│   ├── conftest.py                  — e2e 夹具
-│   ├── helpers.py                   — e2e 辅助
-│   ├── test_whale_field_minimal_smoke.py
-│   ├── test_whale_l5_kafka_pipeline_e2e.py
-│   └── test_whale_l5_storage_e2e.py
-├── integration/
-│   ├── __init__.py                  — integration 入口
-│   ├── test_http_rest_acquisition_chain.py
-│   ├── test_iec101_acquisition_chain.py
-│   ├── test_iec104_acquisition_chain.py
-│   ├── test_modbus_rtu_acquisition_chain.py
-│   ├── test_mqtt_acquisition_chain.py
-│   ├── test_ingest_api_*.py         — ingest API CRUD、审计、鉴权、幂等、dry-run 集成测试
-│   ├── test_ingest_runtime_*.py     — runtime DB、entrypoint、migration 集成测试
-│   ├── test_ingest_scheduler_*.py   — scheduler / failover / graceful shutdown 集成测试
-│   ├── test_ingest_prodlike_*.py    — prodlike 依赖、故障、性能、worker 集成测试
-│   ├── test_ingest_*source_write.py — OPC UA / IEC104 / IEC61850 / Modbus 写入链测试
-│   ├── test_message_pipeline_*.py   — message pipeline e2e / adapter 测试
-│   ├── test_model_asset_*.py        — model asset 迁移与集成测试
-│   ├── test_speed_layer_*.py        — speed layer 集成测试
-│   ├── test_storage_*_integration.py — TDengine 存储集成测试
-│   ├── test_whale_writer_*.py       — writer failure / switchover 测试
-│   └── 其余 `test_*.py`             — Redis、SQLite、L5、bundle、observability 集成测试
-├── performance/
-│   ├── __init__.py                  — performance 入口
-│   ├── endurance/__init__.py        — endurance 分类
-│   ├── load/
-│   │   ├── __init__.py              — load 分类
-│   │   └── conftest.py              — load 夹具
-│   └── stress/
-│       ├── __init__.py              — stress 分类
-│       └── test_acquisition_pipeline_stress.py
-├── support/
-│   ├── ingest_prodlike_runtime.py   — 准生产 runtime 测试辅助
-│   ├── scada_sample_db.py           — SCADA 样本库辅助
-│   └── shared_persistence_sample_db.py — shared persistence 样本库辅助
-└── unit/
-    ├── __init__.py                  — unit 入口
-    ├── architecture/
-    │   ├── __init__.py
-    │   ├── test_seahorse_import_boundary.py
-    │   └── test_starfish_import_boundary.py
-    ├── seahorse/
-    │   ├── __init__.py
-    │   ├── test_bundle.py
-    │   ├── test_compat_wrappers.py
-    │   ├── test_generators.py
-    │   ├── test_models.py
-    │   ├── test_orchestrator.py
-    │   ├── test_reference_data_imports.py
-    │   ├── test_server_plan.py
-    │   └── test_strategies.py
-    ├── starfish/
-    │   ├── __init__.py
-    │   ├── conftest.py
-    │   ├── test_runtime_observability.py
-    │   ├── test_runtime_api.py
-    │   ├── test_runtime_v2.py
-    │   ├── test_starfish_cli.py
-    │   ├── test_server_plan_loader.py
-    │   ├── test_protocol_facade.py
-    │   ├── test_native_runner_framework.py
-    │   ├── test_probe_profile_capacity.py
-    │   ├── test_iec101_*.py
-    │   ├── test_iec61850_facade.py
-    │   ├── test_modbus_*.py
-    │   ├── test_mqtt_facade.py
-    │   ├── test_opcua_iec104_facade.py
-    │   ├── test_remaining_protocols.py
-    │   └── test_server_simulator_facade.py
-    └── test_*.py                    — Whale ingest、source、storage、speed、message、Turtle/Octopus 单测
-```
-
-## Reset 说明
-
-```text
-扫描文件总数:
-  - find 原始文件数: 3336
-  - 排除 cache / build / dist / tmp / 生成物 / `*:Zone.Identifier` 后的候选文件数: 2917
-  - `rg --files` 可导航文件数: 2885
-
-主要省略:
-  - `src/manta/public/imagery/` 大量 JPG 瓦片
-  - cache / pyc / build / dist / node_modules / third_party / 日志 / `*:Zone.Identifier`
-
-主要差异:
-  - 根目录已不存在 `requirements.txt`，本次从导航树移除。
-  - `docs/clean_architecture.md` 已纳入；`docs/clean_architecture.md:Zone.Identifier` 作为系统元数据省略。
-  - Starfish 旧 `src/starfish/drivers/`、`src/starfish/native/`、`src/starfish/protocols/` 不再作为真实源码路径记录。
-  - Starfish 新 `adapters/`、`domain/protocols/`、`infrastructure/native/`、`application/ports/` 和 `application/runtime/graph.py` 已纳入。
-  - Starfish 新 `application/use_cases/` 已纳入，runtime 执行职责从 registry 移至 usecase。
-  - Starfish 新 `application/orchestration/`、`adapters/drivers/protocol/`、`adapters/drivers/native/` 和 `adapters/drivers/factory/` 已纳入。
-  - `ai_shared/report/` Runtime v2、drivers removal 与 observability v1 报告已纳入。
-  - `src/platform_shared/crosscutting/`、`src/octopus/`、`src/manta/src/` 当前结构已纳入。
+.
+├── .claude/ — Claude agent 配置
+│   ├── agents/
+│   │   ├── code-implementer.md                 — code-implementer
+│   │   ├── project-steward.md                  — project-steward
+│   │   ├── test-validator.md                   — test-validator
+│   ├── settings.json                       — JSON 配置
+│   ├── settings.local.json                 — JSON 配置
+├── .codex/ — Codex agent 配置
+│   ├── agents/
+│   │   ├── code-implementer.toml               — TOML 配置
+│   │   ├── project-steward.toml                — TOML 配置
+│   │   ├── test-validator.toml                 — TOML 配置
+│   ├── config.toml                         — TOML 配置
+│   ├── hooks.json                          — JSON 配置
+├── .vscode/ — VS Code 工作区配置
+│   ├── settings.json                       — JSON 配置
+├── ai_shared/ — 共享规则、记忆与 agent 配置
+│   ├── agent_config/ — 共享 agent 配置
+│   │   ├── hooks/ — 安全与质量 hook
+│   │   │   ├── block-dangerous-bash.py             — 阻断明显危险的 shell 命令。
+│   │   │   ├── block-git-write-ops.py              — 阻断默认不允许的 Git/GitHub 写操作。
+│   │   │   ├── comment-doc-gate.py                 — 轻量检查 changed files 的文档注释、类型抑制和危险异常模式。
+│   │   │   ├── docstring-cn-gate.py                — 兼容旧 hook 名称；实际规则已升级为通用注释与文档注释检查。
+│   │   │   ├── no-source-lab-import-gate.sh        — Shell 脚本
+│   │   ├── skills/ — Codex/Claude skills
+│   │   │   ├── changed-files-gate/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   │   │   ├── code-quality-gate/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   │   │   ├── commit-message/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   │   │   ├── heavy-regression/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   │   │   ├── project-tree-reset/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   │   │   ├── project-tree-update/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   │   │   ├── requirement-trace/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   │   │   ├── rule-update/
+│   │   │   │   ├── SKILL.md                            — Skill 使用说明
+│   ├── memory/ — 长期记忆与需求索引
+│   │   ├── BlueCrystal_REQ_BatchLayer.md       — BlueCrystal_REQ_BatchLayer
+│   │   ├── BlueCrystal_REQ_BatchProcessing.md  — BlueCrystal_REQ_BatchProcessing
+│   │   ├── BlueCrystal_REQ_Ingest.md           — BlueCrystal_REQ_Ingest
+│   │   ├── BlueCrystal_REQ_MessagePipeline.md  — BlueCrystal_REQ_MessagePipeline
+│   │   ├── BlueCrystal_REQ_Project.md          — BlueCrystal_REQ_Project
+│   │   ├── BlueCrystal_REQ_README.md           — BlueCrystal Requirements
+│   │   ├── BlueCrystal_REQ_ServingAggregation.md — BlueCrystal_REQ_ServingAggregation
+│   │   ├── BlueCrystal_REQ_SharedSource.md     — BlueCrystal_REQ_SharedSource
+│   │   ├── BlueCrystal_REQ_SourceLab.md        — BlueCrystal_REQ_SourceLab
+│   │   ├── BlueCrystal_REQ_SpeedLayer.md       — BlueCrystal_REQ_SpeedLayer
+│   │   ├── BlueCrystal_REQ_Storage.md          — BlueCrystal_REQ_Storage
+│   │   ├── Octopus_REQ.md                      — Octopus_REQ
+│   │   ├── PlatformShared_REQ_Crosscutting.md  — PlatformShared_REQ_Crosscutting
+│   │   ├── Seahorse_REQ.md                     — Seahorse Requirements
+│   │   ├── Starfish_REQ.md                     — Starfish Requirements
+│   │   ├── Turtle_REQ.md                       — Turtle_REQ
+│   │   ├── project_tree.md                     — BlueCrystal Project Tree
+│   │   ├── test_index.md                       — BlueCrystal 测试索引
+│   │   ├── 业务目标与价值愿景.md                        — 项目白皮书：业务目标与价值愿景
+│   │   ├── 总体逻辑设计.md                           — 项目白皮书-总体逻辑设计
+│   ├── reports/ — 任务报告归档
+│   │   ├── starfish_architecture_doc_finalize.md — Starfish Clean Architecture v3.3 文档封板收尾
+│   │   ├── starfish_clean_boundary_refactor.md — Starfish Clean Boundary Refactor
+│   │   ├── starfish_strict_di_refactor.md      — Starfish Strict DI 收敛重构报告
+│   ├── rules/ — 共享执行规则
+│   │   ├── coding.md                           — 通用编码、接口、类型与注释规则
+│   │   ├── documentation.md                    — 文档、目录树与规则维护
+│   │   ├── python-docstring-cn.md              — Python 中文注释与 Google-style Docstring 规则
+│   │   ├── quality-gate.md                     — 质量门禁规则
+│   │   ├── reporting.md                        — Agent 反馈与报告归档规则
+│   │   ├── routing.md                          — 规则读取路由
+│   │   ├── testing.md                          — 测试规则
+│   │   ├── validation-routing.md               — 验证路由规则
+│   ├── templates/ — 提示模板
+│   │   ├── coding_agent_prompt_template.txt    — 文本模板
+├── alembic/ — 数据库迁移配置与版本
+│   ├── versions/ — Alembic migration 版本
+│   │   ├── 20260527_000001_ingest_runtime_initial.py — ingest runtime initial revision
+│   │   ├── 20260527_000002_add_audit_index_and_job_stagger.py — Add audit_event action/timestamp index and scheduler job stagger colum
+│   │   ├── 20260527_000003_add_idempotency_record.py — Add ingest_idempotency_record table
+│   │   ├── 20260527_000004_add_model_asset_tables.py — Add model_asset, simulation_case, simulation_result, simulation_artifa
+│   ├── env.py                              — Alembic 运行环境
+│   ├── script.py.mako                      — Alembic 模板
+├── config/ — 运行配置样例
+│   ├── ingest/
+│   │   ├── access_policy.external.example.yaml — YAML 配置
+│   │   ├── access_policy.prodlike.yaml         — YAML 配置
+│   │   ├── audit_sink.external.example.yaml    — YAML 配置
+│   │   ├── endurance.prodlike.yaml             — YAML 配置
+│   │   ├── performance.prodlike.yaml           — YAML 配置
+│   │   ├── security_partition.example.yaml     — YAML 配置
+│   ├── whale/ — Whale 模块资产
+│   │   ├── message_pipeline.kafka.example.yaml — YAML 配置
+│   │   ├── message_pipeline.pulsar.example.yaml — YAML 配置
+│   │   ├── speed_layer.writers.example.yaml    — YAML 配置
+│   │   ├── storage.raw_archive.example.yaml    — YAML 配置
+│   │   ├── storage.serving_cache.example.yaml  — YAML 配置
+│   │   ├── storage.tdengine.example.yaml       — YAML 配置
+├── deploy/ — 部署资产与 runbook
+│   ├── octopus/ — Octopus 模块资产
+│   │   ├── README.md                           — Octopus 运维编排基础能力部署
+│   ├── turtle/ — Turtle 模块资产
+│   │   ├── README.md                           — Turtle 治理基础能力部署
+│   ├── whale/ — Whale 模块资产
+│   │   ├── ingest/
+│   │   │   ├── .env.ingest.example                 — 项目文件
+│   │   │   ├── Dockerfile                          — 容器镜像构建文件
+│   │   │   ├── README.md                           — Whale Ingest 现场部署说明
+│   │   │   ├── docker-compose.ingest-dev.yaml      — YAML 配置
+│   │   │   ├── docker-compose.ingest-prodlike.yaml — YAML 配置
+│   │   ├── message_pipeline/
+│   │   │   ├── README.md                           — Whale Message Pipeline 现场部署说明
+│   │   │   ├── docker-compose.whale-l5.yaml        — YAML 配置
+│   │   ├── speed_layer/
+│   │   │   ├── .env.p5.example                     — 项目文件
+│   │   │   ├── README.md                           — Whale Speed Layer 现场部署说明
+│   │   │   ├── docker-compose.p5.yml               — YAML 配置
+│   │   ├── storage/
+│   │   │   ├── README.md                           — Whale Storage 现场部署说明
+│   │   ├── .env.whale.field.example            — 项目文件
+│   │   ├── README.md                           — Whale 现场部署
+├── docs/ — 项目长期文档
+│   ├── 4+1视图.md                            — 4+1 视图关注点与常用 UML 图形
+│   ├── GIT.md                              — Git Commit 信息前缀规范
+│   ├── clean_architecture.md               — Clean Architecture Blueprint & Standard Specification
+│   ├── opcua_iec61850_guide.md             — OPC UA × IEC 61850 通信与建模指南（扩展版）
+│   ├── 代码质量与注释.md                          — Python 工程工具与代码文档规范说明
+│   ├── 工程管理.md                             — 工程管理方法论：低成本自动化驱动的演化型增量迭代开发模型
+│   ├── 测试策略.md                             — Python 项目测试规范与目录组织建议（Codex 使用版）
+├── scripts/ — 质量门禁与运维脚本
+│   ├── check_ads_env.py                    — Beckhoff ADS 环境预检脚本。
+│   ├── check_l2_goose_sv_env.py            — Python 模块
+│   ├── check_l5_field_readback_env.py      — L5 Field Readback 环境预检脚本。
+│   ├── check_serial_env.py                 — 串口 (Serial) 环境预检脚本。
+│   ├── ci_ingest_runtime_gate.sh           — Shell 脚本
+│   ├── cleanup_root_logs.sh                — Shell 脚本
+│   ├── diagnose_whale_p5_dependencies.sh   — Shell 脚本
+│   ├── run_ingest_bundle_one_way_flow_smoke.sh — Shell 脚本
+│   ├── run_ingest_compose_readyz_e2e.sh    — Shell 脚本
+│   ├── run_ingest_dev.sh                   — Shell 脚本
+│   ├── run_ingest_pg_lease_fault_injection.sh — Shell 脚本
+│   ├── run_ingest_prodlike_dependency_smoke.sh — Shell 脚本
+│   ├── run_ingest_prodlike_endurance_smoke.sh — Shell 脚本
+│   ├── run_ingest_prodlike_performance_profile.sh — Shell 脚本
+│   ├── run_ingest_runtime_compose_smoke.sh — Shell 脚本
+│   ├── run_ingest_write_readback_smoke.sh  — Shell 脚本
+│   ├── run_pg_migration_matrix.sh          — Shell 脚本
+│   ├── run_quality_gate.py                 — CI/本地质量门禁聚合脚本。
+│   ├── run_whale_field_minimal_smoke.sh    — Shell 脚本
+│   ├── run_whale_field_quality_gate.sh     — Shell 脚本
+│   ├── run_whale_field_ready_smoke.sh      — Shell 脚本
+│   ├── run_whale_l5_external_dependency_probe.sh — Shell 脚本
+│   ├── run_whale_p5_external_dependency_regression.sh — Shell 脚本
+│   ├── run_whale_writer_switchover.sh      — Shell 脚本
+│   ├── start_whale_p5_dependencies.sh      — Shell 脚本
+│   ├── stop_whale_p5_dependencies.sh       — Shell 脚本
+│   ├── test_ingest_write_readback_smoke_contract.sh — Shell 脚本
+│   ├── validate_shared_source_production_runner.sh — Shell 脚本
+│   ├── whale_test.sh                       — Shell 脚本
+├── src/ — 产品源码
+│   ├── manta/ — Manta 前端资产
+│   │   ├── .husky/
+│   │   │   ├── commit-msg                          — 项目文件
+│   │   │   ├── pre-commit                          — 项目文件
+│   │   ├── config/ — 运行配置样例
+│   │   │   ├── plugin/
+│   │   │   │   ├── arcoResolver.ts                     — TypeScript 模块
+│   │   │   │   ├── arcoStyleImport.ts                  — TypeScript 模块
+│   │   │   │   ├── compress.ts                         — TypeScript 模块
+│   │   │   │   ├── imagemin.ts                         — TypeScript 模块
+│   │   │   │   ├── visualizer.ts                       — TypeScript 模块
+│   │   │   ├── utils/
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   ├── vite.config.base.ts                 — TypeScript 模块
+│   │   │   ├── vite.config.dev.ts                  — TypeScript 模块
+│   │   │   ├── vite.config.prod.ts                 — TypeScript 模块
+│   │   ├── docs/ — 项目长期文档
+│   │   │   ├── openapi/ — OpenAPI 文档
+│   │   │   │   ├── paths/
+│   │   │   │   │   ├── data-acquisition.yaml               — YAML 配置
+│   │   │   │   │   ├── lidar.yaml                          — YAML 配置
+│   │   │   │   │   ├── load-mitigation.yaml                — YAML 配置
+│   │   │   │   │   ├── message.yaml                        — YAML 配置
+│   │   │   │   │   ├── power-analysis.yaml                 — YAML 配置
+│   │   │   │   │   ├── turbine.yaml                        — YAML 配置
+│   │   │   │   │   ├── user-center.yaml                    — YAML 配置
+│   │   │   │   │   ├── user.yaml                           — YAML 配置
+│   │   │   │   │   ├── windfarm.yaml                       — YAML 配置
+│   │   │   │   ├── schemas/ — schema 定义
+│   │   │   │   │   ├── common.yaml                         — YAML 配置
+│   │   │   │   │   ├── data-acquisition.yaml               — YAML 配置
+│   │   │   │   │   ├── lidar.yaml                          — YAML 配置
+│   │   │   │   │   ├── load-mitigation.yaml                — YAML 配置
+│   │   │   │   │   ├── message.yaml                        — YAML 配置
+│   │   │   │   │   ├── power-analysis.yaml                 — YAML 配置
+│   │   │   │   │   ├── turbine.yaml                        — YAML 配置
+│   │   │   │   │   ├── user-center.yaml                    — YAML 配置
+│   │   │   │   │   ├── user.yaml                           — YAML 配置
+│   │   │   │   │   ├── windfarm.yaml                       — YAML 配置
+│   │   │   │   ├── showtime.openapi.yaml               — YAML 配置
+│   │   ├── public/
+│   │   │   ├── models/
+│   │   │   │   ├── WT_10MW.glb                         — 项目文件
+│   │   │   ├── terrain/
+│   │   │   │   ├── 0/
+│   │   │   │   │   ├── 0/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   ├── 1/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   ├── 1/
+│   │   │   │   │   ├── 0/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   ├── 1/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   ├── 2/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   ├── 3/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   ├── 10/
+│   │   │   │   │   ├── 1662/
+│   │   │   │   │   │   ├── 727.terrain                         — 项目文件
+│   │   │   │   │   │   ├── 728.terrain                         — 项目文件
+│   │   │   │   │   ├── 1663/
+│   │   │   │   │   │   ├── 727.terrain                         — 项目文件
+│   │   │   │   │   │   ├── 728.terrain                         — 项目文件
+│   │   │   │   ├── 11/
+│   │   │   │   │   ├── 3325/
+│   │   │   │   │   │   ├── 1454.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 1455.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 1456.terrain                        — 项目文件
+│   │   │   │   │   ├── 3326/
+│   │   │   │   │   │   ├── 1454.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 1455.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 1456.terrain                        — 项目文件
+│   │   │   │   │   ├── 3327/
+│   │   │   │   │   │   ├── 1454.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 1455.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 1456.terrain                        — 项目文件
+│   │   │   │   ├── 12/
+│   │   │   │   │   ├── 6650/
+│   │   │   │   │   │   ├── 2908.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2909.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2910.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2911.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2912.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2913.terrain                        — 项目文件
+│   │   │   │   │   ├── 6651/
+│   │   │   │   │   │   ├── 2908.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2909.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2910.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2911.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2912.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2913.terrain                        — 项目文件
+│   │   │   │   │   ├── 6652/
+│   │   │   │   │   │   ├── 2908.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2909.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2910.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2911.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2912.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2913.terrain                        — 项目文件
+│   │   │   │   │   ├── 6653/
+│   │   │   │   │   │   ├── 2908.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2909.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2910.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2911.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2912.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2913.terrain                        — 项目文件
+│   │   │   │   │   ├── 6654/
+│   │   │   │   │   │   ├── 2908.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2909.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2910.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2911.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2912.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2913.terrain                        — 项目文件
+│   │   │   │   │   ├── 6655/
+│   │   │   │   │   │   ├── 2908.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2909.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2910.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2911.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2912.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 2913.terrain                        — 项目文件
+│   │   │   │   ├── 13/
+│   │   │   │   │   ├── 13301/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13302/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13303/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13304/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13305/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13306/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13307/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13308/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13309/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   │   ├── 13310/
+│   │   │   │   │   │   ├── 5817.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5818.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5819.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5820.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5821.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5822.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5823.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5824.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5825.terrain                        — 项目文件
+│   │   │   │   │   │   ├── 5826.terrain                        — 项目文件
+│   │   │   │   ├── 2/
+│   │   │   │   │   ├── 0/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   ├── 1/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   ├── 2/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   ├── 3/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   ├── 4/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   ├── 5/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   ├── 6/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   ├── 7/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   ├── 3/
+│   │   │   │   │   ├── 0/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 1/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 10/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 11/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 12/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 13/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 14/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 15/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 2/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 3/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 4/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 5/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 6/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 7/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 8/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   ├── 9/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   ├── 4/
+│   │   │   │   │   ├── 0/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 1/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 10/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 11/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 12/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 13/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 14/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 15/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 16/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 17/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 18/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 19/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 2/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 20/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 21/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 22/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 23/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 24/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 25/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 26/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 27/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 28/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 29/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 3/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 30/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 31/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 4/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 5/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 6/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 7/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 8/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   │   ├── 9/
+│   │   │   │   │   │   ├── 0.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 1.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 10.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 11.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 12.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 13.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 14.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 15.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 2.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 3.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 4.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 5.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 6.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 7.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 8.terrain                           — 项目文件
+│   │   │   │   │   │   ├── 9.terrain                           — 项目文件
+│   │   │   │   ├── 5/
+│   │   │   │   │   ├── 51/
+│   │   │   │   │   │   ├── 22.terrain                          — 项目文件
+│   │   │   │   ├── 6/
+│   │   │   │   │   ├── 103/
+│   │   │   │   │   │   ├── 45.terrain                          — 项目文件
+│   │   │   │   ├── 7/
+│   │   │   │   │   ├── 207/
+│   │   │   │   │   │   ├── 90.terrain                          — 项目文件
+│   │   │   │   │   │   ├── 91.terrain                          — 项目文件
+│   │   │   │   ├── 8/
+│   │   │   │   │   ├── 415/
+│   │   │   │   │   │   ├── 181.terrain                         — 项目文件
+│   │   │   │   │   │   ├── 182.terrain                         — 项目文件
+│   │   │   │   ├── 9/
+│   │   │   │   │   ├── 831/
+│   │   │   │   │   │   ├── 363.terrain                         — 项目文件
+│   │   │   │   │   │   ├── 364.terrain                         — 项目文件
+│   │   │   │   ├── layer.json                          — JSON 配置
+│   │   ├── src/ — 产品源码
+│   │   │   ├── api/
+│   │   │   │   ├── generated/
+│   │   │   │   │   ├── openapi/ — OpenAPI 文档
+│   │   │   │   │   │   ├── client/
+│   │   │   │   │   │   │   ├── client.gen.ts                       — TypeScript 模块
+│   │   │   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── types.gen.ts                        — TypeScript 模块
+│   │   │   │   │   │   │   ├── utils.gen.ts                        — TypeScript 模块
+│   │   │   │   │   │   ├── core/
+│   │   │   │   │   │   │   ├── auth.gen.ts                         — TypeScript 模块
+│   │   │   │   │   │   │   ├── bodySerializer.gen.ts               — TypeScript 模块
+│   │   │   │   │   │   │   ├── params.gen.ts                       — TypeScript 模块
+│   │   │   │   │   │   │   ├── pathSerializer.gen.ts               — TypeScript 模块
+│   │   │   │   │   │   │   ├── queryKeySerializer.gen.ts           — TypeScript 模块
+│   │   │   │   │   │   │   ├── serverSentEvents.gen.ts             — TypeScript 模块
+│   │   │   │   │   │   │   ├── types.gen.ts                        — TypeScript 模块
+│   │   │   │   │   │   │   ├── utils.gen.ts                        — TypeScript 模块
+│   │   │   │   │   │   ├── client.gen.ts                       — TypeScript 模块
+│   │   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── sdk.gen.ts                          — TypeScript 模块
+│   │   │   │   │   │   ├── types.gen.ts                        — TypeScript 模块
+│   │   │   │   ├── local-data/
+│   │   │   │   │   ├── data-acquisition.ts                 — TypeScript 模块
+│   │   │   │   │   ├── lidar.ts                            — TypeScript 模块
+│   │   │   │   │   ├── load-mitigation.ts                  — TypeScript 模块
+│   │   │   │   │   ├── power-analysis.ts                   — TypeScript 模块
+│   │   │   │   ├── interceptor.ts                      — TypeScript 模块
+│   │   │   │   ├── lidar-page.ts                       — TypeScript 模块
+│   │   │   ├── assets/ — 静态资产
+│   │   │   │   ├── images/
+│   │   │   │   │   ├── default-avatar.svg                  — 项目文件
+│   │   │   │   ├── style/
+│   │   │   │   │   ├── breakpoint.less                     — 项目文件
+│   │   │   │   │   ├── global.less                         — 项目文件
+│   │   │   │   ├── logo.svg                            — 项目文件
+│   │   │   ├── bootstrap/
+│   │   │   │   ├── cesium.ts                           — TypeScript 模块
+│   │   │   ├── components/
+│   │   │   │   ├── breadcrumb/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── chart/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── footer/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── global-setting/
+│   │   │   │   │   ├── block.vue                           — Vue 组件
+│   │   │   │   │   ├── form-wrapper.vue                    — Vue 组件
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── menu/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   │   ├── use-menu-tree.ts                    — TypeScript 模块
+│   │   │   │   ├── navbar/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── overview-metric-card/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── overview-turbine-info-card/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── overview-turbine-select-card/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── tab-bar/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   │   ├── readme.md                           — 组件说明
+│   │   │   │   │   ├── tab-item.vue                        — Vue 组件
+│   │   │   │   ├── top-metric-card/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   ├── config/ — 运行配置样例
+│   │   │   │   ├── chart-theme.ts                      — TypeScript 模块
+│   │   │   │   ├── settings.json                       — JSON 配置
+│   │   │   ├── directive/
+│   │   │   │   ├── permission/
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   ├── hooks/ — 安全与质量 hook
+│   │   │   │   ├── chart-option.ts                     — TypeScript 模块
+│   │   │   │   ├── loading.ts                          — TypeScript 模块
+│   │   │   │   ├── locale.ts                           — TypeScript 模块
+│   │   │   │   ├── permission.ts                       — TypeScript 模块
+│   │   │   │   ├── request.ts                          — TypeScript 模块
+│   │   │   │   ├── responsive.ts                       — TypeScript 模块
+│   │   │   │   ├── themes.ts                           — TypeScript 模块
+│   │   │   │   ├── user.ts                             — TypeScript 模块
+│   │   │   │   ├── visible.ts                          — TypeScript 模块
+│   │   │   ├── layout/
+│   │   │   │   ├── default-layout.vue                  — Vue 组件
+│   │   │   │   ├── page-layout.vue                     — Vue 组件
+│   │   │   ├── locale/
+│   │   │   │   ├── en-US/
+│   │   │   │   │   ├── settings.ts                         — TypeScript 模块
+│   │   │   │   ├── zh-CN/
+│   │   │   │   │   ├── settings.ts                         — TypeScript 模块
+│   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   ├── mock/
+│   │   │   │   ├── data-acquisition/
+│   │   │   │   │   ├── fixtures.ts                         — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   ├── rules.ts                            — TypeScript 模块
+│   │   │   │   ├── lidar/
+│   │   │   │   │   ├── fixtures.ts                         — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   ├── rules.ts                            — TypeScript 模块
+│   │   │   │   ├── load-mitigation/
+│   │   │   │   │   ├── amplitude-structure.ts              — TypeScript 模块
+│   │   │   │   │   ├── fixtures.ts                         — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   ├── markov-matrix.ts                    — TypeScript 模块
+│   │   │   │   │   ├── optimization-evidence.ts            — TypeScript 模块
+│   │   │   │   │   ├── rules.ts                            — TypeScript 模块
+│   │   │   │   ├── message/
+│   │   │   │   │   ├── data.ts                             — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── power-analysis/
+│   │   │   │   │   ├── fixtures.ts                         — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   ├── rules.ts                            — TypeScript 模块
+│   │   │   │   ├── user/
+│   │   │   │   │   ├── data.ts                             — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── user-center/
+│   │   │   │   │   ├── data.ts                             — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── windfarm/
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   ├── turbine-data.ts                     — TypeScript 模块
+│   │   │   │   │   ├── windfarm-data.ts                    — TypeScript 模块
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   ├── router/
+│   │   │   │   ├── app-menus/
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── guard/
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   ├── permission.ts                       — TypeScript 模块
+│   │   │   │   │   ├── userLoginInfo.ts                    — TypeScript 模块
+│   │   │   │   ├── routes/
+│   │   │   │   │   ├── modules/
+│   │   │   │   │   │   ├── dashboard.ts                        — TypeScript 模块
+│   │   │   │   │   │   ├── data-acquisition.ts                 — TypeScript 模块
+│   │   │   │   │   │   ├── lidar-wind-field.ts                 — TypeScript 模块
+│   │   │   │   │   │   ├── load-mitigation.ts                  — TypeScript 模块
+│   │   │   │   │   │   ├── power-optimization.ts               — TypeScript 模块
+│   │   │   │   │   │   ├── user.ts                             — TypeScript 模块
+│   │   │   │   │   ├── base.ts                             — TypeScript 模块
+│   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   ├── types.ts                            — TypeScript 模块
+│   │   │   │   ├── constants.ts                        — TypeScript 模块
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── typings.d.ts                        — TypeScript 模块
+│   │   │   ├── store/
+│   │   │   │   ├── modules/
+│   │   │   │   │   ├── app/
+│   │   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── types.ts                            — TypeScript 模块
+│   │   │   │   │   ├── tab-bar/
+│   │   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── types.ts                            — TypeScript 模块
+│   │   │   │   │   ├── user/
+│   │   │   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── types.ts                            — TypeScript 模块
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   ├── types/
+│   │   │   │   ├── global.ts                           — TypeScript 模块
+│   │   │   │   ├── lidar.ts                            — TypeScript 模块
+│   │   │   │   ├── mock.ts                             — TypeScript 模块
+│   │   │   │   ├── power-analysis.ts                   — TypeScript 模块
+│   │   │   ├── utils/
+│   │   │   │   ├── auth.ts                             — TypeScript 模块
+│   │   │   │   ├── env.ts                              — TypeScript 模块
+│   │   │   │   ├── event.ts                            — TypeScript 模块
+│   │   │   │   ├── index.ts                            — TypeScript 模块
+│   │   │   │   ├── is.ts                               — TypeScript 模块
+│   │   │   │   ├── route-listener.ts                   — TypeScript 模块
+│   │   │   │   ├── setup-mock.ts                       — TypeScript 模块
+│   │   │   ├── views/
+│   │   │   │   ├── dashboard/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── GeoSceneViewer.locale.ts            — TypeScript 模块
+│   │   │   │   │   │   ├── GeoSceneViewer.vue                  — Vue 组件
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── data-acquisition/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── ChannelResourceCard.vue             — Vue 组件
+│   │   │   │   │   │   ├── ComputeResourceCard.vue             — Vue 组件
+│   │   │   │   │   │   ├── DataQualityAnalysisCard.vue         — Vue 组件
+│   │   │   │   │   │   ├── DeviceCommStatusCard.vue            — Vue 组件
+│   │   │   │   │   │   ├── StorageResourceCard.vue             — Vue 组件
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── exception/
+│   │   │   │   │   ├── 403/
+│   │   │   │   │   │   ├── locale/
+│   │   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   │   ├── 404/
+│   │   │   │   │   │   ├── locale/
+│   │   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   │   ├── 500/
+│   │   │   │   │   │   ├── locale/
+│   │   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── lidar-wind-filed/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── ConsistencyAlignmentChart.vue       — Vue 组件
+│   │   │   │   │   │   ├── DataQualityPanel.vue                — Vue 组件
+│   │   │   │   │   │   ├── DeviceInfoCard.vue                  — Vue 组件
+│   │   │   │   │   │   ├── LidarInflowProfilePanel.vue         — Vue 组件
+│   │   │   │   │   │   ├── LidarVolumeView.vue                 — Vue 组件
+│   │   │   │   │   │   ├── TopRealtimeWindWave.vue             — Vue 组件
+│   │   │   │   │   │   ├── TransferFunctionChart.vue           — Vue 组件
+│   │   │   │   │   │   ├── WindRoseTiStats.vue                 — Vue 组件
+│   │   │   │   │   ├── echarts-gl.d.ts                     — TypeScript 模块
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── load-mitigation/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── AmplitudeStructureComparison.vue    — Vue 组件
+│   │   │   │   │   │   ├── EnergySpectrumComparison.vue        — Vue 组件
+│   │   │   │   │   │   ├── HighAmplitudeRiskComparison.vue     — Vue 组件
+│   │   │   │   │   │   ├── ImprovementStabilityStats.vue       — Vue 组件
+│   │   │   │   │   │   ├── LoadCycleMigrationHeatmap.vue       — Vue 组件
+│   │   │   │   │   │   ├── PeakQuantileEvidence.vue            — Vue 组件
+│   │   │   │   │   │   ├── RmsImprovementOverview.vue          — Vue 组件
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── login/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── banner.vue                          — Vue 组件
+│   │   │   │   │   │   ├── login-form.vue                      — Vue 组件
+│   │   │   │   │   ├── locale/
+│   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── not-found/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── power-analysis/
+│   │   │   │   │   ├── components/
+│   │   │   │   │   │   ├── BootstrapStabilityChart.vue         — Vue 组件
+│   │   │   │   │   │   ├── DistributionShiftChart.vue          — Vue 组件
+│   │   │   │   │   │   ├── GustResponse.vue                    — Vue 组件
+│   │   │   │   │   │   ├── PowerCurveComparisonChart.vue       — Vue 组件
+│   │   │   │   │   │   ├── StatSummaryCard.vue                 — Vue 组件
+│   │   │   │   │   │   ├── TailCcdfChart.vue                   — Vue 组件
+│   │   │   │   │   │   ├── VolatilitySummary.vue               — Vue 组件
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── redirect/
+│   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── result/
+│   │   │   │   │   ├── error/
+│   │   │   │   │   │   ├── locale/
+│   │   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   │   ├── success/
+│   │   │   │   │   │   ├── locale/
+│   │   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   ├── user/
+│   │   │   │   │   ├── info/
+│   │   │   │   │   │   ├── components/
+│   │   │   │   │   │   │   ├── latest-activity.vue                 — Vue 组件
+│   │   │   │   │   │   │   ├── latest-notification.vue             — Vue 组件
+│   │   │   │   │   │   │   ├── my-project.vue                      — Vue 组件
+│   │   │   │   │   │   │   ├── my-team.vue                         — Vue 组件
+│   │   │   │   │   │   │   ├── user-info-header.vue                — Vue 组件
+│   │   │   │   │   │   ├── locale/
+│   │   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   │   │   ├── setting/
+│   │   │   │   │   │   ├── components/
+│   │   │   │   │   │   │   ├── basic-information.vue               — Vue 组件
+│   │   │   │   │   │   │   ├── certification-records.vue           — Vue 组件
+│   │   │   │   │   │   │   ├── certification.vue                   — Vue 组件
+│   │   │   │   │   │   │   ├── enterprise-certification.vue        — Vue 组件
+│   │   │   │   │   │   │   ├── security-settings.vue               — Vue 组件
+│   │   │   │   │   │   │   ├── user-panel.vue                      — Vue 组件
+│   │   │   │   │   │   ├── locale/
+│   │   │   │   │   │   │   ├── en-US.ts                            — TypeScript 模块
+│   │   │   │   │   │   │   ├── zh-CN.ts                            — TypeScript 模块
+│   │   │   │   │   │   ├── index.vue                           — Vue 组件
+│   │   │   ├── App.vue                             — Vue 组件
+│   │   │   ├── env.d.ts                            — TypeScript 模块
+│   │   │   ├── main.ts                             — TypeScript 模块
+│   │   ├── .env.development                    — 项目文件
+│   │   ├── .env.production                     — 项目文件
+│   │   ├── .prettierignore                     — 项目文件
+│   │   ├── babel.config.js                     — JavaScript 模块
+│   │   ├── commitlint.config.js                — JavaScript 模块
+│   │   ├── components.d.ts                     — TypeScript 模块
+│   │   ├── echarts-gl-debug.html               — HTML 页面
+│   │   ├── eslint.config.cjs                   — 项目文件
+│   │   ├── index.html                          — HTML 页面
+│   │   ├── package.json                        — JSON 配置
+│   │   ├── prettier.config.cjs                 — 项目文件
+│   │   ├── stylelint.config.cjs                — 项目文件
+│   │   ├── tsconfig.json                       — JSON 配置
+│   ├── octopus/ — Octopus 模块资产
+│   │   ├── adapters/ — 接口适配器实现
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── alerting/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── automation/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── deployment/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── diagnostics/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── monitoring/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── orchestration/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── reports/ — 任务报告归档
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── rollback/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── runtime/ — 运行时内核与生命周期
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── __init__.py                         — 包导出入口
+│   ├── platform_shared/ — 跨模块共享代码
+│   │   ├── contracts/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── crosscutting/
+│   │   │   ├── context/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── debug/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── diagnostics.py                      — Debug snapshot models for external runner diagnostics.
+│   │   │   │   ├── ring_buffer.py                      — Small recent-failure buffer used by debug tooling.
+│   │   │   │   ├── trace.py                            — Debug trace context and sink abstractions.
+│   │   │   ├── observability/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── audit.py                            — Helpers that bridge audit concepts into observability pipelines.
+│   │   │   │   ├── logging.py                          — Structured logging data models.
+│   │   │   │   ├── metrics.py                          — Metrics sink protocol shared by adapters and wrappers.
+│   │   │   ├── resilience/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── backoff.py                          — Backoff policy helpers.
+│   │   │   │   ├── circuit_breaker.py                  — Minimal circuit-breaker model primitives.
+│   │   │   │   ├── deadline.py                         — Deadline models for bounded operations.
+│   │   │   │   ├── error_classifier.py                 — Stable error classification models.
+│   │   │   │   ├── retry.py                            — Retry-policy models shared by wrappers and adapters.
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── kernel/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── messaging/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── security_primitives/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── masking.py                          — Helpers for masking sensitive values before they reach logs or traces.
+│   │   ├── __init__.py                         — 包导出入口
+│   ├── seahorse/ — Seahorse 模块资产
+│   │   ├── exporters/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── bundle_exporter.py                  — seahorse JSON 包导出器。
+│   │   │   ├── bundle_validator.py                 — Python 模块
+│   │   │   ├── serialization.py                    — seahorse 序列化辅助 —— 校验和计算与规范化 JSON 导出。
+│   │   │   ├── server_config_exporter.py           — seahorse ServerConfig handoff 导出入口。
+│   │   │   ├── server_config_validator.py          — seahorse ServerConfig 契约校验入口。
+│   │   │   ├── server_plan_exporter.py             — seahorse ServerConfig handoff 导出器。
+│   │   │   ├── server_plan_validator.py            — seahorse ServerConfig 契约校验器。
+│   │   │   ├── timeseries_exporter.py              — seahorse JSONL 时序导出器。
+│   │   ├── generators/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── alarm_generator.py                  — seahorse 告警事件生成器。
+│   │   │   ├── control_result_generator.py         — seahorse 控制回写响应生成器。
+│   │   ├── models/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── bundle.py                           — seahorse 核心模型 —— 场景包（ScenarioBundle）。
+│   │   │   ├── generation.py                       — seahorse 核心模型 —— 生成结果值。
+│   │   │   ├── plan.py                             — seahorse 核心模型 —— 种子计划与端点规划。
+│   │   │   ├── scenario.py                         — seahorse 核心模型 —— 场景配置、元数据与种子计划。
+│   │   ├── orchestration/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── scenario_generator.py               — Python 模块
+│   │   ├── ports/ — 抽象端口接口
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── generation_strategy.py              — seahorse 生成策略端口 —— GenerationStrategy Protocol。
+│   │   ├── reference_data/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── gbt_30966_fields.py                 — Python 模块
+│   │   │   ├── protocol_param_data.py              — Python 模块
+│   │   │   ├── protocol_view_defs.py               — 协议端点参数展平视图定义 —— seahorse 参考数据。
+│   │   │   ├── sample_data.py                      — Python 模块
+│   │   ├── strategies/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── curve_generation.py                 — Python 模块
+│   │   │   ├── random_generation.py                — seahorse 确定性随机值生成策略。
+│   │   │   ├── registry.py                         — seahorse 生成策略注册表。
+│   │   │   ├── replay_generation.py                — seahorse 回放生成策略。
+│   │   ├── __init__.py                         — 包导出入口
+│   │   ├── __main__.py                         — 模块 CLI 入口
+│   ├── starfish/ — Starfish 模块资产
+│   │   ├── adapters/ — 接口适配器实现
+│   │   │   ├── config/ — 运行配置样例
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── drivers/ — driver adapter 或 backend 实现
+│   │   │   │   ├── ads/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── ads_driver_adapter.py               — Beckhoff ADS DriverPort adapter。
+│   │   │   │   ├── factory/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── iec/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── goose_driver_adapter.py             — IEC 61850 GOOSE DriverPort adapter。
+│   │   │   │   │   ├── iec101_driver_adapter.py            — IEC 101 DriverPort adapter。
+│   │   │   │   │   ├── sv_driver_adapter.py                — IEC 61850 SV DriverPort adapter。
+│   │   │   │   ├── modbus/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── modbus_rtu_driver_adapter.py        — Modbus RTU DriverPort adapter。
+│   │   │   │   │   ├── modbus_tcp_driver_adapter.py        — Modbus TCP DriverPort adapter。
+│   │   │   │   ├── native/ — native runner 与进程支撑
+│   │   │   │   │   ├── iec/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── iec104_driver_adapter.py            — IEC 104 native DriverPort adapter。
+│   │   │   │   │   │   ├── iec61850_mms_driver_adapter.py      — IEC 61850 MMS native DriverPort adapter。
+│   │   │   │   │   │   ├── iec61850_report_driver_adapter.py   — IEC 61850 Report native DriverPort adapter。
+│   │   │   │   │   ├── opcua/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── opcua_driver_adapter.py             — OPC UA native DriverPort adapter。
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── protocol/ — 协议 driver adapter
+│   │   │   │   │   ├── http/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── http_rest_driver_adapter.py         — HTTP REST DriverPort adapter。
+│   │   │   │   │   ├── mqtt/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── mqtt_driver_adapter.py              — MQTT-like DriverPort adapter。
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── simulator/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── server_simulator_driver_adapter.py  — In-memory simulator DriverPort adapter。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── backend_ports.py                    — Driver adapter 使用的 backend 协议。
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── api/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── server_manager_api.py               — Starfish server manager API facade。
+│   │   ├── application/ — 应用层用例、端口与 runtime
+│   │   │   ├── ports/ — 抽象端口接口
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── config_loader.py                    — Server config 加载 port。
+│   │   │   │   ├── driver_factory.py                   — Driver factory port。
+│   │   │   │   ├── driver_port.py                      — 统一 DriverPort。
+│   │   │   │   ├── registry.py                         — Runtime registry port。
+│   │   │   ├── runtime/ — 运行时内核与生命周期
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── context.py                          — Starfish application runtime kernel root。
+│   │   │   │   ├── event_bus.py                        — RuntimeEvent 与 RuntimeEventBus 应用层事件缓冲。
+│   │   │   │   ├── graph.py                            — Runtime v2 application 运行图模型。
+│   │   │   │   ├── snapshot.py                         — RuntimeSnapshot 应用运行态快照模型。
+│   │   │   │   ├── state.py                            — RuntimeState 应用运行态状态模型。
+│   │   │   ├── use_cases/ — 应用用例与 workflow
+│   │   │   │   ├── workflows/ — 组合用例 workflow
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── bootstrap.py                        — Starfish runtime bootstrap workflow。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── runtime_control.py                  — Starfish runtime 控制用例。
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── domain/ — 领域模型与纯规则
+│   │   │   ├── protocols/ — 协议领域模型
+│   │   │   │   ├── iec101/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── asdu.py                             — IEC 60870-5-101 ASDU 头部编解码。
+│   │   │   │   │   ├── codec.py                            — Python 模块
+│   │   │   │   │   ├── common_address.py                   — IEC 60870-5-101 公共地址（CA）编解码。
+│   │   │   │   │   ├── frame.py                            — IEC 60870-5-101 FT1.2 链路帧编解码。
+│   │   │   │   │   ├── information_elements.py             — IEC 60870-5-101 信息体元素（Information Element）编解码。
+│   │   │   │   │   ├── information_object.py               — IEC 60870-5-101 信息对象（Information Object）编解码。
+│   │   │   │   │   ├── ioa.py                              — IEC 60870-5-101 信息对象地址（IOA）编解码。
+│   │   │   │   │   ├── link_layer.py                       — Python 模块
+│   │   │   │   │   ├── quality.py                          — IEC 60870-5-101 信息体质量描述符（Quality Descriptor）编解码。
+│   │   │   │   │   ├── time.py                             — IEC 60870-5-101 CP56Time2a 7 字节时标信息元素。
+│   │   │   │   │   ├── types.py                            — IEC 60870-5-101 协议类型标识和传输原因枚举。
+│   │   │   │   ├── modbus/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── register_encoding.py                — Modbus 寄存器值编解码工具。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── driver.py                           — starfish driver entry 领域值对象。
+│   │   │   ├── server_config.py                    — starfish 领域契约模型。
+│   │   ├── infrastructure/ — 基础设施实现
+│   │   │   ├── drivers/ — driver adapter 或 backend 实现
+│   │   │   │   ├── ads/
+│   │   │   │   │   ├── ads_backend.py                      — Starfish Beckhoff ADS 协议 backend —— codebase-pending stub。
+│   │   │   │   ├── iec/
+│   │   │   │   │   ├── goose_backend.py                    — Starfish IEC 61850 GOOSE 协议 backend —— environment-pending stub。
+│   │   │   │   │   ├── iec101_backend.py                   — Python 模块
+│   │   │   │   │   ├── sv_backend.py                       — Starfish IEC 61850 Sampled Values 协议 backend —— environment-pending st
+│   │   │   │   ├── modbus/
+│   │   │   │   │   ├── modbus_rtu_pty_backend.py           — Python 模块
+│   │   │   │   │   ├── modbus_tcp_server_backend.py        — Python 模块
+│   │   │   │   ├── native/ — native runner 与进程支撑
+│   │   │   │   │   ├── iec/
+│   │   │   │   │   │   ├── iec104_native_backend.py            — Python 模块
+│   │   │   │   │   │   ├── iec61850_mms_native_backend.py      — Python 模块
+│   │   │   │   │   │   ├── iec61850_report_native_backend.py   — Starfish IEC61850 Report 协议 backend —— report/event 语义 + ReportQueue。
+│   │   │   │   │   ├── opcua/
+│   │   │   │   │   │   ├── opcua_native_backend.py             — Python 模块
+│   │   │   │   ├── protocol/ — 协议 driver adapter
+│   │   │   │   │   ├── http/
+│   │   │   │   │   │   ├── http_rest_server_backend.py         — Starfish HTTP REST 协议真实 server backend。
+│   │   │   │   │   ├── mqtt/
+│   │   │   │   │   │   ├── mqtt_server_backend.py              — Python 模块
+│   │   │   │   ├── simulator/
+│   │   │   │   │   ├── server_simulator_backend.py         — starfish ServerSimulatorBackend —— 最小 in-memory stub 实现。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── backend_factory.py                  — Starfish driver backend 创建与探测入口。
+│   │   │   ├── file_loaders/ — 文件加载器实现
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── server_config_json_loader.py        — starfish server config JSON 驱动加载器。
+│   │   │   ├── native/ — native runner 与进程支撑
+│   │   │   │   ├── bin/
+│   │   │   │   │   ├── iec101_client_runner                — 项目文件
+│   │   │   │   │   ├── iec101_event_runner                 — 项目文件
+│   │   │   │   │   ├── iec101_simulator_slave              — 项目文件
+│   │   │   │   │   ├── iec104_client_runner                — 项目文件
+│   │   │   │   │   ├── iec104_event_runner                 — 项目文件
+│   │   │   │   │   ├── iec104_simulator_server             — 项目文件
+│   │   │   │   │   ├── iec61850_goose_publisher_simulator  — 项目文件
+│   │   │   │   │   ├── iec61850_goose_subscriber_runner    — 项目文件
+│   │   │   │   │   ├── iec61850_mms_client_runner          — 项目文件
+│   │   │   │   │   ├── iec61850_report_runner              — 项目文件
+│   │   │   │   │   ├── iec61850_simulator_server           — 项目文件
+│   │   │   │   │   ├── iec61850_sv_publisher_simulator     — 项目文件
+│   │   │   │   │   ├── iec61850_sv_subscriber_runner       — 项目文件
+│   │   │   │   │   ├── modbus_rtu_polling_runner           — 项目文件
+│   │   │   │   │   ├── modbus_simulator_server             — 项目文件
+│   │   │   │   │   ├── modbus_tcp_polling_runner           — 项目文件
+│   │   │   │   │   ├── open62541_client_runner             — 项目文件
+│   │   │   │   │   ├── open62541_source_simulator          — 项目文件
+│   │   │   │   │   ├── open62541_subscription_runner       — 项目文件
+│   │   │   │   ├── lib60870/
+│   │   │   │   │   ├── iec101_client_runner.c              — C 源码
+│   │   │   │   │   ├── iec101_event_runner.c               — C 源码
+│   │   │   │   │   ├── iec101_simulator_slave.c            — C 源码
+│   │   │   │   │   ├── iec104_client_runner.c              — C 源码
+│   │   │   │   │   ├── iec104_event_runner.c               — C 源码
+│   │   │   │   │   ├── iec104_simulator_server.c           — C 源码
+│   │   │   │   ├── libiec61850/
+│   │   │   │   │   ├── iec61850_goose_publisher_simulator.c — C 源码
+│   │   │   │   │   ├── iec61850_goose_subscriber_runner.c  — C 源码
+│   │   │   │   │   ├── iec61850_mms_client_runner.c        — C 源码
+│   │   │   │   │   ├── iec61850_report_runner.c            — C 源码
+│   │   │   │   │   ├── iec61850_simulator_server.c         — C 源码
+│   │   │   │   │   ├── iec61850_sv_publisher_simulator.c   — C 源码
+│   │   │   │   │   ├── iec61850_sv_subscriber_runner.c     — C 源码
+│   │   │   │   ├── libmodbus/
+│   │   │   │   │   ├── modbus_rtu_polling_runner.c         — C 源码
+│   │   │   │   │   ├── modbus_simulator_server.c           — C 源码
+│   │   │   │   │   ├── modbus_tcp_polling_runner.c         — C 源码
+│   │   │   │   ├── open62541/
+│   │   │   │   │   ├── open62541_client_runner.c           — C 源码
+│   │   │   │   │   ├── open62541_simulator_server.c        — C 源码
+│   │   │   │   │   ├── open62541_subscription_runner.c     — C 源码
+│   │   │   │   ├── CMakeLists.txt                      — CMake 构建配置
+│   │   │   │   ├── README.md                           — 项目总览说明
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── process_handle.py                   — Native 子进程句柄 —— NativeProcessHandle。
+│   │   │   │   ├── runner_probe.py                     — Native runner 探查函数 —— probe_native_runner。
+│   │   │   │   ├── runner_spec.py                      — Native runner 规格定义 —— NativeRunnerSpec dataclass。
+│   │   │   │   ├── runtime.py                          — starfish native runner 启动辅助。
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── README.md                           — Starfish 源码阅读指南
+│   │   ├── __init__.py                         — 包导出入口
+│   │   ├── __main__.py                         — 模块 CLI 入口
+│   │   ├── container.py                        — Starfish 默认 composition root。
+│   ├── turtle/ — Turtle 模块资产
+│   │   ├── adapters/ — 接口适配器实现
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── api/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── audit/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── auth/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── authorizer.py                       — 授权决策模型。
+│   │   │   ├── credential.py                       — 凭证引用重导出。
+│   │   │   ├── identity.py                         — 身份模型。
+│   │   │   ├── policy.py                           — 访问策略端口抽象。
+│   │   ├── change_control/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── compliance/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── audit_policy.py                     — 审计事件模型和 sink 端口。
+│   │   │   ├── data_classification.py              — 数据分类标记。
+│   │   │   ├── retention.py                        — 数据保留策略模型。
+│   │   ├── deployment_policy/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── governance/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── policy/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── ports/ — 抽象端口接口
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── risk/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── runtime/ — 运行时内核与生命周期
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── sdk/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── security/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── certificate.py                      — 证书引用重导出。
+│   │   │   ├── model.py                            — 安全引用模型。
+│   │   │   ├── secret_provider.py                  — 密钥提供方端口。
+│   │   │   ├── tls.py                              — TLS 配置模型。
+│   │   ├── __init__.py                         — 包导出入口
+│   ├── whale/ — Whale 模块资产
+│   │   ├── aggregation/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── ads.py                              — ADS business aggregations for scenario1.
+│   │   │   ├── periodic.py                         — Periodic 1-minute DWS aggregation.
+│   │   │   ├── realtime.py                         — Realtime 5-second DWS aggregation.
+│   │   ├── ingest/
+│   │   │   ├── adapters/ — 接口适配器实现
+│   │   │   │   ├── audit/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── db_audit_sink.py                    — 审计日志适配器。
+│   │   │   │   │   ├── http_audit_sink.py                  — 审计日志适配器。
+│   │   │   │   │   ├── multi_audit_sink.py                 — 可组合的审计 sink 适配器。提供多路审计事件转发和聚合错误处理。
+│   │   │   │   ├── config/ — 运行配置样例
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── opcua_source_acquisition_definition_repository.py — 配置适配器。
+│   │   │   │   │   ├── source_runtime_config_repository.py — 配置适配器。
+│   │   │   │   ├── message/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── kafka_message_publisher.py          — 消息发布适配器。
+│   │   │   │   │   ├── redis_streams_message_publisher.py  — 消息发布适配器。
+│   │   │   │   │   ├── relational_outbox_message_publisher.py — 消息发布适配器。
+│   │   │   │   ├── observability/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── file_sinks.py                       — 可观测性适配器。
+│   │   │   │   ├── security/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── external_access_policy.py           — 基于外部 HTTP 的 ingest 运行时访问策略适配器。将权限决策委托给远程授权服务。
+│   │   │   │   │   ├── file_access_policy.py               — 安全策略适配器。
+│   │   │   │   ├── source/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── dispatch_source_acquisition_adapter.py — 多协议采集端口调度适配器。
+│   │   │   │   │   ├── http_rest_source_acquisition_adapter.py — HTTP REST source 采集适配器。
+│   │   │   │   │   ├── iec101_source_acquisition_adapter.py — IEC 101 source 采集适配器。
+│   │   │   │   │   ├── iec104_source_acquisition_adapter.py — 协议采集适配器。
+│   │   │   │   │   ├── iec104_source_write_adapter.py      — 协议采集适配器。
+│   │   │   │   │   ├── iec61850_report_source_acquisition_adapter.py — IEC 61850 Report source 采集适配器。
+│   │   │   │   │   ├── iec61850_source_acquisition_adapter.py — 协议采集适配器。
+│   │   │   │   │   ├── iec61850_source_write_adapter.py    — 协议采集适配器。
+│   │   │   │   │   ├── modbus_rtu_source_acquisition_adapter.py — Modbus RTU source 采集适配器。
+│   │   │   │   │   ├── modbus_source_acquisition_adapter.py — 协议采集适配器。
+│   │   │   │   │   ├── modbus_source_write_adapter.py      — 协议采集适配器。
+│   │   │   │   │   ├── mqtt_source_acquisition_adapter.py  — MQTT source 采集适配器。
+│   │   │   │   │   ├── opcua_source_acquisition_adapter.py — OPC UA source 采集适配器。
+│   │   │   │   │   ├── opcua_source_write_adapter.py       — OPC UA source write adapter.
+│   │   │   │   │   ├── static_source_acquisition_port_registry.py — 静态 source acquisition port registry。
+│   │   │   │   │   ├── static_source_write_port_registry.py — Static source write port registry.
+│   │   │   │   ├── state/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── redis_source_state_cache.py         — Python 模块
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── api/
+│   │   │   │   ├── routes/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── acquisition_tasks.py                — 采集任务 CRUD 路由。
+│   │   │   │   │   ├── audit_events.py                     — 审计事件查询路由。
+│   │   │   │   │   ├── bundles.py                          — Bundle 元数据查询路由。
+│   │   │   │   │   ├── health.py                           — 管理 健康检查 资源的 API 路由。
+│   │   │   │   │   ├── leases.py                           — 管理 租约 资源的 API 路由。
+│   │   │   │   │   ├── nodes.py                            — 管理 节点 资源的 API 路由。
+│   │   │   │   │   ├── runtime_config.py                   — 管理 运行时配置 资源的 API 路由。
+│   │   │   │   │   ├── scheduler_jobs.py                   — 管理 调度任务 资源的 API 路由。
+│   │   │   │   │   ├── security_partitions.py              — 管理 安全分区 资源的 API 路由。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── app.py                              — Ingest FastAPI 应用工厂。
+│   │   │   │   ├── audit_middleware.py                 — 审计中间件。
+│   │   │   │   ├── errors.py                           — API 错误定义。
+│   │   │   │   ├── idempotency.py                      — 幂等键支持模块。为 ingest 运行时 CRUD API 提供防重复请求的中间件和服务。
+│   │   │   │   ├── readyz.py                           — Python 模块
+│   │   │   │   ├── schemas.py                          — Ingest 运行时 CRUD API 的 Pydantic schema 定义。
+│   │   │   ├── bundle/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── checksum.py                         — Bundle 校验和。
+│   │   │   │   ├── model.py                            — Bundle 数据模型。
+│   │   │   │   ├── redaction.py                        — Bundle 脱敏辅助函数。对 bundle 中的敏感字段按可配置规则做脱敏处理。
+│   │   │   │   ├── service.py                          — Bundle 服务。
+│   │   │   ├── decorators/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── source_acquisition.py               — Python 模块
+│   │   │   │   ├── source_write.py                     — 装饰器模块。
+│   │   │   │   ├── state_cache.py                      — 装饰器模块。
+│   │   │   ├── diagnostics/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── capacity.py                         — Ingest runtime capacity —— 轻量端点/点位/读取容量扫描。
+│   │   │   │   ├── probe.py                            — Ingest runtime probe —— 最小启动-健康-读取探测。
+│   │   │   │   ├── profile.py                          — Ingest runtime profile —— 对 read 执行 N 次采样并统计耗时。
+│   │   │   ├── docs/ — 项目长期文档
+│   │   │   │   ├── DECISIONS.md                        — Ingest 模块决策
+│   │   │   │   ├── 设计说明书.md                            — ingest 模块设计说明书
+│   │   │   ├── domain/ — 领域模型与纯规则
+│   │   │   │   ├── audit_event.py                      — 审计事件领域模型。
+│   │   │   │   ├── write_security_profile.py           — 写入安全配置文件。
+│   │   │   ├── entities/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── node_state.py                       — 节点状态实体。
+│   │   │   │   ├── source_health_state.py              — 数据源健康状态实体。
+│   │   │   ├── file_ingest/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── decoder.py                          — 文件接入专用解码器。
+│   │   │   │   ├── detector.py                         — 文件落地完成检测器。
+│   │   │   │   ├── models.py                           — 文件接入运行期数据模型与 DTO。
+│   │   │   │   ├── repository.py                       — 文件接入仓储层。
+│   │   │   │   ├── service.py                          — 文件接入服务。
+│   │   │   ├── framework/
+│   │   │   │   ├── persistence/
+│   │   │   │   │   ├── orm/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── base.py                             — SQLAlchemy 基础模型。定义 ingest 持久化层共用的 declarative base。
+│   │   │   │   │   ├── init_db.py                          — 框架基础设施。
+│   │   │   │   │   ├── runtime_db.py                       — 框架基础设施。
+│   │   │   │   │   ├── session.py                          — 框架基础设施。
+│   │   │   ├── ports/ — 抽象端口接口
+│   │   │   │   ├── command/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── source_command_audit_port.py        — 端口接口定义。
+│   │   │   │   ├── message/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── message_publisher_port.py           — 端口接口定义。
+│   │   │   │   ├── runtime/ — 运行时内核与生命周期
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── access_policy_port.py               — ingest 运行时 access policy port。
+│   │   │   │   │   ├── source_runtime_config_port.py       — ingest 运行时 source runtime config port。
+│   │   │   │   │   ├── write_lease_port.py                 — ingest 运行时 write lease port。
+│   │   │   │   ├── source/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── source_acquisition_definition_port.py — 端口接口定义。
+│   │   │   │   │   ├── source_acquisition_port.py          — source 采集端口定义。
+│   │   │   │   │   ├── source_acquisition_port_registry.py — 端口接口定义。
+│   │   │   │   │   ├── source_write_port.py                — Source write/control port for ingest.
+│   │   │   │   │   ├── source_write_port_registry.py       — 端口接口定义。
+│   │   │   │   ├── state/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── source_state_cache_port.py          — source latest-state cache 端口定义。
+│   │   │   │   │   ├── source_state_snapshot_reader_port.py — 端口接口定义。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── audit.py                            — 端口接口定义。
+│   │   │   │   ├── diagnostics.py                      — IngestRuntimeDiagnosticsPort — 采集运行时诊断端口.
+│   │   │   │   ├── metrics.py                          — Ingest 指标 port 接口。声明计数器、直方图等指标契约，由具体 sink 实现。
+│   │   │   ├── runtime/ — 运行时内核与生命周期
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── acquisition_mode.py                 — 采集模式定义。
+│   │   │   │   ├── cli.py                              — ingest CLI 入口。
+│   │   │   │   ├── entrypoint.py                       — ingest 启动入口。
+│   │   │   │   ├── fencing.py                          — Fencing token 辅助模块。提供防脑裂的 fencing token 生成和验证能力。
+│   │   │   │   ├── handlers.py                         — WorkerRuntime job handlers for ingest.
+│   │   │   │   ├── job_assignment.py                   — 任务分配逻辑。
+│   │   │   │   ├── job_status.py                       — 任务状态管理。
+│   │   │   │   ├── lease.py                            — Python 模块
+│   │   │   │   ├── message_pipeline_settings.py        — 消息管道配置。
+│   │   │   │   ├── modes.py                            — 运行模式定义。
+│   │   │   │   ├── node_runtime.py                     — 节点运行时管理。
+│   │   │   │   ├── scheduler.py                        — 采集调度器。
+│   │   │   │   ├── scheduler_factory.py                — 调度器工厂。
+│   │   │   │   ├── scheduler_job.py                    — 调度任务定义。
+│   │   │   │   ├── scheduler_settings.py               — 调度器配置。
+│   │   │   │   ├── worker_runtime.py                   — Python 模块
+│   │   │   │   ├── write_lease.py                      — Write-control specific lease guard.
+│   │   │   ├── usecases/
+│   │   │   │   ├── dtos/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── acquired_node_state.py              — 采集状态 DTO。
+│   │   │   │   │   ├── source_acquisition_request.py       — 采集请求 DTO。
+│   │   │   │   │   ├── source_acquisition_start_result.py  — SourceAcquisitionStartResult DTO — source 采集启动结果。
+│   │   │   │   │   ├── source_connection_data.py           — 采集连接 DTO。
+│   │   │   │   │   ├── source_write_request.py             — Source write request DTOs for the write/control use case.
+│   │   │   │   │   ├── source_write_result.py              — 数据传输对象。
+│   │   │   │   │   ├── state_publish_request.py            — 状态快照发布请求 DTO。承载一次发布操作所需的源标识、时间戳等参数。
+│   │   │   │   │   ├── state_publish_result.py             — 数据传输对象。
+│   │   │   │   ├── roles/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── polling_acquisition_role.py         — Polling 采集 role。
+│   │   │   │   │   ├── subscription_acquisition_role.py    — SubscriptionAcquisitionRole — 启动订阅采集 session。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── source_acquisition_use_case.py      — 统一 source 采集 usecase。
+│   │   │   │   ├── source_command_use_case.py          — Python 模块
+│   │   │   │   ├── state_snapshot_publish_use_case.py  — Python 模块
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── composition.py                      — Python 模块
+│   │   │   ├── config.py                           — ingest 配置管理。
+│   │   │   ├── message_pipeline.py                 — 消息管线抽象。定义采集数据输出的发布接口和内存实现。
+│   │   ├── message_pipeline/
+│   │   │   ├── adapters/ — 接口适配器实现
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── in_memory.py                        — 消息管道内存测试适配器。
+│   │   │   │   ├── kafka.py                            — Python 模块
+│   │   │   │   ├── pulsar.py                           — Pulsar 消息管道适配器（contract adapter）。
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── model.py                            — 消息管道领域模型。
+│   │   │   ├── ports.py                            — 消息管道端口接口。
+│   │   ├── model_asset/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── archive.py                          — 仿真归档服务。
+│   │   │   ├── detector.py                         — 仿真文件类型检测器。
+│   │   │   ├── models.py                           — 模型资产 DTO 和数据模型。
+│   │   │   ├── repository.py                       — 模型资产持久化仓库。
+│   │   │   ├── service.py                          — 模型资产导入编排服务。
+│   │   ├── processing/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── cleaner.py                          — Cleaning rules for scenario1 normalized points.
+│   │   │   ├── normalizer.py                       — Raw batch normalization for scenario1.
+│   │   ├── shared/
+│   │   │   ├── enums/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── quality.py                          — Stable enums shared across scenario pipelines.
+│   │   │   ├── persistence/
+│   │   │   │   ├── orm/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── acquisition.py                      — 采集任务与点位状态模块.
+│   │   │   │   │   ├── asset.py                            — Python 模块
+│   │   │   │   │   ├── ingest_diagnostics.py               — 采集诊断模块 — ingest_source_health 与 ingest_runtime_event.
+│   │   │   │   │   ├── ingest_runtime.py                   — Runtime persistence models for ingest API, scheduler, lease, and audit
+│   │   │   │   │   ├── model_asset.py                      — 仿真模型资产 ORM 模型。
+│   │   │   │   │   ├── organization.py                     — 组织模块.
+│   │   │   │   │   ├── scada_ingest.py                     — Python 模块
+│   │   │   │   │   ├── scada_protocol_param.py             — SCADA 协议参数模型 — 第一范式协议参数定义与值存储.
+│   │   │   │   ├── template/
+│   │   │   │   │   ├── OPCUA_client_connections.yaml       — YAML 配置
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── gbt_30966_fields.py                 — 已废弃的 GB/T 30966 字段定义模块。
+│   │   │   │   │   ├── protocol_param_data.py              — 已废弃的协议参数定义模块。
+│   │   │   │   │   ├── protocol_view_defs.py               — 已废弃的协议视图定义模块。
+│   │   │   │   │   ├── sample_data.py                      — 已废弃的 SCADA 样例数据模块。
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── base.py                             — SQLAlchemy declarative base for all Whale ORM models.
+│   │   │   │   ├── init_db.py                          — shared persistence 数据库初始化入口。
+│   │   │   │   ├── session.py                          — shared persistence 层的 SQLAlchemy engine 与 session 工具。
+│   │   │   ├── source/
+│   │   │   │   ├── access/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── adapter.py                          — Reusable source access adapter interfaces.
+│   │   │   │   │   ├── model.py                            — Reusable runtime models for source access adapters.
+│   │   │   │   │   ├── opcua.py                            — Reusable OPC UA source access adapter.
+│   │   │   │   ├── http_rest/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── client.py                           — HTTP REST 生产级 shared source backend。
+│   │   │   │   ├── iec101/
+│   │   │   │   │   ├── backends/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── base.py                             — IEC 101 backend 基础类型定义。
+│   │   │   │   │   │   ├── serial_backend.py                   — IEC 101 串行通信 backend。
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── reader.py                           — IEC 101 source reader facade。
+│   │   │   │   ├── iec104/
+│   │   │   │   │   ├── backends/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── base.py                             — IEC 104 backend base types.
+│   │   │   │   │   │   ├── lib60870_backend.py                 — IEC 104 client backend backed by native C runner subprocess.
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── reader.py                           — IEC 104 source reader/writer facade.
+│   │   │   │   ├── iec61850/
+│   │   │   │   │   ├── backends/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── base.py                             — IEC 61850 MMS backend base types.
+│   │   │   │   │   │   ├── libiec61850_backend.py              — libiec61850-based IEC 61850 MMS client backend (subprocess runner).
+│   │   │   │   │   │   ├── libiec61850_report_backend.py       — libiec61850-based IEC 61850 Report backend (subprocess runner).
+│   │   │   │   │   │   ├── report_base.py                      — IEC 61850 Report backend base types.
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── reader.py                           — IEC 61850 MMS source reader facade.
+│   │   │   │   │   ├── report_reader.py                    — IEC 61850 Report source reader facade.
+│   │   │   │   ├── modbus/
+│   │   │   │   │   ├── backends/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── base.py                             — Modbus TCP backend base types.
+│   │   │   │   │   │   ├── libmodbus_backend.py                — Modbus TCP client backend backed by native C runner subprocess.
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── reader.py                           — Modbus TCP source reader/writer facade.
+│   │   │   │   ├── modbus_rtu/
+│   │   │   │   │   ├── backends/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── base.py                             — Modbus RTU backend 基础类型定义。
+│   │   │   │   │   │   ├── serial_backend.py                   — Python 模块
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── reader.py                           — Modbus RTU source reader facade。
+│   │   │   │   ├── mqtt/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── client.py                           — MQTT 生产级 shared source backend。
+│   │   │   │   ├── opcua/
+│   │   │   │   │   ├── backends/
+│   │   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   │   ├── base.py                             — OPC UA 客户端后端抽象基类。
+│   │   │   │   │   │   ├── factory.py                          — OPC UA 客户端后端工厂。
+│   │   │   │   │   │   ├── open62541_backend.py                — Python 模块
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── reader.py                           — Open62541-backed OPC UA raw polling facade.
+│   │   │   │   ├── scheduling/
+│   │   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   │   ├── concurrency.py                      — Worker-local read concurrency control for high-frequency source pollin
+│   │   │   │   │   ├── fixed_rate.py                       — Python 模块
+│   │   │   │   │   ├── polling.py                          — Worker-local fixed-rate polling primitives for source acquisition.
+│   │   │   │   │   ├── stagger.py                          — Deterministic stagger-offset helpers for worker-local source polling.
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── models.py                           — 统一的 source 层数据模型，用于 read / subscription batch 处理。
+│   │   │   │   ├── ports.py                            — 优化后的 ports.py
+│   │   │   │   ├── runner_resolution.py                — Shared native runner path resolution for production source clients.
+│   │   │   ├── utils/
+│   │   │   │   ├── time.py                             — Time utilities for deterministic scenario processing.
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── speed_layer/
+│   │   │   ├── preprocessing/
+│   │   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   │   ├── models.py                           — speed layer 预处理 Pipeline 运行期 DTO 与 dataclass。
+│   │   │   │   ├── operators.py                        — Python 模块
+│   │   │   │   ├── pipeline.py                         — speed layer 预处理 Pipeline — 固定 10 阶段编排。
+│   │   │   │   ├── registry.py                         — speed layer 预处理 Operator / Strategy Registry。
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── light_processor.py                  — Python 模块
+│   │   │   ├── metrics.py                          — speed layer 指标收集。
+│   │   │   ├── runner.py                           — speed layer pipeline runner。
+│   │   │   ├── writers.py                          — Python 模块
+│   │   ├── storage/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── mart.py                             — 数据集市层（mart）——面向业务服务的预聚合数据。
+│   │   │   ├── raw_archive.py                      — Python 模块
+│   │   │   ├── raw_index.py                        — 原始时序索引层（raw_index）——TDengine 快速查询入口。
+│   │   │   ├── serving_cache.py                    — 业务侧近实时 serving cache 层。
+│   │   │   ├── simulation_result.py                — Python 模块
+│   │   │   ├── standardized.py                     — 标准时序层（standardized）——TDengine 清洗后数据存储。
+│   │   │   ├── warehouse.py                        — 数据仓库层（warehouse）——面向主题分析的数据存储。
+│   │   │   ├── waveform.py                         — Python 模块
+│   │   ├── __init__.py                         — 包导出入口
+├── tests/ — 测试代码
+│   ├── deployment/
+│   │   ├── README.md                           — Deployment Tests
+│   ├── e2e/ — 端到端测试
+│   │   ├── __init__.py                         — 包导出入口
+│   │   ├── conftest.py                         — E2E test fixtures: PostgreSQL + Redis + Kafka infrastructure.
+│   │   ├── helpers.py                          — Shared helpers for e2e tests — importable utilities and constants.
+│   │   ├── test_whale_field_minimal_smoke.py   — Python 模块
+│   │   ├── test_whale_l5_kafka_pipeline_e2e.py — Python 模块
+│   │   ├── test_whale_l5_storage_e2e.py        — Python 模块
+│   ├── integration/ — 集成测试
+│   │   ├── __init__.py                         — 包导出入口
+│   │   ├── test_framework_db_init.py           — Integration tests for framework database initialization.
+│   │   ├── test_http_rest_acquisition_chain.py — HTTP REST 全链路采集集成测试。
+│   │   ├── test_iec101_acquisition_chain.py    — IEC 101 全链路采集集成测试。
+│   │   ├── test_iec104_acquisition_chain.py    — IEC104 全链路采集集成测试。
+│   │   ├── test_ingest_api_acquisition_task_crud.py — Acquisition-task CRUD integration tests.
+│   │   ├── test_ingest_api_audit.py            — API audit integration tests.
+│   │   ├── test_ingest_api_authorization_deny.py — Authorization deny E2E tests for ingest runtime API.
+│   │   ├── test_ingest_api_bundle_metadata_crud.py — Bundle-metadata query API integration tests.
+│   │   ├── test_ingest_api_dry_run_all_mutating_routes.py — Python 模块
+│   │   ├── test_ingest_api_full_audit_matrix.py — Full audit matrix integration tests — verify every API action emits au
+│   │   ├── test_ingest_api_idempotency_all_mutating_routes.py — Idempotency-Key coverage across all mutating CRUD route groups.
+│   │   ├── test_ingest_api_idempotency_dry_run.py — Integration tests for API idempotency key and dry-run support.
+│   │   ├── test_ingest_api_idempotency_dry_run_interaction.py — Idempotency-Key + dry_run=true interaction tests.
+│   │   ├── test_ingest_api_node_lease_audit_query.py — Node / Lease / Audit-event query API integration tests.
+│   │   ├── test_ingest_api_runtime_config_audit.py — Runtime-config API audit tests.
+│   │   ├── test_ingest_api_runtime_config_crud.py — Runtime-config CRUD integration tests.
+│   │   ├── test_ingest_api_scheduler_job_crud.py — Scheduler-job CRUD integration tests.
+│   │   ├── test_ingest_api_security_partition_crud.py — Security-partition CRUD integration tests.
+│   │   ├── test_ingest_audit_db_jsonl_consistency.py — Audit DB/JSONL sink consistency tests.
+│   │   ├── test_ingest_audit_matrix_api_bundle_scheduler_write.py — Audit matrix tests covering API, bundle, scheduler, and write events.
+│   │   ├── test_ingest_bundle_import_export.py — Bundle import/export integration tests.
+│   │   ├── test_ingest_bundle_offline_one_way_flow.py — Offline one-way bundle flow tests.
+│   │   ├── test_ingest_cache_to_kafka_pipeline.py — Integration test: cache snapshot → StateSnapshotPublishUseCase → Kafka
+│   │   ├── test_ingest_dual_node_db_lease_e2e.py — Python 模块
+│   │   ├── test_ingest_external_access_policy_contract.py — External access policy contract tests with a local HTTP stub server.
+│   │   ├── test_ingest_external_audit_sink_contract.py — External audit/SIEM sink contract tests with a local HTTP stub server.
+│   │   ├── test_ingest_file_ingest_integration.py — 文件接入模块集成测试。
+│   │   ├── test_ingest_iec104_source_write.py  — Integration test for IEC 104 source write via SourceCommandUseCase.
+│   │   ├── test_ingest_iec61850_mms_source_write.py — Python 模块
+│   │   ├── test_ingest_iec61850_report_subscription.py — IEC 61850 Report subscription integration tests.
+│   │   ├── test_ingest_lightweight_load_gate.py — Lightweight ingest load gate with in-memory/test sinks.
+│   │   ├── test_ingest_modbus_source_write.py  — Python 模块
+│   │   ├── test_ingest_observability_sink_smoke.py — Smoke test for deployment-ready JSONL observability sinks.
+│   │   ├── test_ingest_opcua_source_write.py   — Integration test for OPC UA source write via SourceCommandUseCase.
+│   │   ├── test_ingest_polling_retry_to_redis.py — Python 模块
+│   │   ├── test_ingest_prodlike_access_policy.py — Production-like access policy integration tests.
+│   │   ├── test_ingest_prodlike_audit_metrics_resilience.py — Audit and metrics resilience tests under prodlike dependency failures.
+│   │   ├── test_ingest_prodlike_audit_sink.py  — Production-like audit sink integration tests.
+│   │   ├── test_ingest_prodlike_endurance_smoke.py — Short-duration endurance smoke for the prodlike ingest compose profile
+│   │   ├── test_ingest_prodlike_kafka_fault_injection.py — Kafka fault injection and recovery tests for prodlike ingest runtime.
+│   │   ├── test_ingest_prodlike_kafka_publish.py — Production-like Kafka publish integration tests.
+│   │   ├── test_ingest_prodlike_performance_profile.py — Performance profile conformance tests for ingest runtime.
+│   │   ├── test_ingest_prodlike_postgres_fault_injection.py — PostgreSQL fault injection and recovery tests for prodlike ingest runt
+│   │   ├── test_ingest_prodlike_postgres_runtime_db.py — Production-like PostgreSQL runtime DB integration tests.
+│   │   ├── test_ingest_prodlike_redis_cache.py — Production-like Redis cache integration tests.
+│   │   ├── test_ingest_prodlike_redis_fault_injection.py — Redis fault injection and recovery tests for prodlike ingest runtime.
+│   │   ├── test_ingest_prodlike_scheduler_backpressure.py — Scheduler backpressure, missed-tick, and assignment-lag tests.
+│   │   ├── test_ingest_prodlike_worker_failover.py — Worker crash, restart, fencing, and failover tests.
+│   │   ├── test_ingest_runtime_alembic_migration.py — Alembic migration integration tests.
+│   │   ├── test_ingest_runtime_alembic_postgres_matrix.py — Alembic PostgreSQL migration matrix — upgrade head & verify schema.
+│   │   ├── test_ingest_runtime_alembic_sqlite_matrix.py — Alembic SQLite migration matrix — upgrade head & downgrade base.
+│   │   ├── test_ingest_runtime_db_init.py      — Runtime DB initialization smoke.
+│   │   ├── test_ingest_runtime_entrypoint_smoke.py — CLI smoke tests for ingest runtime entrypoints.
+│   │   ├── test_ingest_runtime_migrate_entrypoint.py — Integration tests for the migrate CLI entrypoint.
+│   │   ├── test_ingest_scheduler_active_standby_failover.py — Active-standby scheduler failover tests.
+│   │   ├── test_ingest_scheduler_apscheduler_runtime.py — Integration tests for WorkerRuntime / APScheduler-driven ingestion.
+│   │   ├── test_ingest_scheduler_cluster_assignment.py — Cluster scheduler assignment tests.
+│   │   ├── test_ingest_scheduler_dual_active_partitioned.py — Dual-active partitioned scheduler tests.
+│   │   ├── test_ingest_scheduler_graceful_shutdown.py — Integration tests for WorkerRuntime graceful shutdown.
+│   │   ├── test_ingest_scheduler_missed_tick_and_stagger.py — Integration tests for missed_tick and stagger_offset behavior.
+│   │   ├── test_ingest_security_partition_bundle_flow.py — Security partition one-way bundle flow tests for ingest.
+│   │   ├── test_ingest_security_partition_smoke.py — Security partition sample-config smoke.
+│   │   ├── test_ingest_source_acquisition_to_redis.py — Integration test for source server -> Redis latest-state cache.
+│   │   ├── test_ingest_source_cache_message_e2e.py — Integration test for source -> cache -> message chain.
+│   │   ├── test_ingest_source_cache_message_kafka_e2e.py — Kafka container E2E for source -> cache -> message.
+│   │   ├── test_ingest_subscription_strategy.py — Integration tests for current subscription strategy boundaries.
+│   │   ├── test_ingest_worker_runtime_executes_usecase_handlers.py — Integration tests for WorkerRuntime job-type handler dispatch.
+│   │   ├── test_ingest_worker_runtime_handler_failure.py — Integration tests for WorkerRuntime handler failure and missing handle
+│   │   ├── test_ingest_worker_runtime_shutdown_inflight.py — Integration tests for WorkerRuntime shutdown with inflight jobs.
+│   │   ├── test_ingest_write_lease_fencing_e2e.py — Write lease / fencing / readback integration tests.
+│   │   ├── test_l5_external_dependency_verification.py — Python 模块
+│   │   ├── test_message_pipeline_inmemory_e2e.py — message_pipeline InMemory 全链路集成测试。
+│   │   ├── test_message_pipeline_kafka_e2e.py  — message_pipeline Kafka 集成测试（contract-only）。
+│   │   ├── test_modbus_rtu_acquisition_chain.py — Modbus RTU 全链路采集集成测试。
+│   │   ├── test_model_asset_alembic_migration.py — model_asset Alembic migration 集成测试。
+│   │   ├── test_model_asset_integration.py     — model_asset 模块集成测试。
+│   │   ├── test_model_asset_postgres_integration.py — Python 模块
+│   │   ├── test_mqtt_acquisition_chain.py      — MQTT 全链路采集集成测试。
+│   │   ├── test_redis_state_cache_faults.py    — Integration tests for live Redis latest-state cache fault handling.
+│   │   ├── test_shared_persistence_sample_data_init.py — 共享持久化样例初始化 PostgreSQL 集成测试。
+│   │   ├── test_speed_layer_dlq_replay.py      — speed layer DLQ 与 replay 语义集成测试。
+│   │   ├── test_speed_layer_index_standardized_pipeline.py — speed layer index 和 standardized 管道集成测试。
+│   │   ├── test_speed_layer_raw_archive_pipeline.py — speed layer raw_archive 管道集成测试。
+│   │   ├── test_sqlite_config_init.py          — Integration tests for the SQLite config initialization script.
+│   │   ├── test_storage_simulation_result_tdengine_integration.py — TDengine simulation_result 真实写入/读回集成测试。
+│   │   ├── test_storage_waveform_tdengine_integration.py — TDengine waveform 真实写入/读回集成测试。
+│   │   ├── test_whale_writer_failure_recovery.py — Whale writer 故障恢复集成测试。
+│   │   ├── test_whale_writer_switchover.py     — Whale writer 无缝切换集成测试。
+│   ├── performance/ — 性能测试
+│   │   ├── endurance/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   ├── load/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── conftest.py                         — Load test fixtures: PostgreSQL + Redis + Kafka, large NodeSets.
+│   │   ├── stress/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── test_acquisition_pipeline_stress.py — Current-architecture stress smoke for ingest acquisition -> Redis late
+│   │   ├── __init__.py                         — 包导出入口
+│   ├── support/ — 测试支撑代码
+│   │   ├── ingest_prodlike_runtime.py          — Shared helpers for prodlike ingest compose, endurance, and fault tests
+│   │   ├── scada_sample_db.py                  — shared persistence SCADA sample DB 测试辅助函数。
+│   │   ├── shared_persistence_sample_db.py     — Helpers for creating isolated shared persistence sample databases in t
+│   ├── unit/ — 单元测试
+│   │   ├── architecture/
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── test_seahorse_import_boundary.py    — seahorse / ingest / starfish import boundary 门禁测试。
+│   │   │   ├── test_starfish_import_boundary.py    — starfish import boundary 门禁测试。
+│   │   ├── seahorse/ — Seahorse 模块资产
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── test_bundle.py                      — Python 模块
+│   │   │   ├── test_compat_wrappers.py             — 旧路径兼容包装器测试。
+│   │   │   ├── test_generators.py                  — seahorse 生成器测试 —— 告警与控制回写。
+│   │   │   ├── test_models.py                      — seahorse 核心模型序列化与确定性种子测试。
+│   │   │   ├── test_orchestrator.py                — seahorse 最小编排器测试。
+│   │   │   ├── test_reference_data_imports.py      — seahorse reference_data 新路径 import 测试。
+│   │   │   ├── test_server_plan.py                 — seahorse ServerConfig 契约校验、handoff 导出与 CLI 测试。
+│   │   │   ├── test_strategies.py                  — Python 模块
+│   │   ├── shared/
+│   │   │   ├── persistence/
+│   │   │   │   ├── test_model_asset_orm.py             — model_asset ORM 表定义与约束单元测试。
+│   │   │   │   ├── test_scada_protocol_params.py       — SCADA 协议参数模板与 ORM 单测.
+│   │   │   │   ├── test_scada_protocol_views.py        — SCADA 协议视图单测.
+│   │   │   │   ├── test_scada_sample_data_protocol_coverage.py — SCADA 多协议样例数据覆盖单测.
+│   │   ├── starfish/ — Starfish 模块资产
+│   │   │   ├── __init__.py                         — 包导出入口
+│   │   │   ├── conftest.py                         — Starfish unit 测试子树的通用 marker 约束。
+│   │   │   ├── test_iec101_asdu_objects.py         — Starfish IEC 60870-5-101 信息对象（Information Object）测试。
+│   │   │   ├── test_iec101_codec.py                — Python 模块
+│   │   │   ├── test_iec101_ft12_frame.py           — Python 模块
+│   │   │   ├── test_iec101_information_elements.py — Python 模块
+│   │   │   ├── test_iec101_link_layer.py           — Python 模块
+│   │   │   ├── test_iec61850_facade.py             — Python 模块
+│   │   │   ├── test_modbus_register_encoding.py    — Python 模块
+│   │   │   ├── test_modbus_rtu_facade.py           — Starfish Modbus RTU PTY 轻量级 facade 测试。
+│   │   │   ├── test_mqtt_facade.py                 — Python 模块
+│   │   │   ├── test_native_runner_framework.py     — Python 模块
+│   │   │   ├── test_opcua_iec104_facade.py         — Starfish OPC_UA / IEC104 facade 测试。
+│   │   │   ├── test_probe_profile_capacity.py      — Python 模块
+│   │   │   ├── test_protocol_facade.py             — Starfish 协议专用 facade 测试。
+│   │   │   ├── test_remaining_protocols.py         — Python 模块
+│   │   │   ├── test_runtime_api.py                 — starfish 高层运行时 API 测试。
+│   │   │   ├── test_runtime_observability.py       — Runtime observability v1 单元测试。
+│   │   │   ├── test_runtime_v2.py                  — Runtime v2.2 运行图与实例化契约测试。
+│   │   │   ├── test_server_plan_loader.py          — Python 模块
+│   │   │   ├── test_server_simulator_facade.py     — starfish ServerSimulatorDriverAdapter 测试。
+│   │   │   ├── test_starfish_cli.py                — starfish CLI 测试。
+│   │   ├── __init__.py                         — 包导出入口
+│   │   ├── test_acquisition_job_handler.py     — AcquisitionJobHandler 单元测试。
+│   │   ├── test_config.py                      — Unit tests for ingest configuration resolution.
+│   │   ├── test_dual_node_write_lease_conflict.py — 双节点写入冲突与 lease/fencing 并发语义测试。
+│   │   ├── test_http_rest_backend.py           — HTTP REST client backend 单元测试。
+│   │   ├── test_http_rest_source_acquisition_adapter.py — HTTP REST 采集适配器单元测试。
+│   │   ├── test_iec101_backend.py              — IEC 101 backend 单元测试。
+│   │   ├── test_iec101_source_acquisition_adapter.py — IEC 101 source 采集适配器单元测试。
+│   │   ├── test_iec104_backend.py              — Unit tests for IEC 104 backend (stdout protocol parsing).
+│   │   ├── test_iec104_source_acquisition_adapter.py — Unit tests for IEC 104 source acquisition adapter.
+│   │   ├── test_iec104_source_write_adapter.py — Unit tests for IEC 104 source write adapter.
+│   │   ├── test_iec61850_mms_backend.py        — libiec61850 backend 单元测试。
+│   │   ├── test_iec61850_report_acquisition_adapter.py — Python 模块
+│   │   ├── test_iec61850_report_backend.py     — Python 模块
+│   │   ├── test_iec61850_source_acquisition_adapter.py — Iec61850MmsSourceAcquisitionAdapter 单元测试。
+│   │   ├── test_iec61850_source_write_adapter.py — Python 模块
+│   │   ├── test_ingest_api_app.py              — FastAPI app factory tests.
+│   │   ├── test_ingest_audit_event_schema.py   — Structured ingest audit event tests.
+│   │   ├── test_ingest_audit_redaction.py      — Unit tests for audit event redaction.
+│   │   ├── test_ingest_bundle_checksum.py      — Bundle checksum tests.
+│   │   ├── test_ingest_bundle_redaction.py     — Bundle redaction tests.
+│   │   ├── test_ingest_composition_injection.py — QA-1: composition.py 注入完整性测试。
+│   │   ├── test_ingest_file_ingest_decoder.py  — 文件接入解码器单元测试。
+│   │   ├── test_ingest_file_ingest_detector.py — 文件落地完成检测器单元测试。
+│   │   ├── test_ingest_file_ingest_models.py   — 文件接入 DTO 模型单元测试。
+│   │   ├── test_ingest_file_ingest_repository.py — 文件接入仓储层单元测试。
+│   │   ├── test_ingest_file_ingest_service.py  — 文件接入服务单元测试。
+│   │   ├── test_ingest_job_lease.py            — DB-backed lease semantics tests.
+│   │   ├── test_ingest_metrics_events.py       — Metrics event emission tests for ingest core chains.
+│   │   ├── test_ingest_no_source_lab_imports.py — 确保 ingest 生产代码不引入 tools.source_lab（目录已物理删除，此检查为历史门禁保留）。
+│   │   ├── test_ingest_observability_sink.py   — Unit tests for lightweight ingest observability sinks.
+│   │   ├── test_ingest_readyz.py               — Python 模块
+│   │   ├── test_ingest_runtime_entrypoint.py   — CLI entrypoint tests for ingest runtime.
+│   │   ├── test_ingest_runtime_modes.py        — Runtime mode parsing tests.
+│   │   ├── test_ingest_runtime_orm_models.py   — Runtime ORM model registration tests.
+│   │   ├── test_ingest_runtime_scheduler_import.py — Import smoke for the ingest runtime scheduler package.
+│   │   ├── test_ingest_security_partition_config.py — Security partition config guard tests.
+│   │   ├── test_ingest_source_adapter_capability_matrix.py — Ingest adapter capability matrix guard.
+│   │   ├── test_ingest_write_lease.py          — Write lease service tests.
+│   │   ├── test_ingest_write_lease_fencing.py  — Write lease fencing tests.
+│   │   ├── test_ingest_write_security_profile.py — Unit tests for WriteSecurityProfile domain model.
+│   │   ├── test_kafka_message_publisher.py     — Unit tests for the Kafka snapshot publisher.
+│   │   ├── test_message_pipeline_adapters.py   — message_pipeline InMemory 适配器单元测试。
+│   │   ├── test_message_pipeline_envelope.py   — message_pipeline 领域模型单元测试。
+│   │   ├── test_message_pipeline_kafka_adapter.py — Kafka message_pipeline 适配器契约与配置测试。
+│   │   ├── test_message_pipeline_ports.py      — message_pipeline 端口接口契约测试。
+│   │   ├── test_modbus_rtu_backend.py          — Modbus RTU backend 单元测试。
+│   │   ├── test_modbus_rtu_source_acquisition_adapter.py — Modbus RTU source 采集适配器单元测试。
+│   │   ├── test_modbus_source_acquisition_adapter.py — ModbusSourceAcquisitionAdapter 单元测试。
+│   │   ├── test_modbus_source_write_adapter.py — Python 模块
+│   │   ├── test_model_asset_detector.py        — model_asset detector 单元测试。
+│   │   ├── test_model_asset_models.py          — model_asset DTO 模型单元测试。
+│   │   ├── test_model_asset_repository.py      — model_asset repository 单元测试。
+│   │   ├── test_model_asset_service.py         — model_asset service 单元测试。
+│   │   ├── test_mqtt_backend.py                — MQTT client backend 单元测试。
+│   │   ├── test_mqtt_source_acquisition_adapter.py — MQTT 采集适配器单元测试。
+│   │   ├── test_opcua_adapter_resolution.py    — OPC UA adapter 地址解析单元测试。
+│   │   ├── test_opcua_source_acquisition_adapter.py — OPC UA source acquisition adapter 单元测试。
+│   │   ├── test_opcua_source_write_adapter.py  — Python 模块
+│   │   ├── test_open62541_backend.py           — Python 模块
+│   │   ├── test_polling_acquisition_role.py    — PollingAcquisitionRole 单元测试。
+│   │   ├── test_redis_source_state_cache.py    — Unit tests for the Redis latest-state cache adapter.
+│   │   ├── test_redis_streams_message_publisher.py — Unit tests for the Redis Streams snapshot publisher.
+│   │   ├── test_relational_outbox_message_publisher.py — Unit tests for the relational outbox snapshot publisher.
+│   │   ├── test_scheduler_job_routes.py        — QA-5: scheduler_job stagger_offset_ms 持久化端到端测试。
+│   │   ├── test_shared_source_runner_resolution.py — shared_source native runner path resolution boundary tests.
+│   │   ├── test_source_acquisition_port_registry.py — StaticSourceAcquisitionPortRegistry 单元测试。
+│   │   ├── test_source_acquisition_use_case.py — SourceAcquisitionUseCase 单元测试。
+│   │   ├── test_source_command_audit.py        — SourceCommandUseCase audit tests.
+│   │   ├── test_source_command_authorization_guard.py — Unit tests for AuthorizedSourceWritePort.
+│   │   ├── test_source_command_lease_release.py — QA-2: SourceCommandUseCase 异常路径 lease release 测试。
+│   │   ├── test_source_command_use_case.py     — SourceCommandUseCase 单元测试。
+│   │   ├── test_source_command_write_lease_guard.py — Source command write lease guard tests.
+│   │   ├── test_source_runtime_config_repository.py — Unit tests for the runtime-config repository.
+│   │   ├── test_source_scheduling.py           — Unit tests for the worker-local source polling kernel.
+│   │   ├── test_source_write_port_registry.py  — Source write port registry 单元测试。
+│   │   ├── test_speed_layer_light_processor.py — Python 模块
+│   │   ├── test_speed_layer_pipeline_runner.py — Python 模块
+│   │   ├── test_speed_layer_preprocessing.py   — speed layer 预处理 Pipeline Round A 测试。
+│   │   ├── test_state_snapshot_publish_use_case.py — Python 模块
+│   │   ├── test_storage_raw_archive.py         — storage raw_archive 层单元测试。
+│   │   ├── test_storage_raw_index.py           — storage raw_index 层单元测试。
+│   │   ├── test_storage_serving_cache.py       — storage serving_cache Redis 适配器单元测试。
+│   │   ├── test_storage_simulation_result.py   — storage simulation_result 单元测试。
+│   │   ├── test_storage_standardized.py        — storage standardized 层单元测试。
+│   │   ├── test_storage_waveform.py            — storage waveform 层单元测试。
+│   │   ├── test_subscription_acquisition_role.py — SubscriptionAcquisitionRole unit tests.
+│   │   ├── test_subscription_reconnect_baseline.py — Reconnect baseline read strategy tests for SubscriptionAcquisitionRole
+│   │   ├── test_subscription_reconnect_runtime.py — Subscription runtime reconnect/backoff/max-retry tests.
+│   │   ├── test_turtle_octopus_import_boundary.py — turtle/octopus 与 platform_shared 的 import boundary 门禁测试。
+│   │   ├── test_worker_runtime_do_execute.py   — WorkerRuntime._do_execute handler dispatch 单元测试。
+│   ├── TESTING.md                          — Whale 主平台测试指南
+│   ├── __init__.py                         — 包导出入口
+│   ├── conftest.py                         — Shared pytest fixtures for ingest integration tests.
+│   ├── issue_trace.md                      — 测试问题追踪
+├── .gitignore                          — Git 忽略规则
+├── .mcp.json                           — MCP 配置
+├── AGENTS.md                           — Codex/agent 仓库入口规则
+├── CLAUDE.md                           — Claude/Codex 共享执行入口
+├── README.md                           — BlueCrystal - 能源数据统一平台
+├── alembic.ini                         — Alembic 主配置
+├── pyproject.toml                      — Python 项目与工具配置
 ```

@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from starfish.adapters.config import load_server_config
+from starfish.infrastructure.file_loaders import load_server_config
 from starfish.domain.server_config import LoadResult, ValidationResult
 
 
@@ -144,7 +144,7 @@ class TestLoadServerPlanSuccess:
             "host": "127.0.0.1",
             "port": 502,
         })
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -167,7 +167,7 @@ class TestLoadServerPlanSuccess:
             "access_mode": "RO",
             "data_type": "INT32",
         })
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -182,7 +182,7 @@ class TestLoadServerPlanSuccess:
         """update_policy 应正确保留在加载结果中。"""
         payload = _make_valid_payload("up_policy")
         payload["update_policy"] = {"mode": "push", "batch_size": 10}
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -205,7 +205,7 @@ class TestLoadServerPlanSuccess:
             "int_pt": 42,
             "bool_pt": True,
         }
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -373,7 +373,7 @@ class TestLoadServerPlanValidationWarnings:
         """synthetic=False 应产生警告。"""
         payload = _make_valid_payload("syn_false")
         payload["synthetic"] = False
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         payload["payload_hash"] = _compute_payload_hash(payload)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -429,7 +429,7 @@ class TestPayloadHashVerification:
         """相同内容应产生相同 payload_hash。"""
         payload1 = _make_valid_payload("hash_det")
         payload1["generated_at"] = "2024-01-01T00:00:00+00:00"
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         hash1 = _compute_payload_hash(payload1)
 
         payload2 = _make_valid_payload("hash_det")
@@ -442,7 +442,7 @@ class TestPayloadHashVerification:
     def test_payload_hash_differs_by_content(self) -> None:
         """不同 scenario_id 应产生不同 payload_hash。"""
         payload1 = _make_valid_payload("hash_a")
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         hash1 = _compute_payload_hash(payload1)
 
         payload2 = _make_valid_payload("hash_b")
@@ -453,7 +453,7 @@ class TestPayloadHashVerification:
     def test_payload_hash_64_char_hex(self) -> None:
         """payload_hash 应为 64 字符十六进制字符串。"""
         payload = _make_valid_payload("hash_fmt")
-        from starfish.adapters.config.server_config_loader import _compute_payload_hash
+        from starfish.infrastructure.file_loaders.server_config_json_loader import _compute_payload_hash
         computed = _compute_payload_hash(payload)
 
         assert len(computed) == 64

@@ -28,7 +28,7 @@ class NativeProcessHandle:
     负责启动 native 二进制子进程、等待就绪信号（从 stdout/stderr 扫描）
     和优雅终止（terminate -> communicate -> kill 降级链）。
 
-    不负责：端口分配、协议连接、二进制编译、健康探测（TCP connect 等由 facade 自行处理）。
+    不负责：端口分配、协议连接、二进制编译、健康探测（TCP connect 等由 backend 自行处理）。
 
     Attributes:
         _process: 当前活跃的子进程 Popen 对象，未启动或已停止时为 None。

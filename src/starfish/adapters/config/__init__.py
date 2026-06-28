@@ -1,10 +1,8 @@
-"""Starfish config adapter 入口。"""
+"""Starfish config adapter 入口。
+
+配置文件读取属于 infrastructure；当前 adapters/config 不承载物理加载实现。
+"""
 
 from __future__ import annotations
 
-from starfish.adapters.config.server_config_loader import (
-    ServerConfigJsonLoader,
-    load_server_config,
-)
-
-__all__ = ["ServerConfigJsonLoader", "load_server_config"]
+__all__: list[str] = []

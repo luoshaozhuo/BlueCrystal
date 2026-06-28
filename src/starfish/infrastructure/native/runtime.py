@@ -1,7 +1,7 @@
 """starfish native runner 启动辅助。
 
 集中处理 native runner 的路径推导、动态库目录注入和二进制探测，
-避免各协议 facade 重复实现一份近似逻辑。
+避免各协议 backend 重复实现一份近似逻辑。
 """
 
 from __future__ import annotations
@@ -13,8 +13,16 @@ from pathlib import Path
 
 
 def starfish_root_from(module_file: str) -> Path:
-    """根据模块文件路径返回 `src/starfish` 根目录。"""
-    return Path(module_file).absolute().parents[2]
+    """根据模块文件路径返回 `src/starfish` 根目录。
+
+    native backend 已从 adapters 迁入 infrastructure，不同 backend 的目录
+    深度不再一致；按目录名向上查找可以避免路径层级变化影响 runner 定位。
+    """
+    path = Path(module_file).absolute()
+    for parent in (path.parent, *path.parents):
+        if parent.name == "starfish":
+            return parent
+    return path.parents[2]
 
 
 def native_runner_env(binary_path: Path) -> dict[str, str]:

@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from starfish.application.ports import DriverPort, RegistryPort
-from starfish.application.orchestration.registry import RuntimeRegistry, create_server_registry
+from starfish.application.runtime import RuntimeRegistry, create_server_registry
 from starfish.application.use_cases import (
     HotSwapDriverInstanceUseCase,
     StartSystemUseCase,

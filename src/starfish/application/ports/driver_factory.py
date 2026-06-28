@@ -1,6 +1,6 @@
 """Driver factory port。
 
-application runtime registry 通过本 port 请求 endpoint 的 driver binding；
+application runtime 初始化通过本 port 请求 endpoint 的 driver binding；
 具体协议 dispatch、环境探测和 facade 构造属于 adapter 职责。
 """
 

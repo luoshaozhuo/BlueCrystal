@@ -5,8 +5,7 @@
 **不是 server**，**不实现真实串口收发、字节流解析、PTX 超时、重试
 定时器**等生产行为。
 
-能力边界（Round 17 skeleton 范围 + Round 20 计时器/翻转/序列
-增量）:
+能力边界（skeleton 范围 + 计时器/翻转/序列增量）:
 
     - 定义 ``LinkLayerMode`` 枚举：BALANCED / UNBALANCED。
     - 定义 ``LinkState`` 枚举：IDLE / WAIT_ACK / SEND / RECEIVE / ERROR。
@@ -26,24 +25,24 @@
         下一帧（state -> IDLE）。
     - 转移事件以 ``LinkEvent`` dataclass 暴露，便于调用方观测。
 
-Round 20 增量（计时器/翻转/序列骨架；仍是 skeleton）:
+增量（计时器/翻转/序列骨架；仍是 skeleton）:
 
     - ``LinkLayerTimerService`` 抽象接口：``start_timer / cancel_timer /
       cancel_all``。生产实现 ``DefaultLinkLayerTimerService`` 用
       ``threading.Timer``；测试可用 ``FakeLinkLayerTimerService`` 注入
       确定性触发回调。**默认不启用**（``LinkLayer(enable_timers=
-      False)``），保持 Round 17 行为完全一致；测试可显式开启以验证
+      False)``），保持 既有行为完全一致；测试可显式开启以验证
       计时器调度 + 超时回调路径。
     - ``LinkLayer.start_timer(name, ms, callback)`` /
       ``cancel_timer(name)``：基于注入 timer_service 的薄封装。
       ``on_timeout(name)`` 默认实现 = ``bump_retry()`` + state ->
       ERROR（超限后）。
     - retry 超限 → ERROR：``bump_retry()`` 已有"超 max_retries 置
-      ERROR"行为；Round 20 在 ``_apply_nack`` 路径上**显式**调用
+      ERROR"行为；当前在 ``_apply_nack`` 路径上**显式**调用
       ``bump_retry()`` 一次后再做 ERROR 转移，使得 retry_count 与
       状态机同步，测试可断言 ``retry_count == n`` + ``state ==
       ERROR``。
-    - balanced FCB auto flip：``receive_ack()``（Round 20 新增）
+    - balanced FCB auto flip：``receive_ack()``
       收到 ACK 时若 ``fcv==1``（FCV enabled）自动 ``flip_fcb()``。
       ``receive_nack()`` 与 ``on_timeout`` **不**触发 flip（避免
       失败帧错误翻转）。
@@ -58,7 +57,7 @@ Round 20 增量（计时器/翻转/序列骨架；仍是 skeleton）:
 不负责（明确 deferred）:
 
     - 真实 RS-232 / RS-485 / PTY 串口收发、字节流分帧。
-    - 真实超时、重试定时器、t1/t2/t3 等协议计时器线程（Round 20 提供
+    - 真实超时、重试定时器、t1/t2/t3 等协议计时器线程（当前提供
       可注入 timer_service，但 LinkLayer 默认不启用任何计时器线程）。
     - 完整 balanced 模式的发送/接收序列、FCB/FCV 翻转细节（仅
       状态机骨架，不做完整协议状态机）。
@@ -99,7 +98,7 @@ class LinkLayerMode(str, Enum):
 class LinkState(str, Enum):
     """链路层最小状态机状态。
 
-    skeleton 包含五个核心状态（Round 17 扩展）：
+    skeleton 包含五个核心状态：
     - IDLE: 空闲，可发起新请求。
     - WAIT_ACK: 等待对端确认。
     - SEND: 正在发送用户数据帧（balanced 模式专用中间态）。
@@ -265,14 +264,14 @@ class LinkControlHelper:
         )
 
 
-# ── 协议计时器服务接口（Round 20 增量，skeleton）─────────────────────────────────
+# ── 协议计时器服务接口（增量，skeleton）─────────────────────────────────
 
 # Timer 回调签名：``Callable[[str], None]``，name 为 timer 标识。
 TimerCallback = Callable[[str], None]
 
 
 class LinkLayerTimerService:
-    """链路层 timer service 抽象接口（Round 20 新增，skeleton）。
+    """链路层 timer service 抽象接口（已支持，skeleton）。
 
     链路层计时器（t1/t2/t3）的实际执行需要根据运行时环境选择
     ``threading.Timer`` / ``asyncio`` / 真实硬件定时器等不同实现。
@@ -280,7 +279,7 @@ class LinkLayerTimerService:
     注入的 service 调度计时器。
 
     **默认禁用**：``LinkLayer.__init__`` 默认
-    ``enable_timers=False``，保持 Round 17 行为完全一致；测试可在
+    ``enable_timers=False``，保持 既有行为完全一致；测试可在
     构造时显式开启以验证调度路径。
 
     关键不变量：
@@ -545,7 +544,7 @@ class LinkLayer:
         - 收到 ``RESET_ACK``（0x20）：任意状态 -> IDLE。
         - 收到未识别 control：保持当前状态，note 标注。
 
-    balanced / unbalanced 模式差异化（Round 17 新增）:
+    balanced / unbalanced 模式差异化:
         - UNBALANCED：仅主站可发起命令；NACK 触发 ERROR 等待外部恢复。
         - BALANCED：双方均可发起命令；ACK 回到 IDLE 之后可继续发
           下一帧（``mark_sending()`` 显式把 state 设为 SEND）。
@@ -553,9 +552,9 @@ class LinkLayer:
           UNBALANCED 模式下 FCB/FCV 由主站硬性管控，skeleton 不做
           翻转策略，仅暴露 ``flip_fcb()`` 供调用方手动控制。
 
-    Round 20 增量（计时器 / 翻转 / 序列）:
+    增量（计时器 / 翻转 / 序列）:
         - ``enable_timers`` 默认 False（**不**启动任何线程，保持
-          Round 17 行为完全一致）；构造时显式开启并注入
+          既有行为完全一致）；构造时显式开启并注入
           ``timer_service`` 后可调度 t1 / t2 / t3 计时器。
         - ``send_user_data()``：IDLE/SEND -> WAIT_ACK，并启动 t1 计时器
           （若启用）。
@@ -671,14 +670,14 @@ class LinkLayer:
         """测试 / 上层调用方：把 state 置为 RECEIVE（balanced 模式专用）。"""
         self.state = LinkState.RECEIVE
 
-    # ── Timer 调度辅助（Round 20 新增）─────────────────────────────────────
+    # ── Timer 调度辅助─────────────────────────────────────
 
     def start_timer(self, name: str, ms: int, callback: TimerCallback) -> None:
         """通过 ``timer_service`` 启动一次性 timer。
 
         行为：
         - 若 ``enable_timers=False`` 或 ``timer_service is None``，
-          本方法**静默跳过**（与 Round 17 行为一致）。
+          本方法**静默跳过**（与 既有行为一致）。
         - 若 ``enable_timers=True`` 且 service 已注册，则把回调透传
           给 ``timer_service.start_timer``。
 
@@ -704,7 +703,7 @@ class LinkLayer:
         self.timer_service.cancel_all()
 
     def on_timeout(self, name: str) -> None:
-        """默认 timer 触发回调（Round 20 新增，skeleton）。
+        """默认 timer 触发回调（已支持，skeleton）。
 
         行为：
         - 取消同名 timer（避免回调重复触发）。
@@ -728,7 +727,7 @@ class LinkLayer:
             "previous_state": prev_state.value,
         })
 
-    # ── Sequence 状态机（Round 20 新增）────────────────────────────────────
+    # ── Sequence 状态机────────────────────────────────────
 
     def send_user_data(self) -> None:
         """发送 user data 入口：state -> WAIT_ACK，启动 t1 计时器。
@@ -891,7 +890,7 @@ class LinkLayer:
             control = decoded.control
             if control == int(LinkControl.SUPERVISORY):
                 is_ack = True
-                # ACK 到达：t1 取消 + balanced FCV auto-flip（Round 20 增强）
+                # ACK 到达：t1 取消 + balanced FCV auto-flip（增强）
                 ack_prev_state, _flipped = self.receive_ack()
                 # 使用 receive_ack 记录的 previous_state（可能与
                 # 外层 previous_state 不同，但本场景下二者一致）。
@@ -899,7 +898,7 @@ class LinkLayer:
                 note = "ACK 到达"
             elif control == 0x02:
                 is_nack = True
-                # NACK 到达：t1 取消 + bump_retry（Round 20 增强）
+                # NACK 到达：t1 取消 + bump_retry（增强）
                 _nack_prev_state = self.receive_nack()
                 note = "NACK 到达"
             elif control == int(LinkControl.RESET):

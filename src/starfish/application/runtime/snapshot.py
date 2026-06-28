@@ -1,11 +1,11 @@
-"""RuntimeSnapshot 领域快照模型。"""
+"""RuntimeSnapshot 应用运行态快照模型。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
-from starfish.application.runtime.event import RuntimeEvent
+from starfish.application.runtime.event_bus import RuntimeEvent
 from starfish.application.runtime.state import RuntimeState
 
 

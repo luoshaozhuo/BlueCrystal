@@ -12,7 +12,7 @@ from enum import Enum
 import time
 from typing import Any
 
-from starfish.application.runtime.event import RuntimeEvent
+from starfish.application.runtime.event_bus import RuntimeEvent
 from starfish.application.runtime.snapshot import RuntimeSnapshot
 from starfish.application.runtime.state import RuntimeState
 from starfish.domain.server_config import (
@@ -239,7 +239,7 @@ class RuntimeNode:
 class RuntimeGraph:
     """Runtime v2 的运行图。
 
-    RuntimeGraph 替代旧 ServerPlan 的运行时视图，结构为
+    RuntimeGraph 是当前运行时视图，结构为
     nodes[] -> bindings[] -> driver_instance。它不解析配置文件，也不创建
     具体 driver。
     """

@@ -1,18 +1,17 @@
-"""Starfish IEC 60870-5-101 协议 facade —— codec-enhanced-plus stub。
+"""Starfish IEC 60870-5-101 协议 backend —— codec-enhanced-plus stub。
 
 IEC101 是串行链路协议（需 RS-232/RS-485 串口或串口模拟环境）。
 C runner 二进制 (iec101_simulator_slave) 已编译就绪，但缺少串口
 链路环境（PTY 或真实串口）。
 
-模式分级（Round 18 更新）：
+模式分级：
 
-- "codec-enhanced-plus"：编解码器时间增强就绪（Round 16 升级，
-  Round 17 收口，Round 18 扩展命令方向），包含 SIQ/QDS/NVA/
+- "codec-enhanced-plus"：编解码器时间增强就绪，包含 SIQ/QDS/NVA/
   ShortFloat/SVA/CP56Time2a 信息体元素、13 个信息对象
-  （4 监视不带时标 + 2 监视不带时标标度化/短浮点 Round 18
-  新增 + 5 带时标监视 M_SP_TA_1/M_DP_TA_1/M_ME_TA_1/
+  （4 监视不带时标 + 2 监视不带时标标度化/短浮点
+  + 5 带时标监视 M_SP_TA_1/M_DP_TA_1/M_ME_TA_1/
   M_ME_TB_1/M_ME_TC_1 + 4 控制命令 C_SC_NA_1 + 3 设点命令
-  C_SE_NA_1/C_SE_NB_1/C_SE_NC_1 Round 18 新增）、ASDU 信息
+  C_SE_NA_1/C_SE_NB_1/C_SE_NC_1）、ASDU 信息
   对象列表（SQ=0/SQ=1）编解码、FT1.2 固定/可变帧编解码
   （含 checksum）、C_SC_NA_1 QU 字段结构化语义
   （select_execute / qualifier / ql_value / persistent /
@@ -26,12 +25,12 @@ C runner 二进制 (iec101_simulator_slave) 已编译就绪，但缺少串口
   列表（SQ=0/SQ=1）编解码、FT1.2 固定/可变帧编解码（含 checksum），
   但不含 CP56Time2a / 带时标 TypeID / link-layer skeleton。
 - "codec-skeleton"：仅头部编解码（ASDU/COT/IOA/CA），不含信息体与
-  链路层帧（Round 14 状态）。
+  链路层帧。
 - "environment-pending"：C runner 已编译但编解码器骨架和链路环境均未
   就绪。
 - "codebase-pending"：C runner 未编译且无 Python 原生 IEC101 编解码器。
 
-Round 18 变更（codec-enhanced-plus 命令方向扩展）:
+codec-enhanced-plus 命令方向能力:
     新增 ScaledValue IE（16-bit signed scaled value；
     information_elements.py）；
     新增 M_ME_NB_1 / M_ME_NC_1 不带时标标度化/短浮点信息对象；
@@ -55,7 +54,7 @@ Round 18 变更（codec-enhanced-plus 命令方向扩展）:
     roundtrip + M_ME_NB_1 / M_ME_NC_1 / C_SE_NA_1 / C_SE_NB_1 /
     C_SE_NC_1 信息对象 roundtrip。
 
-Round 19 变更（codec-enhanced-plus 带时标命令方向扩展）:
+codec-enhanced-plus 带时标命令方向能力:
     新增 C_SE_TA_1 / C_SE_TB_1 / C_SE_TC_1 三个带时标设定值
     命令 + CP56Time2a 时标（与不带时标 C_SE_NA_1/C_SE_NB_1/
     C_SE_NC_1 同语义但末尾追加 CP56Time2a 7 字节；object body
@@ -78,7 +77,7 @@ Round 19 变更（codec-enhanced-plus 带时标命令方向扩展）:
     C_SE_TA_1/TB_1/TC_1 信息对象 roundtrip + CP56Time2a
     时标。
 
-Round 20 变更（link-layer 计时器/翻转/序列骨架增量）:
+link-layer 计时器/翻转/序列骨架能力:
     新增 capabilities（**仍**是 codec-enhanced-plus 模式增量；
     **不**实现真实 server / 串口 / 写能力）：
     - supports_link_layer_timers=true（LinkLayerTimerService 抽象
@@ -95,7 +94,7 @@ Round 20 变更（link-layer 计时器/翻转/序列骨架增量）:
     ShortFloat 编码端兼容扩展（**不**引入 numpy 硬依赖）：
     encode_short_float 接受 int / numbers.Real（Decimal / Fraction
     等）/ 带 __float__ 的对象（duck typing）；NaN / Inf 仍按
-    Round 17 严格拒绝策略。
+    既有严格拒绝策略。
     仍 supports_server=false / supports_serial_runtime=false /
     supports_write_runtime=false（**不**实现真实 server / 串口 /
     写能力；新增 capabilities 仅是 codec 状态机骨架）。
@@ -158,7 +157,7 @@ def probe_iec101_codec() -> tuple[bool, str]:
 
 
 def probe_iec101_codec_enhanced() -> tuple[bool, str]:
-    """探测 IEC101 增强编解码器（Round 15 新增）可用性。
+    """探测 IEC101 增强编解码器可用性。
 
     在 codec-skeleton 基础上，验证 SIQ/QDS/NVA 信息体元素、
     M_SP_NA_1/M_ME_NA_1/C_SC_NA_1 信息对象、ASDU 列表编解码、
@@ -249,14 +248,14 @@ def probe_iec101_codec_enhanced() -> tuple[bool, str]:
 
 
 def probe_iec101_codec_enhanced_plus() -> tuple[bool, str]:
-    """探测 IEC101 编解码器时间增强（Round 16 新增，Round 18 扩展）可用性。
+    """探测 IEC101 编解码器时间增强（已支持，扩展）可用性。
 
     在 codec-enhanced 基础上，验证：
     - CP56Time2a 7 字节时标 IE encode/decode roundtrip。
     - 带时标 TypeID M_SP_TA_1 / M_DP_TA_1 / M_ME_TA_1 至少其中一个可用。
     - C_SC_NA_1 QU 字段结构化（SingleCommandQualifier）可用。
     - 链路层最小状态机 skeleton（LinkLayer / LinkState / LinkEvent）可用。
-    - Round 18 扩展：ScaledValue IE + M_ME_NB_1 / M_ME_NC_1 信息对象
+    - 扩展：ScaledValue IE + M_ME_NB_1 / M_ME_NC_1 信息对象
       + C_SE_NA_1 / C_SE_NB_1 / C_SE_NC_1 设点命令
       + SetPointCommandQualifier QOS 结构化。
 
@@ -343,7 +342,7 @@ def probe_iec101_codec_enhanced_plus() -> tuple[bool, str]:
         assert qu_dec.ql_value == 2
         assert qu_dec.persistent is False
 
-        # Round 18 扩展 1: ScaledValue IE roundtrip
+        # 扩展 1: ScaledValue IE roundtrip
         sva_bytes = encode_scaled_value(12345)
         assert len(sva_bytes) == 2
         sva_dec = decode_scaled_value(sva_bytes)
@@ -352,7 +351,7 @@ def probe_iec101_codec_enhanced_plus() -> tuple[bool, str]:
         sv_dec = ScaledValue.decode(sv_obj.encode())
         assert sv_dec.value == -32768
 
-        # Round 18 扩展 2: M_ME_NB_1 / M_ME_NC_1 roundtrip
+        # 扩展 2: M_ME_NB_1 / M_ME_NC_1 roundtrip
         me_nb = M_ME_NB_1_Object(sva=12345, qds=QDS())
         me_nb_dec = M_ME_NB_1_Object.decode(me_nb.encode())
         assert me_nb_dec.sva == 12345
@@ -361,7 +360,7 @@ def probe_iec101_codec_enhanced_plus() -> tuple[bool, str]:
         me_nc_dec = M_ME_NC_1_Object.decode(me_nc.encode())
         assert me_nc_dec.sva == 2.5
 
-        # Round 18 扩展 3: C_SE_NA_1 / C_SE_NB_1 / C_SE_NC_1 roundtrip
+        # 扩展 3: C_SE_NA_1 / C_SE_NB_1 / C_SE_NC_1 roundtrip
         se_na = C_SE_NA_1_Object(nva=0.5, select_execute=1)
         se_na_dec = C_SE_NA_1_Object.decode(se_na.encode())
         assert abs(se_na_dec.nva - 0.5) < 1.0 / 32768.0
@@ -375,14 +374,14 @@ def probe_iec101_codec_enhanced_plus() -> tuple[bool, str]:
         se_nc_dec = C_SE_NC_1_Object.decode(se_nc.encode())
         assert se_nc_dec.sva == 2.5
 
-        # Round 18 扩展 4: SetPointCommandQualifier QOS 字段
+        # 扩展 4: SetPointCommandQualifier QOS 字段
         se_qos = SetPointCommandQualifier(ql=2, qualifier=SetPointQualifier.LONG_PULSE)
         assert se_qos.to_byte() == 0x04
         se_qos_dec = SetPointCommandQualifier.from_byte(0x06)
         assert se_qos_dec.ql == 3
         assert se_qos_dec.qualifier == SetPointQualifier.PERSISTENT_OUTPUT
 
-        # Round 19 扩展 1: C_SE_TA_1 / C_SE_TB_1 / C_SE_TC_1
+        # 扩展 1: C_SE_TA_1 / C_SE_TB_1 / C_SE_TC_1
         # 带时标设定值命令 roundtrip（object body 12/12/14 字节，
         # 末尾追加 CP56Time2a 7 字节；与 C_SE_NA_1/NB_1/NC_1
         # 同语义但带时标）。
@@ -444,7 +443,7 @@ def probe_iec101_codec_enhanced_plus() -> tuple[bool, str]:
 def probe_iec101_binary() -> tuple[bool, str]:
     """探测 IEC101 二进制或运行时可用性。
 
-    探测步骤（增强 Round 14）：
+    探测步骤：
         1. 检查编解码器骨架可用性（starfish.domain.protocols.iec101）。
         2. 检查 third_party/lib60870 目录是否存在（lib60870 包含 IEC101 支持）。
         3. 检查 src/starfish/infrastructure/native/bin/ 下是否有 iec101 相关 binary。
@@ -457,7 +456,7 @@ def probe_iec101_binary() -> tuple[bool, str]:
     """
     reasons: list[str] = []
 
-    # 检测编解码器骨架（Round 14 新增）
+    # 检测编解码器骨架
     codec_ok, codec_msg = probe_iec101_codec()
     if codec_ok:
         reasons.append(f"编解码器骨架: {codec_msg}")
@@ -519,13 +518,13 @@ def probe_iec101_binary() -> tuple[bool, str]:
     return (False, full_reason)
 
 
-class Iec101Facade:
+class Iec101Backend:
     """IEC 60870-5-101 协议 server 模拟门面。
 
-    IEC101 依赖串口物理链路或 PTY 模拟。本 facade 以 in-memory 模式
+    IEC101 依赖串口物理链路或 PTY 模拟。本 backend 以 in-memory 模式
     维护点位值。模式按可用能力分级：
 
-    - "codec-enhanced"（Round 15 新增）：编解码器增强就绪，包含信息体
+    - "codec-enhanced"：编解码器增强就绪，包含信息体
       SIQ/QDS/NVA、信息对象 M_SP_NA_1/M_DP_NA_1/M_ME_NA_1/C_SC_NA_1、
       ASDU 列表 SQ=0/SQ=1、FT1.2 帧编解码。
     - "codec-skeleton"：仅头部编解码（ASDU/COT/IOA/CA）。
@@ -550,22 +549,22 @@ class Iec101Facade:
 
     @property
     def mode(self) -> str:
-        """返回运行模式（Round 15 新增 codec-enhanced 层级）。
+        """返回运行模式（已支持 codec-enhanced 层级）。
 
         - "codec-enhanced": 增强编解码器就绪（信息体 + ASDU 列表 + FT1.2 帧）。
         - "codec-skeleton": 编解码器骨架就绪（ASDU/COT/IOA/CA 编解码）。
         - "environment-pending": C runner 已编译但串口链路环境和编解码器骨架未就绪。
         - "codebase-pending": C runner 未编译且编解码器骨架不可用。
         """
-        # 优先检测时间增强编解码器（Round 16）
+        # 优先检测时间增强编解码器
         plus_ok, _ = probe_iec101_codec_enhanced_plus()
         if plus_ok:
             return "codec-enhanced-plus"
-        # 回退：增强编解码器（Round 15）
+        # 回退：增强编解码器
         enhanced_ok, _ = probe_iec101_codec_enhanced()
         if enhanced_ok:
             return "codec-enhanced"
-        # 回退：基础编解码器骨架（Round 14）
+        # 回退：基础编解码器骨架
         codec_ok, _ = probe_iec101_codec()
         if codec_ok:
             return "codec-skeleton"
@@ -579,11 +578,11 @@ class Iec101Facade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
-        """启动 IEC101 facade（in-memory stub）。
+        """启动 IEC101 backend（in-memory stub）。
 
         仅设置内存状态，不启动任何协议 server。
         重复调用安全（幂等）。
@@ -594,7 +593,7 @@ class Iec101Facade:
         self._started_at = datetime.now(timezone.utc)
 
     def stop(self) -> None:
-        """停止 IEC101 facade。
+        """停止 IEC101 backend。
 
         重置 in-memory 状态。不删除已加载的 plan 和 values。
         重复调用安全（幂等）。
@@ -606,7 +605,7 @@ class Iec101Facade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态（含增强诊断和编解码器信息）。
+        """返回当前 backend 的可观测健康状态（含增强诊断和编解码器信息）。
 
         包含 PTY 可用性、lib60870 存在性、编解码器就绪状态等诊断信息。
 
@@ -616,17 +615,17 @@ class Iec101Facade:
         # 收集诊断信息
         diagnosis: dict[str, Any] = {}
 
-        # 编解码器骨架就绪状态（Round 14 新增）
+        # 编解码器骨架就绪状态
         codec_ok, codec_msg = probe_iec101_codec()
         diagnosis["codec_skeleton_ready"] = codec_ok
         diagnosis["codec_skeleton_reason"] = codec_msg
 
-        # 增强编解码器就绪状态（Round 15 新增）
+        # 增强编解码器就绪状态
         enhanced_ok, enhanced_msg = probe_iec101_codec_enhanced()
         diagnosis["codec_enhanced_ready"] = enhanced_ok
         diagnosis["codec_enhanced_reason"] = enhanced_msg
 
-        # 时间增强编解码器就绪状态（Round 16 新增，Round 17 收口）
+        # 时间增强编解码器就绪状态（已支持，能力收敛）
         plus_ok, plus_msg = probe_iec101_codec_enhanced_plus()
         diagnosis["codec_enhanced_plus_ready"] = plus_ok
         diagnosis["codec_enhanced_plus_reason"] = plus_msg
@@ -762,7 +761,7 @@ class Iec101Facade:
     def capabilities(self) -> list[str]:
         """返回当前已加载 plan 的能力声明列表。
 
-        当 plan 未加载时，返回 IEC101 增强编解码器的能力声明（Round 15 新增），
+        当 plan 未加载时，返回 IEC101 增强编解码器的能力声明，
         包含 codec_mode、supported_type_ids、supports_ft12_frame_codec、
         supports_server、supports_serial_runtime。
 
@@ -774,10 +773,9 @@ class Iec101Facade:
         return list(self._plan.capabilities)
 
     def codec_capabilities(self) -> list[str]:
-        """返回 IEC101 增强编解码器能力声明（Round 15 新增，Round 18 扩展，
-        Round 19 二次扩展带时标命令）。
+        """返回 IEC101 增强编解码器能力声明（含带时标命令扩展）。
 
-        描述当前 facade 在编解码层具备的能力，与 server 生命周期能力正交。
+        描述当前 backend 在编解码层具备的能力，与 server 生命周期能力正交。
         即使未加载 plan，也可通过本方法查询 codec 能力。
 
         Returns:
@@ -797,36 +795,35 @@ class Iec101Facade:
             - "supported_command_type_ids=C_SC_NA_1,C_SE_NA_1,C_SE_NB_1,
               C_SE_NC_1,C_SE_TA_1,C_SE_TB_1,C_SE_TC_1"（1 单命令 +
               3 不带时标设点命令 + 3 带时标设点命令，共 7 控制命令
-              TypeId，**Round 19 扩展**）
+              TypeId，**扩展**）
             - "supported_time_tagged_command_type_ids=C_SE_TA_1,
-              C_SE_TB_1,C_SE_TC_1"（3 带时标设点命令，**Round 19
-              新增分组**）
+              C_SE_TB_1,C_SE_TC_1"（3 带时标设点命令分组）
             - "supported_time_tagged_type_ids=M_SP_TA_1,M_DP_TA_1,M_ME_TA_1,
               M_ME_TB_1,M_ME_TC_1"（5 带时标监视 TypeId）
             - "supports_ft12_frame_codec=true"
             - "supports_short_float=true"（plus 模式时存在）
-            - "supports_scaled_value=true"（plus 模式时存在，Round 18 新增）
-            - "supports_command_codec=true"（plus 模式时存在，Round 18 新增）
+            - "supports_scaled_value=true"（plus 模式时存在，已支持）
+            - "supports_command_codec=true"（plus 模式时存在，已支持）
             - "supports_time_tagged_command_codec=true"（plus 模式时
-              存在，**Round 19 新增**；C_SE_TA_1/TB_1/TC_1 仅
+              存在，**已支持**；C_SE_TA_1/TB_1/TC_1 仅
               command codec，**不**等效真实写能力）
             - "supports_cp56time2a=true"（plus 模式时存在）
             - "supports_link_layer_skeleton=true"（plus 模式时存在）
             - "supports_link_layer_timers=true"（plus 模式时存在，
-              **Round 20 新增**；LinkLayerTimerService 抽象 +
+              **已支持**；LinkLayerTimerService 抽象 +
               Default（threading.Timer） + Fake 测试替身；
               LinkLayer 默认 enable_timers=False 不启动线程）
             - "supports_balanced_fcb_auto_flip=true"（plus 模式时
-              存在，**Round 20 新增**；balanced 模式 + FCV enabled
+              存在，**已支持**；balanced 模式 + FCV enabled
               时 receive_ack 自动 flip_fcb；NACK / timeout 不翻；
               FCV disabled 不翻）
             - "supports_retry_skeleton=true"（plus 模式时存在，
-              **Round 20 新增**；receive_nack / on_timeout 显式
+              **已支持**；receive_nack / on_timeout 显式
               bump_retry；retry_count > max_retries 时 state -> ERROR）
             - "supports_server=false"
             - "supports_serial_runtime=false"
-            - "supports_write_runtime=false"（plus 模式时存在，Round 18
-              新增；C_SE_* 仅 command codec，**不**等效真实写能力）
+            - "supports_write_runtime=false"（plus 模式时存在；C_SE_* 仅
+              command codec，**不**等效真实写能力）
         """
         current_mode = self.mode
         if current_mode == "codec-enhanced-plus":
@@ -864,7 +861,7 @@ class Iec101Facade:
                 measurement_line,
                 command_line,
                 "supports_link_layer_skeleton=true",
-                # Round 20 新增 capabilities（计时器 / 翻转 / 重试骨架）
+                # 已支持 capabilities（计时器 / 翻转 / 重试骨架）
                 "supports_link_layer_timers=true",
                 "supports_balanced_fcb_auto_flip=true",
                 "supports_retry_skeleton=true",
@@ -915,7 +912,7 @@ class Iec101Facade:
         """
         raise UnsupportedOperation(
             "write",
-            "Iec101Facade.write 尚未实现，"
+            "Iec101Backend.write 尚未实现，"
             "待 IEC101 串口链路环境及帧编解码器就绪后实现",
         )
 
@@ -930,7 +927,7 @@ class Iec101Facade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "Iec101Facade.subscribe 尚未实现，"
+            "Iec101Backend.subscribe 尚未实现，"
             "待 IEC101 串口链路环境及帧编解码器就绪后实现",
         )
 
@@ -942,13 +939,13 @@ class Iec101Facade:
         """
         raise UnsupportedOperation(
             "report",
-            "Iec101Facade.report 尚未实现，"
+            "Iec101Backend.report 尚未实现，"
             "待 IEC101 链路环境及帧编解码器就绪后实现",
         )
 
 
 __all__ = [
-    "Iec101Facade",
+    "Iec101Backend",
     "probe_iec101_binary",
     "probe_iec101_codec",
     "probe_iec101_codec_enhanced",

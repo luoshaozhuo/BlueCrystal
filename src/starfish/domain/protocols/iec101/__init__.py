@@ -9,18 +9,18 @@
 - CommonAddress (CA) 编解码（2 字节，小端序）（common_address.py）
 - 质量描述符 SIQ / QDS（quality.py）
 - 信息体元素 NVA / ShortFloat（information_elements.py，ShortFloat 为
-  Round 17 新增；NaN/Inf 拒绝策略）
-- CP56Time2a 7 字节时标 IE（time.py，Round 16 新增）
+  已支持；NaN/Inf 拒绝策略）
+- CP56Time2a 7 字节时标 IE（time.py，已支持）
 - 信息对象 M_SP_NA_1 / M_DP_NA_1 / M_ME_NA_1 / C_SC_NA_1 + 带时标
   M_SP_TA_1 / M_DP_TA_1 / M_ME_TA_1 + 带时标标度化/短浮点
-  M_ME_TB_1 / M_ME_TC_1（information_object.py；后两者为 Round 17 新增）
+  M_ME_TB_1 / M_ME_TC_1（information_object.py；后两者为 已支持）
 - ASDU 信息对象列表编解码（codec.py）
 - FT1.2 链路层帧编解码（frame.py）
-- 链路层最小状态机 skeleton（link_layer.py，Round 16 新增，Round 17 扩展
+- 链路层最小状态机 skeleton（link_layer.py，已支持，扩展
   FCB/FCV helper / t1/t2/t3 协议计时器常量 / sequence flip / balanced
   vs unbalanced 差异化状态转移；**非 server**）
 
-能力边界（Round 17 codec-enhanced-plus 收口阶段）：
+能力边界：
 
     已实现: TypeId/COT 枚举、ASDUHeader/IOA/CA 编解码、SIQ/QDS 质量描述符、
            NVA 归一化值、ShortFloat IEEE 754 32-bit IE（4 字节 LE，

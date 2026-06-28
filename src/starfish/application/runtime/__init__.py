@@ -1,9 +1,18 @@
-"""Application runtime support utilities and models。"""
+"""Application runtime kernel models。
+
+runtime 只保存执行内核状态、运行图、事件缓冲与快照模型；外部 adapter
+装配与 API 契约不在本包内实现。
+"""
 
 from __future__ import annotations
 
-from starfish.application.runtime.event_bus import RuntimeEventBus
-from starfish.application.runtime.event import RuntimeEvent
+from starfish.application.runtime.context import (
+    RuntimeRegistry,
+    ServerRegistry,
+    StarfishRuntimeContext,
+    create_server_registry,
+)
+from starfish.application.runtime.event_bus import RuntimeEvent, RuntimeEventBus
 from starfish.application.runtime.graph import (
     DriverCapability,
     DriverInstance,
@@ -27,7 +36,11 @@ __all__ = [
     "RuntimeEventBus",
     "RuntimeGraph",
     "RuntimeNode",
+    "RuntimeRegistry",
     "RuntimeSignal",
     "RuntimeSnapshot",
     "RuntimeState",
+    "ServerRegistry",
+    "StarfishRuntimeContext",
+    "create_server_registry",
 ]

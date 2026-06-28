@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from starfish.application.orchestration.registry import ServerRegistry
-from starfish.application.runtime import DriverInstance, DriverState
+from starfish.application.runtime import DriverInstance, DriverState, ServerRegistry
 from starfish.domain import DriverEntry
 
 

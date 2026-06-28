@@ -1,4 +1,4 @@
-"""Starfish IEC 60870-5-104 协议 facade —— 依赖 lib60870 C runner。
+"""Starfish IEC 60870-5-104 协议 backend —— 依赖 lib60870 C runner。
 
 本模块提供 IEC104 协议 server 模拟门面。根据环境探测
 iec104_simulator_server C runner 二进制可用性，切换 real / unavailable 模式。
@@ -96,10 +96,10 @@ def probe_iec104_binary() -> tuple[bool, str]:
     return True, reason
 
 
-# ── IEC104 facade ────────────────────────────────────────────────────────────────
+# ── IEC104 backend ────────────────────────────────────────────────────────────────
 
 
-class Iec104Facade:
+class Iec104NativeBackend:
     """IEC 60870-5-104 协议 server 模拟门面。
 
     根据 iec104_simulator_server C runner 可用性切换真实子进程或回退模式。
@@ -127,7 +127,7 @@ class Iec104Facade:
     _READY_LINE = "READY"          # runner 就绪信号
 
     def __init__(self, bind_host: str = "127.0.0.1", port: int = 0) -> None:
-        """初始化 IEC104 facade。
+        """初始化 IEC104 backend。
 
         Args:
             bind_host: 绑定地址。
@@ -177,11 +177,11 @@ class Iec104Facade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
-        """启动 IEC104 facade。
+        """启动 IEC104 backend。
 
         真实模式：启动 iec104_simulator_server 子进程 -> 等待 READY。
         unavailable 模式：设置 in-memory 状态。
@@ -269,7 +269,7 @@ class Iec104Facade:
         self._started_at = datetime.now(timezone.utc)
 
     def stop(self) -> None:
-        """停止 IEC104 facade。
+        """停止 IEC104 backend。
 
         真实模式：优雅终止子进程。
         unavailable 模式：重置 in-memory 状态。
@@ -287,7 +287,7 @@ class Iec104Facade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         真实模式：通过 TCP connect 探测端口是否可达。
         unavailable 模式：返回 mode="unavailable" 及原因。
@@ -386,7 +386,7 @@ class Iec104Facade:
         """
         raise UnsupportedOperation(
             "write",
-            "Iec104Facade.write 尚未实现，"
+            "Iec104NativeBackend.write 尚未实现，"
             "待后续轮次实现 IEC104 ASDU 写链路",
         )
 
@@ -401,7 +401,7 @@ class Iec104Facade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "Iec104Facade.subscribe 尚未实现，"
+            "Iec104NativeBackend.subscribe 尚未实现，"
             "待后续轮次实现 IEC104 事件订阅链路",
         )
 
@@ -413,7 +413,7 @@ class Iec104Facade:
         """
         raise UnsupportedOperation(
             "report",
-            "Iec104Facade.report 尚未实现，"
+            "Iec104NativeBackend.report 尚未实现，"
             "待后续轮次实现结构化 telemetry report",
         )
 
@@ -475,4 +475,4 @@ def _drain_stderr(stderr: Any) -> None:
         pass
 
 
-__all__ = ["Iec104Facade", "probe_iec104_binary", "resolve_iec104_runner_path"]
+__all__ = ["Iec104NativeBackend", "probe_iec104_binary", "resolve_iec104_runner_path"]

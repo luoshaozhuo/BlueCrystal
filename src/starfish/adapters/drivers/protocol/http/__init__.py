@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from starfish.adapters.drivers.protocol.http.http_rest_facade import HttpRestFacade
+from starfish.adapters.drivers.protocol.http.http_rest_driver_adapter import HttpRestDriverAdapter
 
-__all__ = ["HttpRestFacade"]
+__all__ = ["HttpRestDriverAdapter"]

@@ -1,4 +1,4 @@
-"""starfish ServerSimulatorFacade 测试。
+"""starfish ServerSimulatorDriverAdapter 测试。
 
 验证：
 1. start/stop 生命周期。
@@ -20,13 +20,31 @@ from __future__ import annotations
 
 import pytest
 
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_default_backend_factory,
+    create_default_driver_factory,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_iec104_driver_adapter,
+    create_iec61850_mms_driver_adapter,
+    create_iec61850_report_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_opcua_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
+
 from starfish.domain.server_config import (
     StarfishServerConfig,
     StarfishEndpointConfig,
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.adapters.drivers.simulator.server_simulator_facade import ServerSimulatorFacade
+from starfish.adapters.drivers.simulator.server_simulator_driver_adapter import ServerSimulatorDriverAdapter
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────
@@ -94,34 +112,34 @@ class TestFacadeLifecycle:
 
     def test_initial_state_is_stopped(self) -> None:
         """新建 facade 应为 stopped 状态。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         health = facade.health()
         assert health["status"] == "stopped"
         assert health["plan_loaded"] is False
 
     def test_start_sets_status(self) -> None:
         """start() 应将状态置为 started。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.start()
         assert facade.health()["status"] == "started"
 
     def test_stop_sets_status(self) -> None:
         """stop() 应将状态置为 stopped。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.start()
         facade.stop()
         assert facade.health()["status"] == "stopped"
 
     def test_start_is_idempotent(self) -> None:
         """重复 start() 应为幂等。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.start()
         facade.start()
         assert facade.health()["status"] == "started"
 
     def test_stop_is_idempotent(self) -> None:
         """重复 stop() 应为幂等。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.start()
         facade.stop()
         facade.stop()
@@ -129,7 +147,7 @@ class TestFacadeLifecycle:
 
     def test_started_at_is_recorded(self) -> None:
         """start() 后 started_at 应非空。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.start()
         assert facade.health()["started_at"] is not None
 
@@ -142,7 +160,7 @@ class TestFacadeHealth:
 
     def test_health_before_load(self) -> None:
         """未 load_points 时 health 应反映空状态。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         health = facade.health()
         assert health["plan_loaded"] is False
         assert health["point_count"] == 0
@@ -152,7 +170,7 @@ class TestFacadeHealth:
     def test_health_after_load(self) -> None:
         """load_points 后 health 应反映 plan 信息。"""
         plan = _make_test_plan("health_test")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         health = facade.health()
@@ -165,7 +183,7 @@ class TestFacadeHealth:
     def test_health_includes_capabilities(self) -> None:
         """health 应包含正确的 capabilities。"""
         plan = _make_test_plan("cap_test", capabilities=["READ", "WRITE"])
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         assert facade.health()["capabilities"] == ["READ", "WRITE"]
@@ -174,7 +192,7 @@ class TestFacadeHealth:
         """health 应反映 synthetic 标识。"""
         plan = _make_test_plan("syn_test")
         plan.synthetic = True
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         assert facade.health()["synthetic"] is True
@@ -189,7 +207,7 @@ class TestFacadeReadUpdate:
     def test_load_points_populates_values(self) -> None:
         """load_points 应从 plan.initial_values 填充内存存储。"""
         plan = _make_test_plan("load_test")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read()
@@ -198,7 +216,7 @@ class TestFacadeReadUpdate:
     def test_read_specific_points(self) -> None:
         """read 指定 point_ids 时应只返回对应值。"""
         plan = _make_test_plan("read_test")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read(["pt_001"])
@@ -207,7 +225,7 @@ class TestFacadeReadUpdate:
     def test_read_nonexistent_point_returns_none(self) -> None:
         """read 不存在的 point_id 应返回 None。"""
         plan = _make_test_plan("nonexist_test")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read(["nonexistent"])
@@ -216,7 +234,7 @@ class TestFacadeReadUpdate:
     def test_read_all_returns_all(self) -> None:
         """不指定 point_ids 时 read 应返回全部点位。"""
         plan = _make_test_plan("all_test")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         assert len(facade.read()) == 2
@@ -224,7 +242,7 @@ class TestFacadeReadUpdate:
     def test_read_empty_list(self) -> None:
         """空 point_ids 列表应返回空 dict。"""
         plan = _make_test_plan("empty_list")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         assert facade.read([]) == {}
@@ -232,7 +250,7 @@ class TestFacadeReadUpdate:
     def test_update_values_modifies_storage(self) -> None:
         """update_values 应更新内存中的点位值。"""
         plan = _make_test_plan("update_test")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         facade.update_values({"pt_001": 999.9, "pt_new": 0})
@@ -247,7 +265,7 @@ class TestFacadeReadUpdate:
         plan1 = _make_test_plan("reload_test", initial_values={"a": 1})
         plan2 = _make_test_plan("reload_test", initial_values={"b": 2})
 
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan1)
         assert facade.read() == {"a": 1}
 
@@ -263,19 +281,19 @@ class TestFacadeNotImplemented:
 
     def test_write_raises_unsupported_operation(self) -> None:
         """write 应抛出 UnsupportedOperation。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         with pytest.raises(UnsupportedOperation, match="write"):
             facade.write("pt_001", 100)
 
     def test_subscribe_raises_unsupported_operation(self) -> None:
         """subscribe 应抛出 UnsupportedOperation。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         with pytest.raises(UnsupportedOperation, match="subscribe"):
             facade.subscribe(["pt_001"])
 
     def test_report_raises_unsupported_operation(self) -> None:
         """report 应抛出 UnsupportedOperation。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         with pytest.raises(UnsupportedOperation, match="report"):
             facade.report()
 
@@ -301,13 +319,13 @@ class TestFacadeCapabilities:
 
     def test_capabilities_before_load(self) -> None:
         """未 load_points 时 capabilities 应返回空列表。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         assert facade.capabilities() == []
 
     def test_capabilities_after_load(self) -> None:
         """load_points 后 capabilities 应返回 plan 中的列表。"""
         plan = _make_test_plan("cap_test", capabilities=["READ", "SUBSCRIBE"])
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         assert facade.capabilities() == ["READ", "SUBSCRIBE"]
@@ -315,7 +333,7 @@ class TestFacadeCapabilities:
     def test_capabilities_returns_copy_not_reference(self) -> None:
         """capabilities 返回的是副本而非内部引用。"""
         plan = _make_test_plan("ref_test", capabilities=["READ"])
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         caps = facade.capabilities()
@@ -362,7 +380,7 @@ class TestFacadeSmokeFlow:
         """完整 smoke 流程应无异常。"""
         plan = _make_test_plan("smoke_flow", initial_values={"pt_001": 3.14})
 
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
 
         # 1. load_points
         facade.load_points(plan)

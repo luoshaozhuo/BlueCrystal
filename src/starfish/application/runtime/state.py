@@ -1,4 +1,4 @@
-"""RuntimeState 领域状态模型。"""
+"""RuntimeState 应用运行态状态模型。"""
 
 from __future__ import annotations
 

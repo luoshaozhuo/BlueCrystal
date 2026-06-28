@@ -1,7 +1,7 @@
 """starfish 高层运行时 API 测试。
 
 验证：
-1. `open_manager()` 可返回统一运行时对象。
+1. `StarfishServerManager(path)` 可返回统一运行时对象。
 2. 单 endpoint runtime 支持 `describe/start/status/read/stop` 基本流程。
 3. 多 endpoint runtime 在未指定 endpoint_id 时，`write()` 会拒绝歧义调用。
 
@@ -19,8 +19,36 @@ from pathlib import Path
 
 import pytest
 
-from starfish.api import StarfishServerManager, open_manager
-from starfish.application import ServerManagerBuildError
+from starfish.api import server_manager_api
+from starfish.api import StarfishServerManager
+from starfish.application import ServerManagerBuildError, StarfishRuntimeContext
+from starfish.application.runtime import create_server_registry
+from starfish.domain import (
+    DriverEntry,
+    StarfishEndpointConfig,
+    StarfishServerConfig,
+    StarfishServerMemberConfig,
+    ValidationResult,
+)
+
+
+class _BoundaryDriverFactory:
+    """为职责边界测试创建不可启动的 fake driver entry。"""
+
+    def create_driver_for_endpoint(
+        self,
+        server: StarfishServerMemberConfig,
+        endpoint: StarfishEndpointConfig,
+    ) -> DriverEntry:
+        """返回不可用 entry，避免职责边界测试触发真实 driver I/O。"""
+        return DriverEntry(
+            server=server,
+            endpoint=endpoint,
+            driver=None,
+            available=False,
+            reason="boundary-only",
+            mode="fake",
+        )
 
 
 def _write_plan(
@@ -64,8 +92,54 @@ def _write_plan(
     return path
 
 
+def _runtime_context_for_boundary_test() -> StarfishRuntimeContext:
+    """构造 manager 委托测试所需的最小 runtime context。"""
+    config = StarfishServerConfig(
+        scenario_id="runtime_api_boundary",
+        config_name="boundary",
+        servers=[
+            StarfishServerMemberConfig(
+                server_id="boundary-server",
+                server_name="Boundary Server",
+                endpoints=[
+                    StarfishEndpointConfig(
+                        endpoint_id="boundary-endpoint",
+                        protocol="UNKNOWN_PROTOCOL",
+                        host="127.0.0.1",
+                        port=0,
+                    )
+                ],
+            )
+        ],
+    )
+    return StarfishRuntimeContext(
+        config=config,
+        validation=ValidationResult(),
+        registry=create_server_registry(config, _BoundaryDriverFactory()),
+    )
+
+
 class TestStarfishRuntimeApi:
     """统一运行时 API 测试。"""
+
+    def test_manager_path_input_delegates_runtime_build_to_composition_root(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """路径入口只委托 API composition root 创建 runtime context。"""
+        plan_path = Path("boundary_server_plan.json")
+        calls: list[Path] = []
+
+        def fake_build_default_runtime(input_path: Path) -> StarfishRuntimeContext:
+            calls.append(input_path)
+            return _runtime_context_for_boundary_test()
+
+        monkeypatch.setattr(server_manager_api, "build_runtime", fake_build_default_runtime)
+
+        manager = StarfishServerManager(plan_path)
+
+        assert calls == [plan_path]
+        assert manager.config.scenario_id == "runtime_api_boundary"
 
     def test_open_runtime_returns_runtime_object(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -83,7 +157,7 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = open_manager(plan_path)
+            runtime = StarfishServerManager(plan_path)
 
             assert isinstance(runtime, StarfishServerManager)
             assert runtime.config.scenario_id == "runtime_api_single"
@@ -104,7 +178,7 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = open_manager(plan_path)
+            runtime = StarfishServerManager(plan_path)
             description = runtime.describe()
             assert description["scenario_id"] == "runtime_api_flow"
             assert description["endpoints"][0]["mode"] == "stub"
@@ -144,7 +218,7 @@ class TestStarfishRuntimeApi:
                 ],
             )
 
-            runtime = open_manager(plan_path)
+            runtime = StarfishServerManager(plan_path)
 
             with pytest.raises(ValueError, match="endpoint_id"):
                 runtime.write("runtime_api_multi_point_000", 1.0)
@@ -165,7 +239,7 @@ class TestStarfishRuntimeApi:
             plan_path.write_text(json.dumps(payload), encoding="utf-8")
 
             with pytest.raises(ServerManagerBuildError, match="校验失败") as exc_info:
-                open_manager(plan_path)
+                StarfishServerManager(plan_path)
 
             assert exc_info.value.validation is not None
             assert exc_info.value.validation.errors

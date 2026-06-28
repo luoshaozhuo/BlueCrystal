@@ -1,6 +1,6 @@
 """Starfish 协议专用 facade 测试。
 
-验证 HttpRestFacade 和 ModbusTcpFacade 的真实 server 生命周期：
+验证 HttpRestDriverAdapter 和 ModbusTcpDriverAdapter 的真实 server 生命周期：
 1. start/stop 真实 server 进程。
 2. health TCP connect 探测。
 3. load_points + read initial_values。
@@ -26,21 +26,39 @@ from urllib.request import ProxyHandler, build_opener
 
 import pytest
 
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_default_backend_factory,
+    create_default_driver_factory,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_iec104_driver_adapter,
+    create_iec61850_mms_driver_adapter,
+    create_iec61850_report_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_opcua_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
+
 from starfish.domain.server_config import (
     StarfishServerConfig,
     StarfishEndpointConfig,
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.adapters.drivers.protocol.http.http_rest_facade import HttpRestFacade
-from starfish.adapters.drivers.modbus.modbus_tcp_facade import ModbusTcpFacade
-from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade
-from starfish.adapters.drivers.simulator.server_simulator_facade import ServerSimulatorFacade
-from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-from starfish.adapters.drivers.modbus.modbus_rtu_facade import ModbusRtuFacade
-from starfish.adapters.drivers.ads.ads_facade import AdsFacade
-from starfish.adapters.drivers.iec.goose_facade import GooseFacade
-from starfish.adapters.drivers.iec.sv_facade import SvFacade
+from starfish.adapters.drivers.protocol.http.http_rest_driver_adapter import HttpRestDriverAdapter
+from starfish.adapters.drivers.modbus.modbus_tcp_driver_adapter import ModbusTcpDriverAdapter
+from starfish.adapters.drivers.protocol.mqtt.mqtt_driver_adapter import MqttDriverAdapter
+from starfish.adapters.drivers.simulator.server_simulator_driver_adapter import ServerSimulatorDriverAdapter
+from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+from starfish.adapters.drivers.modbus.modbus_rtu_driver_adapter import ModbusRtuDriverAdapter
+from starfish.adapters.drivers.ads.ads_driver_adapter import AdsDriverAdapter
+from starfish.adapters.drivers.iec.goose_driver_adapter import GooseDriverAdapter
+from starfish.adapters.drivers.iec.sv_driver_adapter import SvDriverAdapter
 from starfish.adapters.drivers.factory import (
     StarfishDriverFactory,
     create_driver_for_endpoint,
@@ -50,7 +68,7 @@ from starfish.adapters.drivers.factory import (
     get_codebase_pending_protocols,
     get_environment_pending_protocols,
 )
-from starfish.application.orchestration.registry import create_server_registry
+from starfish.application.runtime import create_server_registry
 from starfish.application.use_cases import HealthSystemUseCase, StartSystemUseCase, StopSystemUseCase
 
 # 创建无代理 opener，避免环境代理配置干扰 localhost 请求
@@ -166,12 +184,12 @@ def _make_modbus_plan(
 # ── HTTP REST Facade 测试 ────────────────────────────────────────────────────────
 
 
-class TestHttpRestFacadeLifecycle:
+class TestHttpRestDriverAdapterLifecycle:
     """HTTP REST facade start/stop 生命周期测试。"""
 
     def test_initial_state(self) -> None:
         """新建 facade 应为 stopped 状态。"""
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         h = facade.health()
         assert h["status"] == "stopped"
         assert h["running"] is False
@@ -181,7 +199,7 @@ class TestHttpRestFacadeLifecycle:
     def test_start_and_stop(self) -> None:
         """start 后 server 应可连接，stop 后应断开。"""
         plan = _make_http_plan("start_stop")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -198,7 +216,7 @@ class TestHttpRestFacadeLifecycle:
     def test_start_idempotent(self) -> None:
         """重复 start() 应为幂等。"""
         plan = _make_http_plan("idempotent_start")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -210,7 +228,7 @@ class TestHttpRestFacadeLifecycle:
     def test_stop_idempotent(self) -> None:
         """重复 stop() 应为幂等。"""
         plan = _make_http_plan("idempotent_stop")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -221,7 +239,7 @@ class TestHttpRestFacadeLifecycle:
     def test_port_auto_allocation(self) -> None:
         """端口 0 时 OS 应自动分配端口。"""
         plan = _make_http_plan("auto_port")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -232,13 +250,13 @@ class TestHttpRestFacadeLifecycle:
         facade.stop()
 
 
-class TestHttpRestFacadeReadWrite:
+class TestHttpRestDriverAdapterReadWrite:
     """HTTP REST facade 数据读写测试。"""
 
     def test_load_points_populates_values(self) -> None:
         """load_points 应从 plan.initial_values 填充内存。"""
         plan = _make_http_plan("load")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read()
@@ -248,7 +266,7 @@ class TestHttpRestFacadeReadWrite:
     def test_read_specific_points(self) -> None:
         """指定 point_ids 时应只返回对应值。"""
         plan = _make_http_plan("specific")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read(["temp_sensor_1"])
@@ -257,7 +275,7 @@ class TestHttpRestFacadeReadWrite:
     def test_read_nonexistent_point(self) -> None:
         """不存在 point_id 应返回 None。"""
         plan = _make_http_plan("nonexist")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read(["nonexistent"])
@@ -266,7 +284,7 @@ class TestHttpRestFacadeReadWrite:
     def test_update_values(self) -> None:
         """update_values 应更新内存值。"""
         plan = _make_http_plan("update")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         facade.update_values({"temp_sensor_1": 99.9, "new_point": 0})
@@ -278,7 +296,7 @@ class TestHttpRestFacadeReadWrite:
     def test_http_get_returns_values(self) -> None:
         """HTTP GET /points 应返回当前内存值。"""
         plan = _make_http_plan("http_get")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -298,7 +316,7 @@ class TestHttpRestFacadeReadWrite:
     def test_http_get_404_for_other_paths(self) -> None:
         """非 /points 路径应返回 404。"""
         plan = _make_http_plan("http_404")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -314,7 +332,7 @@ class TestHttpRestFacadeReadWrite:
     def test_capabilities_reflects_plan(self) -> None:
         """capabilities 应返回 plan 中的声明。"""
         plan = _make_http_plan("caps")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         assert facade.capabilities() == ["READ"]
@@ -326,7 +344,7 @@ class TestHttpRestNotImplemented:
     def test_write_raises_unsupported(self) -> None:
         """write 应抛出 UnsupportedOperation。"""
         plan = _make_http_plan("notimpl_write")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="write"):
@@ -335,7 +353,7 @@ class TestHttpRestNotImplemented:
     def test_subscribe_raises_unsupported(self) -> None:
         """subscribe 应抛出 UnsupportedOperation。"""
         plan = _make_http_plan("notimpl_sub")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="subscribe"):
@@ -344,7 +362,7 @@ class TestHttpRestNotImplemented:
     def test_report_raises_unsupported(self) -> None:
         """report 应抛出 UnsupportedOperation。"""
         plan = _make_http_plan("notimpl_report")
-        facade = HttpRestFacade()
+        facade = create_http_rest_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="report"):
@@ -354,12 +372,12 @@ class TestHttpRestNotImplemented:
 # ── Modbus TCP Facade 测试 ───────────────────────────────────────────────────────
 
 
-class TestModbusTcpFacadeLifecycle:
+class TestModbusTcpDriverAdapterLifecycle:
     """Modbus TCP facade start/stop 生命周期测试。"""
 
     def test_initial_state(self) -> None:
         """新建 facade 应为 stopped 状态。"""
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         h = facade.health()
         assert h["status"] == "stopped"
         assert h["running"] is False
@@ -369,7 +387,7 @@ class TestModbusTcpFacadeLifecycle:
     def test_start_and_stop(self) -> None:
         """start 后 server 应可连接，stop 后应断开。"""
         plan = _make_modbus_plan("mb_start_stop")
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -386,7 +404,7 @@ class TestModbusTcpFacadeLifecycle:
     def test_start_idempotent(self) -> None:
         """重复 start() 应为幂等。"""
         plan = _make_modbus_plan("mb_idem_start")
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -397,7 +415,7 @@ class TestModbusTcpFacadeLifecycle:
     def test_port_auto_allocation(self) -> None:
         """端口 0 时 OS 应自动分配端口。"""
         plan = _make_modbus_plan("mb_auto_port")
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -406,7 +424,7 @@ class TestModbusTcpFacadeLifecycle:
         facade.stop()
 
 
-class TestModbusTcpFacadeReadWrite:
+class TestModbusTcpDriverAdapterReadWrite:
     """Modbus TCP facade 数据读写测试。"""
 
     def test_load_points_builds_register_map(self) -> None:
@@ -415,7 +433,7 @@ class TestModbusTcpFacadeReadWrite:
             "mb_map",
             initial_values={"zzz": 10, "aaa": 20, "mmm": 30},
         )
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         # 按字典序排序: aaa=0, mmm=1, zzz=2
@@ -432,7 +450,7 @@ class TestModbusTcpFacadeReadWrite:
             "mb_load",
             initial_values={"reg_valve_1": 100, "reg_valve_2": 200},
         )
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read()
@@ -442,7 +460,7 @@ class TestModbusTcpFacadeReadWrite:
     def test_write_updates_value(self) -> None:
         """write 应更新内部值并可通过 read 读取。"""
         plan = _make_modbus_plan("mb_write")
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         facade.write("reg_valve_1", 999)
@@ -453,7 +471,7 @@ class TestModbusTcpFacadeReadWrite:
     def test_write_unknown_point_raises_keyerror(self) -> None:
         """write 不存在的 point_id 应抛出 KeyError。"""
         plan = _make_modbus_plan("mb_keyerror")
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(KeyError, match="unknown_pid"):
@@ -462,7 +480,7 @@ class TestModbusTcpFacadeReadWrite:
     def test_update_values(self) -> None:
         """update_values 应批量更新内存值。"""
         plan = _make_modbus_plan("mb_update")
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         facade.update_values({"reg_valve_1": 500, "new_reg": 300})
@@ -477,7 +495,7 @@ class TestModbusTcpFacadeReadWrite:
             "mb_fc03",
             initial_values={"a": 100, "b": 200, "c": 300},
         )
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -526,7 +544,7 @@ class TestModbusTcpFacadeReadWrite:
             "mb_fc06",
             initial_values={"a": 10, "b": 20},
         )
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -577,7 +595,7 @@ class TestModbusTcpFacadeReadWrite:
     def test_fc06_write_invalid_address_ignored(self) -> None:
         """FC06 写入无效寄存器地址时不影响已有数据。"""
         plan = _make_modbus_plan("mb_fc06_invalid")
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -606,7 +624,7 @@ class TestModbusTcpFacadeReadWrite:
     def test_capabilities(self) -> None:
         """capabilities 应返回 plan 中的声明。"""
         plan = _make_modbus_plan("mb_caps")
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         assert facade.capabilities() == ["READ", "WRITE"]
@@ -618,7 +636,7 @@ class TestModbusTcpNotImplemented:
     def test_subscribe_raises_unsupported(self) -> None:
         """subscribe 应抛出 UnsupportedOperation。"""
         plan = _make_modbus_plan("mb_notimpl_sub")
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="subscribe"):
@@ -627,7 +645,7 @@ class TestModbusTcpNotImplemented:
     def test_report_raises_unsupported(self) -> None:
         """report 应抛出 UnsupportedOperation。"""
         plan = _make_modbus_plan("mb_notimpl_report")
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="report"):
@@ -643,7 +661,7 @@ class TestFacadeSmokeFlow:
     def test_http_rest_smoke_flow(self) -> None:
         """HTTP REST facade 完整 smoke 流程。"""
         plan = _make_http_plan("http_smoke_flow")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
 
         # load_points
@@ -675,7 +693,7 @@ class TestFacadeSmokeFlow:
     def test_modbus_tcp_smoke_flow(self) -> None:
         """Modbus TCP facade 完整 smoke 流程。"""
         plan = _make_modbus_plan("mb_smoke_flow")
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
 
         # load_points
@@ -716,25 +734,25 @@ class TestRegistryFactoryDispatch:
     """ServerRegistry 工厂 dispatch 测试。"""
 
     def test_http_rest_dispatches_to_http_rest_facade(self) -> None:
-        """HTTP_REST 协议应 dispatch 到 HttpRestFacade。"""
+        """HTTP_REST 协议应 dispatch 到 HttpRestDriverAdapter。"""
         plan = _make_http_plan("dispatch_http")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
 
         assert entry.mode == "real"
         assert entry.available is True
-        assert isinstance(entry.driver, HttpRestFacade)
+        assert isinstance(entry.driver, HttpRestDriverAdapter)
         assert entry.driver.protocol == "HTTP_REST"
 
     def test_modbus_tcp_dispatches_to_modbus_tcp_facade(self) -> None:
-        """MODBUS_TCP 协议应 dispatch 到 ModbusTcpFacade。"""
+        """MODBUS_TCP 协议应 dispatch 到 ModbusTcpDriverAdapter。"""
         plan = _make_modbus_plan("dispatch_modbus")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
 
         assert entry.mode == "real"
         assert entry.available is True
-        assert isinstance(entry.driver, ModbusTcpFacade)
+        assert isinstance(entry.driver, ModbusTcpDriverAdapter)
         assert entry.driver.protocol == "MODBUS_TCP"
 
     def test_unknown_protocol_dispatches_to_stub(self) -> None:
@@ -746,11 +764,11 @@ class TestRegistryFactoryDispatch:
             host="127.0.0.1",
             port=4840,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
 
         assert entry.mode == "stub"
         assert entry.available is True
-        assert isinstance(entry.driver, ServerSimulatorFacade)
+        assert isinstance(entry.driver, ServerSimulatorDriverAdapter)
         assert "in-memory stub" in entry.reason
 
     def test_create_drivers_multiple_endpoints(self) -> None:
@@ -790,7 +808,7 @@ class TestRegistryFactoryDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_server_registry(plan, StarfishDriverFactory())
+        registry = create_server_registry(plan, create_default_driver_factory())
 
         assert len(registry.entries) == 4
 
@@ -801,10 +819,10 @@ class TestRegistryFactoryDispatch:
         assert modes["iec61850_ep"] == "stub"
 
         # 类型检查
-        assert isinstance(registry.entries[0].driver, HttpRestFacade)
-        assert isinstance(registry.entries[1].driver, ModbusTcpFacade)
-        assert isinstance(registry.entries[2].driver, MqttFacade)
-        assert isinstance(registry.entries[3].driver, ServerSimulatorFacade)
+        assert isinstance(registry.entries[0].driver, HttpRestDriverAdapter)
+        assert isinstance(registry.entries[1].driver, ModbusTcpDriverAdapter)
+        assert isinstance(registry.entries[2].driver, MqttDriverAdapter)
+        assert isinstance(registry.entries[3].driver, ServerSimulatorDriverAdapter)
 
     def test_get_supported_protocols(self) -> None:
         """get_supported_protocols 应返回已实现协议列表。"""
@@ -818,7 +836,7 @@ class TestRegistryFactoryDispatch:
         assert len(iec_protocols) >= 1
 
     def test_mqtt_dispatches_to_mqtt_facade(self) -> None:
-        """MQTT 协议应 dispatch 到 MqttFacade（mqtt-lightweight mode）。"""
+        """MQTT 协议应 dispatch 到 MqttDriverAdapter（mqtt-lightweight mode）。"""
         plan = _make_http_plan("dispatch_mqtt")
         ep = StarfishEndpointConfig(
             endpoint_id="mqtt_ep",
@@ -826,11 +844,11 @@ class TestRegistryFactoryDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
 
         assert entry.mode == "mqtt-lightweight"
         assert entry.available is True
-        assert isinstance(entry.driver, MqttFacade)
+        assert isinstance(entry.driver, MqttDriverAdapter)
         assert entry.driver.protocol == "MQTT"
         assert "非完整 MQTT broker" in entry.reason
 
@@ -844,12 +862,12 @@ class TestRegistryFactoryDispatch:
                 host="127.0.0.1",
                 port=0,
             )
-            entry = create_driver_for_endpoint(ep, plan)
+            entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
             # "m q t t" 归一化后变成 "M_Q_T_T"，不匹配 MQTT
             # 但 "mqtt" 和 "MQTT" 应该都匹配
             if variant in ("mqtt", "MQTT", "Mqtt"):
-                assert isinstance(entry.driver, MqttFacade), (
-                    f"变体 '{variant}' 应 dispatch 到 MqttFacade, "
+                assert isinstance(entry.driver, MqttDriverAdapter), (
+                    f"变体 '{variant}' 应 dispatch 到 MqttDriverAdapter, "
                     f"实际 mode={entry.mode}"
                 )
 
@@ -865,10 +883,10 @@ class TestRegistryFactoryDispatch:
         """get_lightweight_protocols 应只返回 lightweight 模式协议。
         MODBUS_RTU 在 PTY 可用时也属于 lightweight。
         """
-        protocols = get_lightweight_protocols()
+        protocols = get_lightweight_protocols(create_default_backend_factory())
         assert "MQTT" in protocols
         assert "HTTP_REST" not in protocols
-        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.infrastructure.drivers.backend_factory import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         if pty_ok:
             assert "MODBUS_RTU" in protocols
@@ -881,7 +899,7 @@ class TestPendingProtocolDispatch:
     """Round 10 新增：codebase-pending 和 environment-pending 协议 dispatch 测试。"""
 
     def test_iec101_dispatches_to_iec101_facade(self) -> None:
-        """IEC101 协议应 dispatch 到 Iec101Facade
+        """IEC101 协议应 dispatch 到 Iec101DriverAdapter
         （mode 可能为 codec-enhanced/codec-enhanced-plus/codec-skeleton/
         environment-pending/codebase-pending）。"""
         plan = _make_http_plan("dispatch_iec101")
@@ -891,7 +909,7 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=2404,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode in (
             "codec-enhanced",
             "codec-enhanced-plus",
@@ -900,11 +918,11 @@ class TestPendingProtocolDispatch:
             "codebase-pending",
         )
         assert entry.available is True
-        assert isinstance(entry.driver, Iec101Facade)
+        assert isinstance(entry.driver, Iec101DriverAdapter)
         assert entry.driver.protocol == "IEC101"
 
     def test_iec_101_variant_dispatches_to_iec101_facade(self) -> None:
-        """IEC_101 协议变体应 dispatch 到 Iec101Facade
+        """IEC_101 协议变体应 dispatch 到 Iec101DriverAdapter
         （mode 可能为 codec-enhanced/codec-enhanced-plus/codec-skeleton/
         environment-pending/codebase-pending）。"""
         plan = _make_http_plan("dispatch_iec_101")
@@ -914,7 +932,7 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=2404,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode in (
             "codec-enhanced",
             "codec-enhanced-plus",
@@ -922,10 +940,10 @@ class TestPendingProtocolDispatch:
             "environment-pending",
             "codebase-pending",
         )
-        assert isinstance(entry.driver, Iec101Facade)
+        assert isinstance(entry.driver, Iec101DriverAdapter)
 
     def test_modbus_rtu_dispatches_to_modbus_rtu_facade(self) -> None:
-        """MODBUS_RTU 协议应 dispatch 到 ModbusRtuFacade
+        """MODBUS_RTU 协议应 dispatch 到 ModbusRtuDriverAdapter
         （PTY 可用时 rtu-lightweight，不可用时 codebase-pending）。"""
         plan = _make_http_plan("dispatch_modbus_rtu")
         ep = StarfishEndpointConfig(
@@ -934,17 +952,17 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode in ("rtu-lightweight", "codebase-pending"), (
             f"MODBUS_RTU mode 应为 rtu-lightweight 或 codebase-pending，"
             f"实际 {entry.mode}"
         )
         assert entry.available is True
-        assert isinstance(entry.driver, ModbusRtuFacade)
+        assert isinstance(entry.driver, ModbusRtuDriverAdapter)
         assert entry.driver.protocol == "MODBUS_RTU"
 
     def test_beckhoff_ads_dispatches_to_ads_facade(self) -> None:
-        """BECKHOFF_ADS 协议应 dispatch 到 AdsFacade（codebase-pending）。"""
+        """BECKHOFF_ADS 协议应 dispatch 到 AdsDriverAdapter（codebase-pending）。"""
         plan = _make_http_plan("dispatch_ads")
         ep = StarfishEndpointConfig(
             endpoint_id="ads_ep",
@@ -952,14 +970,14 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=48898,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "codebase-pending"
         assert entry.available is True
-        assert isinstance(entry.driver, AdsFacade)
+        assert isinstance(entry.driver, AdsDriverAdapter)
         assert entry.driver.protocol == "BECKHOFF_ADS"
 
     def test_ads_short_name_dispatches_to_ads_facade(self) -> None:
-        """ADS 短名协议应 dispatch 到 AdsFacade（codebase-pending）。"""
+        """ADS 短名协议应 dispatch 到 AdsDriverAdapter（codebase-pending）。"""
         plan = _make_http_plan("dispatch_ads_short")
         ep = StarfishEndpointConfig(
             endpoint_id="ads_short_ep",
@@ -967,12 +985,12 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=48898,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "codebase-pending"
-        assert isinstance(entry.driver, AdsFacade)
+        assert isinstance(entry.driver, AdsDriverAdapter)
 
     def test_goose_dispatches_to_goose_facade(self) -> None:
-        """GOOSE 协议应 dispatch 到 GooseFacade（environment-pending）。"""
+        """GOOSE 协议应 dispatch 到 GooseDriverAdapter（environment-pending）。"""
         plan = _make_http_plan("dispatch_goose")
         ep = StarfishEndpointConfig(
             endpoint_id="goose_ep",
@@ -980,14 +998,14 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "environment-pending"
         assert entry.available is True
-        assert isinstance(entry.driver, GooseFacade)
+        assert isinstance(entry.driver, GooseDriverAdapter)
         assert entry.driver.protocol == "GOOSE"
 
     def test_sv_dispatches_to_sv_facade(self) -> None:
-        """SV 协议应 dispatch 到 SvFacade（environment-pending）。"""
+        """SV 协议应 dispatch 到 SvDriverAdapter（environment-pending）。"""
         plan = _make_http_plan("dispatch_sv")
         ep = StarfishEndpointConfig(
             endpoint_id="sv_ep",
@@ -995,10 +1013,10 @@ class TestPendingProtocolDispatch:
             host="127.0.0.1",
             port=0,
         )
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "environment-pending"
         assert entry.available is True
-        assert isinstance(entry.driver, SvFacade)
+        assert isinstance(entry.driver, SvDriverAdapter)
         assert entry.driver.protocol == "SV"
 
     def test_multi_endpoint_with_pending_protocols(self) -> None:
@@ -1038,7 +1056,7 @@ class TestPendingProtocolDispatch:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_server_registry(plan, StarfishDriverFactory())
+        registry = create_server_registry(plan, create_default_driver_factory())
         assert len(registry.entries) == 4
 
         modes = {e.endpoint.endpoint_id: e.mode for e in registry.entries}
@@ -1054,10 +1072,10 @@ class TestPendingProtocolDispatch:
         assert modes["sv_ep"] == "environment-pending"
 
         # 类型检查
-        assert isinstance(registry.entries[0].driver, HttpRestFacade)
-        assert isinstance(registry.entries[1].driver, Iec101Facade)
-        assert isinstance(registry.entries[2].driver, GooseFacade)
-        assert isinstance(registry.entries[3].driver, SvFacade)
+        assert isinstance(registry.entries[0].driver, HttpRestDriverAdapter)
+        assert isinstance(registry.entries[1].driver, Iec101DriverAdapter)
+        assert isinstance(registry.entries[2].driver, GooseDriverAdapter)
+        assert isinstance(registry.entries[3].driver, SvDriverAdapter)
 
     def test_get_supported_protocols_includes_pending(self) -> None:
         """get_supported_protocols 应包含 codebase-pending 和 environment-pending 协议。"""
@@ -1074,18 +1092,18 @@ class TestPendingProtocolDispatch:
         """get_codebase_pending_protocols 应返回 codebase-pending 协议。
         IEC101 和 MODBUS_RTU 动态决定：binary/PTY 可用时不在此列表。
         """
-        protocols = get_codebase_pending_protocols()
+        protocols = get_codebase_pending_protocols(create_default_backend_factory())
         assert "BECKHOFF_ADS" in protocols
         assert "GOOSE" not in protocols
         assert "SV" not in protocols
         # IEC101 在 binary 缺失时应在列表中
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        if Iec101Facade().mode == "codebase-pending":
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        if create_iec101_driver_adapter().mode == "codebase-pending":
             assert "IEC101" in protocols
         else:
             assert "IEC101" not in protocols
         # MODBUS_RTU 在 PTY 不可用时应在列表中
-        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.infrastructure.drivers.backend_factory import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         if not pty_ok:
             assert "MODBUS_RTU" in protocols
@@ -1094,12 +1112,12 @@ class TestPendingProtocolDispatch:
         """get_environment_pending_protocols 应返回 environment-pending 协议。
         IEC101 动态判断：binary 已编译时为 environment-pending。
         """
-        protocols = get_environment_pending_protocols()
+        protocols = get_environment_pending_protocols(create_default_backend_factory())
         assert "GOOSE" in protocols
         assert "SV" in protocols
         # IEC101 在 binary 已编译时应在列表中
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        if Iec101Facade().mode == "environment-pending":
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        if create_iec101_driver_adapter().mode == "environment-pending":
             assert "IEC101" in protocols
         else:
             assert "IEC101" not in protocols
@@ -1133,7 +1151,7 @@ class TestRuntimeLifecycleUseCases:
             capabilities=["READ"],
             initial_values={"a": 1},
         )
-        registry = create_server_registry(plan, StarfishDriverFactory())
+        registry = create_server_registry(plan, create_default_driver_factory())
 
         started_entries = []
         try:
@@ -1165,7 +1183,7 @@ class TestRuntimeLifecycleUseCases:
             capabilities=["READ"],
             initial_values={},
         )
-        registry = create_server_registry(plan, StarfishDriverFactory())
+        registry = create_server_registry(plan, create_default_driver_factory())
 
         health = HealthSystemUseCase().execute(registry)
         assert "http_ep" in health
@@ -1175,8 +1193,8 @@ class TestRuntimeLifecycleUseCases:
 # ── Round 19 Modbus TCP facade register_encoding 工具接入测试 ──────────────────
 
 
-class TestModbusTcpFacadeRegisterEncoding:
-    """ModbusTcpFacade 接入 register_encoding 工具的测试（Round 19 新增）。
+class TestModbusTcpDriverAdapterRegisterEncoding:
+    """ModbusTcpDriverAdapter 接入 register_encoding 工具的测试（Round 19 新增）。
 
     验证 facade 的 encode_register_value / decode_register_value 方法
     **真实调用** starfish.domain.protocols.modbus.register_encoding 工具，
@@ -1189,7 +1207,7 @@ class TestModbusTcpFacadeRegisterEncoding:
         from starfish.domain.protocols.modbus.register_encoding import (
             ModbusRegisterValueType,
         )
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         regs = facade.encode_register_value(
             0x1234,
             ModbusRegisterValueType.UINT16,
@@ -1202,7 +1220,7 @@ class TestModbusTcpFacadeRegisterEncoding:
             ByteOrder, ModbusRegisterValueType, WordOrder,
             encode_register_value,
         )
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         regs = facade.encode_register_value(
             0x01020304,
             ModbusRegisterValueType.UINT32,
@@ -1222,7 +1240,7 @@ class TestModbusTcpFacadeRegisterEncoding:
         from starfish.domain.protocols.modbus.register_encoding import (
             ByteOrder, ModbusRegisterValueType, WordOrder,
         )
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         for value in [0.0, 1.0, 2.5, -1.5, 1024.0]:
             regs = facade.encode_register_value(
                 value,
@@ -1243,7 +1261,7 @@ class TestModbusTcpFacadeRegisterEncoding:
         from starfish.domain.protocols.modbus.register_encoding import (
             ModbusRegisterValueType,
         )
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         for value in [0, 1, 100, 32767, -1, -32768]:
             regs = facade.encode_register_value(
                 value,
@@ -1261,7 +1279,7 @@ class TestModbusTcpFacadeRegisterEncoding:
             ModbusRegisterValueType,
             RegisterEncodingValueError,
         )
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         with pytest.raises(RegisterEncodingValueError):
             facade.encode_register_value(
                 float("nan"),
@@ -1270,7 +1288,7 @@ class TestModbusTcpFacadeRegisterEncoding:
 
     def test_register_encoding_capabilities_contains_required(self) -> None:
         """register_encoding_capabilities() 应包含 5 value_type + 2 byte_order + 2 word_order。"""
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         caps = facade.register_encoding_capabilities()
         assert "supports_register_encoding=true" in caps
         assert "supports_typed_register_helpers=true" in caps
@@ -1297,11 +1315,11 @@ class TestModbusTcpFacadeRegisterEncoding:
     def test_register_encoding_does_not_modify_existing_facade_behavior(self) -> None:
         """register_encoding 接入不应修改 FC03/FC06 等基础帧行为。
 
-        验证 ModbusTcpFacade 既有 capabilities() 仍按 plan 行为
+        验证 ModbusTcpDriverAdapter 既有 capabilities() 仍按 plan 行为
         返回（不自动插入 register_encoding 字段）；register_encoding
         字段必须通过独立 register_encoding_capabilities() 方法获取。
         """
-        facade = ModbusTcpFacade()
+        facade = create_modbus_tcp_driver_adapter()
         # 加载 plan 后 capabilities() 才会带 plan 能力
         plan = _make_modbus_tcp_plan()
         facade.load_points(plan)

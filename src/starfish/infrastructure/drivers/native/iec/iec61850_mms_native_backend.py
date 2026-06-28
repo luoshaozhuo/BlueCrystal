@@ -1,4 +1,4 @@
-"""Starfish IEC61850 MMS 协议 facade —— 依赖 libiec61850 C runner。
+"""Starfish IEC61850 MMS 协议 backend —— 依赖 libiec61850 C runner。
 
 本模块提供 IEC61850 MMS 协议 server 模拟门面。根据环境探测
 iec61850_simulator_server C runner 二进制可用性，切换 real / unavailable 模式。
@@ -15,7 +15,7 @@ unavailable 模式（binary 缺失时）：
 
 NOT_IMPLEMENTED（所有模式）：
 - write() / subscribe() / report() 明确抛出 UnsupportedOperation。
-  当前 MMS facade 只实现最简 lifecycle (start/stop/health/read)，不实现
+  当前 MMS backend 只实现最简 lifecycle (start/stop/health/read)，不实现
   MMS 协议帧编解码和 write/subscribe/report 完整语义。
 
 协议特征：
@@ -99,10 +99,10 @@ def probe_iec61850_mms_binary() -> tuple[bool, str]:
     return True, reason
 
 
-# ── IEC61850 MMS facade ───────────────────────────────────────────────────────────
+# ── IEC61850 MMS backend ───────────────────────────────────────────────────────────
 
 
-class Iec61850MmsFacade:
+class Iec61850MmsNativeBackend:
     """IEC61850 MMS 协议 server 模拟门面。
 
     根据 iec61850_simulator_server C runner 可用性切换真实子进程或回退模式。
@@ -126,7 +126,7 @@ class Iec61850MmsFacade:
     _READY_PREFIX = "READY"
 
     def __init__(self, bind_host: str = "127.0.0.1", port: int = 0) -> None:
-        """初始化 IEC61850 MMS facade。
+        """初始化 IEC61850 MMS backend。
 
         Args:
             bind_host: 绑定地址。
@@ -176,11 +176,11 @@ class Iec61850MmsFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
-        """启动 IEC61850 MMS facade。
+        """启动 IEC61850 MMS backend。
 
         真实模式：启动 iec61850_simulator_server C runner -> 等待 READY。
         unavailable 模式：设置 in-memory 状态。
@@ -248,7 +248,7 @@ class Iec61850MmsFacade:
         self._started_at = datetime.now(timezone.utc)
 
     def stop(self) -> None:
-        """停止 IEC61850 MMS facade。
+        """停止 IEC61850 MMS backend。
 
         真实模式：优雅终止子进程。
         unavailable 模式：重置 in-memory 状态。
@@ -266,7 +266,7 @@ class Iec61850MmsFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         真实模式：通过 TCP connect 探测端点是否可达。
         unavailable 模式：返回 mode="unavailable" 及原因。
@@ -324,7 +324,7 @@ class Iec61850MmsFacade:
         """从内存读取当前点位值。
 
         不执行 MMS 协议真实读取（不依赖 MMS client runner）。
-        当前实现为 in-memory read，与 OpcUaFacade / Iec104Facade read 语义一致。
+        当前实现为 in-memory read，与 OpcUaNativeBackend / Iec104NativeBackend read 语义一致。
 
         Args:
             point_ids: 要读取的点位 ID 列表，None 表示全部。
@@ -368,7 +368,7 @@ class Iec61850MmsFacade:
         """
         raise UnsupportedOperation(
             "write",
-            "Iec61850MmsFacade.write 尚未实现，"
+            "Iec61850MmsNativeBackend.write 尚未实现，"
             "待后续轮次接入 MMS client runner 实现 MMS 协议写链路",
         )
 
@@ -383,7 +383,7 @@ class Iec61850MmsFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "Iec61850MmsFacade.subscribe 尚未实现，"
+            "Iec61850MmsNativeBackend.subscribe 尚未实现，"
             "待后续轮次接入 MMS report/subscribe 链路",
         )
 
@@ -395,7 +395,7 @@ class Iec61850MmsFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "Iec61850MmsFacade.report 尚未实现，"
+            "Iec61850MmsNativeBackend.report 尚未实现，"
             "待后续轮次接入 IEC61850 Report Control Block 链路",
         )
 
@@ -534,7 +534,7 @@ def _drain_stderr(stderr: Any) -> None:
 
 
 __all__ = [
-    "Iec61850MmsFacade",
+    "Iec61850MmsNativeBackend",
     "probe_iec61850_mms_binary",
     "resolve_iec61850_mms_simulator_path",
 ]

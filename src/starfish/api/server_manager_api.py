@@ -1,7 +1,7 @@
-"""starfish 高层 server manager API。
+"""Starfish server manager API facade。
 
-本模块为 CLI 和其他消费者提供统一 manager 对象，外部只需要操作
-`StarfishServerManager`，无需直接感知底层协议实现、注册表或配置加载细节。
+API 层负责默认 adapter 装配，并将用户入口委托给 application workflow 和
+runtime 控制用例；runtime context 只在内部保存，不作为外部 DTO 暴露。
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from starfish.application import BuiltManager, LoadedConfig, StarfishServerManagerService
+from starfish.application.runtime.context import StarfishRuntimeContext
 from starfish.application.use_cases import (
     HealthSystemUseCase,
     ReadSystemUseCase,
@@ -17,62 +17,68 @@ from starfish.application.use_cases import (
     StopSystemUseCase,
     WriteSystemUseCase,
 )
-from starfish.adapters.config.server_config_loader import ServerConfigJsonLoader
-from starfish.adapters.drivers.factory import StarfishDriverFactory
+from starfish.container import build_default_runtime_context
 
 
 class StarfishServerManager:
-    """Starfish 对外 server 管理对象。"""
+    """对外唯一入口 facade。"""
 
-    def __init__(self, built_manager: BuiltManager) -> None:
-        self._built_manager = built_manager
-        self._started_entries: list[Any] = []
+    def __init__(
+        self,
+        conf_path: Path | None = None,
+        *,
+        context: StarfishRuntimeContext | None = None,
+    ) -> None:
+        """初始化 manager。
+
+        Args:
+            conf_path: 配置文件路径，如果提供则通过默认 composition root 构建 runtime context。
+            context: 已构建的 runtime context，如果提供则直接使用。
+        Raises:
+            ValueError: 如果两者都未提供。
+        """
+        if context is not None:
+            self._runtime = context
+        elif conf_path is not None:
+            self._runtime = build_default_runtime_context(conf_path)
+        else:
+            raise ValueError("必须提供 conf_path 或 context")
+        self._started: list[Any] = []
+
+    # ---------------- runtime views ----------------
 
     @property
-    def config(self) -> Any:
-        """返回当前 manager 绑定的服务端配置。"""
-        return self._built_manager.config
+    def config(self):
+        """返回已加载配置对象。"""
+        return self._runtime.config
 
     @property
-    def registry(self) -> Any:
-        """返回底层驱动注册表。"""
-        return self._built_manager.registry
+    def registry(self):
+        """返回内部 runtime registry 视图。"""
+        return self._runtime.registry
 
-    def describe(self) -> dict[str, Any]:
-        """返回当前 manager 管理的 servers 结构描述。"""
-        return {
-            "scenario_id": self.config.scenario_id,
-            "config_name": self.config.config_name,
-            "synthetic": self.config.synthetic,
-            "server_count": len(self.config.servers),
-            "endpoints": [
-                {
-                    "server_id": entry.server.server_id,
-                    "server_name": entry.server.server_name,
-                    "endpoint_id": entry.endpoint.endpoint_id,
-                    "protocol": entry.endpoint.protocol,
-                    "mode": entry.mode,
-                    "available": entry.available,
-                    "reason": entry.reason,
-                }
-                for entry in self.registry.entries
-            ],
-        }
+    @property
+    def validation(self):
+        """返回配置加载校验结果。"""
+        return self._runtime.validation
+
+    # ---------------- lifecycle ----------------
 
     def start(self) -> None:
         """启动全部可用 endpoint。"""
-        if self._started_entries:
+        if self._started:
             return
-
-        self._started_entries = StartSystemUseCase().execute(self.registry)
+        self._started = StartSystemUseCase().execute(self.registry)
 
     def stop(self) -> None:
-        """停止已启动 endpoint。"""
-        StopSystemUseCase().execute(self.registry, self._started_entries)
-        self._started_entries = []
+        """停止本 manager 已启动的 endpoint。"""
+        StopSystemUseCase().execute(self.registry, self._started)
+        self._started = []
+
+    # ---------------- observability ----------------
 
     def status(self) -> dict[str, Any]:
-        """返回聚合运行状态。"""
+        """返回面向 API 调用方的运行状态摘要。"""
         return {
             "scenario_id": self.config.scenario_id,
             "config_name": self.config.config_name,
@@ -81,33 +87,44 @@ class StarfishServerManager:
             "endpoints": HealthSystemUseCase().execute(self.registry),
         }
 
-    def health(self, endpoint_id: str | None = None) -> dict[str, Any]:
-        """查询健康状态。"""
-        if endpoint_id is None:
-            return self.status()
-        return HealthSystemUseCase().execute(self.registry, endpoint_id=endpoint_id)
+    def describe(self) -> dict[str, Any]:
+        """返回配置与 endpoint 装配摘要。"""
+        return {
+            "scenario_id": self.config.scenario_id,
+            "config_name": self.config.config_name,
+            "synthetic": self.config.synthetic,
+            "server_count": len(self.config.servers),
+            "endpoints": [
+                {
+                    "server_id": e.server.server_id,
+                    "endpoint_id": e.endpoint.endpoint_id,
+                    "protocol": e.endpoint.protocol,
+                    "mode": e.mode,
+                    "available": e.available,
+                    "reason": e.reason,
+                }
+                for e in self.registry.entries
+            ],
+        }
 
-    def read(
-        self,
-        point_ids: list[str] | None = None,
-        *,
-        endpoint_id: str | None = None,
-    ) -> dict[str, Any]:
-        """读取当前点位值。"""
+    # ---------------- data plane ----------------
+
+    def health(self, endpoint_id: str | None = None):
+        """查询 endpoint 健康状态。"""
+        if endpoint_id:
+            return HealthSystemUseCase().execute(self.registry, endpoint_id=endpoint_id)
+        return self.status()
+
+    def read(self, point_ids=None, *, endpoint_id=None):
+        """读取点位值。"""
         return ReadSystemUseCase().execute(
             self.registry,
             point_ids,
             endpoint_id=endpoint_id,
         )
 
-    def write(
-        self,
-        point_id: str,
-        value: Any,
-        *,
-        endpoint_id: str | None = None,
-    ) -> None:
-        """向单个 endpoint 写值。"""
+    def write(self, point_id: str, value: Any, *, endpoint_id=None) -> None:
+        """写入单点值。"""
         WriteSystemUseCase().execute(
             self.registry,
             point_id,
@@ -116,31 +133,4 @@ class StarfishServerManager:
         )
 
 
-def _default_service() -> StarfishServerManagerService:
-    """创建默认运行时应用服务。
-
-    API 层承担 composition root 职责，负责把 adapters 注入 application
-    ports；application 层不直接依赖具体 driver 或文件 I/O 实现。
-    """
-    return StarfishServerManagerService(
-        config_loader=ServerConfigJsonLoader(),
-        driver_factory=StarfishDriverFactory(),
-    )
-
-
-def load_config(input_path: Path) -> LoadedConfig:
-    """加载并校验服务端配置。"""
-    return _default_service().load_config(input_path)
-
-
-def build_manager(input_path: Path) -> BuiltManager:
-    """构建 server manager 装配结果。"""
-    return _default_service().build_manager(input_path)
-
-
-def open_manager(input_path: Path) -> StarfishServerManager:
-    """构建并返回统一高层 manager 对象。"""
-    return StarfishServerManager(build_manager(input_path))
-
-
-__all__ = ["StarfishServerManager", "load_config", "build_manager", "open_manager"]
+__all__ = ["StarfishServerManager"]

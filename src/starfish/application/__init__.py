@@ -5,29 +5,27 @@
 
 from __future__ import annotations
 
-from starfish.application.orchestration.service import (
-    BuiltManager,
-    LoadedConfig,
-    ServerManagerBuildError,
-    StarfishServerManagerService,
-)
+from starfish.application.runtime import StarfishRuntimeContext
 from starfish.application.use_cases import (
+    BuildRuntimeContextWorkflow,
     HealthSystemUseCase,
     HotSwapDriverInstanceUseCase,
+    LoadedConfig,
     ReadSystemUseCase,
+    ServerManagerBuildError,
     StartSystemUseCase,
     StopSystemUseCase,
     WriteSystemUseCase,
 )
 
 __all__ = [
+    "BuildRuntimeContextWorkflow",
     "LoadedConfig",
-    "BuiltManager",
     "HealthSystemUseCase",
     "HotSwapDriverInstanceUseCase",
     "ReadSystemUseCase",
     "ServerManagerBuildError",
-    "StarfishServerManagerService",
+    "StarfishRuntimeContext",
     "StartSystemUseCase",
     "StopSystemUseCase",
     "WriteSystemUseCase",

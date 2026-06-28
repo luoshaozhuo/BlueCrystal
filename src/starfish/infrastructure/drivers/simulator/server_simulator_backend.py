@@ -1,6 +1,6 @@
-"""starfish ServerSimulatorFacade —— 最小 in-memory stub 实现。
+"""starfish ServerSimulatorBackend —— 最小 in-memory stub 实现。
 
-本模块提供协议 server 模拟的最小门面，用于验证 ServerPlan 加载、
+本模块提供协议 server 模拟的最小门面，用于验证 server config 加载、
 点位读取和基本健康检查能力。当前采用 in-memory 存储方案，
 不启动真实协议 server 进程。
 
@@ -27,7 +27,7 @@ from starfish.domain import (
 )
 
 
-class ServerSimulatorFacade:
+class ServerSimulatorBackend:
     """协议 server 模拟门面 —— in-memory stub 实现。
 
     维护内存中的点位值存储，支持 read、health 和 capabilities 查询。
@@ -142,7 +142,7 @@ class ServerSimulatorFacade:
         """
         raise UnsupportedOperation(
             "write",
-            "ServerSimulatorFacade.write 尚未实现，"
+            "ServerSimulatorBackend.write 尚未实现，"
             "待后续轮次接入真实协议 write handler",
         )
 
@@ -160,7 +160,7 @@ class ServerSimulatorFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "ServerSimulatorFacade.subscribe 尚未实现，"
+            "ServerSimulatorBackend.subscribe 尚未实现，"
             "待后续轮次接入真实协议 subscribe handler",
         )
 
@@ -177,7 +177,7 @@ class ServerSimulatorFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "ServerSimulatorFacade.report 尚未实现，"
+            "ServerSimulatorBackend.report 尚未实现，"
             "待后续轮次实现结构化 telemetry report",
         )
 
@@ -204,4 +204,4 @@ class ServerSimulatorFacade:
         return list(self._plan.capabilities)
 
 
-__all__ = ["ServerSimulatorFacade"]
+__all__ = ["ServerSimulatorBackend"]

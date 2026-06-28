@@ -1,14 +1,11 @@
 """starfish CLI 测试。
 
 验证：
-1. validate-config 正常加载和校验输出。
-2. describe 展示 plan 与 facade 装配结果。
-3. health 可查询未启动/已启动 facade 状态。
-4. read 可启动 simulator 并读取当前值。
-5. run 可作为 simulator 运行入口启动并停止 facade。
-6. 文件不存在时 CLI 返回非零。
-7. 无效 JSON 时 CLI 返回非零。
-8. --help 输出正常。
+1. CLI 只暴露 run 子命令，旧诊断子命令不能作为隐藏入口调用。
+2. run 可使用位置参数或既有 --input 用法启动并停止 facade。
+3. 文件不存在时 CLI 返回非零。
+4. 无效 JSON 时 CLI 返回非零。
+5. --help 输出正常。
 
 测试阶段：P1 开发期验证 + P2 构建期验证。
 使用的替身：临时 JSON 文件。
@@ -21,17 +18,44 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 import starfish.__main__ as starfish_cli
 from starfish.__main__ import main
-from starfish.application import ServerManagerBuildError
-from starfish.domain import ValidationResult
+
+
+def _python_m_starfish(*args: str) -> subprocess.CompletedProcess[str]:
+    """以真实模块入口执行 CLI，覆盖 `__main__` 的进程退出语义。
+
+    Args:
+        *args: 传给 `python -m starfish` 的参数。
+
+    Returns:
+        已捕获 stdout/stderr 的子进程结果。
+    """
+    env = os.environ.copy()
+    src_path = str(Path(__file__).resolve().parents[3] / "src")
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        src_path
+        if not existing_pythonpath
+        else os.pathsep.join([src_path, existing_pythonpath])
+    )
+    return subprocess.run(
+        [sys.executable, "-m", "starfish", *args],
+        check=False,
+        cwd=Path(__file__).resolve().parents[3],
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
 
 def _write_valid_json(
@@ -162,178 +186,31 @@ def _write_invalid_json_payload(tmpdir: str, name: str) -> Path:
     return path
 
 
-class TestValidatePlanCLI:
-    """validate-config CLI 测试。"""
+class TestRemovedCLICommands:
+    """旧诊断命令必须从 CLI 入口彻底移除。"""
 
-    def test_validate_plan_routes_through_api_function(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """CLI 应通过 `starfish.api` 高层入口触发计划加载。"""
-
-        called_with: list[Path] = []
-
-        def fake_load_config(input_path: Path) -> object:
-            called_with.append(input_path)
-            return SimpleNamespace(
-                config=SimpleNamespace(
-                    scenario_id="api_cli",
-                    server_name="api_cli server",
-                    endpoints=[],
-                    points=[],
-                    synthetic=True,
-                    capabilities=[],
-                ),
-                validation=SimpleNamespace(
-                    is_valid=True,
-                    errors=[],
-                    warnings=[],
-                    passed_checks=[],
-                ),
-            )
-
-        monkeypatch.setattr(starfish_cli, "load_config", fake_load_config)
-        plan_path = Path("/tmp/runtime_api_plan.json")
-
-        assert main(["validate-config", "--input", str(plan_path)]) == 0
-        assert called_with == [plan_path]
-
-    @pytest.mark.smoke
-    def test_help(self) -> None:
-        assert main(["validate-config", "--help"]) == 0
-
-    @pytest.mark.smoke
-    def test_load_valid_file(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_validate_ok")
-            assert main(["validate-config", "--input", str(plan_path)]) == 0
-
-    def test_invalid_file_reports_errors(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = _write_invalid_json_payload(tmpdir, "bad_validate")
-            assert main(["validate-config", "--input", str(path)]) != 0
-
-    def test_missing_file(self) -> None:
-        assert main(["validate-config", "--input", "/nonexistent/file.json"]) != 0
-
-    def test_invalid_json(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "bad.json"
-            path.write_text("not valid json {{{", encoding="utf-8")
-            assert main(["validate-config", "--input", str(path)]) != 0
-
-    def test_requires_input(self) -> None:
-        with pytest.raises(SystemExit) as exc_info:
-            main(["validate-config"])
-        assert exc_info.value.code != 0
-
-
-class TestDescribeCLI:
-    """describe CLI 测试。"""
-
-    @pytest.mark.smoke
-    def test_help(self) -> None:
-        assert main(["describe", "--help"]) == 0
-
-    def test_describe_valid_file(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_describe_ok")
-            assert main(["describe", "--input", str(plan_path)]) == 0
-
-    def test_describe_multi_endpoint(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_multi_endpoint_json(tmpdir, "cli_describe_multi")
-            assert main(["describe", "--input", str(plan_path)]) == 0
-
-    def test_describe_missing_file(self) -> None:
-        assert main(["describe", "--input", "/nonexistent/file.json"]) != 0
-
-    def test_describe_requires_input(self) -> None:
-        with pytest.raises(SystemExit) as exc_info:
-            main(["describe"])
-        assert exc_info.value.code != 0
-
-    def test_describe_uses_runtime_build_error_details_without_reloading_plan(
+    @pytest.mark.parametrize("command", ["validate-config", "describe", "health", "read"])
+    def test_removed_command_fails_before_loading_manager(
         self,
+        command: str,
         monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """open_manager 失败时应直接使用异常内的校验明细。"""
+        """旧命令应被 Typer 拒绝，不能成为隐藏可用入口。"""
 
-        def fake_open_manager(input_path: Path) -> object:
-            del input_path
-            raise ServerManagerBuildError(
-                "校验失败 (2 个错误)",
-                validation=ValidationResult(
-                    errors=["缺少 endpoints", "缺少 points"],
-                ),
-            )
+        called = False
 
-        monkeypatch.setattr(starfish_cli, "open_manager", fake_open_manager)
+        def fake_manager(input_path: Path) -> object:
+            nonlocal called
+            called = True
+            raise AssertionError(f"{command} 不应加载 manager: {input_path}")
 
-        assert main(["describe", "--input", "/tmp/invalid.json"]) == 1
-        captured = capsys.readouterr()
-        assert "错误：校验失败 (2 个错误)" in captured.out
-        assert "[ERROR] 缺少 endpoints" in captured.out
-        assert "[ERROR] 缺少 points" in captured.out
+        monkeypatch.setattr(starfish_cli, "StarfishServerManager", fake_manager)
 
-
-class TestHealthCLI:
-    """health CLI 测试。"""
-
-    def test_help(self) -> None:
-        assert main(["health", "--help"]) == 0
-
-    def test_health_valid_file_without_start(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_health_ok")
-            assert main(["health", "--input", str(plan_path)]) == 0
-
-    def test_health_valid_file_with_start(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_health_start")
-            assert main(["health", "--input", str(plan_path), "--start"]) == 0
-
-    def test_health_missing_file(self) -> None:
-        assert main(["health", "--input", "/nonexistent/file.json"]) != 0
-
-    def test_health_invalid_file_fails(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = _write_invalid_json_payload(tmpdir, "bad_health")
-            assert main(["health", "--input", str(path)]) != 0
-
-    def test_health_requires_input(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
-            main(["health"])
+            main([command, "--input", "/tmp/runtime_api_plan.json"])
+
         assert exc_info.value.code != 0
-
-
-class TestReadCLI:
-    """read CLI 测试。"""
-
-    def test_help(self) -> None:
-        assert main(["read", "--help"]) == 0
-
-    def test_read_valid_file(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_read_ok")
-            assert main(["read", "--input", str(plan_path)]) == 0
-
-    def test_read_selected_point(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            plan_path = _write_valid_json(tmpdir, "cli_read_point")
-            point_id = "cli_read_point_point_000"
-            assert main(["read", "--input", str(plan_path), "--point", point_id]) == 0
-
-    def test_read_missing_file(self) -> None:
-        assert main(["read", "--input", "/nonexistent/file.json"]) != 0
-
-    def test_read_invalid_file_fails(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = _write_invalid_json_payload(tmpdir, "bad_read")
-            assert main(["read", "--input", str(path)]) != 0
-
-    def test_read_requires_input(self) -> None:
-        with pytest.raises(SystemExit) as exc_info:
-            main(["read"])
-        assert exc_info.value.code != 0
+        assert called is False
 
 
 class TestRunCLI:
@@ -349,6 +226,11 @@ class TestRunCLI:
             plan_path = _write_valid_json(tmpdir, "cli_run_ok")
             assert main(["run", "--input", str(plan_path), "--duration", "0"]) == 0
 
+    def test_run_accepts_positional_config_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = _write_valid_json(tmpdir, "cli_run_positional")
+            assert main(["run", str(plan_path), "--duration", "0"]) == 0
+
     def test_run_multi_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = _write_multi_endpoint_json(tmpdir, "cli_run_multi")
@@ -363,9 +245,7 @@ class TestRunCLI:
             assert main(["run", "--input", str(path), "--duration", "0"]) != 0
 
     def test_run_requires_input(self) -> None:
-        with pytest.raises(SystemExit) as exc_info:
-            main(["run"])
-        assert exc_info.value.code != 0
+        assert main(["run"]) != 0
 
 
 class TestTopLevelCLI:
@@ -384,10 +264,37 @@ class TestTopLevelCLI:
         assert main(["--help"]) == 0
 
 
+class TestPythonModuleEntrypoint:
+    """真实 `python -m starfish` 入口回归测试。"""
+
+    def test_python_m_keeps_run_as_subcommand(self) -> None:
+        result = _python_m_starfish("run", "--duration", "0")
+
+        assert result.returncode != 0
+        assert "文件不存在: run" not in result.stdout
+        assert "文件不存在: run" not in result.stderr
+        assert "缺少 server 配置 JSON 文件路径" in result.stderr
+
+    @pytest.mark.parametrize("command", ["validate-config", "describe", "health", "read"])
+    def test_python_m_removed_commands_fail_during_parse(self, command: str) -> None:
+        result = _python_m_starfish(
+            command,
+            "--input",
+            "/nonexistent/file.json",
+            "--duration",
+            "0",
+        )
+
+        assert result.returncode != 0
+        assert "/nonexistent/file.json" not in result.stdout
+        assert "/nonexistent/file.json" not in result.stderr
+        assert "No such command" in result.stderr or "No such command" in result.stdout
+
+
 class TestSeahorseStarfishCLIIntegration:
     """验证 Seahorse 导出 JSON 可被 Starfish CLI 直接消费。"""
 
-    def test_cli_loads_seahorse_exported_json(self) -> None:
+    def test_cli_runs_seahorse_exported_json_with_positional_config(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
         from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
@@ -407,7 +314,7 @@ class TestSeahorseStarfishCLIIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             plan_path = Path(tmpdir) / "cli_integration_server_plan.json"
             plan_path.write_text(json_str, encoding="utf-8")
-            assert main(["validate-config", "--input", str(plan_path)]) == 0
+            assert main(["run", str(plan_path), "--duration", "0"]) == 0
 
     def test_cli_runs_seahorse_exported_json(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))

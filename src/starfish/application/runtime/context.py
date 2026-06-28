@@ -1,9 +1,9 @@
-"""Starfish Runtime v2 registry 应用编排。
+"""Starfish application runtime kernel root。
 
-本模块位于 application 层，只负责从已校验配置构建 RuntimeGraph、将
-Node/Binding 绑定到 DriverInstance，并通过 DriverFactoryPort 请求
-adapter 创建 driver。它不解析配置文件、不选择协议实现、不调用 native、
-不执行 subprocess，也不触碰协议 codec。
+本模块是 `application.runtime` 的唯一入口对象所在地：`StarfishRuntimeContext`
+持有已校验配置、校验结果与运行时 registry 视图。RuntimeRegistry 与
+ServerRegistry 只构建和保存 RuntimeGraph 状态，不启动 driver、不解析文件、
+不选择具体协议实现。
 """
 
 from __future__ import annotations
@@ -11,13 +11,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 
 from starfish.application.ports.driver_factory import DriverFactoryPort
-from starfish.application.runtime import (
+from starfish.application.runtime.event_bus import RuntimeEventBus
+from starfish.application.runtime.graph import (
     DriverCapability,
     DriverInstance,
     DriverRuntimeHandle,
     DriverState,
     RuntimeBinding,
-    RuntimeEventBus,
     RuntimeGraph,
     RuntimeNode,
     RuntimeSignal,
@@ -27,6 +27,7 @@ from starfish.domain import (
     StarfishEndpointConfig,
     StarfishServerConfig,
     StarfishServerMemberConfig,
+    ValidationResult,
 )
 
 
@@ -48,7 +49,17 @@ def _driver_instance_from_entry(
     version: str,
     event_bus: RuntimeEventBus | None = None,
 ) -> DriverInstance:
-    """将 adapter factory 输出转换为 Runtime v2 DriverInstance。"""
+    """将 adapter factory 输出转换为 Runtime v2 DriverInstance。
+
+    Args:
+        entry: 由 application port 返回的 driver entry。
+        binding_id: RuntimeGraph binding 标识。
+        version: 实例版本，用于 hot swap 区分新旧实例。
+        event_bus: 可选的 runtime 内部事件总线。
+
+    Returns:
+        已初始化到 INITIALIZED 状态的 DriverInstance。
+    """
     instance = DriverInstance(
         id=f"{binding_id}:{version}",
         version=version,
@@ -111,7 +122,14 @@ class RuntimeRegistry:
         self._event_bus = event_bus or RuntimeEventBus()
 
     def build_runtime_graph(self, config: StarfishServerConfig) -> RuntimeGraph:
-        """根据已校验配置构建 RuntimeGraph。"""
+        """根据已校验配置构建 RuntimeGraph。
+
+        Args:
+            config: 已通过加载与校验的 Starfish server 配置。
+
+        Returns:
+            nodes[] -> bindings[] -> driver_instance 结构的运行图。
+        """
         graph = RuntimeGraph(
             scenario_id=config.scenario_id,
             config_name=config.config_name,
@@ -153,11 +171,6 @@ class ServerRegistry:
     本类只保存已构建的 RuntimeGraph、提供 endpoint/entry 到
     node/binding/instance 的解析，以及刷新旧 entries 兼容视图。启动、停止、
     健康检查、读写和 hot swap 旧实例停机均由 application use case 执行。
-
-    Attributes:
-        config: 已通过校验的 Starfish server 配置。
-        runtime_graph: Runtime v2 运行图。
-        entries: 每个 endpoint 对应的旧兼容运行时装配结果。
     """
 
     config: StarfishServerConfig
@@ -266,4 +279,22 @@ def create_server_registry(
     return registry
 
 
-__all__ = ["RuntimeRegistry", "ServerRegistry", "create_server_registry"]
+@dataclass(frozen=True)
+class StarfishRuntimeContext:
+    """runtime 唯一状态容器。
+
+    context 是 API/Façade 与 use case 之间传递 runtime kernel 的唯一对象；
+    它不作为外部 DTO 或网络契约暴露，也不携带 driver I/O 实现细节。
+    """
+
+    config: StarfishServerConfig
+    validation: ValidationResult
+    registry: ServerRegistry
+
+
+__all__ = [
+    "RuntimeRegistry",
+    "ServerRegistry",
+    "StarfishRuntimeContext",
+    "create_server_registry",
+]

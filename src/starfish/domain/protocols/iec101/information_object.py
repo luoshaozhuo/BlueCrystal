@@ -29,13 +29,13 @@
 - M_ME_NB_1 (TypeId=11)：
     测量值标度化（scaled），不带时标。
     信息体结构 = SVA(2 bytes, 16-bit signed int) + QDS(1 byte)。
-    object body 长度 = 3 字节。Round 18 新增 information object
+    object body 长度 = 3 字节。已支持 information object
     实现（按 lib60870 语义对齐）。
 
 - M_ME_NC_1 (TypeId=13)：
     短浮点测量值（ShortFloat），不带时标。
     信息体结构 = ShortFloat(4 bytes, IEEE 754 LE) + QDS(1 byte)。
-    object body 长度 = 5 字节。Round 18 新增 information object
+    object body 长度 = 5 字节。已支持 information object
     实现。
 
 当前实现的 TypeId（控制方向）：
@@ -55,8 +55,8 @@
         persistent 标志（常用约定）
         保留位。
     本实现保留位级编码能力（旧 roundtrip），同时引入结构化
-    ``SingleCommandQualifier`` dataclass（Round 16 升级，
-    Round 17 进一步显式化 select_execute / qualifier / ql_value /
+    ``SingleCommandQualifier`` dataclass（结构化升级，进一步显式化
+    select_execute / qualifier / ql_value /
     persistent / pulse 子字段映射），编码时仍按位级写入，结构化
     字段与位级 1:1 对应：
         bit 0 = select_execute
@@ -67,7 +67,7 @@
     旧 roundtrip 测试继续通过。S/E 位（bit 1）由
     ``C_SC_NA_1_Object.select_execute`` 单独维护，与 QU 字段正交。
 
-当前实现的 TypeId（带时标，Round 16/17 新增）：
+当前实现的 TypeId（带时标）：
 
 - M_SP_TA_1 (TypeId=2)：
     单点信息，带 CP56Time2a 时标。
@@ -84,7 +84,7 @@
     信息体结构 = NVA(2 bytes) + QDS(1 byte) + CP56Time2a(7 bytes)。
     object body 长度 = 10 字节。
 
-- M_ME_TB_1 (TypeId=12，Round 17 新增)：
+- M_ME_TB_1 (TypeId=12，已支持)：
     标度化测量值，带 CP56Time2a 时标。
     信息体结构 = SVA(2 bytes, 16-bit signed int) + QDS(1 byte)
     + CP56Time2a(7 bytes)。
@@ -94,7 +94,7 @@
     完全不同；SVA 是工程量级整数表示，由 device profile 决定
     量程映射）。
 
-- M_ME_TC_1 (TypeId=14，Round 17 新增)：
+- M_ME_TC_1 (TypeId=14，已支持)：
     短浮点测量值，带 CP56Time2a 时标。
     信息体结构 = ShortFloat(4 bytes, IEEE 754 LE) + QDS(1 byte)
     + CP56Time2a(7 bytes)。
@@ -107,7 +107,7 @@
 - SQ=1 模式下首 IOA + 自增序列的协议行为（由 asdu 列表层处理）。
 - M_DP_NA_1 的全部 QUALIFIER 子语义；M_DP_NA_1 仍仅位级。
 - C_SE_TA_1 / C_SE_TB_1 / C_SE_TC_1 等控制方向带时标命令
-  （Round 19 新增；与不带时标 C_SE_NA_1/C_SE_NB_1/C_SE_NC_1
+  （已支持；与不带时标 C_SE_NA_1/C_SE_NB_1/C_SE_NC_1
   同语义但末尾追加 CP56Time2a 7 字节时标；object body 长度
   12 / 12 / 14 字节；仍仅 command codec，
   **不**等效真实写能力）。
@@ -292,7 +292,7 @@ class M_ME_NA_1_Object:
 
 
 # ── M_ME_NB_1: Measured value, scaled (without time tag) ──────────────────────
-# Round 18 新增：与 M_ME_TB_1 同语义但不带时标，对应 TypeId=11。
+# 已支持：与 M_ME_TB_1 同语义但不带时标，对应 TypeId=11。
 # SVA 是 16-bit 有符号整数（-32768..+32767）；量程与单位由
 # device profile / 业务侧解释（与 NVA 的"归一化至 -1.0..1.0-1/32768"
 # 语义完全不同；SVA 是工程量级整数表示）。编码：小端序 int16。
@@ -303,7 +303,7 @@ M_ME_NB_1_OBJECT_SIZE = 3  # SVA(2) + QDS(1) = 3 字节
 
 @dataclass
 class M_ME_NB_1_Object:
-    """M_ME_NB_1 信息对象（标度化测量值，不带时标，Round 18 新增）。
+    """M_ME_NB_1 信息对象（标度化测量值，不带时标，已支持）。
 
     信息体结构 = SVA(2 bytes, 16-bit signed int) + QDS(1 byte)，
     object body = 3 字节。
@@ -360,7 +360,7 @@ class M_ME_NB_1_Object:
 
 
 # ── M_ME_NC_1: Measured value, short float (without time tag) ──────────────────
-# Round 18 新增：与 M_ME_TC_1 同语义但不带时标，对应 TypeId=13。
+# 已支持：与 M_ME_TC_1 同语义但不带时标，对应 TypeId=13。
 # ShortFloat 携带 IEEE 754 single-precision 浮点（4 字节 LE）；
 # 编码/解码时拒绝 NaN/Inf（详见 information_elements.encode_short_float）。
 # 业务方如需支持 NaN/Inf，应在边界层映射为 QDS.invalid=True 等协议层
@@ -372,7 +372,7 @@ M_ME_NC_1_OBJECT_SIZE = 5  # ShortFloat(4) + QDS(1) = 5 字节
 
 @dataclass
 class M_ME_NC_1_Object:
-    """M_ME_NC_1 信息对象（短浮点测量值，不带时标，Round 18 新增）。
+    """M_ME_NC_1 信息对象（短浮点测量值，不带时标，已支持）。
 
     信息体结构 = ShortFloat(4 bytes, IEEE 754 LE) + QDS(1 byte)，
     object body = 5 字节。
@@ -434,7 +434,7 @@ C_SC_NA_1_OBJECT_SIZE = 1  # SCS(1 bit) + S/E(1 bit) + QU(5 bits) + 保留(1 bit
 
 
 class CommandPulse(str, Enum):
-    """C_SC_NA_1 命令脉冲/输出类型枚举（Round 17 新增）。
+    """C_SC_NA_1 命令脉冲/输出类型枚举。
 
     常见 IEC 60870-5-101 限定词语义映射：
 
@@ -472,7 +472,7 @@ _UNSET = object()
 
 @dataclass
 class SingleCommandQualifier:
-    """C_SC_NA_1 QU 字段结构化语义（Round 16 新增，Round 17 扩展）。
+    """C_SC_NA_1 QU 字段结构化语义（已支持，扩展）。
 
     把过去 6 位位级 ``qualifier`` 升级为结构化字段，便于业务层按
     协议语义理解与操作。**注意**：S/E 位（byte bit 1）在协议中独立于
@@ -495,14 +495,14 @@ class SingleCommandQualifier:
             3 = persistent output (持续输出)。
         - persistent: True 表示持续输出（常与 ql_value=3 等价，
           保留独立字段以便业务层按布尔语义直接操作）。
-        - pulse: 命令脉冲/输出类型枚举（Round 17 新增），与
+        - pulse: 命令脉冲/输出类型枚举，与
           ``ql_value`` / ``persistent`` 双向同步。
-        - select_execute: S/E 位镜像（Round 17 新增）。仅作
+        - select_execute: S/E 位镜像。仅作
           便利视图；权威源仍是 ``C_SC_NA_1_Object.select_execute``。
-        - qualifier: 6 位命令限定词位级字段镜像（Round 17 新增）。
+        - qualifier: 6 位命令限定词位级字段镜像。
           编码权威源；``sync_from_qualifier()`` 会从此回写到
           ``ql_value`` 等结构化字段。
-        - ql: 限定词 0..3 的别名（Round 17 新增，与 ``ql_value``
+        - ql: 限定词 0..3 的别名（已支持，与 ``ql_value``
           同步；保留以兼容 IEC 文档中的 ql 命名）。
 
     Attributes:
@@ -547,7 +547,7 @@ class SingleCommandQualifier:
                 f"pulse 必须为 CommandPulse 实例，实际 "
                 f"{type(self.pulse).__name__}"
             )
-        # Round 17 一致性策略：分层权威源 + 严格冲突检测
+        # 既有一致性策略：分层权威源 + 严格冲突检测
         # 优先级（高 -> 低）：qualifier > ql_value / ql > pulse
         # 1. ``qualifier`` 是位级字段权威源；若 ``qualifier`` 与
         #    ``ql_value + persistent`` 位布局不一致，先以 qualifier
@@ -660,7 +660,7 @@ class SingleCommandQualifier:
 class C_SC_NA_1_Object:
     """C_SC_NA_1 信息对象（单命令，不带时标）。
 
-    Round 16 升级：保留位级 ``qualifier``（旧 roundtrip 兼容），
+    结构化升级：保留位级 ``qualifier``（旧 roundtrip 兼容），
     同时新增结构化 ``qu_bit`` 字段（``SingleCommandQualifier``）。
     编码权威源策略：
         - ``scs`` / ``select_execute`` / ``qualifier``（位级字段）始终是
@@ -675,7 +675,7 @@ class C_SC_NA_1_Object:
         scs: 单命令状态（0=OFF, 1=ON）。
         select_execute: 0=execute 执行，1=select 选择。
         qualifier: 6 位命令限定词（QU 字段），默认为 0。
-        qu_bit: 结构化 QU 字段（Round 16 新增），类型 ``SingleCommandQualifier``。
+        qu_bit: 结构化 QU 字段，类型 ``SingleCommandQualifier``。
     """
 
     scs: int = 0
@@ -751,7 +751,7 @@ class C_SC_NA_1_Object:
 
 
 # ── C_SE_NA_1 / C_SE_NB_1 / C_SE_NC_1: Set-point command ──────────────────────
-# Round 18 新增：三个不带时标设定值命令。
+# 已支持：三个不带时标设定值命令。
 # 注意：本模块**不实现真实写命令发送**；Iec101Facade 仍保持
 # supports_server=false / supports_write_runtime=false（避免
 # command codec 被误解为真实写能力）。命令编解码器是 IEC 101
@@ -762,7 +762,7 @@ class C_SC_NA_1_Object:
 
 
 class SetPointQualifier(str, Enum):
-    """C_SE_* 设定值命令限定词枚举（Round 18 新增）。
+    """C_SE_* 设定值命令限定词枚举。
 
     对应 IEC 60870-5-101 §7.2.6.6 / §7.2.6.7 / §7.2.6.8 QOS
     字段定义（ql 0..3，2 bits）：
@@ -798,7 +798,7 @@ _SET_POINT_QUALIFIER_TO_QL: dict[SetPointQualifier, int] = {
 
 @dataclass
 class SetPointCommandQualifier:
-    """C_SE_* QOS 字段结构化语义（Round 18 新增）。
+    """C_SE_* QOS 字段结构化语义。
 
     把 6 位位级 QOS 升级为结构化字段，便于业务层按协议语义理解与
     操作。S/E 位（byte bit 1）在协议中独立于 QOS 字段（byte bits
@@ -893,7 +893,7 @@ C_SE_NA_1_OBJECT_SIZE = 5  # NVA(2) + QOS(1) + S/E(2 bits) = 5 字节
 
 @dataclass
 class C_SE_NA_1_Object:
-    """C_SE_NA_1 信息对象（归一化设定值命令，不带时标，Round 18 新增）。
+    """C_SE_NA_1 信息对象（归一化设定值命令，不带时标，已支持）。
 
     字节布局（5 字节）：
 
@@ -980,7 +980,7 @@ C_SE_NB_1_OBJECT_SIZE = 5  # SVA(2) + QOS(1) + S/E+reserved(2) = 5 字节
 
 @dataclass
 class C_SE_NB_1_Object:
-    """C_SE_NB_1 信息对象（标度化设定值命令，不带时标，Round 18 新增）。
+    """C_SE_NB_1 信息对象（标度化设定值命令，不带时标，已支持）。
 
     字节布局（5 字节）：
 
@@ -1065,7 +1065,7 @@ C_SE_NC_1_OBJECT_SIZE = 7  # ShortFloat(4) + QOS(1) + S/E+reserved(2) = 7 字节
 
 @dataclass
 class C_SE_NC_1_Object:
-    """C_SE_NC_1 信息对象（短浮点设定值命令，不带时标，Round 18 新增）。
+    """C_SE_NC_1 信息对象（短浮点设定值命令，不带时标，已支持）。
 
     字节布局（7 字节）：
 
@@ -1143,7 +1143,7 @@ class C_SE_NC_1_Object:
 
 
 # ── C_SE_TA_1 / C_SE_TB_1 / C_SE_TC_1: Set-point command with CP56Time2a ──────
-# Round 19 新增：三个带时标设定值命令。
+# 已支持：三个带时标设定值命令。
 # 字节布局（与 IEC 60870-5-101 §7.2.6.9/10/11 对齐）：
 #   C_SE_TA_1: NVA(2) + QOS(1) + S/E(1) + reserved(1) + CP56Time2a(7) = 12 字节
 #   C_SE_TB_1: SVA(2) + QOS(1) + S/E(1) + reserved(1) + CP56Time2a(7) = 12 字节
@@ -1163,7 +1163,7 @@ C_SE_TA_1_OBJECT_SIZE = 12  # NVA(2) + QOS(1) + S/E(1) + reserved(1) + CP56Time2
 
 @dataclass
 class C_SE_TA_1_Object:
-    """C_SE_TA_1 信息对象（归一化设定值命令，带 CP56Time2a 时标，Round 19 新增）。
+    """C_SE_TA_1 信息对象（归一化设定值命令，带 CP56Time2a 时标，已支持）。
 
     字节布局（12 字节）：
 
@@ -1262,7 +1262,7 @@ C_SE_TB_1_OBJECT_SIZE = 12  # SVA(2) + QOS(1) + S/E(1) + reserved(1) + CP56Time2
 
 @dataclass
 class C_SE_TB_1_Object:
-    """C_SE_TB_1 信息对象（标度化设定值命令，带 CP56Time2a 时标，Round 19 新增）。
+    """C_SE_TB_1 信息对象（标度化设定值命令，带 CP56Time2a 时标，已支持）。
 
     字节布局（12 字节）：
 
@@ -1361,7 +1361,7 @@ C_SE_TC_1_OBJECT_SIZE = 14  # ShortFloat(4) + QOS(1) + S/E(1) + reserved(1) + CP
 
 @dataclass
 class C_SE_TC_1_Object:
-    """C_SE_TC_1 信息对象（短浮点设定值命令，带 CP56Time2a 时标，Round 19 新增）。
+    """C_SE_TC_1 信息对象（短浮点设定值命令，带 CP56Time2a 时标，已支持）。
 
     字节布局（14 字节）：
 

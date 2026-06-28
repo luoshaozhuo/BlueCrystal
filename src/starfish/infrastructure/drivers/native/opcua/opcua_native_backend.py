@@ -1,4 +1,4 @@
-"""Starfish OPC UA 协议 facade —— 依赖 open62541 C runner。
+"""Starfish OPC UA 协议 backend —— 依赖 open62541 C runner。
 
 本模块提供 OPC UA 协议 server 模拟门面。根据环境探测 open62541
 C runner 二进制 (open62541_source_simulator) 可用性，切换 real / unavailable 模式。
@@ -220,10 +220,10 @@ def probe_opcua_binary() -> tuple[bool, str]:
     return True, reason
 
 
-# ── OPC UA facade ────────────────────────────────────────────────────────────────
+# ── OPC UA backend ────────────────────────────────────────────────────────────────
 
 
-class OpcUaFacade:
+class OpcUaNativeBackend:
     """OPC UA 协议 server 模拟门面。
 
     根据 open62541 C runner 可用性切换真实子进程或回退模式。
@@ -246,7 +246,7 @@ class OpcUaFacade:
     _READY_PREFIX = "READY"
 
     def __init__(self, bind_host: str = "127.0.0.1", port: int = 0) -> None:
-        """初始化 OPC UA facade。
+        """初始化 OPC UA backend。
 
         Args:
             bind_host: 绑定地址。
@@ -297,11 +297,11 @@ class OpcUaFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
-        """启动 OPC UA facade。
+        """启动 OPC UA backend。
 
         真实模式：生成 TSV -> 启动 open62541 C runner -> 等待 READY。
         unavailable 模式：设置 in-memory 状态。
@@ -336,7 +336,7 @@ class OpcUaFacade:
 
         # 生成 TSV 配置文件
         if self._plan is None:
-            raise RuntimeError("OPC UA facade: load_points() 必须先于 start() 调用")
+            raise RuntimeError("OPC UA backend: load_points() 必须先于 start() 调用")
         tsv_content = _generate_opcua_tsv(self._bind_host, actual_port, self._plan)
         self._temp_dir = tempfile.TemporaryDirectory(prefix="starfish_opcua_")
         config_path = Path(self._temp_dir.name) / "server.tsv"
@@ -380,7 +380,7 @@ class OpcUaFacade:
         self._started_at = datetime.now(timezone.utc)
 
     def stop(self) -> None:
-        """停止 OPC UA facade。
+        """停止 OPC UA backend。
 
         真实模式：优雅终止子进程，清理临时文件。
         unavailable 模式：重置 in-memory 状态。
@@ -399,7 +399,7 @@ class OpcUaFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         真实模式：通过 TCP connect 探测端点是否可达。
         unavailable 模式：返回 mode="unavailable" 及原因。
@@ -498,7 +498,7 @@ class OpcUaFacade:
         """
         raise UnsupportedOperation(
             "write",
-            "OpcUaFacade.write 尚未实现，"
+            "OpcUaNativeBackend.write 尚未实现，"
             "待后续轮次实现 OPC UA 客户端 write 链路",
         )
 
@@ -513,7 +513,7 @@ class OpcUaFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "OpcUaFacade.subscribe 尚未实现，"
+            "OpcUaNativeBackend.subscribe 尚未实现，"
             "待后续轮次实现 OPC UA 订阅链路",
         )
 
@@ -525,7 +525,7 @@ class OpcUaFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "OpcUaFacade.report 尚未实现，"
+            "OpcUaNativeBackend.report 尚未实现，"
             "待后续轮次实现结构化 telemetry report",
         )
 
@@ -673,4 +673,4 @@ def _drain_stderr(stderr: Any) -> None:
         pass
 
 
-__all__ = ["OpcUaFacade", "probe_opcua_binary", "resolve_open62541_runner_path"]
+__all__ = ["OpcUaNativeBackend", "probe_opcua_binary", "resolve_open62541_runner_path"]

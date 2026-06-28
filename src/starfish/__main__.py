@@ -1,17 +1,14 @@
-"""starfish CLI 入口 —— 通过高层 API 校验 server 配置并管理 servers。
+"""starfish CLI 入口 —— 通过高层 API 启动 Starfish simulator。
 
 使用方式：
 
 ```text
-python -m starfish validate-config --input <server_config.json>
-python -m starfish describe --input <server_config.json>
-python -m starfish health --input <server_config.json> --start
-python -m starfish read --input <server_config.json>
+python -m starfish run <server_config.json>
 python -m starfish run --input <server_config.json> --duration 30
 ```
 
 模块职责：
-- 暴露 5 个子命令：validate-config / describe / health / read / run。
+- 只暴露 `run` 子命令，旧诊断入口不再作为隐藏命令保留。
 - 统一经 `starfish.api` 进入 application usecase，而不是直接耦合 loader/registry。
 - 提供独立可单元测试的 `main(argv) -> int` 入口，封装 typer 的
   `SystemExit` 行为，错误路径以返回值表达退出码。
@@ -36,10 +33,11 @@ from typing import Annotated, Any
 
 import typer
 import typer.main
+from click.exceptions import Exit as ClickExit
 from click.exceptions import UsageError as ClickUsageError
 from typer._click.exceptions import UsageError as TyperUsageError
 
-from starfish.api import StarfishServerManager, load_config, open_manager
+from starfish.api import StarfishServerManager
 from starfish.application import ServerManagerBuildError
 
 
@@ -48,55 +46,20 @@ _PROG_NAME = "starfish"
 app = typer.Typer(
     name=_PROG_NAME,
     help="Starfish 多协议 simulator 运行 CLI",
+    no_args_is_help=False,
     rich_markup_mode="rich",
 )
 
 
-def _load_config_or_exit(input_path: Path) -> tuple[Any | None, Any]:
-    """加载并校验 server 配置 JSON。"""
-    try:
-        result = load_config(input_path)
-    except FileNotFoundError:
-        print(f"错误：文件不存在: {input_path}", file=sys.stderr)
-        return None, None
-    except Exception as exc:
-        print(f"错误：加载失败: {exc}", file=sys.stderr)
-        return None, None
-
-    validation = result.validation
-    if not validation.is_valid:
-        print(f"错误：校验失败 ({len(validation.errors)} 个错误)")
-        return None, validation
-
-    config = result.config
-    if config is None:
-        print("错误：config 为 None")
-        return None, validation
-    return config, validation
-
-
-def _print_validation(validation: Any) -> None:
-    """打印 validate-config 校验明细。"""
-    if validation.errors:
-        print(f"\n校验错误 ({len(validation.errors)}):")
-        for err in validation.errors:
-            print(f"  [ERROR] {err}")
-    if validation.warnings:
-        print(f"\n校验警告 ({len(validation.warnings)}):")
-        for warn in validation.warnings:
-            print(f"  [WARN]  {warn}")
-    if validation.passed_checks:
-        print(f"\n通过项 ({len(validation.passed_checks)}):")
-        for passed in validation.passed_checks:
-            print(f"  [PASS] {passed}")
-
-
-def _open_manager_or_print_error(input_path: Path) -> StarfishServerManager | None:
+def _open_manager_or_print_error(config_path: Path) -> StarfishServerManager | None:
     """加载配置并创建统一 server manager 对象。"""
+    if config_path is None:
+        print("错误：缺少 server 配置 JSON 文件路径", file=sys.stderr)
+        return None
     try:
-        return open_manager(input_path)
+        return StarfishServerManager(config_path)
     except FileNotFoundError:
-        print(f"错误：文件不存在: {input_path}", file=sys.stderr)
+        print(f"错误：文件不存在: {config_path}", file=sys.stderr)
         return None
     except ServerManagerBuildError as exc:
         print(f"错误：{exc}")
@@ -160,166 +123,59 @@ def main(argv: list[str]) -> int:
             prog_name=_PROG_NAME,
             standalone_mode=False,
         )
+    except ClickExit as exc:
+        if exc.exit_code == 0:
+            return 0
+        raise SystemExit(exc.exit_code) from None
     except (ClickUsageError, TyperUsageError) as exc:
+        print(exc.format_message(), file=sys.stderr)
         raise SystemExit(exc.exit_code) from None
 
     return 0 if rc is None else rc
 
 
-@app.command("validate-config")
-def validate_config(
-    input_path: Annotated[
-        Path,
-        typer.Option("--input", help="server 配置 JSON 文件路径"),
-    ],
-) -> int:
-    """加载并校验 Seahorse 导出的 server config JSON 文件。"""
-    config, validation = _load_config_or_exit(input_path)
-    if config is None:
-        if validation is not None and getattr(validation, "errors", None):
-            for err in validation.errors:
-                print(f"  [ERROR] {err}")
-        return 1
+@app.callback()
+def cli(ctx: typer.Context) -> None:
+    """保持 `python -m starfish` 的显式子命令解析边界。
 
-    _print_validation(validation)
-    print()
-    _print_config_summary(config)
-    return 0
+    Args:
+        ctx: Typer/Click 当前解析上下文。
 
-
-@app.command("describe")
-def describe_config(
-    input_path: Annotated[
-        Path,
-        typer.Option("--input", help="server 配置 JSON 文件路径"),
-    ],
-) -> int:
-    """展示 server 配置摘要和 facade 装配结果。"""
-    manager = _open_manager_or_print_error(input_path)
-    if manager is None:
-        return 1
-
-    _print_config_summary(manager.config)
-    print()
-    _print_registry_summary(manager.config, manager.registry)
-    return 0
-
-
-@app.command("health")
-def health_command(
-    input_path: Annotated[
-        Path,
-        typer.Option("--input", help="server 配置 JSON 文件路径"),
-    ],
-    start_first: Annotated[
-        bool,
-        typer.Option("--start/--no-start", help="先启动 facade 再查询 health"),
-    ] = False,
-) -> int:
-    """查看各 endpoint 当前 health。"""
-    manager = _open_manager_or_print_error(input_path)
-    if manager is None:
-        return 1
-
-    all_ok = True
-    if start_first:
-        try:
-            manager.start()
-        except Exception as exc:
-            print(f"[start] 失败: {exc}", file=sys.stderr)
-            all_ok = False
-
-    for entry in manager.registry.entries:
-        print(f"\n--- health endpoint={entry.endpoint.endpoint_id} ---")
-        print(f"  protocol:  {entry.endpoint.protocol}")
-        print(f"  mode:      {entry.mode}")
-        print(f"  available: {entry.available}")
-        if not entry.available or entry.driver is None:
-            print("  status:    unavailable")
-            print(f"  reason:    {entry.reason}")
-            continue
-        try:
-            health = manager.health(entry.endpoint.endpoint_id)
-            for key, value in health.items():
-                print(f"  {key}: {value}")
-        except Exception as exc:
-            print(f"  错误: {exc}", file=sys.stderr)
-            all_ok = False
-
-    if start_first:
-        manager.stop()
-    return 0 if all_ok else 1
-
-
-@app.command("read")
-def read_command(
-    input_path: Annotated[
-        Path,
-        typer.Option("--input", help="server 配置 JSON 文件路径"),
-    ],
-    point_ids: Annotated[
-        list[str],
-        typer.Option("--point", help="只读取指定 point_id，可重复传入"),
-    ] = [],
-) -> int:
-    """启动 simulator，读取当前点位值并停止。"""
-    manager = _open_manager_or_print_error(input_path)
-    if manager is None:
-        return 1
-
-    try:
-        manager.start()
-    except Exception as exc:
-        print(f"错误：启动 simulator 失败: {exc}", file=sys.stderr)
-        return 1
-
-    available_entries = [
-        entry for entry in manager.registry.entries
-        if entry.available and entry.driver is not None
-    ]
-    if not available_entries:
-        print("错误：没有可启动的 simulator endpoint", file=sys.stderr)
-        return 1
-
-    all_ok = True
-    selected_points = point_ids or None
-    try:
-        values_by_endpoint = manager.read(selected_points)
-    except Exception as exc:
-        print(f"错误：读取失败: {exc}", file=sys.stderr)
-        manager.stop()
-        return 1
-
-    for entry in available_entries:
-        print(f"\n--- read endpoint={entry.endpoint.endpoint_id} ---")
-        print(f"  protocol: {entry.endpoint.protocol}")
-        print(f"  mode:     {entry.mode}")
-        try:
-            values = values_by_endpoint.get(entry.endpoint.endpoint_id, {})
-            print(f"  point_count: {len(values)}")
-            for point_id, value in values.items():
-                print(f"  {point_id}={value}")
-        except Exception as exc:
-            print(f"  错误: {exc}", file=sys.stderr)
-            all_ok = False
-
-    manager.stop()
-    return 0 if all_ok else 1
+    Raises:
+        typer.Exit: 未提供子命令时以解析错误退出，避免误触发 manager 加载。
+    """
+    if ctx.invoked_subcommand is None:
+        print(ctx.get_help(), file=sys.stderr)
+        raise typer.Exit(2)
 
 
 @app.command("run")
 def run_command(
+    config_path: Annotated[
+        Path | None,
+        typer.Argument(help="server 配置 JSON 文件路径"),
+    ] = None,
     input_path: Annotated[
-        Path,
-        typer.Option("--input", help="server 配置 JSON 文件路径"),
-    ],
+        Path | None,
+        typer.Option("--input", help="server 配置 JSON 文件路径（兼容旧用法）"),
+    ] = None,
     duration: Annotated[
         float | None,
         typer.Option("--duration", min=0.0, help="运行秒数；不传则持续运行直到 Ctrl+C"),
     ] = None,
 ) -> int:
-    """启动全部可用 simulator facade 并保持运行。"""
-    manager = _open_manager_or_print_error(input_path)
+    """启动全部可用 simulator facade 并保持运行。
+
+    Args:
+        config_path: 推荐的位置参数配置路径。
+        input_path: 兼容既有 `--input` run 用法的配置路径。
+        duration: 可选运行时长；None 表示持续运行直到收到中断。
+
+    Returns:
+        Typer 使用的进程退出码。
+    """
+    selected_path = input_path or config_path
+    manager = _open_manager_or_print_error(selected_path)
     if manager is None:
         return 1
 
@@ -355,4 +211,4 @@ def run_command(
 
 
 if __name__ == "__main__":
-    app()
+    sys.exit(main(sys.argv[1:]))

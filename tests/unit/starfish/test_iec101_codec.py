@@ -17,6 +17,24 @@ from __future__ import annotations
 
 import pytest
 
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_default_backend_factory,
+    create_default_driver_factory,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_iec104_driver_adapter,
+    create_iec61850_mms_driver_adapter,
+    create_iec61850_report_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_opcua_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
+
 from starfish.domain.protocols.iec101 import (
     ASDUHeader,
     CauseOfTransmission,
@@ -341,7 +359,7 @@ class TestIec101CodecAvailability:
 
     def test_codec_probe_returns_true(self) -> None:
         """编解码器可用时应返回 True。"""
-        from starfish.adapters.drivers.iec.iec101_facade import probe_iec101_codec
+        from starfish.infrastructure.drivers.backend_factory import probe_iec101_codec
         ok, reason = probe_iec101_codec()
         assert ok is True
         assert "编解码器" in reason
@@ -349,14 +367,14 @@ class TestIec101CodecAvailability:
     def test_facade_mode_is_codec_enhanced(self) -> None:
         """IEC101 facade mode 应为 codec-enhanced（Round 15 升级）或
         codec-enhanced-plus（Round 16 升级）—— 任一增强形态均可接受。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         assert facade.mode in ("codec-enhanced", "codec-enhanced-plus")
 
     def test_health_includes_codec_info(self) -> None:
         """IEC101 facade health() 应包含编解码器诊断信息。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         h = facade.health()
         assert "diagnosis" in h
         diag = h["diagnosis"]
@@ -368,8 +386,8 @@ class TestIec101CodecAvailability:
 
     def test_health_codec_enhanced_plus_diagnosis(self) -> None:
         """Round 17 修复：health() 应包含 codec_enhanced_plus 诊断。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         h = facade.health()
         diag = h["diagnosis"]
         # Round 17 新增 codec_enhanced_plus 诊断字段
@@ -390,8 +408,8 @@ class TestIec101CodecAvailability:
         - 包含 "supports_serial_runtime=false"。
         - 不应回退到 codec-enhanced 文案。
         """
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         mode = facade.mode
         assert mode == "codec-enhanced-plus", (
             f"期望 mode=codec-enhanced-plus，实际 {mode}"
@@ -423,8 +441,8 @@ class TestIec101CodecAvailability:
 
     def test_codec_capabilities_includes_enhanced_plus(self) -> None:
         """codec_capabilities() 在 codec-enhanced-plus 模式下应包含扩展声明。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         assert "codec_mode=codec-enhanced-plus" in caps
         # Round 17 扩展 supported_type_ids 必须含 M_ME_TB_1 / M_ME_TC_1
@@ -448,8 +466,8 @@ class TestIec101CodecAvailability:
     def test_codec_capabilities_m_me_tb1_tc1(self) -> None:
         """codec_capabilities() 应同时包含 M_ME_TB_1 / M_ME_TC_1 在
         supported_type_ids 和 supported_time_tagged_type_ids 中。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         time_tagged_line = [
             c for c in caps if c.startswith("supported_time_tagged_type_ids=")
@@ -461,8 +479,8 @@ class TestIec101CodecAvailability:
         """Round 18：codec_capabilities() 应包含 13 TypeId 矩阵 +
         supports_command_codec + supports_scaled_value +
         supports_write_runtime=false。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         # 13 TypeId 矩阵：4 监视不带时标 + 2 监视不带时标标度化/短浮点
         # + 4 控制命令 + 5 带时标监视
@@ -499,8 +517,8 @@ class TestIec101CodecAvailability:
 
     def test_codec_capabilities_does_not_overstate_write_runtime(self) -> None:
         """Round 18：capabilities 不得高估 command codec 为真实写能力。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         # supports_write_runtime 必须为 false
         assert "supports_write_runtime=false" in caps
@@ -582,8 +600,8 @@ class TestIec101CodecRound19:
 
     def test_codec_capabilities_17_type_ids(self) -> None:
         """Round 19：codec_capabilities() 应包含 17 TypeId 矩阵。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         type_ids_line = [c for c in caps if c.startswith("supported_type_ids=")][0]
         # 17 TypeId 矩阵：5 监视不带时标（M_SP_NA_1 / M_DP_NA_1 / M_ME_NA_1
@@ -597,8 +615,8 @@ class TestIec101CodecRound19:
 
     def test_codec_capabilities_includes_c_se_ta_tb_tc(self) -> None:
         """Round 19：codec_capabilities() 应包含 C_SE_TA_1 / C_SE_TB_1 / C_SE_TC_1。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         type_ids_line = [c for c in caps if c.startswith("supported_type_ids=")][0]
         assert "C_SE_TA_1" in type_ids_line
@@ -607,8 +625,8 @@ class TestIec101CodecRound19:
 
     def test_codec_capabilities_command_type_ids_includes_time_tagged(self) -> None:
         """Round 19：supported_command_type_ids 应包含 3 个带时标命令（7 个命令）。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         command_line = [c for c in caps if c.startswith("supported_command_type_ids=")][0]
         # 7 个控制命令：1 C_SC_NA_1 + 3 C_SE_NA_1/NB_1/NC_1
@@ -627,8 +645,8 @@ class TestIec101CodecRound19:
 
     def test_codec_capabilities_time_tagged_command_type_ids(self) -> None:
         """Round 19：应新增 supported_time_tagged_command_type_ids 分组。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         tt_command_lines = [
             c for c in caps
@@ -642,15 +660,15 @@ class TestIec101CodecRound19:
 
     def test_codec_capabilities_supports_time_tagged_command_codec(self) -> None:
         """Round 19：应新增 supports_time_tagged_command_codec=true。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         assert "supports_time_tagged_command_codec=true" in caps
 
     def test_codec_capabilities_does_not_overstate_write_runtime_round19(self) -> None:
         """Round 19：capabilities 仍不得高估 C_SE_T* command codec 为真实写能力。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         assert "supports_write_runtime=false" in caps
         assert "supports_server=false" in caps
@@ -658,8 +676,8 @@ class TestIec101CodecRound19:
 
     def test_health_reason_text_includes_17_type_ids_and_c_se_ta_tb_tc(self) -> None:
         """Round 19：health() reason_text 应包含 17 TypeId 矩阵 + C_SE_TA_1/TB_1/TC_1。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         h = facade.health()
         reason = h["reason"]
         assert "17 TypeID" in reason, (
@@ -672,7 +690,7 @@ class TestIec101CodecRound19:
 
     def test_probe_iec101_codec_enhanced_plus_includes_c_se_ta_tb_tc(self) -> None:
         """Round 19：probe_iec101_codec_enhanced_plus() 应验证 C_SE_T* roundtrip。"""
-        from starfish.adapters.drivers.iec.iec101_facade import probe_iec101_codec_enhanced_plus
+        from starfish.infrastructure.drivers.backend_factory import probe_iec101_codec_enhanced_plus
         ok, reason = probe_iec101_codec_enhanced_plus()
         assert ok is True, f"probe failed: {reason}"
         assert "C_SE_TA_1" in reason
@@ -681,8 +699,8 @@ class TestIec101CodecRound19:
 
     def test_codec_capabilities_does_not_hardcode_13_or_15(self) -> None:
         """Round 19：codec_capabilities() 不得回退到 13/15 TypeId（应=17）。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         # 检查 capability 实际值（=17）；不得硬写 13/15
         type_ids_line = [c for c in caps if c.startswith("supported_type_ids=")][0]
@@ -703,29 +721,29 @@ class TestIec101CodecRound20:
 
     def test_codec_capabilities_supports_link_layer_timers(self) -> None:
         """Round 20：supports_link_layer_timers=true。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         assert "supports_link_layer_timers=true" in caps
 
     def test_codec_capabilities_supports_balanced_fcb_auto_flip(self) -> None:
         """Round 20：supports_balanced_fcb_auto_flip=true。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         assert "supports_balanced_fcb_auto_flip=true" in caps
 
     def test_codec_capabilities_supports_retry_skeleton(self) -> None:
         """Round 20：supports_retry_skeleton=true。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         assert "supports_retry_skeleton=true" in caps
 
     def test_codec_capabilities_does_not_overstate_round20(self) -> None:
         """Round 20：capabilities 不得高估为真实 server / 串口 / 写能力。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         caps = facade.codec_capabilities()
         assert "supports_server=false" in caps
         assert "supports_serial_runtime=false" in caps
@@ -733,8 +751,8 @@ class TestIec101CodecRound20:
 
     def test_health_reason_text_includes_round20_capabilities(self) -> None:
         """Round 20：health() reason_text 应包含 link-layer 计时器/翻转/重试。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-        facade = Iec101Facade()
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+        facade = create_iec101_driver_adapter()
         h = facade.health()
         reason = h["reason"]
         assert "link-layer timers" in reason

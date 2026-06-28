@@ -1,4 +1,4 @@
-"""RuntimeEventBus 应用层事件缓冲。
+"""RuntimeEvent 与 RuntimeEventBus 应用层事件缓冲。
 
 本模块提供进程内、非外部依赖的事件尾部查询能力。不负责持久化、不发送到
 Prometheus / OTEL / Kafka 等外部系统，也不改变 driver 执行语义。
@@ -6,7 +6,29 @@ Prometheus / OTEL / Kafka 等外部系统，也不改变 driver 执行语义。
 
 from __future__ import annotations
 
-from starfish.application.runtime.event import RuntimeEvent
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass(frozen=True)
+class RuntimeEvent:
+    """Starfish runtime 统一事件记录。
+
+    Attributes:
+        ts: 事件发生时间，使用 `time.time()` 秒级浮点时间戳。
+        type: 事件类型，取值为 START / STOP / READ / WRITE / SWAP / ERROR。
+        node_id: RuntimeGraph node id。
+        instance_id: DriverInstance id。
+        driver: driver 协议或运行模式标识。
+        payload: 事件附加信息；仅保存轻量上下文，不承载外部 I/O 资源。
+    """
+
+    ts: float
+    type: str
+    node_id: str
+    instance_id: str
+    driver: str
+    payload: dict[str, Any] = field(default_factory=dict)
 
 
 class RuntimeEventBus:
@@ -36,4 +58,4 @@ class RuntimeEventBus:
         return list(self._events[-n:])
 
 
-__all__ = ["RuntimeEventBus"]
+__all__ = ["RuntimeEvent", "RuntimeEventBus"]

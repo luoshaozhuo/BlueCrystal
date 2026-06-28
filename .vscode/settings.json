@@ -1,0 +1,12 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python.defaultInterpreterPath": "/home/luosh/miniconda3/envs/BlueCrystal/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "terminal.integrated.env.linux": {
+        "PATH": "/home/luosh/miniconda3/envs/BlueCrystal/bin:${env:PATH}",
+        "CONDA_DEFAULT_ENV": "BlueCrystal",
+        "CONDA_PREFIX": "/home/luosh/miniconda3/envs/BlueCrystal"
+    },
+}

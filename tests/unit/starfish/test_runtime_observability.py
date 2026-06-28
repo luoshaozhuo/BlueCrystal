@@ -7,12 +7,13 @@ RuntimeSnapshot 与非侵入式事件 hook，不启动真实 socket、native run
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from starfish.api.server_manager_api import StarfishServerManager
-from starfish.application import BuiltManager
+from starfish.application import StarfishRuntimeContext
 from starfish.application.runtime import RuntimeEvent, RuntimeEventBus, RuntimeSnapshot
-from starfish.application.orchestration.registry import create_server_registry
+from starfish.application.runtime import create_server_registry
 from starfish.domain import (
     DriverEntry,
     StarfishEndpointConfig,
@@ -120,11 +121,12 @@ def _manager(driver: FakeDriver | None = None) -> StarfishServerManager:
     config = _config()
     registry = create_server_registry(config, FakeFactory(driver))
     return StarfishServerManager(
-        BuiltManager(
+        Path("obs_server_plan.json"),
+        context=StarfishRuntimeContext(
             config=config,
             validation=ValidationResult(),
             registry=registry,
-        )
+        ),
     )
 
 

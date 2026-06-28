@@ -1,4 +1,4 @@
-"""Starfish HTTP REST 协议真实 server facade。
+"""Starfish HTTP REST 协议真实 server backend。
 
 本模块提供 HTTP REST 协议的真实 server 生命周期实现。
 使用 Python 标准库 `http.server.ThreadingHTTPServer` 启动真实 HTTP 服务端，
@@ -39,8 +39,8 @@ class _PointsHandler(BaseHTTPRequestHandler):
     其他路径返回 404。不记录访问日志以保持测试环境清洁。
     """
 
-    # 类变量，由 HttpRestFacade 在 start 时注入
-    facade_ref: HttpRestFacade | None = None
+    # 类变量，由 HttpRestServerBackend 在 start 时注入
+    backend_ref: HttpRestServerBackend | None = None
 
     def do_GET(self) -> None:  # noqa: N802
         """处理 GET 请求。
@@ -52,10 +52,10 @@ class _PointsHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
-        facade = _PointsHandler.facade_ref
+        backend = _PointsHandler.backend_ref
         values_dict: dict[str, Any] = {}
-        if facade is not None:
-            values_dict = facade.read()
+        if backend is not None:
+            values_dict = backend.read()
 
         payload = {
             "values": [
@@ -75,8 +75,8 @@ class _PointsHandler(BaseHTTPRequestHandler):
         del format, args
 
 
-class HttpRestFacade:
-    """HTTP REST 协议真实 server facade。
+class HttpRestServerBackend:
+    """HTTP REST 协议真实 server backend。
 
     启动 Python 标准库 HTTPServer 提供 /points GET 端点，
     支持内存值存储和实时读取。所有操作在调用线程中同步执行，
@@ -109,7 +109,7 @@ class HttpRestFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
@@ -124,7 +124,7 @@ class HttpRestFacade:
         if self._started:
             return
 
-        _PointsHandler.facade_ref = self
+        _PointsHandler.backend_ref = self
         server = HTTPServer((self._bind_host, self._port), _PointsHandler)
         self._server = server
         self._actual_port = server.server_port
@@ -162,7 +162,7 @@ class HttpRestFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         通过 TCP connect 探测 server 是否可达，
         并返回点位数量、capabilities 等元信息。
@@ -260,7 +260,7 @@ class HttpRestFacade:
         """
         raise UnsupportedOperation(
             "write",
-            "HttpRestFacade.write 尚未实现，HTTP REST server 当前仅支持 GET /points，"
+            "HttpRestServerBackend.write 尚未实现，HTTP REST server 当前仅支持 GET /points，"
             "待后续轮次实现 POST/PUT 写入端点",
         )
 
@@ -277,7 +277,7 @@ class HttpRestFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "HttpRestFacade.subscribe 尚未实现，"
+            "HttpRestServerBackend.subscribe 尚未实现，"
             "待后续轮次实现 SSE 或 WebSocket 推送",
         )
 
@@ -289,7 +289,7 @@ class HttpRestFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "HttpRestFacade.report 尚未实现，"
+            "HttpRestServerBackend.report 尚未实现，"
             "待后续轮次实现结构化 telemetry report",
         )
 
@@ -304,4 +304,4 @@ class HttpRestFacade:
         return "real"
 
 
-__all__ = ["HttpRestFacade"]
+__all__ = ["HttpRestServerBackend"]

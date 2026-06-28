@@ -8,11 +8,11 @@
     - NVA (Normalized Value, 16-bit signed normalized value)
         范围 [-1.0, +1.0 - 1/32768]，对应 IEC 60870-5-101 的
         normalized value（占 2 字节，整数表示 -1.0 ~ +(1-2^-15)）。
-    - SVA (Scaled Value, 16-bit signed integer) Round 18 新增
+    - SVA (Scaled Value, 16-bit signed integer) 已支持
         占 2 字节，整数表示 -32768..+32767。SVA 是工程量级整数
         表示，量程与单位由 device profile / 业务侧解释（与 NVA
         的"归一化至 -1.0..1.0-1/32768"语义完全不同）。
-    - ShortFloat (IEEE 754 32-bit float, Round 17 新增)
+    - ShortFloat (IEEE 754 32-bit float, 已支持)
         占 4 字节，按 IEC 60870-5-101 / -104 协议字节序
         （小端序）编码 IEEE 754 single-precision。
         NaN / Inf 策略：拒绝（编码 / 解码均不允许），
@@ -96,10 +96,10 @@ def decode_normalized_value(data: bytes) -> float:
     return int_value / 32768.0
 
 
-# ── 标度化值（Scaled Value, SVA）── Round 18 新增 ────────────────────────────────
+# ── 标度化值（Scaled Value, SVA）── 已支持 ────────────────────────────────
 # 16-bit 有符号整数（-32768..+32767），与 NVA 同长度但语义不同。
 # SVA 是工程量级整数表示，量程与单位由 device profile / 业务侧解释。
-# Round 18 新增：实现 encode / decode / ScaledValue dataclass。
+# 已支持：实现 encode / decode / ScaledValue dataclass。
 # 字节序：小端序（little-endian）。
 
 
@@ -202,7 +202,7 @@ def encode_short_float(value: Any) -> bytes:
     字节序：little-endian（IEC 60870-5-101 / -104 标准字节序，
     与网络字节序相反；调用方须按协议规定以小端序组帧）。
 
-    Round 20 兼容范围（顺序尝试，**不**引入 numpy 硬依赖）：
+    兼容范围（顺序尝试，**不**引入 numpy 硬依赖）：
         1. 原生 ``float`` 实例：直接走 ``struct.pack("<f", value)``。
         2. ``int`` 实例：通过 ``float(int)`` 转换（``int`` 是
            ``numbers.Integral``，但 round-trip ``int -> float -> struct``

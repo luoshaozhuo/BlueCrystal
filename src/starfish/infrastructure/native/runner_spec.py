@@ -1,7 +1,7 @@
 """Native runner 规格定义 —— NativeRunnerSpec dataclass。
 
 本模块定义 native runner 的元数据规格，供 runner_probe 和 process_handle 模块使用。
-规格定义与协议无关，可被所有 native-runner facade 复用。
+规格定义与协议无关，可被所有 native-runner backend 复用。
 
 安全边界：
 - 不得 import seahorse / whale.ingest / whale.shared.source。

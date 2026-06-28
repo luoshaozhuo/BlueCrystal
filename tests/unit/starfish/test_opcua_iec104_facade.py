@@ -2,15 +2,15 @@
 
 验证：
 1. 依赖探测（probe_opcua_binary / probe_iec104_binary）。
-2. OpcUaFacade / Iec104Facade 生命周期（start / stop / health / load_points / read / update_values）。
+2. OpcUaDriverAdapter / Iec104DriverAdapter 生命周期（start / stop / health / load_points / read / update_values）。
 3. unavailable 模式语义（binary 缺失时的安全回退）。
 4. real 模式生命周期（binary 存在时启动 C runner 子进程）。
-5. ServerRegistry dispatch（OPC_UA -> OpcUaFacade, IEC_104 -> Iec104Facade）。
+5. ServerRegistry dispatch（OPC_UA -> OpcUaDriverAdapter, IEC_104 -> Iec104DriverAdapter）。
 6. probe / profile / capacity 对新协议的处理。
 7. NOT_IMPLEMENTED 能力（write / subscribe / report）验证。
 
 测试阶段：开发期验证 (P1)。
-使用的替身：OpcUaFacade（real/unavailable 模式）、Iec104Facade（real/unavailable 模式）。
+使用的替身：OpcUaDriverAdapter（real/unavailable 模式）、Iec104DriverAdapter（real/unavailable 模式）。
 外部依赖：open62541_source_simulator C runner（real mode 测试需要），
   iec104_simulator_server C runner（real mode 测试需要）。
 不能证明：完整 OPC UA 协议栈读写、IEC104 ASDU 编解码、生产级链路验证。
@@ -24,21 +24,43 @@ from pathlib import Path
 
 import pytest
 
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_default_backend_factory,
+    create_default_driver_factory,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_iec104_driver_adapter,
+    create_iec61850_mms_driver_adapter,
+    create_iec61850_report_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_opcua_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
+
 from starfish.domain.server_config import (
     StarfishServerConfig,
     StarfishEndpointConfig,
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.adapters.drivers.native.opcua.opcua_facade import (
-    OpcUaFacade,
+from starfish.adapters.drivers.native.opcua.opcua_driver_adapter import (
+    OpcUaDriverAdapter,
+)
+from starfish.infrastructure.drivers.native.opcua.opcua_native_backend import (
     probe_opcua_binary,
     resolve_open62541_runner_path,
     _generate_opcua_tsv,  # noqa: PLC2701 -- 测试内部 helper
     _map_opcua_type,       # noqa: PLC2701 -- 测试内部 helper
 )
-from starfish.adapters.drivers.native.iec.iec104_facade import (
-    Iec104Facade,
+from starfish.adapters.drivers.native.iec.iec104_driver_adapter import (
+    Iec104DriverAdapter,
+)
+from starfish.infrastructure.drivers.native.iec.iec104_native_backend import (
     probe_iec104_binary,
     resolve_iec104_runner_path,
 )
@@ -229,15 +251,15 @@ class TestDependencyProbes:
                 assert "\t" not in field
 
 
-# ── OpcUaFacade unavailable 模式测试（无 binary 依赖）────────────────────────────
+# ── OpcUaDriverAdapter unavailable 模式测试（无 binary 依赖）────────────────────────────
 
 
-class TestOpcUaFacadeUnavailable:
-    """OpcUaFacade 基本接口测试（unavailable 模式通用，无需 binary）。"""
+class TestOpcUaDriverAdapterUnavailable:
+    """OpcUaDriverAdapter 基本接口测试（unavailable 模式通用，无需 binary）。"""
 
     def test_facade_protocol_and_mode(self) -> None:
         """facade 应返回正确的 protocol 和 mode 属性。"""
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         assert facade.protocol == "OPC_UA"
         assert facade.mode in ("real", "unavailable")
         assert isinstance(facade.binary_available, bool)
@@ -246,7 +268,7 @@ class TestOpcUaFacadeUnavailable:
     def test_unavailable_mode_start_stop(self) -> None:
         """start/stop 应成功（in-memory 或 real 模式均适用）。"""
         plan = _make_test_plan("test_start_stop")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)  # real 模式下 start 需要已加载 plan
         facade.start()
         assert facade.health()["status"] == "started"
@@ -256,7 +278,7 @@ class TestOpcUaFacadeUnavailable:
     def test_unavailable_mode_load_points_and_read(self) -> None:
         """load_points 和 read 应正确工作。"""
         plan = _make_test_plan("test_load")
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read()
@@ -275,7 +297,7 @@ class TestOpcUaFacadeUnavailable:
     def test_unavailable_mode_update_values(self) -> None:
         """update_values 应正确更新内存值。"""
         plan = _make_test_plan("test_update")
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         facade.load_points(plan)
 
         facade.update_values({"p0": 999.0, "p_new": "hello"})
@@ -288,7 +310,7 @@ class TestOpcUaFacadeUnavailable:
     def test_unavailable_mode_health(self) -> None:
         """health 应正确返回 unavailable 模式信息。"""
         plan = _make_test_plan("test_health")
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         facade.load_points(plan)
 
         h = facade.health()
@@ -307,7 +329,7 @@ class TestOpcUaFacadeUnavailable:
     def test_unavailable_mode_capabilities(self) -> None:
         """capabilities 应返回 plan 中的能力声明。"""
         plan = _make_test_plan("test_caps")
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         assert facade.capabilities() == []
         facade.load_points(plan)
         assert facade.capabilities() == ["READ"]
@@ -315,7 +337,7 @@ class TestOpcUaFacadeUnavailable:
     def test_idempotent_start_stop(self) -> None:
         """重复 start/stop 应安全（幂等）。"""
         plan = _make_test_plan("test_idempotent")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
         facade.start()  # 重复 start
@@ -326,20 +348,20 @@ class TestOpcUaFacadeUnavailable:
 
     def test_read_before_load_points(self) -> None:
         """load_points 前 read 返回空 dict。"""
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         values = facade.read()
         assert values == {}
 
 
-# ── OpcUaFacade NOT_IMPLEMENTED 测试 ────────────────────────────────────────────
+# ── OpcUaDriverAdapter NOT_IMPLEMENTED 测试 ────────────────────────────────────────────
 
 
-class TestOpcUaFacadeNotImplemented:
-    """OpcUaFacade NOT_IMPLEMENTED 操作测试。"""
+class TestOpcUaDriverAdapterNotImplemented:
+    """OpcUaDriverAdapter NOT_IMPLEMENTED 操作测试。"""
 
     def test_write_not_implemented(self) -> None:
         """write 应抛出 UnsupportedOperation。"""
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         with pytest.raises(UnsupportedOperation) as exc:
             facade.write("p0", 42)
         assert "NOT_IMPLEMENTED" in str(exc.value)
@@ -347,7 +369,7 @@ class TestOpcUaFacadeNotImplemented:
 
     def test_subscribe_not_implemented(self) -> None:
         """subscribe 应抛出 UnsupportedOperation。"""
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         with pytest.raises(UnsupportedOperation) as exc:
             facade.subscribe(["p0", "p1"])
         assert "NOT_IMPLEMENTED" in str(exc.value)
@@ -355,7 +377,7 @@ class TestOpcUaFacadeNotImplemented:
 
     def test_report_not_implemented(self) -> None:
         """report 应抛出 UnsupportedOperation。"""
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         with pytest.raises(UnsupportedOperation) as exc:
             facade.report()
         assert "NOT_IMPLEMENTED" in str(exc.value)
@@ -363,19 +385,19 @@ class TestOpcUaFacadeNotImplemented:
 
     def test_stop_before_start_safe(self) -> None:
         """未 start 时 stop 应安全（不抛异常）。"""
-        facade = OpcUaFacade()
+        facade = create_opcua_driver_adapter()
         facade.stop()  # 不应抛异常
 
 
-# ── Iec104Facade unavailable 模式测试（无 binary 依赖）───────────────────────────
+# ── Iec104DriverAdapter unavailable 模式测试（无 binary 依赖）───────────────────────────
 
 
-class TestIec104FacadeUnavailable:
-    """Iec104Facade 基本接口测试（unavailable 模式通用，无需 binary）。"""
+class TestIec104DriverAdapterUnavailable:
+    """Iec104DriverAdapter 基本接口测试（unavailable 模式通用，无需 binary）。"""
 
     def test_facade_protocol_and_mode(self) -> None:
         """facade 应返回正确的 protocol 和 mode 属性。"""
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         assert facade.protocol == "IEC104"
         assert facade.mode in ("real", "unavailable")
         assert isinstance(facade.binary_available, bool)
@@ -383,7 +405,7 @@ class TestIec104FacadeUnavailable:
 
     def test_unavailable_mode_start_stop(self) -> None:
         """unavailable 模式 start/stop 应成功。"""
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         facade.start()
         assert facade.health()["status"] == "started"
         facade.stop()
@@ -392,7 +414,7 @@ class TestIec104FacadeUnavailable:
     def test_unavailable_mode_load_points_and_read(self) -> None:
         """load_points 和 read 应正确工作。"""
         plan = _make_test_plan("iec104_load", protocol="IEC104")
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read()
@@ -403,7 +425,7 @@ class TestIec104FacadeUnavailable:
     def test_unavailable_mode_update_values(self) -> None:
         """update_values 应正确更新内存值。"""
         plan = _make_test_plan("iec104_update", protocol="IEC104")
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         facade.load_points(plan)
 
         facade.update_values({"p0": 999.0})
@@ -412,7 +434,7 @@ class TestIec104FacadeUnavailable:
     def test_unavailable_mode_health(self) -> None:
         """health 应正确返回 unavailable 模式信息。"""
         plan = _make_test_plan("iec104_health", protocol="IEC104")
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         facade.load_points(plan)
 
         h = facade.health()
@@ -428,7 +450,7 @@ class TestIec104FacadeUnavailable:
 
     def test_idempotent_start_stop(self) -> None:
         """重复 start/stop 应安全（幂等）。"""
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         facade.start()
         facade.start()
         assert facade.health()["status"] == "started"
@@ -437,15 +459,15 @@ class TestIec104FacadeUnavailable:
         assert facade.health()["status"] == "stopped"
 
 
-# ── Iec104Facade NOT_IMPLEMENTED 测试 ───────────────────────────────────────────
+# ── Iec104DriverAdapter NOT_IMPLEMENTED 测试 ───────────────────────────────────────────
 
 
-class TestIec104FacadeNotImplemented:
-    """Iec104Facade NOT_IMPLEMENTED 操作测试。"""
+class TestIec104DriverAdapterNotImplemented:
+    """Iec104DriverAdapter NOT_IMPLEMENTED 操作测试。"""
 
     def test_write_not_implemented(self) -> None:
         """write 应抛出 UnsupportedOperation。"""
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         with pytest.raises(UnsupportedOperation) as exc:
             facade.write("p0", 42)
         assert "NOT_IMPLEMENTED" in str(exc.value)
@@ -453,7 +475,7 @@ class TestIec104FacadeNotImplemented:
 
     def test_subscribe_not_implemented(self) -> None:
         """subscribe 应抛出 UnsupportedOperation。"""
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         with pytest.raises(UnsupportedOperation) as exc:
             facade.subscribe(["p0"])
         assert "NOT_IMPLEMENTED" in str(exc.value)
@@ -461,7 +483,7 @@ class TestIec104FacadeNotImplemented:
 
     def test_report_not_implemented(self) -> None:
         """report 应抛出 UnsupportedOperation。"""
-        facade = Iec104Facade()
+        facade = create_iec104_driver_adapter()
         with pytest.raises(UnsupportedOperation) as exc:
             facade.report()
         assert "NOT_IMPLEMENTED" in str(exc.value)
@@ -475,10 +497,10 @@ class TestRuntimeRegistryDispatch:
     """ServerRegistry OPC_UA / IEC104 协议 dispatch 测试。"""
 
     def test_registry_dispatches_opcua(self) -> None:
-        """OPC_UA 协议应 dispatch 到 OpcUaFacade。"""
+        """OPC_UA 协议应 dispatch 到 OpcUaDriverAdapter。"""
         plan = _make_test_plan("reg_opcua", protocol="OPC_UA")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
 
         assert entry.mode in ("real", "unavailable")
         assert entry.driver is not None
@@ -491,10 +513,10 @@ class TestRuntimeRegistryDispatch:
             assert "unavailable" in entry.reason.lower()
 
     def test_registry_dispatches_iec104(self) -> None:
-        """IEC_104 协议应 dispatch 到 Iec104Facade。"""
+        """IEC_104 协议应 dispatch 到 Iec104DriverAdapter。"""
         plan = _make_test_plan("reg_iec104", protocol="IEC_104")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
 
         assert entry.mode in ("real", "unavailable")
         assert entry.driver is not None
@@ -505,10 +527,10 @@ class TestRuntimeRegistryDispatch:
             assert entry.available is False
 
     def test_registry_dispatches_iec104_alternate_spelling(self) -> None:
-        """IEC104（无下划线）协议名应 dispatch 到 Iec104Facade。"""
+        """IEC104（无下划线）协议名应 dispatch 到 Iec104DriverAdapter。"""
         plan = _make_test_plan("reg_iec104b", protocol="IEC104")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
 
         assert entry.driver is not None
         assert entry.driver.protocol == "IEC104"
@@ -542,14 +564,14 @@ class TestRuntimeRegistryDispatch:
 
 
 @pytest.mark.timeout(30)
-class TestOpcUaFacadeRealMode:
-    """OpcUaFacade real 模式测试（需要 open62541 C runner）。"""
+class TestOpcUaDriverAdapterRealMode:
+    """OpcUaDriverAdapter real 模式测试（需要 open62541 C runner）。"""
 
     @requires_opcua_binary
     def test_real_mode_start_stop(self) -> None:
         """real 模式 start 应启动 open62541 子进程，stop 应终止。"""
         plan = _make_test_plan("real_start")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
 
         assert facade.mode == "real"
@@ -571,7 +593,7 @@ class TestOpcUaFacadeRealMode:
     def test_real_mode_health_tcp_connect(self) -> None:
         """real 模式 health 应通过 TCP connect 确认端口可达。"""
         plan = _make_test_plan("real_health")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -586,7 +608,7 @@ class TestOpcUaFacadeRealMode:
     def test_real_mode_idempotent_start(self) -> None:
         """重复 start 应安全（幂等）。"""
         plan = _make_test_plan("real_idempotent")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -601,14 +623,14 @@ class TestOpcUaFacadeRealMode:
     def test_real_mode_stop_before_start_safe(self) -> None:
         """未 start 时 stop 应安全。"""
         plan = _make_test_plan("real_stop_before")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
         facade.stop()  # 不应抛异常
 
     @requires_opcua_binary
     def test_real_mode_start_without_load_points_raises(self) -> None:
         """未 load_points 时 start 应抛出 RuntimeError。"""
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         with pytest.raises(RuntimeError, match="load_points"):
             facade.start()
 
@@ -617,14 +639,14 @@ class TestOpcUaFacadeRealMode:
 
 
 @pytest.mark.timeout(30)
-class TestIec104FacadeRealMode:
-    """Iec104Facade real 模式测试（需要 iec104_simulator_server C runner）。"""
+class TestIec104DriverAdapterRealMode:
+    """Iec104DriverAdapter real 模式测试（需要 iec104_simulator_server C runner）。"""
 
     @requires_iec104_binary
     def test_real_mode_start_stop(self) -> None:
         """real 模式 start 应启动 iec104_simulator_server 子进程，stop 应终止。"""
         plan = _make_test_plan("real_iec104", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         facade.load_points(plan)
 
         assert facade.mode == "real"
@@ -645,7 +667,7 @@ class TestIec104FacadeRealMode:
     def test_real_mode_health_tcp_connect(self) -> None:
         """real 模式 health 应通过 TCP connect 确认端口可达。"""
         plan = _make_test_plan("real_iec104_health", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -660,7 +682,7 @@ class TestIec104FacadeRealMode:
     def test_real_mode_idempotent_start(self) -> None:
         """重复 start 应安全（幂等）。"""
         plan = _make_test_plan("real_iec104_idem", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -674,7 +696,7 @@ class TestIec104FacadeRealMode:
     @requires_iec104_binary
     def test_real_mode_start_without_load_points_raises(self) -> None:
         """IEC104 不需要 plan 也能 start（与 OPC_UA 不同，IEC104 无需 TSV config）。"""
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         # IEC104 runner 只需要端口，不需要 load_points
         # 但为了健康检查的一致性，应 load_points 后再 start
         facade.load_points(
@@ -696,7 +718,7 @@ class TestProbeForNewProtocols:
     def test_probe_opcua_unavailable_mode(self) -> None:
         """probe 对 OPC_UA facade 应能执行（unavailable 模式仍 start/health/read 成功）。"""
         plan = _make_test_plan("probe_opcua")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         result = probe_facade(facade, plan=plan, endpoint_id="opcua_ep")
         assert result.status == "PASS"
         assert result.protocol == "OPC_UA"
@@ -707,7 +729,7 @@ class TestProbeForNewProtocols:
     def test_probe_iec104_unavailable_mode(self) -> None:
         """probe 对 IEC104 facade 应能执行。"""
         plan = _make_test_plan("probe_iec104", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         result = probe_facade(facade, plan=plan, endpoint_id="iec104_ep")
         assert result.status == "PASS"
         assert result.protocol == "IEC104"
@@ -719,7 +741,7 @@ class TestProbeForNewProtocols:
     def test_probe_opcua_real_mode(self) -> None:
         """probe 对 OPC_UA real mode facade 应能执行并返回 real 模式。"""
         plan = _make_test_plan("probe_opcua_real")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         # 必须在 load_points 后 probe
         facade.load_points(plan)
         result = probe_facade(facade, plan=plan, endpoint_id="opcua_real_ep")
@@ -732,7 +754,7 @@ class TestProbeForNewProtocols:
     def test_probe_iec104_real_mode(self) -> None:
         """probe 对 IEC104 real mode facade 应能执行并返回 real 模式。"""
         plan = _make_test_plan("probe_iec104_real", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         facade.load_points(plan)
         result = probe_facade(facade, plan=plan, endpoint_id="iec104_real_ep")
         assert result.status == "PASS"
@@ -747,7 +769,7 @@ class TestProfileForNewProtocols:
     def test_profile_opcua_unavailable_mode(self) -> None:
         """profile 对 OPC_UA facade 应能采样统计。"""
         plan = _make_test_plan("prof_opcua")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
 
         result = profile_facade(facade, iterations=10, endpoint_id="opcua_ep")
@@ -762,7 +784,7 @@ class TestProfileForNewProtocols:
     def test_profile_iec104_unavailable_mode(self) -> None:
         """profile 对 IEC104 facade 应能采样统计。"""
         plan = _make_test_plan("prof_iec104", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         facade.load_points(plan)
 
         result = profile_facade(facade, iterations=10, endpoint_id="iec104_ep")
@@ -777,7 +799,7 @@ class TestCapacityForNewProtocols:
     def test_capacity_opcua_unavailable_mode_returns_not_run(self) -> None:
         """unavailable 模式的 OPC_UA capacity 应返回 NOT_RUN + reason。"""
         plan = _make_test_plan("cap_opcua")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
 
         result = capacity_scan(facade, read_count=5, endpoint_id="opcua_ep")
@@ -790,7 +812,7 @@ class TestCapacityForNewProtocols:
     def test_capacity_iec104_unavailable_mode_returns_not_run(self) -> None:
         """unavailable 模式的 IEC104 capacity 应返回 NOT_RUN + reason。"""
         plan = _make_test_plan("cap_iec104", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         facade.load_points(plan)
 
         result = capacity_scan(facade, read_count=5, endpoint_id="iec104_ep")
@@ -808,34 +830,34 @@ class TestRegressionExistingProtocols:
     """确保 OPC_UA/IEC104 新增不影响已有协议。"""
 
     def test_http_rest_still_dispatches_to_real(self) -> None:
-        """HTTP_REST 仍 dispatch 到 HttpRestFacade (real mode)。"""
+        """HTTP_REST 仍 dispatch 到 HttpRestDriverAdapter (real mode)。"""
         plan = _make_test_plan("reg_http", protocol="HTTP_REST")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "real"
         assert entry.available is True
 
     def test_modbus_tcp_still_dispatches_to_real(self) -> None:
-        """MODBUS_TCP 仍 dispatch 到 ModbusTcpFacade (real mode)。"""
+        """MODBUS_TCP 仍 dispatch 到 ModbusTcpDriverAdapter (real mode)。"""
         plan = _make_test_plan("reg_modbus", protocol="MODBUS_TCP")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "real"
         assert entry.available is True
 
     def test_mqtt_still_dispatches_to_lightweight(self) -> None:
-        """MQTT 仍 dispatch 到 MqttFacade (mqtt-lightweight mode)。"""
+        """MQTT 仍 dispatch 到 MqttDriverAdapter (mqtt-lightweight mode)。"""
         plan = _make_test_plan("reg_mqtt", protocol="MQTT")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "mqtt-lightweight"
         assert entry.available is True
 
     def test_unknown_protocol_still_dispatches_to_stub(self) -> None:
-        """未知协议仍 dispatch 到 ServerSimulatorFacade (stub mode)。"""
+        """未知协议仍 dispatch 到 ServerSimulatorDriverAdapter (stub mode)。"""
         plan = _make_test_plan("reg_unknown", protocol="IEC_61850_MMS")
         ep = plan.endpoints[0]
-        entry = create_driver_for_endpoint(ep, plan)
+        entry = create_driver_for_endpoint(ep, plan, backend_factory=create_default_backend_factory())
         assert entry.mode == "stub"
 
 
@@ -848,7 +870,7 @@ class TestSmokeIntegration:
     def test_opcua_full_smoke_flow(self) -> None:
         """OPC_UA facade 完整 smoke 流程: load -> start -> health -> read -> stop。"""
         plan = _make_test_plan("smoke_opcua")
-        facade = OpcUaFacade(port=0)
+        facade = create_opcua_driver_adapter(port=0)
         facade.load_points(plan)
 
         try:
@@ -880,7 +902,7 @@ class TestSmokeIntegration:
     def test_iec104_full_smoke_flow(self) -> None:
         """IEC104 facade 完整 smoke 流程: load -> start -> health -> read -> stop。"""
         plan = _make_test_plan("smoke_iec104", protocol="IEC104")
-        facade = Iec104Facade(port=0)
+        facade = create_iec104_driver_adapter(port=0)
         facade.load_points(plan)
 
         try:
@@ -907,8 +929,8 @@ class TestSmokeIntegration:
         plan_opcua = _make_test_plan("conc_opcua")
         plan_iec104 = _make_test_plan("conc_iec104", protocol="IEC104")
 
-        opcua = OpcUaFacade(port=0)
-        iec104 = Iec104Facade(port=0)
+        opcua = create_opcua_driver_adapter(port=0)
+        iec104 = create_iec104_driver_adapter(port=0)
 
         try:
             opcua.load_points(plan_opcua)

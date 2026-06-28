@@ -1,4 +1,4 @@
-"""Starfish MQTT 轻量级协议 facade。
+"""Starfish MQTT 轻量级协议 backend。
 
 本模块提供 MQTT-like 协议的轻量级 TCP server 生命周期实现。
 使用 Python 标准库 socket 启动真实 TCP server，采用 JSON 行协议
@@ -93,8 +93,8 @@ class SubscriptionQueue:
         self._q.put((point_id, value))
 
 
-class MqttFacade:
-    """MQTT 轻量级协议 facade。
+class MqttServerBackend:
+    """MQTT 轻量级协议 backend。
 
     启动 TCP socket server，监听指定端口，提供基于 JSON 行协议的
     轻量级 MQTT-like 端点。内部管理 topic -> payload 映射和
@@ -147,7 +147,7 @@ class MqttFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
@@ -208,7 +208,7 @@ class MqttFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         通过 TCP connect 探测 server socket 是否可连接。
 
@@ -316,7 +316,7 @@ class MqttFacade:
         更新匹配点位时，新值推入返回的 SubscriptionQueue。
 
         本方法实现了 Starfish 工具层 subscribe 语义，
-        不同于其他 facade 的 NOT_IMPLEMENTED。
+        不同于其他 backend 的 NOT_IMPLEMENTED。
 
         Args:
             point_ids: 要订阅的点位 ID 列表。
@@ -337,7 +337,7 @@ class MqttFacade:
     def write(self, point_id: str, value: Any) -> None:
         """写入单个点位值 —— 当前未实现。
 
-        MQTT 轻量级 facade 暂不支持单点写入 API。
+        MQTT 轻量级 backend 暂不支持单点写入 API。
         可通过 update_values 批量更新。
 
         Args:
@@ -349,7 +349,7 @@ class MqttFacade:
         """
         raise UnsupportedOperation(
             "write",
-            "MqttFacade.write 尚未实现，请使用 update_values 批量更新点位值",
+            "MqttServerBackend.write 尚未实现，请使用 update_values 批量更新点位值",
         )
 
     def report(self) -> dict[str, Any]:
@@ -360,7 +360,7 @@ class MqttFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "MqttFacade.report 尚未实现，"
+            "MqttServerBackend.report 尚未实现，"
             "待后续轮次实现结构化 telemetry report",
         )
 
@@ -519,4 +519,4 @@ class MqttFacade:
         return json.dumps({"published": True, "point_id": point_id}).encode("utf-8") + b"\n"
 
 
-__all__ = ["MqttFacade", "SubscriptionQueue"]
+__all__ = ["MqttServerBackend", "SubscriptionQueue"]

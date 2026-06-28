@@ -52,7 +52,7 @@ class TypeId(IntEnum):
     C_SE_NA_1 = 48  # 设点命令归一化（Set point command, normalized）
     C_SE_NB_1 = 49  # 设点命令标度化
     C_SE_NC_1 = 50  # 设点命令短浮点
-    # ── 控制方向带时标命令（Round 19 新增）────────────────────────────────
+    # ── 控制方向带时标命令────────────────────────────────
     C_SE_TA_1 = 58  # 设点命令归一化，带 CP56Time2a 时标
     C_SE_TB_1 = 59  # 设点命令标度化，带 CP56Time2a 时标
     C_SE_TC_1 = 60  # 设点命令短浮点，带 CP56Time2a 时标

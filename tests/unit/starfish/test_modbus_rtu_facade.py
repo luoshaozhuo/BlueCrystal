@@ -26,14 +26,34 @@ import time
 
 import pytest
 
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_default_backend_factory,
+    create_default_driver_factory,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_iec104_driver_adapter,
+    create_iec61850_mms_driver_adapter,
+    create_iec61850_report_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_opcua_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
+
 from starfish.domain.server_config import (
     StarfishServerConfig,
     StarfishEndpointConfig,
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.adapters.drivers.modbus.modbus_rtu_facade import (
-    ModbusRtuFacade,
+from starfish.adapters.drivers.modbus.modbus_rtu_driver_adapter import (
+    ModbusRtuDriverAdapter,
+)
+from starfish.infrastructure.drivers.modbus.modbus_rtu_pty_backend import (
     probe_modbus_rtu_binary,
     _crc16,
     _build_rtu_frame,
@@ -198,13 +218,13 @@ class TestModbusRtuCodebasePending:
 
     def test_construction_codebase_pending(self) -> None:
         """构造 codebase-pending facade 应返回正确 mode。"""
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         assert facade.protocol == "MODBUS_RTU"
         assert facade.mode == "codebase-pending"
 
     def test_start_stop_codebase_pending(self) -> None:
         """codebase-pending 模式 start/stop 生命周期。"""
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.start()
         h = facade.health()
         assert h["status"] == "started"
@@ -217,7 +237,7 @@ class TestModbusRtuCodebasePending:
     def test_load_points_and_read_codebase_pending(self) -> None:
         """codebase-pending 模式 load_points / read。"""
         plan = _make_plan("rtu_cp")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
         values = facade.read()
         assert values["point_a"] == 1.0
@@ -226,7 +246,7 @@ class TestModbusRtuCodebasePending:
     def test_update_values_codebase_pending(self) -> None:
         """codebase-pending 模式 update_values。"""
         plan = _make_plan("rtu_cp_update")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
         facade.update_values({"point_a": 99.9})
         assert facade.read(["point_a"]) == {"point_a": 99.9}
@@ -234,7 +254,7 @@ class TestModbusRtuCodebasePending:
     def test_not_implemented_codebase_pending(self) -> None:
         """codebase-pending 模式 NOT_IMPLEMENTED 操作。"""
         plan = _make_plan("rtu_cp_notimpl")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="write"):
@@ -249,7 +269,7 @@ class TestModbusRtuCodebasePending:
     def test_capabilities_codebase_pending(self) -> None:
         """codebase-pending 模式 capabilities。"""
         plan = _make_plan("rtu_cp_caps")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         assert facade.capabilities() == []
         facade.load_points(plan)
         # Round 14: capabilities() 现在包含 plan 声明能力 + MODBUS_RTU 功能码
@@ -291,20 +311,20 @@ class TestProbeModbusRtu:
 
 
 @pytest.fixture
-def rtu_facade() -> ModbusRtuFacade:
+def rtu_facade() -> ModbusRtuDriverAdapter:
     """创建 rtu-lightweight 模式的 facade 实例。"""
-    return ModbusRtuFacade(mode="rtu-lightweight")
+    return create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
 
 
 class TestModbusRtuLightweight:
     """rtu-lightweight 模式下的 PTY 生命周期和操作测试。"""
 
-    def test_construction(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_construction(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """新建 facade 应为未启动状态，mode 为 rtu-lightweight。"""
         assert rtu_facade.protocol == "MODBUS_RTU"
         assert rtu_facade.mode == "rtu-lightweight"
 
-    def test_initial_health(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_initial_health(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """停止状态 health 应反映正确元信息。"""
         h = rtu_facade.health()
         assert h["status"] == "stopped"
@@ -313,7 +333,7 @@ class TestModbusRtuLightweight:
         assert h["running"] is False
         assert "不等同真实串口" in h.get("note", "")
 
-    def test_start_stop_lifecycle(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_start_stop_lifecycle(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """PTY start/stop 基本生命周期。"""
         rtu_facade.start()
         h = rtu_facade.health()
@@ -330,7 +350,7 @@ class TestModbusRtuLightweight:
         # 停止后 slave_path 应为空
         assert rtu_facade.slave_path == ""
 
-    def test_start_idempotent(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_start_idempotent(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """重复 start 为幂等。"""
         rtu_facade.start()
         path1 = rtu_facade.slave_path
@@ -339,14 +359,14 @@ class TestModbusRtuLightweight:
         assert path1 == path2
         rtu_facade.stop()
 
-    def test_stop_idempotent(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_stop_idempotent(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """重复 stop 为幂等。"""
         rtu_facade.start()
         rtu_facade.stop()
         rtu_facade.stop()
         assert rtu_facade.health()["status"] == "stopped"
 
-    def test_load_points_and_read(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_load_points_and_read(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """load_points 后 read 返回 initial_values。"""
         plan = _make_plan("rtu_lw_load")
         rtu_facade.load_points(plan)
@@ -354,35 +374,35 @@ class TestModbusRtuLightweight:
         assert values["point_a"] == 1.0
         assert values["point_b"] == 2.0
 
-    def test_read_specific_points(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_read_specific_points(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """指定 point_ids 时应只返回对应值。"""
         plan = _make_plan("rtu_lw_specific")
         rtu_facade.load_points(plan)
         values = rtu_facade.read(["point_a"])
         assert values == {"point_a": 1.0}
 
-    def test_read_nonexistent_point(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_read_nonexistent_point(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """不存在 point_id 应返回 None。"""
         plan = _make_plan("rtu_lw_nonexist")
         rtu_facade.load_points(plan)
         values = rtu_facade.read(["nonexistent"])
         assert values == {"nonexistent": None}
 
-    def test_write_success(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_write_success(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """write 应更新内存值。"""
         plan = _make_plan("rtu_lw_write")
         rtu_facade.load_points(plan)
         rtu_facade.write("point_a", 42.0)
         assert rtu_facade.read(["point_a"]) == {"point_a": 42.0}
 
-    def test_write_nonexistent_point(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_write_nonexistent_point(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """write 不存在点位应抛出 KeyError。"""
         plan = _make_plan("rtu_lw_write_err")
         rtu_facade.load_points(plan)
         with pytest.raises(KeyError):
             rtu_facade.write("nonexistent", 100)
 
-    def test_update_values(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_update_values(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """update_values 应批量更新内存值。"""
         plan = _make_plan("rtu_lw_update")
         rtu_facade.load_points(plan)
@@ -391,7 +411,7 @@ class TestModbusRtuLightweight:
         assert values["point_a"] == 99.9
         assert values["new_point"] == 0
 
-    def test_capabilities(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_capabilities(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """capabilities 应返回 plan 中的声明 + MODBUS_RTU 功能码。"""
         plan = _make_plan("rtu_lw_caps")
         rtu_facade.load_points(plan)
@@ -400,25 +420,25 @@ class TestModbusRtuLightweight:
         assert "MODBUS_RTU_FC03" in caps
         assert "MODBUS_RTU_FC06" in caps
 
-    def test_capabilities_no_plan(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_capabilities_no_plan(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """未加载 plan 时 capabilities 返回空列表。"""
         assert rtu_facade.capabilities() == []
 
-    def test_subscribe_raises_unsupported(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_subscribe_raises_unsupported(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """subscribe 应抛出 UnsupportedOperation。"""
         plan = _make_plan("rtu_lw_sub")
         rtu_facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="subscribe"):
             rtu_facade.subscribe(["point_a"])
 
-    def test_report_raises_unsupported(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_report_raises_unsupported(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """report 应抛出 UnsupportedOperation。"""
         plan = _make_plan("rtu_lw_report")
         rtu_facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="report"):
             rtu_facade.report()
 
-    def test_health_after_load_points(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_health_after_load_points(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """load_points 后 health 应反映 plan 信息。"""
         plan = _make_plan("rtu_lw_health")
         rtu_facade.load_points(plan)
@@ -428,7 +448,7 @@ class TestModbusRtuLightweight:
         assert h["endpoint_count"] == 1
         assert h["synthetic"] is True
 
-    def test_health_with_slave_path(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_health_with_slave_path(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """启动后 health 应包含 slave_path。"""
         plan = _make_plan("rtu_lw_slave")
         rtu_facade.load_points(plan)
@@ -440,7 +460,7 @@ class TestModbusRtuLightweight:
         finally:
             rtu_facade.stop()
 
-    def test_slave_path_before_start(self, rtu_facade: ModbusRtuFacade) -> None:
+    def test_slave_path_before_start(self, rtu_facade: ModbusRtuDriverAdapter) -> None:
         """未启动时 slave_path 应为空。"""
         assert rtu_facade.slave_path == ""
 
@@ -449,7 +469,7 @@ class TestModbusRtuLightweight:
 
 
 class TestRegisterMapping:
-    """point_id -> 寄存器地址映射测试（与 ModbusTcpFacade 一致）。"""
+    """point_id -> 寄存器地址映射测试（与 ModbusTcpDriverAdapter 一致）。"""
 
     def test_sorted_register_mapping(self) -> None:
         """point_id 按字典序排序后分配从 0 开始的寄存器地址。"""
@@ -457,7 +477,7 @@ class TestRegisterMapping:
             "rtu_map",
             initial_values={"c_zone": 1, "a_zone": 2, "b_zone": 3},
         )
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
 
         # 字典序：a_zone, b_zone, c_zone → 寄存器 0, 1, 2
@@ -473,7 +493,7 @@ class TestRegisterMapping:
     def test_register_map_stable_on_reload(self) -> None:
         """重复 load_points 后寄存器映射应保持稳定。"""
         plan = _make_plan("rtu_reload")
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         map1 = dict(facade._reg_map)
         facade.load_points(plan)
@@ -557,7 +577,7 @@ class TestModbusRtuPtyCommunication:
             "rtu_fc03_pty",
             initial_values={"point_a": 100, "point_b": 200},
         )
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -601,7 +621,7 @@ class TestModbusRtuPtyCommunication:
             "rtu_fc06_pty",
             initial_values={"point_a": 50, "point_b": 75},
         )
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -637,7 +657,7 @@ class TestModbusRtuPtyCommunication:
             "rtu_fc03_range",
             initial_values={"point_a": 100},
         )
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -671,7 +691,7 @@ class TestModbusRtuPtyCommunication:
     def test_illegal_function_code_returns_exception(self) -> None:
         """非法功能码应返回异常响应。"""
         plan = _make_plan("rtu_exception")
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -706,7 +726,7 @@ class TestModbusRtuPtyCommunication:
     def test_crc_error_frame_ignored(self) -> None:
         """CRC 错误的帧应被静默忽略。"""
         plan = _make_plan("rtu_crc_bad")
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -742,7 +762,7 @@ class TestModbusRtuEdgeCases:
 
     def test_start_without_load_points(self) -> None:
         """未 load_points 时 start 应成功执行。"""
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.start()
         try:
             h = facade.health()
@@ -754,19 +774,19 @@ class TestModbusRtuEdgeCases:
 
     def test_read_without_plan(self) -> None:
         """未 load_points 时 read 应返回空 dict。"""
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         values = facade.read()
         assert values == {}
 
     def test_capabilities_without_plan(self) -> None:
         """未 load_points 时 capabilities 返回空列表。"""
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         assert facade.capabilities() == []
 
     def test_bool_value_handling(self) -> None:
         """布尔值应转为 1/0 用于寄存器响应。"""
         plan = _make_plan("rtu_bool", initial_values={"flag": True})
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -985,7 +1005,7 @@ class TestModbusRtuFc01Coils:
     def test_fc01_read_coils_via_pty(self) -> None:
         """通过 PTY slave 发送 FC01 请求并验证线圈状态响应。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1024,7 +1044,7 @@ class TestModbusRtuFc01Coils:
     def test_fc01_illegal_data_address(self) -> None:
         """FC01 请求超出范围的线圈地址应返回异常 0x02。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1050,7 +1070,7 @@ class TestModbusRtuFc01Coils:
     def test_fc01_illegal_data_value(self) -> None:
         """FC01 请求数量超出范围应返回异常 0x03。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1084,7 +1104,7 @@ class TestModbusRtuFc02DiscreteInputs:
     def test_fc02_read_discrete_inputs_via_pty(self) -> None:
         """通过 PTY slave 发送 FC02 请求并验证离散输入状态响应。"""
         plan = _make_plan_with_discrete_inputs()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1115,7 +1135,7 @@ class TestModbusRtuFc02DiscreteInputs:
     def test_fc02_illegal_data_address(self) -> None:
         """FC02 请求超出范围的离散输入地址应返回异常 0x02。"""
         plan = _make_plan_with_discrete_inputs()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1148,7 +1168,7 @@ class TestModbusRtuFc04InputRegisters:
     def test_fc04_read_input_registers_via_pty(self) -> None:
         """通过 PTY slave 发送 FC04 请求并验证输入寄存器响应。"""
         plan = _make_plan_with_input_registers()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1181,7 +1201,7 @@ class TestModbusRtuFc04InputRegisters:
     def test_fc04_illegal_data_value(self) -> None:
         """FC04 请求数量超出范围应返回异常 0x03。"""
         plan = _make_plan_with_input_registers()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1215,7 +1235,7 @@ class TestModbusRtuFc05WriteSingleCoil:
     def test_fc05_write_coil_on_via_pty(self) -> None:
         """通过 PTY slave 发送 FC05 ON 请求并验证响应（回显）+ 读回。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1246,7 +1266,7 @@ class TestModbusRtuFc05WriteSingleCoil:
     def test_fc05_write_coil_off_via_pty(self) -> None:
         """通过 PTY slave 发送 FC05 OFF 请求并验证响应（回显）。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1274,7 +1294,7 @@ class TestModbusRtuFc05WriteSingleCoil:
     def test_fc05_illegal_data_value(self) -> None:
         """FC05 写入非法线圈值（非 0x0000/0xFF00）应返回异常 0x03。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1301,7 +1321,7 @@ class TestModbusRtuFc05WriteSingleCoil:
     def test_fc05_write_then_read_back(self) -> None:
         """FC05 写入后通过 FC01 读回验证一致性。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1344,7 +1364,7 @@ class TestModbusRtuFc15WriteMultipleCoils:
     def test_fc15_write_multiple_coils_via_pty(self) -> None:
         """通过 PTY slave 发送 FC15 请求并验证响应。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1379,7 +1399,7 @@ class TestModbusRtuFc15WriteMultipleCoils:
     def test_fc15_write_then_read_back(self) -> None:
         """FC15 写入后通过 FC01 读回验证一致性。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1417,7 +1437,7 @@ class TestModbusRtuFc15WriteMultipleCoils:
     def test_fc15_byte_count_mismatch(self) -> None:
         """FC15 byte_count 与数量不匹配应返回异常 0x03。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1455,7 +1475,7 @@ class TestModbusRtuFc16WriteMultipleRegisters:
     def test_fc16_write_multiple_registers_via_pty(self) -> None:
         """通过 PTY slave 发送 FC16 请求并验证响应。"""
         plan = _make_plan("rtu_fc16")
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1489,7 +1509,7 @@ class TestModbusRtuFc16WriteMultipleRegisters:
     def test_fc16_write_then_read_back(self) -> None:
         """FC16 写入后通过 FC03 读回验证一致性。"""
         plan = _make_plan("rtu_fc16_readback")
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1529,7 +1549,7 @@ class TestModbusRtuFc16WriteMultipleRegisters:
     def test_fc16_byte_count_mismatch(self) -> None:
         """FC16 byte_count 与数量不匹配应返回异常 0x03。"""
         plan = _make_plan("rtu_fc16_bcm")
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         facade.start()
 
@@ -1567,7 +1587,7 @@ class TestDataAreaModel:
     def test_health_reports_data_areas(self) -> None:
         """health() 应包含各数据区统计。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         h = facade.health()
         assert "data_areas" in h
@@ -1580,7 +1600,7 @@ class TestDataAreaModel:
     def test_function_codes_in_health(self) -> None:
         """health() 应列出支持的功能码。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         h = facade.health()
         assert "function_codes" in h
@@ -1594,7 +1614,7 @@ class TestDataAreaModel:
     def test_capabilities_include_fc_codes(self) -> None:
         """capabilities() 应包含 MODBUS_RTU 功能码声明。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         caps = facade.capabilities()
         assert "MODBUS_RTU_FC01" in caps
@@ -1606,7 +1626,7 @@ class TestDataAreaModel:
     def test_point_area_classification(self) -> None:
         """通过 variable_key 正确分类点位到数据区。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         assert facade._point_area.get("coil_0") == "coils"
         assert facade._point_area.get("coil_1") == "coils"
@@ -1615,7 +1635,7 @@ class TestDataAreaModel:
     def test_update_values_syncs_coil_state(self) -> None:
         """update_values 应同步更新线圈存储。"""
         plan = _make_plan_with_coils()
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         facade.load_points(plan)
         # 初始状态 coil_0=True
         assert facade._coil_states.get("coil_0") is True
@@ -1628,7 +1648,7 @@ class TestDataAreaModel:
 
 
 class TestModbusRtuRegisterEncodingIntegration:
-    """ModbusRtuFacade 接入 register_encoding 工具的测试（Round 19 新增）。
+    """ModbusRtuDriverAdapter 接入 register_encoding 工具的测试（Round 19 新增）。
 
     验证 facade 的 encode_register_value / decode_register_value 方法
     **真实调用** starfish.domain.protocols.modbus.register_encoding 工具，
@@ -1637,7 +1657,7 @@ class TestModbusRtuRegisterEncodingIntegration:
 
     def test_encode_register_value_uint16_calls_tool(self) -> None:
         """encode_register_value(UINT16) 应真实调用 register_encoding 工具。"""
-        facade = ModbusRtuFacade()
+        facade = create_modbus_rtu_driver_adapter()
         # 真实调用 register_encoding 工具
         regs = facade.encode_register_value(
             0x1234,
@@ -1647,7 +1667,7 @@ class TestModbusRtuRegisterEncodingIntegration:
 
     def test_encode_register_value_uint32_little_little(self) -> None:
         """encode_register_value(UINT32, little, little) 应按工具规则编码。"""
-        facade = ModbusRtuFacade()
+        facade = create_modbus_rtu_driver_adapter()
         regs = facade.encode_register_value(
             0x01020304,
             ModbusRegisterValueType.UINT32,
@@ -1666,7 +1686,7 @@ class TestModbusRtuRegisterEncodingIntegration:
 
     def test_encode_register_value_float32(self) -> None:
         """encode_register_value(FLOAT32) 应能往返。"""
-        facade = ModbusRtuFacade()
+        facade = create_modbus_rtu_driver_adapter()
         regs = facade.encode_register_value(
             2.5,
             ModbusRegisterValueType.FLOAT32,
@@ -1684,7 +1704,7 @@ class TestModbusRtuRegisterEncodingIntegration:
 
     def test_decode_register_value_consistency(self) -> None:
         """encode + decode 应真实回得原值。"""
-        facade = ModbusRtuFacade()
+        facade = create_modbus_rtu_driver_adapter()
         for value in [0, 1, 100, 32767, -32768]:
             regs = facade.encode_register_value(
                 value,
@@ -1701,7 +1721,7 @@ class TestModbusRtuRegisterEncodingIntegration:
         from starfish.domain.protocols.modbus.register_encoding import (
             RegisterEncodingValueError,
         )
-        facade = ModbusRtuFacade()
+        facade = create_modbus_rtu_driver_adapter()
         with pytest.raises(RegisterEncodingValueError):
             facade.encode_register_value(
                 float("nan"),
@@ -1710,7 +1730,7 @@ class TestModbusRtuRegisterEncodingIntegration:
 
     def test_register_encoding_capabilities_contains_required(self) -> None:
         """register_encoding_capabilities() 应包含 5 value_type + 2 byte_order + 2 word_order。"""
-        facade = ModbusRtuFacade()
+        facade = create_modbus_rtu_driver_adapter()
         caps = facade.register_encoding_capabilities()
         assert "supports_register_encoding=true" in caps
         assert "supports_typed_register_helpers=true" in caps
@@ -1736,7 +1756,7 @@ class TestModbusRtuRegisterEncodingIntegration:
 
     def test_register_encoding_does_not_modify_existing_facade_behavior(self) -> None:
         """register_encoding 接入不应修改 FC03/FC06 等基础帧行为。"""
-        facade = ModbusRtuFacade()
+        facade = create_modbus_rtu_driver_adapter()
         # 加载 plan 后 capabilities() 才会带 FC 列表（既有行为）
         plan = _make_plan()
         facade.load_points(plan)

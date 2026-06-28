@@ -7,8 +7,8 @@
 4. 边界：空 plan、stub mode、不支持协议、未启动 facade。
 
 测试阶段：开发期验证 (P1)。
-使用的替身：HttpRestFacade (real)、ModbusTcpFacade (real)、
-  MqttFacade (mqtt-lightweight)、ServerSimulatorFacade (stub)。
+使用的替身：HttpRestDriverAdapter (real)、ModbusTcpDriverAdapter (real)、
+  MqttDriverAdapter (mqtt-lightweight)、ServerSimulatorDriverAdapter (stub)。
 外部依赖：无（纯 Python 标准库）。
 不能证明：生产级性能结论、生产容量规划、多并发压力。
 NOT_RUN 条件：无。
@@ -21,15 +21,26 @@ from starfish.domain.server_config import (
     StarfishEndpointConfig,
     StarfishPointConfig,
 )
-from starfish.adapters.drivers.simulator.server_simulator_facade import ServerSimulatorFacade
-from starfish.adapters.drivers.protocol.http.http_rest_facade import HttpRestFacade
-from starfish.adapters.drivers.modbus.modbus_tcp_facade import ModbusTcpFacade
-from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade
-from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
-from starfish.adapters.drivers.modbus.modbus_rtu_facade import ModbusRtuFacade
-from starfish.adapters.drivers.ads.ads_facade import AdsFacade
-from starfish.adapters.drivers.iec.goose_facade import GooseFacade
-from starfish.adapters.drivers.iec.sv_facade import SvFacade
+from starfish.adapters.drivers.simulator.server_simulator_driver_adapter import ServerSimulatorDriverAdapter
+from starfish.adapters.drivers.protocol.http.http_rest_driver_adapter import HttpRestDriverAdapter
+from starfish.adapters.drivers.modbus.modbus_tcp_driver_adapter import ModbusTcpDriverAdapter
+from starfish.adapters.drivers.protocol.mqtt.mqtt_driver_adapter import MqttDriverAdapter
+from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+from starfish.adapters.drivers.modbus.modbus_rtu_driver_adapter import ModbusRtuDriverAdapter
+from starfish.adapters.drivers.ads.ads_driver_adapter import AdsDriverAdapter
+from starfish.adapters.drivers.iec.goose_driver_adapter import GooseDriverAdapter
+from starfish.adapters.drivers.iec.sv_driver_adapter import SvDriverAdapter
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
 from whale.ingest.diagnostics.probe import ProbeResult, probe_facade
 from whale.ingest.diagnostics.profile import ProfileResult, profile_facade
 from whale.ingest.diagnostics.capacity import CapacityResult, capacity_scan
@@ -99,7 +110,7 @@ class TestProbeFacade:
     def test_probe_stub_facade_pass(self) -> None:
         """stub facade 探针应返回 PASS。"""
         plan = _make_minimal_plan("probe_stub")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="stub_ep")
         assert result.status == "PASS"
         assert result.protocol == ""
@@ -109,7 +120,7 @@ class TestProbeFacade:
 
     def test_probe_stub_facade_without_plan(self) -> None:
         """无 plan 时探针跳过 load_points，仍应 PASS。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         result = probe_facade(facade, endpoint_id="no_plan_ep")
         assert result.status == "PASS"
         assert "load_points" not in result.details
@@ -120,7 +131,7 @@ class TestProbeFacade:
             "probe_http",
             protocol_name="HTTP_REST",
         )
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         result = probe_facade(facade, plan=plan, endpoint_id="http_ep")
         assert result.status == "PASS"
         assert result.mode == "real"
@@ -139,7 +150,7 @@ class TestProbeFacade:
             protocol_name="MODBUS_TCP",
             initial_values={"a": 100, "b": 200},
         )
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         result = probe_facade(facade, plan=plan, endpoint_id="modbus_ep")
         assert result.status == "PASS"
         assert result.mode == "real"
@@ -153,7 +164,7 @@ class TestProbeFacade:
             "probe_mqtt",
             protocol_name="MQTT",
         )
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         result = probe_facade(facade, plan=plan, endpoint_id="mqtt_ep")
         assert result.status == "PASS"
         assert result.mode == "mqtt-lightweight"
@@ -164,7 +175,7 @@ class TestProbeFacade:
     def test_probe_with_specific_point_ids(self) -> None:
         """指定 read_point_ids 时只探测这些点。"""
         plan = _make_minimal_plan("probe_specific")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         result = probe_facade(
             facade, plan=plan,
             read_point_ids=["point_0"],
@@ -177,7 +188,7 @@ class TestProbeFacade:
     def test_probe_skip_start(self) -> None:
         """skip_start=True 时跳过 start 步骤。"""
         plan = _make_minimal_plan("probe_skip_start")
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.start()
 
         result = probe_facade(facade, plan=plan, skip_start=True)
@@ -190,7 +201,7 @@ class TestProbeFacade:
         （mode 可能为 codec-enhanced/codec-enhanced-plus/codec-skeleton/
         environment-pending/codebase-pending）。"""
         plan = _make_minimal_plan("probe_iec101", protocol_name="IEC101")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="iec101_ep")
         assert result.status == "PASS"
         assert result.mode in (
@@ -207,10 +218,10 @@ class TestProbeFacade:
         （mode 可能为 rtu-lightweight 或 codebase-pending）。"""
         plan = _make_minimal_plan("probe_modbus_rtu", protocol_name="MODBUS_RTU")
         # 根据 PTY 可用性选择模式
-        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.infrastructure.drivers.backend_factory import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         mode = "rtu-lightweight" if pty_ok else "codebase-pending"
-        facade = ModbusRtuFacade(mode=mode)
+        facade = create_modbus_rtu_driver_adapter(mode=mode)
         result = probe_facade(facade, plan=plan, endpoint_id="modbus_rtu_ep")
         assert result.status == "PASS"
         assert result.mode in ("rtu-lightweight", "codebase-pending")
@@ -222,7 +233,7 @@ class TestProbeFacade:
     def test_probe_ads_facade_pass(self) -> None:
         """Beckhoff ADS codebase-pending facade 探针应返回 PASS。"""
         plan = _make_minimal_plan("probe_ads", protocol_name="BECKHOFF_ADS")
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="ads_ep")
         assert result.status == "PASS"
         assert result.mode == "codebase-pending"
@@ -231,7 +242,7 @@ class TestProbeFacade:
     def test_probe_goose_facade_pass(self) -> None:
         """GOOSE environment-pending facade 探针应返回 PASS。"""
         plan = _make_minimal_plan("probe_goose", protocol_name="GOOSE")
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="goose_ep")
         assert result.status == "PASS"
         assert result.mode == "environment-pending"
@@ -240,7 +251,7 @@ class TestProbeFacade:
     def test_probe_sv_facade_pass(self) -> None:
         """SV environment-pending facade 探针应返回 PASS。"""
         plan = _make_minimal_plan("probe_sv", protocol_name="SV")
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="sv_ep")
         assert result.status == "PASS"
         assert result.mode == "environment-pending"
@@ -267,7 +278,7 @@ class TestProfileFacade:
     def test_profile_stub_facade(self) -> None:
         """stub facade 的 profile 应返回有效统计。"""
         plan = _make_minimal_plan("profile_stub")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         result = profile_facade(facade, iterations=50, endpoint_id="stub_ep")
@@ -287,7 +298,7 @@ class TestProfileFacade:
             "profile_http",
             protocol_name="HTTP_REST",
         )
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -310,7 +321,7 @@ class TestProfileFacade:
     def test_profile_with_specific_point_ids(self) -> None:
         """指定 point_ids 时 profile 只读取这些点。"""
         plan = _make_minimal_plan("profile_specific")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         result = profile_facade(
@@ -323,7 +334,7 @@ class TestProfileFacade:
 
     def test_profile_zero_iterations_fails(self) -> None:
         """iterations < 1 时应返回 FAIL。"""
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         result = profile_facade(facade, iterations=0)
         assert result.status == "FAIL"
         assert "iterations" in result.reason
@@ -333,7 +344,7 @@ class TestProfileFacade:
         （mode 可能为 codec-enhanced/codec-enhanced-plus/codec-skeleton/
         environment-pending/codebase-pending）。"""
         plan = _make_minimal_plan("profile_iec101", protocol_name="IEC101")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         result = profile_facade(facade, iterations=30, endpoint_id="iec101_ep")
         assert result.status == "PASS"
@@ -357,7 +368,7 @@ class TestProfileFacade:
         plan = _make_minimal_plan(
             "capacity_iec101_codec_plus", protocol_name="IEC101",
         )
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         result = capacity_scan(facade, endpoint_id="iec101_capacity")
         assert result.status == "NOT_RUN", (
@@ -374,7 +385,7 @@ class TestProfileFacade:
         plan = _make_minimal_plan(
             "probe_iec101_codec_plus_health", protocol_name="IEC101",
         )
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="iec101_probe")
         assert result.status == "PASS"
         assert result.mode == "codec-enhanced-plus"
@@ -392,7 +403,7 @@ class TestProfileFacade:
     def test_profile_goose_facade(self) -> None:
         """GOOSE environment-pending facade 的 profile 应 PASS。"""
         plan = _make_minimal_plan("profile_goose", protocol_name="GOOSE")
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         facade.load_points(plan)
         result = profile_facade(facade, iterations=20, endpoint_id="goose_ep")
         assert result.status == "PASS"
@@ -402,7 +413,7 @@ class TestProfileFacade:
     def test_profile_sv_facade(self) -> None:
         """SV environment-pending facade 的 profile 应 PASS。"""
         plan = _make_minimal_plan("profile_sv", protocol_name="SV")
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         facade.load_points(plan)
         result = profile_facade(facade, iterations=20, endpoint_id="sv_ep")
         assert result.status == "PASS"
@@ -437,7 +448,7 @@ class TestCapacityScan:
             protocol_name="HTTP_REST",
             initial_values={f"p{i}": i for i in range(10)},
         )
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -465,7 +476,7 @@ class TestCapacityScan:
             protocol_name="MODBUS_TCP",
             initial_values={"a": 1, "b": 2, "c": 3},
         )
-        facade = ModbusTcpFacade(port=0)
+        facade = create_modbus_tcp_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -485,7 +496,7 @@ class TestCapacityScan:
             protocol_name="MQTT",
             initial_values={"x": 10, "y": 20},
         )
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -505,10 +516,10 @@ class TestCapacityScan:
         容量扫描应报告 NOT_RUN。MODBUS_RTU 现在在 _CAPACITY_SUPPORTED 中。
         """
         facades = [
-            ("IEC101", Iec101Facade()),
-            ("BECKHOFF_ADS", AdsFacade()),
-            ("GOOSE", GooseFacade()),
-            ("SV", SvFacade()),
+            ("IEC101", create_iec101_driver_adapter()),
+            ("BECKHOFF_ADS", create_ads_driver_adapter()),
+            ("GOOSE", create_goose_driver_adapter()),
+            ("SV", create_sv_driver_adapter()),
         ]
         plan = _make_minimal_plan("capacity_pending")
         for name, facade in facades:
@@ -528,10 +539,10 @@ class TestCapacityScan:
             protocol_name="MODBUS_RTU",
             initial_values={"a": 1, "b": 2},
         )
-        from starfish.adapters.drivers.modbus.modbus_rtu_facade import probe_modbus_rtu_binary
+        from starfish.infrastructure.drivers.backend_factory import probe_modbus_rtu_binary
         pty_ok, _ = probe_modbus_rtu_binary()
         mode = "rtu-lightweight" if pty_ok else "codebase-pending"
-        facade = ModbusRtuFacade(mode=mode)
+        facade = create_modbus_rtu_driver_adapter(mode=mode)
         facade.load_points(plan)
 
         result = capacity_scan(facade, endpoint_id="modbus_rtu_cap")
@@ -554,11 +565,11 @@ class TestCapacityScan:
     def test_capacity_unsupported_protocol_not_run(self) -> None:
         """不支持协议（stub/OPC_UA）应返回 NOT_RUN。
 
-        ServerSimulatorFacade 无 protocol 属性，capacity_scan 中
+        ServerSimulatorDriverAdapter 无 protocol 属性，capacity_scan 中
         result.protocol 为空字符串，不在支持列表中 -> NOT_RUN。
         """
         plan = _make_minimal_plan("capacity_stub", protocol_name="OPC_UA")
-        facade = ServerSimulatorFacade()
+        facade = create_server_simulator_driver_adapter()
         facade.load_points(plan)
 
         result = capacity_scan(facade, endpoint_id="stub_ep")
@@ -577,7 +588,7 @@ class TestCapacityScan:
             protocol_name="HTTP_REST",
             initial_values={},
         )
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -613,7 +624,7 @@ class TestToolsIntegration:
             protocol_name="HTTP_REST",
             initial_values={f"p{i}": float(i) for i in range(5)},
         )
-        facade = HttpRestFacade(port=0)
+        facade = create_http_rest_driver_adapter(port=0)
         facade.load_points(plan)
 
         # 1. probe
@@ -644,7 +655,7 @@ class TestToolsIntegration:
             "tools_int_mqtt",
             protocol_name="MQTT",
         )
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
 
         probe_result = probe_facade(facade, plan=plan, endpoint_id="mqtt_int")
@@ -665,9 +676,9 @@ class TestIec101Round20Capabilities:
 
     def test_probe_iec101_round20_still_pass(self) -> None:
         """Round 20：IEC101 probe 仍 PASS（codec-only 模式下 NOT_RUN/CODEC_ONLY 不影响 probe）。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
         plan = _make_minimal_plan("probe_iec101_round20", protocol_name="IEC101")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="iec101_ep_r20")
         assert result.status == "PASS"
         assert result.protocol == "IEC101"
@@ -682,9 +693,9 @@ class TestIec101Round20Capabilities:
 
     def test_profile_iec101_round20_still_pass(self) -> None:
         """Round 20：IEC101 profile 仍 PASS。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
         plan = _make_minimal_plan("profile_iec101_round20", protocol_name="IEC101")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         result = profile_facade(facade, iterations=20, endpoint_id="iec101_profile_r20")
         assert result.status == "PASS"
@@ -692,9 +703,9 @@ class TestIec101Round20Capabilities:
 
     def test_capacity_iec101_round20_still_not_run(self) -> None:
         """Round 20：IEC101 capacity 仍 NOT_RUN（codec 增量不升级 capacity）。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
         plan = _make_minimal_plan("capacity_iec101_round20", protocol_name="IEC101")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         result = capacity_scan(facade, endpoint_id="iec101_capacity_r20")
         assert result.status == "NOT_RUN"
@@ -702,9 +713,9 @@ class TestIec101Round20Capabilities:
 
     def test_iec101_health_round20_diagnosis(self) -> None:
         """Round 20：IEC101 health() diagnosis 仍为 codec-enhanced-plus 模式。"""
-        from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade
+        from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
         plan = _make_minimal_plan("health_iec101_round20", protocol_name="IEC101")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         result = probe_facade(facade, plan=plan, endpoint_id="iec101_health_r20")
         assert "health" in result.details
         health = result.details["health"]

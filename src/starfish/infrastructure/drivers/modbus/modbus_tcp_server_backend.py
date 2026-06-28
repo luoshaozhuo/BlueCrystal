@@ -1,4 +1,4 @@
-"""Starfish Modbus TCP 协议真实 server facade。
+"""Starfish Modbus TCP 协议真实 server backend。
 
 本模块提供 Modbus TCP 协议的真实 server 生命周期实现。
 使用 Python 标准库 socket 启动真实 TCP server，处理 Modbus
@@ -9,10 +9,10 @@ FC03（Read Holding Registers）和 FC06（Write Single Register）功能码。
     第一个 point_id 对应寄存器 0，第二个对应寄存器 1，依此类推。
     此映射在 load_points 时确定，后续 start/stop 不影响映射关系。
 
-Round 19 扩展（register_encoding 工具接入）：
+register_encoding 工具接入：
     接入 ``starfish.domain.protocols.modbus.register_encoding`` 工具子包，
     提供 ``encode_register_value`` / ``decode_register_value`` 公共
-    API（在 facade 上以 ``encode_register_value`` /
+    API（在 backend 上以 ``encode_register_value`` /
     ``decode_register_value`` 形式暴露），支持 5 value_type × 4 byte/
     word 组合。FC03/FC06/FC16 等真实 Modbus 帧行为**不**受影响
     （register_encoding 仅作为 CPU 辅助层，不修改 socket server 的
@@ -23,7 +23,7 @@ Round 19 扩展（register_encoding 工具接入）：
 当前实现状态：
 - 已实现: start() / stop() / health() / load_points() / read() /
   write() / update_values() / capabilities() + register_encoding
-  工具接入（Round 19）
+  工具接入
   （write 为真实 Modbus FC06 写入，内部值更新后可通过 FC03 读取）
 - NOT_IMPLEMENTED: subscribe() / report()
 
@@ -50,8 +50,8 @@ from typing import Any
 from starfish.domain import StarfishServerMemberConfig, UnsupportedOperation
 
 
-class ModbusTcpFacade:
-    """Modbus TCP 协议真实 server facade。
+class ModbusTcpServerBackend:
+    """Modbus TCP 协议真实 server backend。
 
     启动 TCP socket server，监听指定端口，处理 Modbus TCP 客户端请求。
     支持 FC03（读取多个保持寄存器）和 FC06（写入单个寄存器）。
@@ -59,7 +59,7 @@ class ModbusTcpFacade:
 
     点位映射策略：
         由于 StarfishServerMemberConfig 的 StarfishPointConfig 不含寄存器地址字段，
-        本 facade 在 load_points 时将 plan.initial_values 的 key 按字典序
+        本 backend 在 load_points 时将 plan.initial_values 的 key 按字典序
         排序，按索引分配连续的寄存器地址（0-based）。此映射是确定性的，
         只要 initial_values 的 key 集合不变，映射关系就稳定。
 
@@ -102,7 +102,7 @@ class ModbusTcpFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
@@ -162,7 +162,7 @@ class ModbusTcpFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         通过 TCP connect 探测 server socket 是否可连接。
 
@@ -288,7 +288,7 @@ class ModbusTcpFacade:
             return []
         return list(self._plan.capabilities)
 
-    # ── Register encoding 工具接入（Round 19 新增）────────────────────────────
+    # ── Register encoding 工具接入────────────────────────────
 
     def encode_register_value(
         self,
@@ -300,7 +300,7 @@ class ModbusTcpFacade:
         """将值编码为 16-bit 寄存器列表（Modbus 寄存器值）。
 
         接入 ``starfish.domain.protocols.modbus.register_encoding.encode_register_value``
-        工具。本 facade 不修改 FC03/FC06/FC16 等真实 Modbus 帧行为，仅
+        工具。本 backend 不修改 FC03/FC06/FC16 等真实 Modbus 帧行为，仅
         在 CPU 层提供 32-bit / float32 register encoding 辅助。
 
         Args:
@@ -373,7 +373,7 @@ class ModbusTcpFacade:
         )
 
     def register_encoding_capabilities(self) -> list[str]:
-        """返回 register_encoding 工具的能力声明（Round 19 新增）。
+        """返回 register_encoding 工具的能力声明。
 
         包含 supports_register_encoding / supported_register_value_types /
         supported_byte_orders / supported_word_orders / supports_typed_
@@ -413,7 +413,7 @@ class ModbusTcpFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "ModbusTcpFacade.subscribe 尚未实现，"
+            "ModbusTcpServerBackend.subscribe 尚未实现，"
             "Modbus 协议不支持服务端主动推送，需通过轮询替代",
         )
 
@@ -425,7 +425,7 @@ class ModbusTcpFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "ModbusTcpFacade.report 尚未实现，"
+            "ModbusTcpServerBackend.report 尚未实现，"
             "待后续轮次实现结构化 telemetry report",
         )
 
@@ -632,4 +632,4 @@ class ModbusTcpFacade:
         return mbap + pdu
 
 
-__all__ = ["ModbusTcpFacade"]
+__all__ = ["ModbusTcpServerBackend"]

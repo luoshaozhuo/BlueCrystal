@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
-from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade, SubscriptionQueue
+from starfish.adapters.drivers.protocol.mqtt.mqtt_driver_adapter import (
+    MqttDriverAdapter,
+    SubscriptionQueue,
+)
 
-__all__ = ["MqttFacade", "SubscriptionQueue"]
+__all__ = ["MqttDriverAdapter", "SubscriptionQueue"]

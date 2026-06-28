@@ -1,4 +1,4 @@
-"""Starfish IEC61850 Report 协议 facade —— report/event 语义 + ReportQueue。
+"""Starfish IEC61850 Report 协议 backend —— report/event 语义 + ReportQueue。
 
 本模块提供 IEC61850 Report 协议 server 模拟门面，实现 report 语义和事件队列。
 根据环境探测 iec61850_simulator_server 和 iec61850_report_runner C runner
@@ -19,7 +19,7 @@ unavailable 模式（binary 缺失时）：
 
 NOT_IMPLEMENTED（所有模式）：
 - read() / write() / subscribe() 明确抛出 UnsupportedOperation。
-  IEC61850 Report facade 专注于 report 事件语义，不实现 MMS 读写。
+  IEC61850 Report backend 专注于 report 事件语义，不实现 MMS 读写。
 
 协议特征：
 - 零新增第三方 Python 依赖（subprocess / threading 均为 Python 标准库）。
@@ -60,7 +60,7 @@ class ReportQueue:
     """IEC61850 Report 事件队列封装。
 
     封装 queue.Queue 提供阻塞 / 非阻塞取事件，用于 subscribe 返回的句柄。
-    语义与 MqttFacade 的 SubscriptionQueue 类似，但命名为 ReportQueue / event
+    语义与 MqttServerBackend 的 SubscriptionQueue 类似，但命名为 ReportQueue / event
     以体现 IEC61850 Report Control Block 事件模型。
 
     每个 REPORT 事件是一个 dict，包含 event_type、point_id、value、timestamp。
@@ -150,10 +150,10 @@ def resolve_iec61850_report_runner_path() -> Path:
 
 
 def resolve_iec61850_report_simulator_path() -> Path:
-    """解析 iec61850_simulator_server 可执行文件路径（report facade 复用 MMS server）。
+    """解析 iec61850_simulator_server 可执行文件路径（report backend 复用 MMS server）。
 
     优先级：
-        1. 环境变量 IEC61850_MMS_RUNNER_PATH（复用 MMS facade 路径）。
+        1. 环境变量 IEC61850_MMS_RUNNER_PATH（复用 MMS backend 路径）。
         2. 默认路径 src/starfish/infrastructure/native/bin/iec61850_simulator_server。
 
     Returns:
@@ -205,10 +205,10 @@ def probe_iec61850_report_binary() -> tuple[bool, str]:
     return True, f"IEC61850 Report binaries 可用: simulator={sim_reason}; runner={run_reason}"
 
 
-# ── IEC61850 Report facade ───────────────────────────────────────────────────────
+# ── IEC61850 Report backend ───────────────────────────────────────────────────────
 
 
-class Iec61850ReportFacade:
+class Iec61850ReportNativeBackend:
     """IEC61850 Report 协议 server 模拟门面，含 report/event 语义和 ReportQueue。
 
     根据 iec61850_simulator_server + iec61850_report_runner C runner 可用性切换模式。
@@ -237,7 +237,7 @@ class Iec61850ReportFacade:
     _RCB_REF = "EventsRCB01"
 
     def __init__(self, bind_host: str = "127.0.0.1", port: int = 0) -> None:
-        """初始化 IEC61850 Report facade。
+        """初始化 IEC61850 Report backend。
 
         Args:
             bind_host: 绑定地址。
@@ -295,11 +295,11 @@ class Iec61850ReportFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
-        """启动 IEC61850 Report facade。
+        """启动 IEC61850 Report backend。
 
         真实模式：启动 iec61850_simulator_server C runner -> 等待 READY。
         report-lightweight 模式：设置 in-memory 状态。
@@ -364,7 +364,7 @@ class Iec61850ReportFacade:
         self._started_at = datetime.now(timezone.utc)
 
     def stop(self) -> None:
-        """停止 IEC61850 Report facade。
+        """停止 IEC61850 Report backend。
 
         真实模式：停止 report runner，终止 simulator server 子进程。
         report-lightweight 模式：重置 in-memory 状态，清空事件队列。
@@ -406,7 +406,7 @@ class Iec61850ReportFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         真实模式：通过 TCP connect 探测 simulator 端点是否可达。
         report-lightweight 模式：返回 mode="report-lightweight" 及原因。
@@ -554,7 +554,7 @@ class Iec61850ReportFacade:
     # ── NOT_IMPLEMENTED ───────────────────────────────────────────────────────
 
     def read(self, point_ids: list[str] | None = None) -> dict[str, Any]:
-        """读取点位值 —— IEC61850 Report facade 专注于 report，不实现 read。
+        """读取点位值 —— IEC61850 Report backend 专注于 report，不实现 read。
 
         Args:
             point_ids: 忽略。
@@ -564,13 +564,13 @@ class Iec61850ReportFacade:
         """
         raise UnsupportedOperation(
             "read",
-            "Iec61850ReportFacade.read 尚未实现。"
-            "IEC61850 Report facade 专注于 report/event 语义，"
-            "read 功能应由 Iec61850MmsFacade 提供",
+            "Iec61850ReportNativeBackend.read 尚未实现。"
+            "IEC61850 Report backend 专注于 report/event 语义，"
+            "read 功能应由 Iec61850MmsNativeBackend 提供",
         )
 
     def write(self, point_id: str, value: Any) -> None:
-        """写入点位值 —— IEC61850 Report facade 不实现 write。
+        """写入点位值 —— IEC61850 Report backend 不实现 write。
 
         Args:
             point_id: 忽略。
@@ -581,9 +581,9 @@ class Iec61850ReportFacade:
         """
         raise UnsupportedOperation(
             "write",
-            "Iec61850ReportFacade.write 尚未实现。"
-            "IEC61850 Report facade 专注于 report/event 语义，"
-            "write 功能应由 Iec61850MmsFacade 提供",
+            "Iec61850ReportNativeBackend.write 尚未实现。"
+            "IEC61850 Report backend 专注于 report/event 语义，"
+            "write 功能应由 Iec61850MmsNativeBackend 提供",
         )
 
     def subscribe(self, point_ids: list[str] | None = None) -> None:
@@ -602,7 +602,7 @@ class Iec61850ReportFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "Iec61850ReportFacade.subscribe 尚未实现。"
+            "Iec61850ReportNativeBackend.subscribe 尚未实现。"
             "使用 report() 排空事件队列作为替代",
         )
 
@@ -739,7 +739,7 @@ def _drain_stderr(stderr: Any) -> None:
 
 
 __all__ = [
-    "Iec61850ReportFacade",
+    "Iec61850ReportNativeBackend",
     "ReportQueue",
     "probe_iec61850_report_binary",
     "resolve_iec61850_report_runner_path",

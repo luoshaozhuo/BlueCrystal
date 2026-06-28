@@ -1,6 +1,6 @@
-"""Starfish MqttFacade 测试。
+"""Starfish MqttDriverAdapter 测试。
 
-验证 MqttFacade 的轻量级 MQTT-like 端点：
+验证 MqttDriverAdapter 的轻量级 MQTT-like 端点：
 1. start/stop 真实 TCP server 进程。
 2. health TCP connect 探测。
 3. load_points + read initial_values。
@@ -27,13 +27,31 @@ import socket
 
 import pytest
 
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_default_backend_factory,
+    create_default_driver_factory,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_iec104_driver_adapter,
+    create_iec61850_mms_driver_adapter,
+    create_iec61850_report_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_opcua_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
+
 from starfish.domain.server_config import (
     StarfishServerConfig,
     StarfishEndpointConfig,
     StarfishPointConfig,
     UnsupportedOperation,
 )
-from starfish.adapters.drivers.protocol.mqtt.mqtt_facade import MqttFacade, SubscriptionQueue
+from starfish.adapters.drivers.protocol.mqtt.mqtt_driver_adapter import MqttDriverAdapter, SubscriptionQueue
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────
@@ -140,15 +158,15 @@ class TestSubscriptionQueue:
         assert q.get_nowait() is None
 
 
-# ── MqttFacade 生命周期测试 ─────────────────────────────────────────────────────
+# ── MqttDriverAdapter 生命周期测试 ─────────────────────────────────────────────────────
 
 
-class TestMqttFacadeLifecycle:
-    """MqttFacade start/stop 生命周期测试。"""
+class TestMqttDriverAdapterLifecycle:
+    """MqttDriverAdapter start/stop 生命周期测试。"""
 
     def test_initial_state(self) -> None:
         """新建 facade 应为 stopped 状态。"""
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         h = facade.health()
         assert h["status"] == "stopped"
         assert h["running"] is False
@@ -158,7 +176,7 @@ class TestMqttFacadeLifecycle:
     def test_start_and_stop(self) -> None:
         """start 后 server 应可连接，stop 后应断开。"""
         plan = _make_mqtt_plan("start_stop")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -177,7 +195,7 @@ class TestMqttFacadeLifecycle:
     def test_start_idempotent(self) -> None:
         """重复 start() 应为幂等。"""
         plan = _make_mqtt_plan("idempotent_start")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -189,7 +207,7 @@ class TestMqttFacadeLifecycle:
     def test_stop_idempotent(self) -> None:
         """重复 stop() 应为幂等。"""
         plan = _make_mqtt_plan("idempotent_stop")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
 
         facade.start()
@@ -200,7 +218,7 @@ class TestMqttFacadeLifecycle:
     def test_port_auto_allocation(self) -> None:
         """端口 0 时 OS 应自动分配端口。"""
         plan = _make_mqtt_plan("auto_port")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -211,16 +229,16 @@ class TestMqttFacadeLifecycle:
         facade.stop()
 
 
-# ── MqttFacade 数据操作测试 ─────────────────────────────────────────────────────
+# ── MqttDriverAdapter 数据操作测试 ─────────────────────────────────────────────────────
 
 
-class TestMqttFacadeDataOperations:
-    """MqttFacade 数据读写 + subscribe 测试。"""
+class TestMqttDriverAdapterDataOperations:
+    """MqttDriverAdapter 数据读写 + subscribe 测试。"""
 
     def test_load_points_populates_values(self) -> None:
         """load_points 应从 plan.initial_values 填充内存。"""
         plan = _make_mqtt_plan("load")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read()
@@ -231,7 +249,7 @@ class TestMqttFacadeDataOperations:
     def test_read_specific_points(self) -> None:
         """指定 point_ids 时应只返回对应值。"""
         plan = _make_mqtt_plan("specific")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read(["sensor_temp"])
@@ -240,7 +258,7 @@ class TestMqttFacadeDataOperations:
     def test_read_nonexistent_point(self) -> None:
         """不存在 point_id 应返回 None。"""
         plan = _make_mqtt_plan("nonexist")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read(["nonexistent"])
@@ -252,7 +270,7 @@ class TestMqttFacadeDataOperations:
             "read_all",
             initial_values={"a": 1, "b": 2, "c": 3},
         )
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         values = facade.read()
@@ -264,7 +282,7 @@ class TestMqttFacadeDataOperations:
     def test_update_values(self) -> None:
         """update_values 应更新内存值。"""
         plan = _make_mqtt_plan("update")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         facade.update_values({"sensor_temp": 99.9, "new_point": 0})
@@ -276,7 +294,7 @@ class TestMqttFacadeDataOperations:
     def test_update_values_empty(self) -> None:
         """空 dict 更新应无影响。"""
         plan = _make_mqtt_plan("empty_update")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         original = facade.read()
@@ -286,42 +304,42 @@ class TestMqttFacadeDataOperations:
     def test_capabilities_returns_plan_capabilities(self) -> None:
         """capabilities 应返回 plan 中的声明。"""
         plan = _make_mqtt_plan("caps")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         assert facade.capabilities() == ["READ", "SUBSCRIBE"]
 
     def test_capabilities_empty_without_load(self) -> None:
         """未 load_points 时 capabilities 应返回空列表。"""
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         assert facade.capabilities() == []
 
     def test_empty_initial_values(self) -> None:
         """空 initial_values 时 read() 应返回空 dict。"""
         plan = _make_mqtt_plan("empty_iv", initial_values={})
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
         assert facade.read() == {}
 
     def test_health_without_load(self) -> None:
         """未 load_points 时 health 仍可调用。"""
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         h = facade.health()
         assert h["plan_loaded"] is False
         assert h["point_count"] == 0
         assert h["subscription_count"] == 0
 
 
-# ── MqttFacade subscribe 测试 ───────────────────────────────────────────────────
+# ── MqttDriverAdapter subscribe 测试 ───────────────────────────────────────────────────
 
 
-class TestMqttFacadeSubscribe:
-    """MqttFacade subscribe 轮询队列测试。"""
+class TestMqttDriverAdapterSubscribe:
+    """MqttDriverAdapter subscribe 轮询队列测试。"""
 
     def test_subscribe_returns_queue(self) -> None:
         """subscribe 应返回 SubscriptionQueue 实例。"""
         plan = _make_mqtt_plan("sub_queue")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         sub_q = facade.subscribe(["sensor_temp"])
@@ -331,7 +349,7 @@ class TestMqttFacadeSubscribe:
     def test_subscribe_receives_update(self) -> None:
         """update_values 更新订阅点位后，队列应收到通知。"""
         plan = _make_mqtt_plan("sub_update")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         sub_q = facade.subscribe(["sensor_temp"])
@@ -344,7 +362,7 @@ class TestMqttFacadeSubscribe:
     def test_subscribe_multiple_points(self) -> None:
         """订阅多个点位时，任一更新应收到通知。"""
         plan = _make_mqtt_plan("sub_multi")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         sub_q = facade.subscribe(["sensor_temp", "sensor_humidity"])
@@ -358,7 +376,7 @@ class TestMqttFacadeSubscribe:
     def test_subscribe_unrelated_point_not_notified(self) -> None:
         """更新未订阅的点位时不应收到通知。"""
         plan = _make_mqtt_plan("sub_unrelated")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         sub_q = facade.subscribe(["sensor_temp"])
@@ -370,7 +388,7 @@ class TestMqttFacadeSubscribe:
     def test_multiple_subscribers_same_point(self) -> None:
         """同一 point_id 的多个订阅者应同时收到通知。"""
         plan = _make_mqtt_plan("sub_multi_sub")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         q1 = facade.subscribe(["sensor_temp"])
@@ -384,7 +402,7 @@ class TestMqttFacadeSubscribe:
     def test_subscribe_load_points_clears_old(self) -> None:
         """重新 load_points 后旧订阅队列不再有效。"""
         plan = _make_mqtt_plan("sub_reload")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         q1 = facade.subscribe(["sensor_temp"])
@@ -401,7 +419,7 @@ class TestMqttFacadeSubscribe:
             "sub_tcp_pub",
             initial_values={"a": 1, "b": 2},
         )
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
 
         sub_q = facade.subscribe(["a"])
@@ -432,16 +450,16 @@ class TestMqttFacadeSubscribe:
             facade.stop()
 
 
-# ── MqttFacade NOT_IMPLEMENTED 测试 ──────────────────────────────────────────────
+# ── MqttDriverAdapter NOT_IMPLEMENTED 测试 ──────────────────────────────────────────────
 
 
-class TestMqttFacadeNotImplemented:
-    """MqttFacade NOT_IMPLEMENTED 语义测试。"""
+class TestMqttDriverAdapterNotImplemented:
+    """MqttDriverAdapter NOT_IMPLEMENTED 语义测试。"""
 
     def test_write_raises_unsupported(self) -> None:
         """write 应抛出 UnsupportedOperation。"""
         plan = _make_mqtt_plan("notimpl_write")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="write"):
@@ -450,18 +468,18 @@ class TestMqttFacadeNotImplemented:
     def test_report_raises_unsupported(self) -> None:
         """report 应抛出 UnsupportedOperation。"""
         plan = _make_mqtt_plan("notimpl_report")
-        facade = MqttFacade()
+        facade = create_mqtt_driver_adapter()
         facade.load_points(plan)
 
         with pytest.raises(UnsupportedOperation, match="report"):
             facade.report()
 
 
-# ── MqttFacade TCP 线上协议测试 ─────────────────────────────────────────────────
+# ── MqttDriverAdapter TCP 线上协议测试 ─────────────────────────────────────────────────
 
 
-class TestMqttFacadeTcpProtocol:
-    """MqttFacade TCP JSON 行协议测试。"""
+class TestMqttDriverAdapterTcpProtocol:
+    """MqttDriverAdapter TCP JSON 行协议测试。"""
 
     def _send_and_recv(self, sock: socket.socket, msg: dict) -> dict:
         """发送 JSON 消息并接收响应。
@@ -485,7 +503,7 @@ class TestMqttFacadeTcpProtocol:
             "tcp_read",
             initial_values={"x": 10, "y": 20},
         )
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -509,7 +527,7 @@ class TestMqttFacadeTcpProtocol:
             "tcp_read_all",
             initial_values={"p1": "hello", "p2": 42},
         )
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -533,7 +551,7 @@ class TestMqttFacadeTcpProtocol:
             "tcp_publish",
             initial_values={"count": 0},
         )
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -561,7 +579,7 @@ class TestMqttFacadeTcpProtocol:
     def test_unsupported_action(self) -> None:
         """不支持的 action 应返回 error。"""
         plan = _make_mqtt_plan("tcp_bad_action")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -581,7 +599,7 @@ class TestMqttFacadeTcpProtocol:
     def test_invalid_json(self) -> None:
         """无效 JSON 应返回 error。"""
         plan = _make_mqtt_plan("tcp_bad_json")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -603,7 +621,7 @@ class TestMqttFacadeTcpProtocol:
     def test_missing_point_id_in_read(self) -> None:
         """read action 无 point_ids 时仍应正常返回（当作空 list）。"""
         plan = _make_mqtt_plan("tcp_read_no_ids")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -623,7 +641,7 @@ class TestMqttFacadeTcpProtocol:
     def test_multiple_clients(self) -> None:
         """多个客户端应能同时连接。"""
         plan = _make_mqtt_plan("tcp_multi_client")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
         facade.start()
 
@@ -649,16 +667,16 @@ class TestMqttFacadeTcpProtocol:
             facade.stop()
 
 
-# ── MqttFacade 完整 smoke 流程测试 ───────────────────────────────────────────────
+# ── MqttDriverAdapter 完整 smoke 流程测试 ───────────────────────────────────────────────
 
 
-class TestMqttFacadeSmokeFlow:
-    """MqttFacade 完整 smoke 流程测试。"""
+class TestMqttDriverAdapterSmokeFlow:
+    """MqttDriverAdapter 完整 smoke 流程测试。"""
 
     def test_full_smoke_flow(self) -> None:
-        """MqttFacade 完整 start/read/subscribe/stop 流程。"""
+        """MqttDriverAdapter 完整 start/read/subscribe/stop 流程。"""
         plan = _make_mqtt_plan("smoke_flow")
-        facade = MqttFacade(port=0)
+        facade = create_mqtt_driver_adapter(port=0)
         facade.load_points(plan)
 
         # load_points

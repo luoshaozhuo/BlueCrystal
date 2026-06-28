@@ -16,12 +16,37 @@ from __future__ import annotations
 
 import pytest
 
+from starfish.container import (
+    create_ads_driver_adapter,
+    create_default_backend_factory,
+    create_default_driver_factory,
+    create_goose_driver_adapter,
+    create_http_rest_driver_adapter,
+    create_iec101_driver_adapter,
+    create_iec104_driver_adapter,
+    create_iec61850_mms_driver_adapter,
+    create_iec61850_report_driver_adapter,
+    create_modbus_rtu_driver_adapter,
+    create_modbus_tcp_driver_adapter,
+    create_mqtt_driver_adapter,
+    create_opcua_driver_adapter,
+    create_server_simulator_driver_adapter,
+    create_sv_driver_adapter,
+)
+
 from starfish.domain.server_config import StarfishServerConfig, StarfishEndpointConfig, StarfishPointConfig, UnsupportedOperation
-from starfish.adapters.drivers.iec.iec101_facade import Iec101Facade, probe_iec101_binary
-from starfish.adapters.drivers.modbus.modbus_rtu_facade import ModbusRtuFacade, probe_modbus_rtu_binary
-from starfish.adapters.drivers.ads.ads_facade import AdsFacade, probe_ads_binary
-from starfish.adapters.drivers.iec.goose_facade import GooseFacade, probe_goose_binary
-from starfish.adapters.drivers.iec.sv_facade import SvFacade, probe_sv_binary
+from starfish.adapters.drivers.iec.iec101_driver_adapter import Iec101DriverAdapter
+from starfish.adapters.drivers.modbus.modbus_rtu_driver_adapter import ModbusRtuDriverAdapter
+from starfish.adapters.drivers.ads.ads_driver_adapter import AdsDriverAdapter
+from starfish.adapters.drivers.iec.goose_driver_adapter import GooseDriverAdapter
+from starfish.adapters.drivers.iec.sv_driver_adapter import SvDriverAdapter
+from starfish.infrastructure.drivers.backend_factory import (
+    probe_ads_binary,
+    probe_goose_binary,
+    probe_iec101_binary,
+    probe_modbus_rtu_binary,
+    probe_sv_binary,
+)
 
 
 # ── 共享 fixtures ────────────────────────────────────────────────────────────────
@@ -73,7 +98,7 @@ def _make_minimal_plan(scenario_id: str = "test") -> StarfishServerConfig:
 # ── IEC101 Facade 测试 ───────────────────────────────────────────────────────────
 
 
-class TestIec101Facade:
+class TestIec101DriverAdapter:
     """IEC101 facade codebase-pending stub 测试。"""
 
     def test_construction(self) -> None:
@@ -81,7 +106,7 @@ class TestIec101Facade:
         mode 为 codec-enhanced（Round 15 增强编解码器就绪）或
         codec-enhanced-plus（Round 16 时间增强）/codec-skeleton/
         environment-pending/codebase-pending。"""
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         assert facade.protocol == "IEC101"
         assert facade.mode in (
             "codec-enhanced",
@@ -93,7 +118,7 @@ class TestIec101Facade:
 
     def test_initial_health(self) -> None:
         """停止状态 health 应反映正确元信息。"""
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         h = facade.health()
         assert h["status"] == "stopped"
         assert h["mode"] in (
@@ -116,7 +141,7 @@ class TestIec101Facade:
 
     def test_start_stop_lifecycle(self) -> None:
         """start/stop 基本生命周期。"""
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.start()
         assert facade.health()["status"] == "started"
         facade.stop()
@@ -124,7 +149,7 @@ class TestIec101Facade:
 
     def test_start_idempotent(self) -> None:
         """重复 start 为幂等。"""
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.start()
         facade.start()
         assert facade.health()["status"] == "started"
@@ -132,7 +157,7 @@ class TestIec101Facade:
 
     def test_stop_idempotent(self) -> None:
         """重复 stop 为幂等。"""
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.start()
         facade.stop()
         facade.stop()
@@ -141,7 +166,7 @@ class TestIec101Facade:
     def test_load_points_and_read(self) -> None:
         """load_points 后 read 返回 initial_values。"""
         plan = _make_minimal_plan("iec101_load")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         values = facade.read()
         assert values["point_a"] == 1.0
@@ -150,7 +175,7 @@ class TestIec101Facade:
     def test_read_specific_points(self) -> None:
         """指定 point_ids 时应只返回对应值。"""
         plan = _make_minimal_plan("iec101_specific")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         values = facade.read(["point_a"])
         assert values == {"point_a": 1.0}
@@ -158,7 +183,7 @@ class TestIec101Facade:
     def test_read_nonexistent_point(self) -> None:
         """不存在 point_id 应返回 None。"""
         plan = _make_minimal_plan("iec101_nonexist")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         values = facade.read(["nonexistent"])
         assert values == {"nonexistent": None}
@@ -166,7 +191,7 @@ class TestIec101Facade:
     def test_update_values(self) -> None:
         """update_values 应更新内存值。"""
         plan = _make_minimal_plan("iec101_update")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         facade.update_values({"point_a": 99.9, "new_point": 0})
         values = facade.read()
@@ -177,13 +202,13 @@ class TestIec101Facade:
     def test_capabilities(self) -> None:
         """capabilities 应返回 plan 中的声明。"""
         plan = _make_minimal_plan("iec101_caps")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         assert facade.capabilities() == ["READ"]
 
     def test_capabilities_no_plan(self) -> None:
         """未加载 plan 时 capabilities 返回增强编解码器能力声明（Round 15 新增）。"""
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         caps = facade.capabilities()
         # Round 16：mode 可为 codec-enhanced-plus（CP56Time2a+带时标+link-layer skeleton）
         assert (
@@ -204,7 +229,7 @@ class TestIec101Facade:
     def test_write_raises_unsupported(self) -> None:
         """write 应抛出 UnsupportedOperation。"""
         plan = _make_minimal_plan("iec101_write")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="write"):
             facade.write("point_a", 100)
@@ -212,7 +237,7 @@ class TestIec101Facade:
     def test_subscribe_raises_unsupported(self) -> None:
         """subscribe 应抛出 UnsupportedOperation。"""
         plan = _make_minimal_plan("iec101_sub")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="subscribe"):
             facade.subscribe(["point_a"])
@@ -220,7 +245,7 @@ class TestIec101Facade:
     def test_report_raises_unsupported(self) -> None:
         """report 应抛出 UnsupportedOperation。"""
         plan = _make_minimal_plan("iec101_report")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="report"):
             facade.report()
@@ -228,7 +253,7 @@ class TestIec101Facade:
     def test_health_after_load_points(self) -> None:
         """load_points 后 health 应反映 plan 信息。"""
         plan = _make_minimal_plan("iec101_health")
-        facade = Iec101Facade()
+        facade = create_iec101_driver_adapter()
         facade.load_points(plan)
         h = facade.health()
         assert h["plan_loaded"] is True
@@ -240,18 +265,18 @@ class TestIec101Facade:
 # ── MODBUS_RTU Facade 测试 ───────────────────────────────────────────────────────
 
 
-class TestModbusRtuFacade:
+class TestModbusRtuDriverAdapter:
     """MODBUS_RTU facade 测试（codebase-pending 或 rtu-lightweight）。"""
 
     def test_construction(self) -> None:
         """默认构造应为 codebase-pending 模式（显式指定时）。"""
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         assert facade.protocol == "MODBUS_RTU"
         assert facade.mode == "codebase-pending"
 
     def test_construction_rtu_lightweight(self) -> None:
         """rtu-lightweight 模式构造。"""
-        facade = ModbusRtuFacade(mode="rtu-lightweight")
+        facade = create_modbus_rtu_driver_adapter(mode="rtu-lightweight")
         assert facade.protocol == "MODBUS_RTU"
         assert facade.mode == "rtu-lightweight"
 
@@ -270,7 +295,7 @@ class TestModbusRtuFacade:
 
     def test_start_stop_lifecycle_codebase_pending(self) -> None:
         """codebase-pending 模式 start/stop。"""
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.start()
         assert facade.health()["status"] == "started"
         facade.stop()
@@ -279,7 +304,7 @@ class TestModbusRtuFacade:
     def test_load_points_and_read_codebase_pending(self) -> None:
         """codebase-pending 模式 load_points/read。"""
         plan = _make_minimal_plan("modbus_rtu_load")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
         values = facade.read()
         assert values["point_a"] == 1.0
@@ -288,7 +313,7 @@ class TestModbusRtuFacade:
     def test_update_values_codebase_pending(self) -> None:
         """codebase-pending 模式 update_values。"""
         plan = _make_minimal_plan("modbus_rtu_update")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
         facade.update_values({"point_b": 500})
         assert facade.read(["point_b"]) == {"point_b": 500}
@@ -296,7 +321,7 @@ class TestModbusRtuFacade:
     def test_write_not_implemented_codebase_pending(self) -> None:
         """codebase-pending 模式 write 应抛出 UnsupportedOperation。"""
         plan = _make_minimal_plan("modbus_rtu_write")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="write"):
             facade.write("point_a", 100)
@@ -304,7 +329,7 @@ class TestModbusRtuFacade:
     def test_subscribe_raises_unsupported(self) -> None:
         """subscribe（所有模式）应抛出 UnsupportedOperation。"""
         plan = _make_minimal_plan("modbus_rtu_sub")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="subscribe"):
             facade.subscribe(["point_a"])
@@ -312,7 +337,7 @@ class TestModbusRtuFacade:
     def test_report_raises_unsupported(self) -> None:
         """report（所有模式）应抛出 UnsupportedOperation。"""
         plan = _make_minimal_plan("modbus_rtu_report")
-        facade = ModbusRtuFacade(mode="codebase-pending")
+        facade = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="report"):
             facade.report()
@@ -321,11 +346,11 @@ class TestModbusRtuFacade:
 # ── Beckhoff ADS Facade 测试 ─────────────────────────────────────────────────────
 
 
-class TestAdsFacade:
+class TestAdsDriverAdapter:
     """Beckhoff ADS facade codebase-pending stub 测试。"""
 
     def test_construction(self) -> None:
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         assert facade.protocol == "BECKHOFF_ADS"
         assert facade.mode == "codebase-pending"
 
@@ -335,7 +360,7 @@ class TestAdsFacade:
         assert "codebase-pending" in reason
 
     def test_start_stop_lifecycle(self) -> None:
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         facade.start()
         assert facade.health()["status"] == "started"
         facade.stop()
@@ -343,34 +368,34 @@ class TestAdsFacade:
 
     def test_load_points_and_read(self) -> None:
         plan = _make_minimal_plan("ads_load")
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         facade.load_points(plan)
         values = facade.read()
         assert values["point_a"] == 1.0
 
     def test_capabilities(self) -> None:
         plan = _make_minimal_plan("ads_caps")
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         facade.load_points(plan)
         assert facade.capabilities() == ["READ"]
 
     def test_write_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("ads_write")
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="write"):
             facade.write("point_a", 100)
 
     def test_subscribe_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("ads_sub")
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="subscribe"):
             facade.subscribe(["point_a"])
 
     def test_report_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("ads_report")
-        facade = AdsFacade()
+        facade = create_ads_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation, match="report"):
             facade.report()
@@ -379,11 +404,11 @@ class TestAdsFacade:
 # ── GOOSE Facade 测试 ────────────────────────────────────────────────────────────
 
 
-class TestGooseFacade:
+class TestGooseDriverAdapter:
     """GOOSE facade environment-pending stub 测试。"""
 
     def test_construction(self) -> None:
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         assert facade.protocol == "GOOSE"
         assert facade.mode == "environment-pending"
 
@@ -394,7 +419,7 @@ class TestGooseFacade:
         assert "GOOSE" in reason
 
     def test_start_stop_lifecycle(self) -> None:
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         facade.start()
         assert facade.health()["status"] == "started"
         facade.stop()
@@ -402,7 +427,7 @@ class TestGooseFacade:
 
     def test_load_points_and_read(self) -> None:
         plan = _make_minimal_plan("goose_load")
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         facade.load_points(plan)
         values = facade.read()
         assert values["point_a"] == 1.0
@@ -411,7 +436,7 @@ class TestGooseFacade:
     def test_health_mode_is_environment_pending(self) -> None:
         """health 应报告 mode=environment-pending。"""
         plan = _make_minimal_plan("goose_health")
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         facade.load_points(plan)
         h = facade.health()
         assert h["mode"] == "environment-pending"
@@ -420,21 +445,21 @@ class TestGooseFacade:
 
     def test_write_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("goose_write")
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation):
             facade.write("point_a", 100)
 
     def test_subscribe_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("goose_sub")
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation):
             facade.subscribe(["point_a"])
 
     def test_report_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("goose_report")
-        facade = GooseFacade()
+        facade = create_goose_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation):
             facade.report()
@@ -443,11 +468,11 @@ class TestGooseFacade:
 # ── SV Facade 测试 ───────────────────────────────────────────────────────────────
 
 
-class TestSvFacade:
+class TestSvDriverAdapter:
     """SV (Sampled Values) facade environment-pending stub 测试。"""
 
     def test_construction(self) -> None:
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         assert facade.protocol == "SV"
         assert facade.mode == "environment-pending"
 
@@ -458,7 +483,7 @@ class TestSvFacade:
         assert "SV" in reason
 
     def test_start_stop_lifecycle(self) -> None:
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         facade.start()
         assert facade.health()["status"] == "started"
         facade.stop()
@@ -466,7 +491,7 @@ class TestSvFacade:
 
     def test_load_points_and_read(self) -> None:
         plan = _make_minimal_plan("sv_load")
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         facade.load_points(plan)
         values = facade.read()
         assert values["point_a"] == 1.0
@@ -474,28 +499,28 @@ class TestSvFacade:
 
     def test_update_values_and_read(self) -> None:
         plan = _make_minimal_plan("sv_update")
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         facade.load_points(plan)
         facade.update_values({"point_a": -999.0})
         assert facade.read(["point_a"]) == {"point_a": -999.0}
 
     def test_write_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("sv_write")
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation):
             facade.write("point_a", 100)
 
     def test_subscribe_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("sv_sub")
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation):
             facade.subscribe(["point_a"])
 
     def test_report_raises_unsupported(self) -> None:
         plan = _make_minimal_plan("sv_report")
-        facade = SvFacade()
+        facade = create_sv_driver_adapter()
         facade.load_points(plan)
         with pytest.raises(UnsupportedOperation):
             facade.report()
@@ -514,24 +539,24 @@ class TestPendingFacadeModeConsistency:
         （无 .NET runtime / Python ADS 实现）。MODBUS_RTU 默认 mode 根据
         构造参数而定，不在此处断言固定值。
         """
-        assert Iec101Facade().mode in (
+        assert create_iec101_driver_adapter().mode in (
             "codec-enhanced",
             "codec-enhanced-plus",
             "codec-skeleton",
             "codebase-pending",
             "environment-pending",
         )
-        assert AdsFacade().mode == "codebase-pending"
+        assert create_ads_driver_adapter().mode == "codebase-pending"
 
     def test_modbus_rtu_mode_by_construction(self) -> None:
         """MODBUS_RTU facade 的 mode 由构造参数决定。"""
-        assert ModbusRtuFacade(mode="codebase-pending").mode == "codebase-pending"
-        assert ModbusRtuFacade(mode="rtu-lightweight").mode == "rtu-lightweight"
+        assert create_modbus_rtu_driver_adapter(mode="codebase-pending").mode == "codebase-pending"
+        assert create_modbus_rtu_driver_adapter(mode="rtu-lightweight").mode == "rtu-lightweight"
 
     def test_environment_pending_facades_mode(self) -> None:
         """GOOSE、SV 的 mode 均为 environment-pending。"""
-        assert GooseFacade().mode == "environment-pending"
-        assert SvFacade().mode == "environment-pending"
+        assert create_goose_driver_adapter().mode == "environment-pending"
+        assert create_sv_driver_adapter().mode == "environment-pending"
 
     def test_probes_return_bool_and_reason(self) -> None:
         """所有 pending facade 的 probe 函数均返回 (bool, str) 且 reason 非空。
@@ -564,10 +589,10 @@ class TestPendingFacadeModeConsistency:
         MODBUS_RTU codebase-pending 模式 write 也 NOT_IMPLEMENTED。
         """
         facades = [
-            ("IEC101", Iec101Facade()),
-            ("ADS", AdsFacade()),
-            ("GOOSE", GooseFacade()),
-            ("SV", SvFacade()),
+            ("IEC101", create_iec101_driver_adapter()),
+            ("ADS", create_ads_driver_adapter()),
+            ("GOOSE", create_goose_driver_adapter()),
+            ("SV", create_sv_driver_adapter()),
         ]
         plan = _make_minimal_plan("notimpl_test")
         for name, facade in facades:
@@ -580,7 +605,7 @@ class TestPendingFacadeModeConsistency:
                 facade.report()
 
         # MODBUS_RTU codebase-pending 模式: write/subscribe/report 均 NOT_IMPLEMENTED
-        modbus_cp = ModbusRtuFacade(mode="codebase-pending")
+        modbus_cp = create_modbus_rtu_driver_adapter(mode="codebase-pending")
         modbus_cp.load_points(plan)
         with pytest.raises(UnsupportedOperation):
             modbus_cp.write("point_a", 0)

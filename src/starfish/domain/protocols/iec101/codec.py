@@ -8,20 +8,20 @@
 - M_SP_NA_1 (1): 单点信息，不带时标。
 - M_DP_NA_1 (3): 双点信息，不带时标。
 - M_ME_NA_1 (9): 归一化测量值，不带时标。
-- M_ME_NB_1 (11): 标度化测量值，不带时标（Round 18 新增）。
-- M_ME_NC_1 (13): 短浮点测量值，不带时标（Round 18 新增）。
+- M_ME_NB_1 (11): 标度化测量值，不带时标。
+- M_ME_NC_1 (13): 短浮点测量值，不带时标。
 - C_SC_NA_1 (45): 单命令，不带时标。
-- C_SE_NA_1 (48): 设点命令归一化，不带时标（Round 18 新增）。
-- C_SE_NB_1 (49): 设点命令标度化，不带时标（Round 18 新增）。
-- C_SE_NC_1 (50): 设点命令短浮点，不带时标（Round 18 新增）。
-- C_SE_TA_1 (58): 设点命令归一化，带 CP56Time2a 时标（Round 19 新增）。
-- C_SE_TB_1 (59): 设点命令标度化，带 CP56Time2a 时标（Round 19 新增）。
-- C_SE_TC_1 (60): 设点命令短浮点，带 CP56Time2a 时标（Round 19 新增）。
-- M_SP_TA_1 (2): 单点信息，带 CP56Time2a 时标（Round 16 新增）。
-- M_DP_TA_1 (4): 双点信息，带 CP56Time2a 时标（Round 16 新增）。
-- M_ME_TA_1 (10): 归一化测量值，带 CP56Time2a 时标（Round 16 新增）。
-- M_ME_TB_1 (12): 标度化测量值，带 CP56Time2a 时标（Round 17 新增）。
-- M_ME_TC_1 (14): 短浮点测量值，带 CP56Time2a 时标（Round 17 新增）。
+- C_SE_NA_1 (48): 设点命令归一化，不带时标。
+- C_SE_NB_1 (49): 设点命令标度化，不带时标。
+- C_SE_NC_1 (50): 设点命令短浮点，不带时标。
+- C_SE_TA_1 (58): 设点命令归一化，带 CP56Time2a 时标。
+- C_SE_TB_1 (59): 设点命令标度化，带 CP56Time2a 时标。
+- C_SE_TC_1 (60): 设点命令短浮点，带 CP56Time2a 时标。
+- M_SP_TA_1 (2): 单点信息，带 CP56Time2a 时标。
+- M_DP_TA_1 (4): 双点信息，带 CP56Time2a 时标。
+- M_ME_TA_1 (10): 归一化测量值，带 CP56Time2a 时标。
+- M_ME_TB_1 (12): 标度化测量值，带 CP56Time2a 时标。
+- M_ME_TC_1 (14): 短浮点测量值，带 CP56Time2a 时标。
 
 对未知 TypeId：返回 UnknownAsdu 错误，不抛出异常（不崩溃）。
 
@@ -87,18 +87,18 @@ _TYPE_ID_OBJECT_SIZE: dict[int, int] = {
     int(TypeId.M_DP_NA_1): 1,  # DPI
     int(TypeId.M_DP_TA_1): 8,  # DPI + CP56Time2a
     int(TypeId.M_ME_NA_1): 3,  # NVA + QDS
-    int(TypeId.M_ME_NB_1): 3,  # SVA + QDS (Round 18 新增)
-    int(TypeId.M_ME_NC_1): 5,  # ShortFloat + QDS (Round 18 新增)
+    int(TypeId.M_ME_NB_1): 3,  # SVA + QDS
+    int(TypeId.M_ME_NC_1): 5,  # ShortFloat + QDS
     int(TypeId.M_ME_TA_1): 10,  # NVA + QDS + CP56Time2a
-    int(TypeId.M_ME_TB_1): 10,  # SVA + QDS + CP56Time2a (Round 17 新增)
-    int(TypeId.M_ME_TC_1): 12,  # ShortFloat + QDS + CP56Time2a (Round 17 新增)
+    int(TypeId.M_ME_TB_1): 10,  # SVA + QDS + CP56Time2a
+    int(TypeId.M_ME_TC_1): 12,  # ShortFloat + QDS + CP56Time2a
     int(TypeId.C_SC_NA_1): 1,  # SCS + SE + QOC
-    int(TypeId.C_SE_NA_1): 5,  # NVA + QOS + S/E + reserved (Round 18 新增)
-    int(TypeId.C_SE_NB_1): 5,  # SVA + QOS + S/E + reserved (Round 18 新增)
-    int(TypeId.C_SE_NC_1): 7,  # ShortFloat + QOS + S/E + reserved (Round 18 新增)
-    int(TypeId.C_SE_TA_1): 12,  # NVA + QOS + S/E + reserved + CP56Time2a (Round 19 新增)
-    int(TypeId.C_SE_TB_1): 12,  # SVA + QOS + S/E + reserved + CP56Time2a (Round 19 新增)
-    int(TypeId.C_SE_TC_1): 14,  # ShortFloat + QOS + S/E + reserved + CP56Time2a (Round 19 新增)
+    int(TypeId.C_SE_NA_1): 5,  # NVA + QOS + S/E + reserved
+    int(TypeId.C_SE_NB_1): 5,  # SVA + QOS + S/E + reserved
+    int(TypeId.C_SE_NC_1): 7,  # ShortFloat + QOS + S/E + reserved
+    int(TypeId.C_SE_TA_1): 12,  # NVA + QOS + S/E + reserved + CP56Time2a
+    int(TypeId.C_SE_TB_1): 12,  # SVA + QOS + S/E + reserved + CP56Time2a
+    int(TypeId.C_SE_TC_1): 14,  # ShortFloat + QOS + S/E + reserved + CP56Time2a
 }
 
 # ── TypeId -> object 工厂映射（用于 decode 时构造对象）──────────────────────────

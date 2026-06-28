@@ -1,12 +1,12 @@
 """starfish Native Runner 管理框架。
 
 本包提供协议二进制 native runner 的探查、规格定义和子进程生命周期管理能力。
-当前用途：为 OPC_UA / IEC104 / IEC61850 等依赖 C runner 的协议 facade
+当前用途：为 OPC_UA / IEC104 / IEC61850 等依赖 C runner 的协议 backend
 提供统一的 native binary 探查和进程管理接口。
 
 本包不自行启动 protocol server，仅提供底层通用原语。
 
-默认 binary 路径：src/starfish/infrastructure/native/bin/，各 facade 可通过环境变量覆盖。
+默认 binary 路径：src/starfish/infrastructure/native/bin/，各 backend 可通过环境变量覆盖。
 
 安全边界：
 - 不得 import seahorse / whale.ingest / whale.shared.source。
@@ -26,7 +26,7 @@ def default_native_bin_dir() -> Path:
     """返回 starfish native binary 默认目录的绝对路径。
 
     路径为 src/starfish/infrastructure/native/bin/，由调用方用于构建各协议
-    C runner 的默认路径（facade 可通过环境变量覆盖）。
+    C runner 的默认路径（backend 可通过环境变量覆盖）。
 
     Returns:
         src/starfish/infrastructure/native/bin/ 目录的绝对路径。

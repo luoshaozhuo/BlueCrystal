@@ -1,4 +1,4 @@
-"""Modbus 寄存器值编解码工具（Round 18 新增）。
+"""Modbus 寄存器值编解码工具。
 
 本模块提供 Modbus TCP / Modbus RTU 共享的寄存器值编解码工具。
 按 value_type（uint16/int16/uint32/int32/float32）、byte_order

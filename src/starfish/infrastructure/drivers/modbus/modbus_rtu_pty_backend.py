@@ -1,4 +1,4 @@
-"""Starfish Modbus RTU 协议 PTY 轻量级 server facade。
+"""Starfish Modbus RTU 协议 PTY 轻量级 server backend。
 
 本模块提供 Modbus RTU 协议的轻量级 PTY server 生命周期实现。
 使用 Python 标准库 pty 创建 PTY pair，在 daemon 线程中从 master 端
@@ -13,7 +13,7 @@
     FC15 Write Multiple Coils (多位写入，位打包)
     FC16 Write Multiple Registers (多寄存器写入)
 
-与 ModbusTcpFacade 的差异（链路层）：
+与 ModbusTcpServerBackend 的差异（链路层）：
     - TCP 版本：使用 MBAP 头部（7 字节），无 CRC。
     - RTU 版本：无 MBAP 头部，帧尾使用 CRC-16-IBM 校验。
 
@@ -36,10 +36,10 @@ PTY 帧边界策略：
     已实现: start() / stop() / health() / load_points() / read() / write()
     未实现: subscribe() / report()
 
-Round 19 扩展（register_encoding 工具接入）：
+register_encoding 工具接入：
     接入 ``starfish.domain.protocols.modbus.register_encoding`` 工具子包，
     提供 ``encode_register_value`` / ``decode_register_value`` 公共
-    API（在 facade 上以 ``encode_register_value`` /
+    API（在 backend 上以 ``encode_register_value`` /
     ``decode_register_value`` 形式暴露），支持 5 value_type × 4 byte/
     word 组合。FC01/FC02/FC03/FC04/FC05/FC06/FC15/FC16 等真实
     Modbus 帧行为**不**受影响（register_encoding 仅作为 CPU 辅助层，
@@ -232,8 +232,8 @@ def probe_modbus_rtu_binary() -> tuple[bool, str]:
         )
 
 
-class ModbusRtuFacade:
-    """Modbus RTU 协议轻量级 PTY server facade。
+class ModbusRtuPtyBackend:
+    """Modbus RTU 协议轻量级 PTY server backend。
 
     使用 pty.openpty() 创建 PTY pair，在 daemon 线程中从 master 端
     读取 RTU 帧并响应 FC01-FC06、FC15、FC16。
@@ -254,7 +254,7 @@ class ModbusRtuFacade:
         - "coils" / "coil" -> coils 区
         - "discrete_inputs" / "discrete" -> discrete_inputs 区
         - "input_registers" / "input_reg" -> input_registers 区
-        - 默认 -> holding_registers 区（与 Round 13 兼容）
+        - 默认 -> holding_registers 区（保持既有兼容）
         每个数据区内按 point_id 字典序排序分配从 0 开始的地址。
 
     不负责：真实串口配置、浮点/32-bit 寄存器编解码、多从站 ID 支持、
@@ -292,7 +292,7 @@ class ModbusRtuFacade:
         self._started_at: datetime | None = None
         self._slave_id: int = slave_id
 
-        # 寄存器地址映射（holding registers 区，兼容 Round 13）
+        # 寄存器地址映射（holding registers 区，保持既有兼容）
         self._reg_map: dict[str, int] = {}
         self._reg_rev: dict[int, str] = {}
 
@@ -350,7 +350,7 @@ class ModbusRtuFacade:
     # ── 生命周期 ──────────────────────────────────────────────────────────────
 
     def connect(self) -> None:
-        """完成 DriverPort 预连接；当前 facade 保持 start() 负责实际启动。"""
+        """完成 DriverPort 预连接；当前 backend 保持 start() 负责实际启动。"""
         return None
 
     def start(self) -> None:
@@ -433,7 +433,7 @@ class ModbusRtuFacade:
     # ── 可观测性 ──────────────────────────────────────────────────────────────
 
     def health(self) -> dict[str, Any]:
-        """返回当前 facade 的可观测健康状态。
+        """返回当前 backend 的可观测健康状态。
 
         检查 PTY fd 是否有效。codebase-pending 模式始终报告 running=False。
         包含各数据区点位统计。
@@ -513,7 +513,7 @@ class ModbusRtuFacade:
             - variable_key 含 "coils" / "coil" -> coils
             - variable_key 含 "discrete_inputs" / "discrete" -> discrete_inputs
             - variable_key 含 "input_registers" / "input_reg" -> input_registers
-            - 其他（含空字符串） -> holding_registers（默认，兼容 Round 13）
+            - 其他（含空字符串） -> holding_registers（默认，保持既有兼容）
 
         Args:
             point: StarfishPointConfig 实例。
@@ -613,7 +613,7 @@ class ModbusRtuFacade:
         if self._mode == "codebase-pending":
             raise UnsupportedOperation(
                 "write",
-                "ModbusRtuFacade.write 尚未实现（codebase-pending 模式），"
+                "ModbusRtuPtyBackend.write 尚未实现（codebase-pending 模式），"
                 "待 Modbus RTU PTY 链路可用后实现",
             )
 
@@ -644,10 +644,10 @@ class ModbusRtuFacade:
                     self._di_states[pid] = bool(val)
 
     def capabilities(self) -> list[str]:
-        """返回当前 facade 的能力声明列表。
+        """返回当前 backend 的能力声明列表。
 
         当 plan 已加载时返回 plan 声明的能力 + MODBUS_RTU 功能码列表。
-        未加载 plan 时返回空列表（兼容 Round 13 行为）。
+        未加载 plan 时返回空列表（兼容 既有行为）。
 
         Returns:
             能力声明字符串列表，未加载时返回空列表。
@@ -662,7 +662,7 @@ class ModbusRtuFacade:
         ])
         return caps
 
-    # ── Register encoding 工具接入（Round 19 新增）────────────────────────────
+    # ── Register encoding 工具接入────────────────────────────
 
     def encode_register_value(
         self,
@@ -674,7 +674,7 @@ class ModbusRtuFacade:
         """将值编码为 16-bit 寄存器列表（Modbus 寄存器值）。
 
         接入 ``starfish.domain.protocols.modbus.register_encoding.encode_register_value``
-        工具。本 facade 不修改 FC01/FC02/FC03/FC04/FC05/FC06/FC15/FC16
+        工具。本 backend 不修改 FC01/FC02/FC03/FC04/FC05/FC06/FC15/FC16
         等真实 Modbus RTU 帧行为，仅在 CPU 层提供 32-bit / float32
         register encoding 辅助。**不**接入真实 RS-232/RS-485 串口
         现场验证。
@@ -749,7 +749,7 @@ class ModbusRtuFacade:
         )
 
     def register_encoding_capabilities(self) -> list[str]:
-        """返回 register_encoding 工具的能力声明（Round 19 新增）。
+        """返回 register_encoding 工具的能力声明。
 
         包含 supports_register_encoding / supported_register_value_types /
         supported_byte_orders / supported_word_orders / supports_typed_
@@ -789,7 +789,7 @@ class ModbusRtuFacade:
         """
         raise UnsupportedOperation(
             "subscribe",
-            "ModbusRtuFacade.subscribe 尚未实现，"
+            "ModbusRtuPtyBackend.subscribe 尚未实现，"
             "Modbus RTU 协议不支持服务端主动推送，需通过轮询替代",
         )
 
@@ -801,7 +801,7 @@ class ModbusRtuFacade:
         """
         raise UnsupportedOperation(
             "report",
-            "ModbusRtuFacade.report 尚未实现，"
+            "ModbusRtuPtyBackend.report 尚未实现，"
             "待后续轮次实现结构化 telemetry report",
         )
 
@@ -1281,7 +1281,7 @@ class ModbusRtuFacade:
 
 
 __all__ = [
-    "ModbusRtuFacade",
+    "ModbusRtuPtyBackend",
     "probe_modbus_rtu_binary",
     "_crc16",
     "_build_rtu_frame",

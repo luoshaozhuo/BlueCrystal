@@ -1,14 +1,8 @@
-"""starfish server manager 应用服务。
+"""Starfish runtime bootstrap workflow。
 
-本模块显式承担 usecase/orchestration 角色：
-- 组合文件加载驱动与运行时注册驱动。
-- 统一处理配置加载、校验失败和 server manager 装配流程。
-- 为 API/CLI 提供稳定的高层调用入口。
-
-不负责：
-- CLI 参数解析与终端输出格式。
-- 协议细节实现。
-- 原始 JSON 解析细节本身。
+本模块承接原 builder/service 的应用编排职责：通过 port 加载
+server 配置、处理校验失败，并创建 runtime context。具体 JSON loader、
+driver factory 或协议 facade 的选择由外层 API/adapter 完成。
 """
 
 from __future__ import annotations
@@ -17,8 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from starfish.application.ports import ConfigLoaderPort, DriverFactoryPort
+from starfish.application.runtime import StarfishRuntimeContext, create_server_registry
 from starfish.domain import StarfishServerConfig, ValidationResult
-from starfish.application.orchestration.registry import ServerRegistry, create_server_registry
 
 
 class ServerManagerBuildError(ValueError):
@@ -61,23 +55,12 @@ class LoadedConfig:
         return self.config is not None and self.validation.is_valid
 
 
-@dataclass(frozen=True)
-class BuiltManager:
-    """Server manager 装配结果。
+class BuildRuntimeContextWorkflow:
+    """构建 Starfish runtime context 的组合用例。
 
-    Args:
-        config: 已通过校验的 server 配置。
-        validation: 加载阶段校验结果。
-        registry: 基于配置装配出的 server 注册表。
+    该 workflow 只依赖 application ports，保持 UseCase 层不直接依赖 adapter
+    或 infrastructure 的具体实现。
     """
-
-    config: StarfishServerConfig
-    validation: ValidationResult
-    registry: ServerRegistry
-
-
-class StarfishServerManagerService:
-    """Starfish server manager 用例编排服务。"""
 
     def __init__(
         self,
@@ -85,7 +68,7 @@ class StarfishServerManagerService:
         config_loader: ConfigLoaderPort,
         driver_factory: DriverFactoryPort,
     ) -> None:
-        """初始化应用服务依赖。
+        """初始化 workflow 依赖。
 
         Args:
             config_loader: server config 加载 port。
@@ -94,31 +77,31 @@ class StarfishServerManagerService:
         self._config_loader = config_loader
         self._driver_factory = driver_factory
 
-    def load_config(self, input_path: Path) -> LoadedConfig:
+    def load_config(self, config_path: Path) -> LoadedConfig:
         """加载并校验 server 配置。
 
         Args:
-            input_path: server config JSON 文件路径。
+            config_path: server config JSON 文件路径。
 
         Returns:
             包含配置和校验结果的 `LoadedConfig`。
         """
-        result = self._config_loader.load_server_config(input_path)
+        result = self._config_loader.load_server_config(config_path)
         return LoadedConfig(config=result.config, validation=result.validation)
 
-    def build_manager(self, input_path: Path) -> BuiltManager:
-        """加载配置并创建 server manager。
+    def execute(self, config_path: Path) -> StarfishRuntimeContext:
+        """加载配置并创建 runtime context。
 
         Args:
-            input_path: server config JSON 文件路径。
+            config_path: server config JSON 文件路径。
 
         Returns:
-            可供 API/CLI 使用的 manager 装配结果。
+            application runtime kernel root。
 
         Raises:
-            ServerManagerBuildError: 校验失败或 config 缺失，无法进入 manager 阶段。
+            ServerManagerBuildError: 校验失败或 config 缺失，无法进入 runtime 阶段。
         """
-        loaded = self.load_config(input_path)
+        loaded = self.load_config(config_path)
         if loaded.config is None:
             raise ServerManagerBuildError("config 为 None", validation=loaded.validation)
         if not loaded.validation.is_valid:
@@ -126,11 +109,15 @@ class StarfishServerManagerService:
                 f"校验失败 ({len(loaded.validation.errors)} 个错误)",
                 validation=loaded.validation,
             )
-        return BuiltManager(
+        return StarfishRuntimeContext(
             config=loaded.config,
             validation=loaded.validation,
             registry=create_server_registry(loaded.config, self._driver_factory),
         )
 
 
-__all__ = ["LoadedConfig", "BuiltManager", "ServerManagerBuildError", "StarfishServerManagerService"]
+__all__ = [
+    "BuildRuntimeContextWorkflow",
+    "LoadedConfig",
+    "ServerManagerBuildError",
+]

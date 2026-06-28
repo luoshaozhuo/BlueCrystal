@@ -27,7 +27,6 @@ env/
 ENV/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -77,3 +76,7 @@ logs/
 # Frontend workspace artifacts
 /src/manta/node_modules/
 /src/manta/dist/
+
+# local cache
+/.mypy_cache/
+/.ruff_cache/

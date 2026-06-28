@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from starfish.application.runtime import RuntimeGraph
+from starfish.application.runtime.graph import RuntimeGraph
 from starfish.domain import StarfishServerConfig
 
 
