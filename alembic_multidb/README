@@ -1,0 +1,196 @@
+# alembic_multidb — Whale 多库 Alembic 工作流
+
+> 状态: 2026-06-29 预迁移落地,仅 env.py 接入 .env 兜底。
+> 范围: 替代 `alembic/` 旧目录,与 `alembic.ini` 的 `script_location = alembic_multidb` 对应。
+
+## 1. 职责
+
+`alembic_multidb/` 只负责驱动 alembic 命令(`upgrade` / `downgrade` /
+`revision` / `stamp` 等),把 `WHALE_DB_URL` 注入到 `[whale]` 段的
+`sqlalchemy.url`,并维护 `target_metadata` 以便 `alembic revision --autogenerate`
+能识别 `whale.shared.persistence.Base` 之上的全部 ORM 实体。
+
+建表 / 重建视图 / 可选样例数据**不**走 alembic,仍然走:
+
+```text
+python -m whale.shared.persistence.init_db
+python -m whale.ingest.framework.persistence.init_db --non-interactive
+```
+
+两套入口读取的是**两套**环境变量,不要混用:
+
+| 入口 | 读取的环境变量 | 职责 |
+|---|---|---|
+| `alembic -c alembic.ini` (本目录) | `WHALE_DB_URL` | 迁移 / 版本控制 |
+| `python -m whale.shared.persistence.init_db` | `WHALE_SHARED_DB_URL` 等 | 建表 / 重建视图 |
+| `python -m whale.ingest.framework.persistence.init_db` | `WHALE_INGEST_*` | 建表 / 重建视图 |
+
+## 2. 环境变量解析顺序
+
+`alembic_multidb/env.py` 内 `_resolve_whale_db_url` 按以下顺序解析
+`WHALE_DB_URL`:
+
+1. 进程内 `os.environ[WHALE_DB_URL]`(真实 shell 环境变量优先)。
+2. 仓库根 `.env` 中的 `WHALE_DB_URL`(由 `dotenv_values()` 读 `.env`,
+   只读不写,不会 mutate 当前进程或子进程环境)。
+3. 两者都不存在 → `raise SystemExit`,中文错误信息包含
+   `WHALE_DB_URL` 与三个 SQLAlchemy URL 示例
+   (sqlite / postgresql+psycopg / mysql+pymysql);
+   **不会**回退到 `alembic.ini` 中 `[whale] sqlalchemy.url` 的占位字符串
+   (例如历史 `driver://admin:...`)。
+
+## 3. 已支持的 SQLAlchemy URL schema
+
+```text
+sqlite:///<abs-path>/whale.db
+postgresql+psycopg://user:pass@host:port/dbname
+mysql+pymysql://user:pass@host:port/dbname
+```
+
+## 4. 运行约束
+
+`dotenv_values()` 默认从进程当前工作目录解析 `.env`,因此:
+
+```text
+python -m alembic -c alembic.ini upgrade head
+python -m alembic -c alembic.ini revision --autogenerate -m "..."
+```
+
+**必须在仓库根目录运行**。如果 CWD 切换到子目录,`.env` 兜底链路不会命中,
+只会去读真实 `os.environ`,若仍未设置 `WHALE_DB_URL` 则直接 `SystemExit`。
+
+## 5. 现状
+
+- `alembic_multidb/versions/` 当前为空目录,因此
+  `python -m alembic -c alembic.ini upgrade head` 是 no-op。
+- 真正的建表 / 重建视图 / 可选样例数据靠 `init_db` 入口,与本目录职责分离。
+- `alembic_multidb/__pycache__/` 为 Python 自动生成的字节码缓存,不要手工提交。
+- 历史 `alembic/` 目录(及 4 份 `alembic/versions/20260527_*.py` 迁移脚本)
+  在 2026-06-29 已迁出工作区,本会话预迁移到 `alembic_multidb/`。
+
+## 6. 本轮验证摘要 (2026-06-29)
+
+本轮只跑过 `env.py` 的本地静态 + 进程级行为验证,共 6 步,全部 PASS:
+
+1. 静态语法检查(`python -c "import ast; ast.parse(open('env.py').read())"`)通过。
+2. Happy path: 真实 `os.environ` 中设 `WHALE_DB_URL=sqlite:///...`,行为符合预期。
+3. Error path: 真环境变量未设 → 触发 `SystemExit`,中文错误信息含三个 schema 示例。
+4. `.env` 兜底:仓库根写 `.env` 后,即使 `os.environ` 未设也能解析到 URL。
+5. 真实环境变量优先 over `.env`:同时设置时 `$TMP2` mtime 未刷新,验证走 `os.environ`。
+6. 清理:`.env*` 与 `/tmp/tmp.*` 全部回基线,未污染仓库。
+
+未跑:网络/PostgreSQL/MySQL 真库集成、Compose 烟测、CI 端到端。
+
+## 7. URL 编码与密码含特殊字符
+
+当 `WHALE_DB_URL` 的 password 段(或 user / database 段)字面包含
+URL 保留字符时,必须先 percent-encode,否则 SQLAlchemy URL parser
+会把 `%XX` 序列按 RFC 3986 解码成原字符,导致传到 PostgreSQL 的密码
+与数据库里存的明文不一致,触发看似"密码错"的 auth failure。
+
+### 7.1 根因:SQLAlchemy 对 password 段做 percent-decode
+
+这不是 bug。SQLAlchemy 解析 URL 时,会对 userinfo / path 等段按
+RFC 3986 做 percent-decode,因此 URL 里写 `%40` 会被还原为 `@`。
+如果字面密码本身就是 `db%401645`(九字符),URL 里若写
+`db%401645`,SQLAlchemy decode 后会变成 `db@1645` 八字符,与 PG
+端 entrypoint 存的明文 `db%401645` 不一致,scram-sha-256 哈希
+比对失败,**auth failed**。
+
+### 7.2 需要 percent-encode 的保留字符
+
+URL 任意一段(user / password / host / database)中含以下字符
+都需要编码:
+
+```text
+:  %3A
+@  %40
+/  %2F
+%  %25
+#  %23
+?  %3F
+[  %5B
+]  %5D
+```
+
+通用规则:把字面字符写成两字节 percent-encoded 形式,
+**让 SQLAlchemy decode 后恰好还原成原字符**。
+
+### 7.3 最稳的做法:用 `urllib.parse.quote` 自动编码
+
+**不要**手写 `%xx`,改用:
+
+```python
+from urllib.parse import quote
+encoded_pw = quote(raw_password, safe="")
+url = f"postgresql+psycopg://whale:{encoded_pw}@127.0.0.1:5432/whale"
+```
+
+`quote(s, safe="")` 会按 RFC 3986 把所有非 unreserved 字符编码,
+包括 `%` 自身,从而避开手写容易漏字符 / 多写一层的问题。
+
+### 7.4 字面密码 `db%401645` 的错误 vs 正确示例
+
+以字面密码 `db%401645`(明文就是这九字符,含字面 `%` 和 `@`)为例:
+
+```text
+# 错误:直接写,SQLAlchemy 把 %40 decode 成 @,auth failed
+WHALE_DB_URL=postgresql+psycopg://whale:db%401645@127.0.0.1:5432/whale
+#   decode 后 password 变成: db@1645
+#   期望 password:            db%401645
+#   -> scram-sha-256 mismatch -> auth failed
+
+# 正确:把字面 % 再编码一次,SQLAlchemy decode 后还原成 db%401645
+WHALE_DB_URL=postgresql+psycopg://whale:db%25401645@127.0.0.1:5432/whale
+#   decode 后 password 变成: db%401645
+#   期望 password:            db%401645
+#   -> 匹配 -> auth OK
+```
+
+实测 2026-06-29:正确写法下 `python -m alembic -c alembic.ini upgrade head`
+退出码 `EXIT 0`,日志含 `Context impl PostgresqlImpl.`。
+
+### 7.5 env.py 第 130-151 行:`_inject_section_url` 关闭 interpolation
+
+alembic 内部使用 `configparser`,其默认 `BasicInterpolation` 会把 `%`
+当作插值触发符。URL 里出现 `%25` / `%40` / `%23` 等序列时,
+`cfg.set(...)` 会抛 `ValueError: invalid interpolation syntax`。
+
+`env.py` 第 130-151 行的 `_inject_section_url` 通过 `_NoInterp` stub
+替换 `cfg._interpolation`,在写入前 / 读回两路上都直通字符串,
+因此:
+
+```text
+- URL 含 %25 / %40 / %23 不再触发 invalid interpolation syntax
+- 修复前:cfg.set 抛 ValueError,alembic upgrade 立即崩溃
+- 修复后:cfg.set 正常写入,alembic 拿到完整 URL 再交给 SQLAlchemy 解码
+```
+
+注意:`alembic.ini` 里的 `%(here)s` 在 `context.config` 构建阶段就
+已经解析完毕,本进程不再依赖 interpolation 能力,因此替换 stub
+是安全的,不会影响 `script_location`。
+
+### 7.6 本会话验证摘要 (2026-06-29)
+
+`test-validator` 共 7 项,全部 EXIT 0 / PASS:
+
+```text
+1. 含 % 密码 happy path:WHALE_DB_URL 含 db%25401645,alembic upgrade head 退出 0,日志含 Context impl PostgresqlImpl.
+2. 不含 % 回归:常规 password 走同一链路,行为与修复前一致。
+3. 错误路径:password 缺失 / scheme 非法分别触发 SystemExit + ArgumentError,信息含期望示例。
+4. init_db 协同:alembic upgrade head 与 python -m whale.shared.persistence.init_db 不互相干扰。
+5. alembic history:正常列出 (empty) versions。
+6. alembic heads:正常输出 (empty)。
+7. alembic show head:正常退出 0,无 revision 时输出 empty 提示。
+```
+
+### 7.7 适用范围与边界
+
+本节只约束**走 SQLAlchemy URL parser 的链路**(包括 alembic、
+SQLAlchemy Engine / Session)。若用户用 `psycopg.connect()` 直连
+或不经过 SQLAlchemy 解析,则不需要 percent-encode,因为 psycopg
+对 password 段是字符串透传,不做 percent-decode。
+
+数据库侧(SQLAlchemy 把解析后的 password 发给 libpq 的链路)不受
+URL 编码影响,密码在 wire 协议层仍是明文字节序列,由 scram-sha-256
+按字节哈希比对。

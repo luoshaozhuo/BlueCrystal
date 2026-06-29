@@ -4,9 +4,19 @@
     "python.defaultInterpreterPath": "/home/luosh/miniconda3/envs/BlueCrystal/bin/python",
     "python.terminal.activateEnvironment": true,
     "python.terminal.activateEnvInCurrentTerminal": true,
-    "terminal.integrated.env.linux": {
-        "PATH": "/home/luosh/miniconda3/envs/BlueCrystal/bin:${env:PATH}",
-        "CONDA_DEFAULT_ENV": "BlueCrystal",
-        "CONDA_PREFIX": "/home/luosh/miniconda3/envs/BlueCrystal"
-    },
+    "terminal.integrated.defaultProfile.linux": "BlueCrystal Conda",
+    "terminal.integrated.profiles.linux": {
+        "BlueCrystal Conda": {
+            "path": "/bin/bash",
+            "args": [
+                "-lc",
+                "source /home/luosh/miniconda3/etc/profile.d/conda.sh && conda activate BlueCrystal && exec bash"
+            ],
+            "icon": "terminal-bash"
+        },
+        "bash": {
+            "path": "/bin/bash",
+            "icon": "terminal-bash"
+        }
+    }
 }

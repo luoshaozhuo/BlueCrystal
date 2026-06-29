@@ -92,14 +92,14 @@
 │   │   ├── validation-routing.md               — 验证路由规则
 │   ├── templates/ — 提示模板
 │   │   ├── coding_agent_prompt_template.txt    — 文本模板
-├── alembic/ — 数据库迁移配置与版本
-│   ├── versions/ — Alembic migration 版本
-│   │   ├── 20260527_000001_ingest_runtime_initial.py — ingest runtime initial revision
-│   │   ├── 20260527_000002_add_audit_index_and_job_stagger.py — Add audit_event action/timestamp index and scheduler job stagger colum
-│   │   ├── 20260527_000003_add_idempotency_record.py — Add ingest_idempotency_record table
-│   │   ├── 20260527_000004_add_model_asset_tables.py — Add model_asset, simulation_case, simulation_result, simulation_artifa
-│   ├── env.py                              — Alembic 运行环境
+├── alembic/ — [已迁出工作区] 旧版 Alembic 配置与 4 份 20260527_* 迁移脚本
+│   └── 2026-06-29 预迁移到 alembic_multidb/,alembic.ini 的 script_location 已切到新目录
+├── alembic_multidb/ — 多库范式 Alembic 工作流 (Whale)
+│   ├── README                              — 职责 / 解析顺序 / 运行约束 / 本轮验证
+│   ├── env.py                              — 解析 WHALE_DB_URL(真 env 优先,.env 兜底),注入 [whale] sqlalchemy.url
 │   ├── script.py.mako                      — Alembic 模板
+│   ├── versions/                           — Alembic migration 版本(当前为空,alembic upgrade head 为 no-op)
+│   ├── __pycache__/                        — Python 字节码缓存(自动生成,不要手工提交)
 ├── config/ — 运行配置样例
 │   ├── ingest/
 │   │   ├── access_policy.external.example.yaml — YAML 配置
@@ -2353,6 +2353,6 @@
 ├── AGENTS.md                           — Codex/agent 仓库入口规则
 ├── CLAUDE.md                           — Claude/Codex 共享执行入口
 ├── README.md                           — BlueCrystal - 能源数据统一平台
-├── alembic.ini                         — Alembic 主配置
+├── alembic.ini                         — Alembic 主配置,script_location 指向 alembic_multidb/
 ├── pyproject.toml                      — Python 项目与工具配置
 ```
