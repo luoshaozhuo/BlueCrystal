@@ -357,56 +357,155 @@ Seahorse-Starfish 之间的契约通过纯 JSON/dict schema 隔离，禁止运�
 | SH-AR-002 | 总体逻辑设计 8.1/8.3 | Seahorse 不进入生产链路 | AR | 高 | 全组件 | P2 | 已建立并通过 | import boundary 测试（5 passed）；grep 确认 `whale.ingest` 无 seahorse import | 同上 | 无立即差距 | 持续监控 | 2026-06-04 |
 | SH-AR-003 | 总体逻辑设计 8.1/8.3 | Bundle/export/CLI 不写生产数据库、不进入 ingest、不替代 Starfish | AR | 高 | seahorse.exporters、seahorse.__main__ | P1+P2 | 已建立并通过 | `tests/unit/seahorse/test_bundle.py` CLI tests 确认纯本地文件操作；import boundary AST 扫描 + grep 确认零 database/ingest/starfish import | starfish 目录尚未存在时跳过（非 FAIL） | 无立即差距 | 持续监控；每次 seahorse 变更后重跑 import boundary | 2026-06-04 |
 | SH-AR-004 | 总体逻辑设计 8.1/8.2/8.3 | Seahorse-Starfish contract boundary（JSON/dict schema 隔离，不 import starfish runtime） | AR | 高 | seahorse.exporters | P1+P2 | 已建立并通过 | AST 扫描 + grep 确认 seahorse exporters 零 starfish import；server_plan_exporter/server_plan_validator 文件头注释声明 no-starfish-import 边界；导出产物为纯 JSON；**Starfish 已创建（Round 5），Seahorse-Starfish contract roundtrip 验证通过：Starfish loader 成功消费 Seahorse handoff JSON，payload_hash 复算通过（match/mismatch/deterministic/empty/missing 五路径），Seahorse->Starfish 和 Starfish->seahorse 双向 import boundary AST 扫描零违规（6 向验证）** | `tests/unit/seahorse/test_server_plan.py` -> all 31 passed；`tests/architecture/test_seahorse_import_boundary.py` -> 5 passed；`tests/architecture/test_starfish_import_boundary.py` -> 9 passed；`tests/unit/starfish/test_server_plan_loader.py` -> bundle roundtrip passed | 无立即差距；Seahorse-Starfish contract boundary 双向验证已建立 | 持续监控；每次 Seahorse schema 变更后需重跑双向 roundtrip + import boundary | 2026-06-04 |
+| SH-R7B-001 | Seahorse_REQ Round 7B 硬清理 | 删除 `seahorse.models` 旧顶层目录及其 5 个文件（`__init__.py` / `bundle.py` / `generation.py` / `plan.py` / `scenario.py`），物理删除，无 compat wrapper、无 DeprecationWarning | CLEANUP | 高 | src/seahorse | P2 | 已完成 | `git status` 35 项删除；`ls src/seahorse/models` 不存在；`find src/seahorse -maxdepth 1 -type d` 仅返回 `__pycache__` 与 5 个新架构目录；用户明确要求"不要管兼容问题，不要留历史尾巴" | `tests/unit/architecture/test_seahorse_import_boundary.py::test_legacy_top_directories_removed[models]` PASS；`test_legacy_top_packages_not_importable[seahorse.models]` PASS；`tests/unit/seahorse/test_compat_wrappers.py::test_legacy_top_dirs_removed[models]` PASS；`test_legacy_top_packages_not_importable[seahorse.models]` PASS；4 个 `test_legacy_leaf_modules_not_importable`（scenario/plan/generation/bundle）PASS；`test_seahorse_package_root_has_no_legacy_name` PASS；`test_seahorse_domain_init_does_not_advertise_legacy_models` PASS | 旧 public import `seahorse.models` 已破坏，这是用户预期（无兼容尾巴）；范围外残留 `tests/unit/starfish/test_server_plan_loader.py` 与 `test_starfish_cli.py` 中 6 处旧 import 未迁移（handoff forbidden） | 下一轮：迁移 starfish 测试中的 6 处 `seahorse.models` 旧 import | 2026-06-30 |
+| SH-R7B-002 | Seahorse_REQ Round 7B 硬清理 | 删除 `seahorse.exporters` 旧顶层目录及其 9 个文件（`__init__.py` + 8 个 exporter/validator/serialization），物理删除，无 compat wrapper | CLEANUP | 高 | src/seahorse | P2 | 已完成 | `git status` 9 项删除；`find src/seahorse -maxdepth 1 -type d` 无 `exporters`；`seahorse.adapters.gateways.server_plan_handoff_gateway` / `bundle_validator` 已被 `tests/unit/seahorse/test_server_plan.py` / `test_bundle.py` 替代引用 | `test_legacy_top_directories_removed[exporters]` PASS；`test_legacy_top_packages_not_importable[seahorse.exporters]` PASS；`test_compat_wrappers` ×8 `test_legacy_leaf_modules_not_importable`（bundle_exporter / bundle_validator / server_config_exporter / server_config_validator / server_plan_exporter / server_plan_validator / serialization / timeseries_exporter）PASS；`test_no_legacy_seahorse_imports_in_repo[seahorse]` AST 扫描无 `seahorse.exporters` 命中 | 旧 public import `seahorse.exporters` 已破坏，这是用户预期（无兼容尾巴）；范围外残留 `tests/unit/starfish/test_server_plan_loader.py` 与 `test_starfish_cli.py` 中 4 处旧 import 未迁移（handoff forbidden） | 下一轮：迁移 starfish 测试中的 4 处 `seahorse.exporters` 旧 import | 2026-06-30 |
+| SH-R7B-003 | Seahorse_REQ Round 7B 硬清理 | 删除 `seahorse.strategies` 旧顶层目录及其 5 个文件（`__init__.py` + random/curve/replay/registry），物理删除，无 compat wrapper | CLEANUP | 高 | src/seahorse | P2 | 已完成 | `git status` 5 项删除；`seahorse.application.use_cases.{random_generation,curve_generation,replay_generation,strategy_registry}` 已承载业务实现 | `test_legacy_top_directories_removed[strategies]` PASS；`test_legacy_top_packages_not_importable[seahorse.strategies]` PASS；`test_compat_wrappers` ×4 `test_legacy_leaf_modules_not_importable`（curve_generation / random_generation / replay_generation / registry）PASS；`tests/unit/seahorse/test_strategies.py` 已切到新路径并 304 项套件中通过 | 旧 public import `seahorse.strategies` 已破坏，这是用户预期（无兼容尾巴） | 持续维护新路径 `seahorse.application.use_cases.*` | 2026-06-30 |
+| SH-R7B-004 | Seahorse_REQ Round 7B 硬清理 | 删除 `seahorse.generators` 旧顶层目录及其 3 个文件（`__init__.py` + alarm_generator + control_result_generator），物理删除，无 compat wrapper | CLEANUP | 高 | src/seahorse | P2 | 已完成 | `git status` 3 项删除；`seahorse.application.use_cases.{alarm_generator,control_result_generator}` 已承载业务实现 | `test_legacy_top_directories_removed[generators]` PASS；`test_legacy_top_packages_not_importable[seahorse.generators]` PASS；`test_compat_wrappers` ×2 `test_legacy_leaf_modules_not_importable`（alarm_generator / control_result_generator）PASS；`tests/unit/seahorse/test_generators.py` 已切到新路径并 304 项套件中通过；`test_seahorse_use_cases_init_does_not_advertise_legacy_paths` PASS | 旧 public import `seahorse.generators` 已破坏，这是用户预期（无兼容尾巴） | 持续维护新路径 `seahorse.application.use_cases.*` | 2026-06-30 |
+| SH-R7B-005 | Seahorse_REQ Round 7B 硬清理 | 删除 `seahorse.orchestration` 旧顶层目录及其 2 个文件（`__init__.py` + scenario_generator），物理删除，无 compat wrapper | CLEANUP | 高 | src/seahorse | P2 | 已完成 | `git status` 2 项删除；`seahorse.application.use_cases.scenario_generator.SeahorseGenerator` 已承载业务实现 | `test_legacy_top_directories_removed[orchestration]` PASS；`test_legacy_top_packages_not_importable[seahorse.orchestration]` PASS；`test_compat_wrappers` ×1 `test_legacy_leaf_modules_not_importable[orchestration.scenario_generator]` PASS；`tests/unit/seahorse/test_orchestrator.py` 已切到 `seahorse.application.use_cases.scenario_generator` 并 304 项套件中通过；`test_seahorse_use_cases_init_does_not_advertise_legacy_paths` PASS | 旧 public import `seahorse.orchestration` 已破坏，这是用户预期（无兼容尾巴）；范围外残留 `tests/unit/starfish/test_server_plan_loader.py` 与 `test_starfish_cli.py` 中 2 处旧 import 未迁移（handoff forbidden） | 下一轮：迁移 starfish 测试中的 2 处 `seahorse.orchestration` 旧 import | 2026-06-30 |
+| SH-R7B-006 | Seahorse_REQ Round 7B 硬清理 | 删除 `seahorse.ports` 旧顶层目录及其 2 个文件（`__init__.py` + generation_strategy），物理删除，无 compat wrapper | CLEANUP | 高 | src/seahorse | P2 | 已完成 | `git status` 2 项删除；`seahorse.application.ports.generation_strategy_port.GenerationStrategyPort` 已承载业务实现 | `test_legacy_top_directories_removed[ports]` PASS；`test_legacy_top_packages_not_importable[seahorse.ports]` PASS；`test_compat_wrappers` ×1 `test_legacy_leaf_modules_not_importable[ports.generation_strategy]` PASS | 旧 public import `seahorse.ports` 已破坏，这是用户预期（无兼容尾巴）；本轮范围内无外部残留 | 持续维护新路径 `seahorse.application.ports.*` | 2026-06-30 |
+| SH-R7B-007 | Seahorse_REQ Round 7B 硬清理 | 删除 `seahorse.reference_data` 旧顶层目录及其 5 个文件（`__init__.py` + gbt_30966_fields + protocol_param_data + protocol_view_defs + sample_data），物理删除，无 compat wrapper；`whale_metadata_repository` 改为 import `whale.shared.persistence.template.*` | CLEANUP | 高 | src/seahorse | P2 | 已完成 | `git status` 5 项删除；`src/seahorse/infrastructure/repositories/whale_metadata_repository.py` 切到 `whale.shared.persistence.template.{protocol_param_data,gbt_30966_fields}` 等新 import 路径 | `test_legacy_reference_data_directory_removed` PASS；`test_legacy_reference_data_modules_not_importable` ×5 PASS（seahorse.reference_data / .protocol_param_data / .protocol_view_defs / .sample_data / .gbt_30966_fields）；`test_whale_metadata_repository_does_not_import_seahorse_reference_data` PASS；`test_protocol_param_data_available_via_whale_template` PASS；`test_protocol_view_defs_available_via_whale_views` PASS；`test_gbt_30966_fields_available_via_whale_template` PASS；`test_reference_data_replaced_by_whale_template_top_level` PASS；304 项套件全 PASS | 旧 public import `seahorse.reference_data` 已破坏，这是用户预期（无兼容尾巴）；范围外残留 `src/whale/shared/persistence/template/{__init__,protocol_view_defs,protocol_param_data,gbt_30966_fields}.py` 4 处旧 import 未迁移（handoff forbidden） | 下一轮：迁移 whale/shared/persistence/template/* 4 处旧 import 到新路径或清理为真实数据归属 | 2026-06-30 |
+| SH-R7B-008 | Seahorse_REQ Round 7B 硬清理 | import boundary 门禁强化：删除 `LEGACY_WRAPPER_ROOTS`，新增 `LEGACY_TOP_PACKAGES` ×7 + `LEGACY_SCAN_ROOTS` ×3，提供 ×7 `test_legacy_top_directories_removed`、×7 `test_legacy_top_packages_not_importable`、×3 `test_no_legacy_seahorse_imports_in_repo` AST 扫描 | AR | 高 | tests/unit/architecture | P2 | 已完成 | `tests/unit/architecture/test_seahorse_import_boundary.py` 中 `LEGACY_WRAPPER_ROOTS` 已删除，`LEGACY_TOP_PACKAGES` 含 7 个旧顶层包，`LEGACY_SCAN_ROOTS` 含 `src/seahorse/` + `tests/unit/seahorse/` + `tests/unit/architecture/` | import boundary 28 / 28 PASS；304 项单测套件 304 / 304 PASS in 130.13s | 扫描范围仅覆盖 Round 7B 授权区，未触及 `src/whale/shared/persistence/template/*` 与 `tests/unit/starfish/*`（下一轮扩展扫描范围后再次验证） | 下一轮：扩展 `LEGACY_SCAN_ROOTS` 覆盖 `src/whale/` 与 `tests/unit/starfish/`，全面收口 | 2026-06-30 |
+| SH-R7B-009 | Seahorse_REQ Round 7B 硬清理 | `test_compat_wrappers.py` 重写：从旧 compat wrapper 单测改为硬清理验证（×7 目录删除 + ×7 包不可 import + ×24 单文件不可 import + seahorse 包根目录不含旧路径 + domain/use_cases __doc__ 不再含旧路径说明 + 真实参考数据归属 Whale template） | TEST | 高 | tests/unit/seahorse | P2 | 已完成 | `tests/unit/seahorse/test_compat_wrappers.py` 全部测试已改为硬约束断言，不再依赖 compat wrapper | 304 项套件全 PASS；新测试覆盖 `LEGACY_TOP_PACKAGES` ×7 + `LEGACY_TOP_DIRS` ×7 + `LEGACY_LEAF_MODULES` ×24 + 5 个 docstring / 目录扫描断言 | `test_compat_wrappers.py` 不再是 compat wrapper 测试，而是清理后状态固化测试 | 持续维护；任何旧顶层包复活将立即被硬断言捕获 | 2026-06-30 |
+| SH-R7B-010 | Seahorse_REQ Round 7B 硬清理 | `test_reference_data_imports.py` 重写：从旧新路径 import 测试改为 reference_data 硬清理验证（顶层目录删除 + 5 个模块不可 import + 协议参数/视图/GBT 字段真实数据归属 Whale shared persistence + whale_metadata_repository 不再 import seahorse.reference_data） | TEST | 高 | tests/unit/seahorse | P2 | 已完成 | `tests/unit/seahorse/test_reference_data_imports.py` 全部测试已改为硬约束断言 | 304 项套件全 PASS；新测试覆盖 reference_data 顶层目录 + 5 个模块 + 3 个真实数据归属 + whale_metadata_repository AST | 范围外 `whale.shared.persistence.template` 内部 4 处旧 wrapper import 仍 broken（下一轮） | 下一轮：迁移 whale template 旧 wrapper，扩展扫描范围 | 2026-06-30 |
+| SH-R7B-011 | Seahorse_REQ Round 7B 硬清理 | CLI 5 个子命令 --help 全部正常；ScenarioBundle checksum、ServerConfig payload_hash、Starfish handoff schema 不变 | CONTRACT | 高 | src/seahorse | P1 | 已完成 | `python -m seahorse generate/validate/plan/runtime-smoke --help` 全部正常；`seahorse.domain.bundle_checksum` / `seahorse.domain.plan` 字段不变；`seahorse.adapters.gateways.server_plan_handoff_gateway` schema 不变 | 304 项套件全 PASS；test-validator 验证 CLI 5 / 5 正常 | 无 | 持续维护 | 2026-06-30 |
+| SH-R7B-012 | Seahorse_REQ Round 7B 硬清理 | 用户预期确认：旧 public import 已破坏是用户明确要求；任何 wrapper、DeprecationWarning、legacy 命名都是禁止的 | POLICY | 高 | 全组件 | P1+P2 | 已确认 | 用户 prompt 明确"不要管兼容问题，不要留历史尾巴"；本轮物理删除全部旧顶层目录与 35 个旧文件，未新增 compat wrapper / DeprecationWarning / legacy 命名 | 304 项套件全 PASS；import boundary 28 / 28 PASS；`test_compat_wrappers.py` 中无 `DeprecationWarning` 触发；`test_seahorse_domain_init_does_not_advertise_legacy_models` PASS | 范围外 `whale/shared/persistence/template/*` 内部 4 处旧 import 仍残存（不属于本轮授权） | 下一轮：whale template 旧 wrapper import 同样按"无兼容尾巴"硬清理 | 2026-06-30 |
+| SH-R7C-001 | Seahorse_REQ Round 7B 后续（Round 7C） | `src/whale/shared/persistence/template/__init__.py` 删除 `from seahorse.reference_data import (...)` wrapper 与 `DeprecationWarning`，改为自持真实数据 re-export，导出 13 个真实数据符号（ALL_LOGICAL_NODES / LogicalNodeDef / LogicalNodeField / build_field_dict / total_field_count / ENDPOINT_PARAM_DEFS / SIGNAL_PARAM_DEFS / ParamDef / get_endpoint_params / get_signal_params / SCADA_PROTOCOL_VIEW_DEFINITIONS / SCADA_PROTOCOL_VIEW_SQL / ViewDefinition） | CLEANUP | 高 | src/whale/shared/persistence/template | P2 | 已完成 | `git status` 修改 `src/whale/shared/persistence/template/__init__.py`；docstring 明确"本包不再 re-export `seahorse.reference_data`，也未保留任何兼容 wrapper 或 `DeprecationWarning`"；`python -c "import whale.shared.persistence.template as m; print(len(m.ALL_LOGICAL_NODES), len(m.SCADA_PROTOCOL_VIEW_DEFINITIONS))"` 输出 `19 11` | `compileall src/whale/shared/persistence/template` 退出码 0；`test_whale_template_does_not_import_seahorse_reference_data` PASS；import boundary 28 / 28 PASS；starfish loader + CLI 57 / 57 PASS | 旧 public import `seahorse.reference_data` 已破坏（自 Round 7B 起），这是用户预期（无兼容尾巴）；范围外 `whale.template.sample_data` 重建与否未决（handoff 未授权） | 持续维护自持真实数据 | 2026-06-30 |
+| SH-R7C-002 | Seahorse_REQ Round 7B 后续（Round 7C） | `src/whale/shared/persistence/template/protocol_view_defs.py` 改为从 `whale.shared.persistence.views.scada_protocol_views` 转发 `ViewDefinition` / `SCADA_PROTOCOL_VIEW_DEFINITIONS` / `SCADA_PROTOCOL_VIEW_SQL`，不再 import `seahorse.reference_data.protocol_view_defs` | CLEANUP | 高 | src/whale/shared/persistence/template | P2 | 已完成 | `git status` 修改 `src/whale/shared/persistence/template/protocol_view_defs.py`；docstring 明确"本模块从 `whale.shared.persistence.views` 转发 SCADA 协议视图定义，也不再保留对 `seahorse.reference_data` 的兼容 wrapper"；`SCADA_PROTOCOL_VIEW_DEFINITIONS` 长度 = 11 | `compileall` 退出码 0；`test_whale_template_does_not_import_seahorse_reference_data` PASS | 旧 public import `seahorse.reference_data.protocol_view_defs` 已破坏，这是用户预期 | 持续维护 `whale.shared.persistence.views.scada_protocol_views` 单一真实源 | 2026-06-30 |
+| SH-R7C-003 | Seahorse_REQ Round 7B 后续（Round 7C） | `src/whale/shared/persistence/template/protocol_param_data.py` 自持 `ParamDef` dataclass + `ENDPOINT_PARAM_DEFS` / `SIGNAL_PARAM_DEFS` 协议参数矩阵，覆盖 BECKHOFF_ADS / HTTP_REST / IEC101 / IEC104 / IEC61850 / MODBUS / MQTT / OPC_UA 8 种协议 × 2 类参数；暴露 `get_endpoint_params` / `get_signal_params` 查询接口 | CLEANUP | 高 | src/whale/shared/persistence/template | P2 | 已完成 | `git status` 修改 `src/whale/shared/persistence/template/protocol_param_data.py`；`ENDPOINT_PARAM_DEFS` 与 `SIGNAL_PARAM_DEFS` 各 8 个协议 key；`ParamDef` 含 name / default / description / kind / value_type 字段；docstring 明确"ParamDef 协议矩阵是真实数据归属" | `compileall` 退出码 0；`test_whale_template_does_not_import_seahorse_reference_data` PASS | 旧 public import `seahorse.reference_data.protocol_param_data` 已破坏，这是用户预期 | 持续维护 8 协议参数矩阵 | 2026-06-30 |
+| SH-R7C-004 | Seahorse_REQ Round 7B 后续（Round 7C） | `src/whale/shared/persistence/template/gbt_30966_fields.py` 自持 `LogicalNodeDef` / `LogicalNodeField` dataclass + `ALL_LOGICAL_NODES = 19` 节点 + `build_field_dict` / `total_field_count` 工具；不再 import `seahorse.reference_data.gbt_30966_fields` | CLEANUP | 高 | src/whale/shared/persistence/template | P2 | 已完成 | `git status` 修改 `src/whale/shared/persistence/template/gbt_30966_fields.py`；`ALL_LOGICAL_NODES` 长度 = 19（首 3 节点：WPPD / WTUR / WROT）；`LogicalNodeDef` 含 name / ln_class / cdc / description / fields；docstring 明确"ALL_LOGICAL_NODES = 19 节点是真实数据归属" | `compileall` 退出码 0；`test_whale_template_does_not_import_seahorse_reference_data` PASS | 旧 public import `seahorse.reference_data.gbt_30966_fields` 已破坏，这是用户预期 | 持续维护 19 节点 GBT 30966.2-2022 字段定义 | 2026-06-30 |
+| SH-R7C-005 | Seahorse_REQ Round 7B 后续（Round 7C） | `tests/unit/starfish/test_server_plan_loader.py` 6 处 `seahorse.*` 旧 import 全部迁移：`seahorse.models.scenario` → `seahorse.domain.scenario`、`seahorse.orchestration.scenario_generator` → `seahorse.application.use_cases.scenario_generator`、`seahorse.exporters.server_plan_exporter` → `seahorse.adapters.gateways.server_plan_handoff_gateway` | CLEANUP | 高 | tests/unit/starfish | P2 | 已完成 | `git status` 修改 `tests/unit/starfish/test_server_plan_loader.py`；diff 显示 6 处 import 路径替换 | `pytest tests/unit/starfish/test_server_plan_loader.py -q` 30 / 30 PASS；import boundary 28 / 28 PASS；starfish loader+CLI 57 / 57 PASS | 旧 public import `seahorse.models` / `seahorse.orchestration` / `seahorse.exporters` 在 starfish 测试中已彻底迁移，无 compat wrapper | 持续维护 starfish 测试使用新路径 import | 2026-06-30 |
+| SH-R7C-006 | Seahorse_REQ Round 7B 后续（Round 7C） | `tests/unit/starfish/test_starfish_cli.py` 4 处 `seahorse.*` 旧 import 全部迁移：`seahorse.exporters.server_plan_exporter` → `seahorse.adapters.gateways.server_plan_handoff_gateway`、`seahorse.models.scenario` → `seahorse.domain.scenario`、`seahorse.orchestration.scenario_generator` → `seahorse.application.use_cases.scenario_generator` | CLEANUP | 高 | tests/unit/starfish | P2 | 已完成 | `git status` 修改 `tests/unit/starfish/test_starfish_cli.py`；diff 显示 4 处 import 路径替换 | `pytest tests/unit/starfish/test_starfish_cli.py -q` 27 / 27 PASS；import boundary 28 / 28 PASS；starfish loader+CLI 57 / 57 PASS | 旧 public import `seahorse.exporters` / `seahorse.models` / `seahorse.orchestration` 在 starfish CLI 测试中已彻底迁移，无 compat wrapper | 持续维护 starfish CLI 测试使用新路径 import | 2026-06-30 |
+| SH-R7C-007 | Seahorse_REQ Round 7B 后续（Round 7C） | `tests/TESTING.md` 删除 `python -m seahorse.reference_data` 旧提示语——该入口自 Round 7B 起已物理删除，不再作为测试引导 | CLEANUP | 中 | tests | P2 | 已完成 | `git status` 修改 `tests/TESTING.md`（单行 -1）；`grep -n "python -m seahorse.reference_data" tests/TESTING.md` 输出 NO_HIT | `tests/TESTING.md` 字面搜索 0 命中；与 `seahorse_round7c_repo_import_closure.md` 一致 | 范围外 `src/whale/ingest/framework/persistence/init_db.py` 旧 wrapper import 已在本轮修复（属于其他路径，与本条并列） | 持续维护 TESTING.md 引导语 | 2026-06-30 |
+| SH-R7C-008 | Seahorse_REQ Round 7B 后续（Round 7C） | `test_seahorse_import_boundary.py` 的 `LEGACY_SCAN_ROOTS` 由 3 个根（`src/seahorse/` + `tests/unit/seahorse/` + `tests/unit/architecture/`）扩展到 2 个根（`SRC_ROOT` + `TESTS_ROOT`，覆盖整个 `src/` + `tests/`），并新增 `test_whale_template_does_not_import_seahorse_reference_data` 反向断言——AST 扫描 `src/whale/shared/persistence/template/*.py`，确保无 `seahorse.reference_data` import | AR | 高 | tests/unit/architecture | P2 | 已完成 | `git status` 修改 `tests/unit/architecture/test_seahorse_import_boundary.py`；`LEGACY_SCAN_ROOTS = (SRC_ROOT, TESTS_ROOT)`；新增 `test_whale_template_does_not_import_seahorse_reference_data` 函数 | import boundary 28 / 28 PASS；AST 扫描 `src/` + `tests/` 全树 OFFENDER COUNT = 0 / 0；新增反向断言 PASS | 旧 public import 在仓库全树 AST 中已不存在任何引用，这是用户预期 | 持续维护 LEGACY_SCAN_ROOTS 覆盖完整 src/ + tests/ | 2026-06-30 |
+| SH-R7C-009 | Seahorse_REQ Round 7B 后续（Round 7C） | CLI 5 个子命令 --help 全部正常；ScenarioBundle checksum、ServerConfig payload_hash、Starfish handoff schema 不变（Round 7B 契约在 Round 7C 仓库收口后仍保留） | CONTRACT | 高 | src/seahorse | P1 | 已完成 | `python -m seahorse {generate,validate,plan,runtime-smoke} --help` 全部输出合法 help；`seahorse.domain.bundle_checksum` / `seahorse.domain.plan` 字段不变；`seahorse.adapters.gateways.server_plan_handoff_gateway` schema 不变 | 公开 CLI 子命令 --help 5 / 5 PASS；starfish loader+CLI 57 / 57 PASS；tests/unit/seahorse + tests/unit/architecture 315 / 315 PASS | 无 | 持续维护 CLI 与契约 | 2026-06-30 |
+| SH-R7C-010 | Seahorse_REQ Round 7B 后续（Round 7C） | 用户预期确认：旧 public import 已彻底破坏，无 compat wrapper / shim / DeprecationWarning / legacy；范围外遗留与既有失败不属于本轮收口对象 | POLICY | 高 | 全组件 | P1+P2 | 已确认 | 用户 prompt 明确"不要管兼容问题，不要留历史尾巴"；Round 7C 进一步在仓库全树（`src/` + `tests/`）确认 OFFENDER COUNT = 0；whale.template 4 个模块改为自持真实数据；starfish 测试 10 处旧 import 全部迁移；TESTING.md 旧提示已清理；本轮未引入任何 compat wrapper / shim / DeprecationWarning / legacy 命名 | import boundary 28 / 28 PASS；starfish loader+CLI 57 / 57 PASS；CLI 5 / 5 PASS；tests/unit/seahorse + tests/unit/architecture 315 / 315 PASS | 范围外遗留：①`tests/unit/shared/persistence/test_scada_sample_data_protocol_coverage.py` 引用已删 `sample_data`（不属于本轮授权）；②`tests/unit/starfish/test_runtime_api.py::test_manager_path_input_delegates_runtime_build_to_composition_root` pre-existing 失败（与 broken import 无关）；③27 environment-pending skips（缺 native 动态库 libiec61850 / libopen62541 / liblib60870，非本轮目标） | 后续 handoff：test_runtime_api 单独排查；test_scada_sample_data_protocol_coverage.py 的 sample_data 是否重建或下线该测试；native 动态库环境补齐 | 2026-06-30 |
 
 ## 6. 实现文件清单
 
 ```text
 src/seahorse/
 ├── __init__.py                    — 包入口，安全边界声明
-├── __main__.py                    — CLI 主入口（4 子命令：generate-scenario/export-bundle/validate-bundle/export-server-plan）
-├── models/                        — 核心数据模型（15 个 dataclass）
-│   ├── __init__.py               — 导出入口
-│   ├── scenario.py                — ScenarioConfig, ScenarioMetadata
-│   ├── plan.py                    — SeedPlan/ServerPlan 等 9 个规划型 dataclass
+├── __main__.py                    — CLI 主入口（5 子命令：generate-scenario/export-bundle/validate-bundle/export-server-plan/runtime-smoke）
+├── container.py                   — Seahorse facade/runtime/writer 装配（Round 7 新增 build_runtime_smoke_workflow）
+├── adapters/                      — 接口适配器实现（CLI controller + handoff gateway + serializer + driver adapter）
+│   ├── __init__.py
+│   ├── controllers/
+│   │   ├── __init__.py
+│   │   └── cli_controller.py      — Seahorse argparse CLI controller
+│   ├── drivers/                   — driver adapter 实现（曲线/随机/回放策略 adapter + backend 协议）
+│   │   ├── __init__.py
+│   │   ├── backend_ports.py
+│   │   ├── curve_generation.py
+│   │   ├── random_generation.py
+│   │   ├── replay_generation.py
+│   │   └── factory/__init__.py
+│   ├── gateways/                  — handoff gateway（ServerConfig + ServerPlan handoff + validator + Starfish writer gateway）
+│   │   ├── __init__.py
+│   │   ├── server_config_handoff_gateway.py
+│   │   ├── server_config_validator.py
+│   │   ├── server_plan_handoff_gateway.py
+│   │   ├── server_plan_validator.py
+│   │   └── starfish_writer_gateway.py
+│   ├── presenters/__init__.py
+│   └── serializers/               — JSON / JSONL serializer
+│       ├── __init__.py
+│       ├── bundle_json_serializer.py
+│       ├── bundle_serialization.py
+│       └── timeseries_jsonl_serializer.py
+├── api/
+│   ├── __init__.py
+│   └── seahorse_facade.py         — 离线生成与 handoff facade（Round 7 新增 run_runtime_smoke）
+├── application/                   — 用例编排 + 端口契约 + 运行时骨架
+│   ├── __init__.py
+│   ├── exceptions.py
+│   ├── ports/                     — 应用层端口契约
+│   │   ├── __init__.py
+│   │   ├── clock_port.py
+│   │   ├── data_source_port.py
+│   │   ├── generation_strategy_port.py
+│   │   ├── scheduler_port.py
+│   │   ├── starfish_writer_port.py
+│   │   ├── telemetry_port.py
+│   │   └── whale_metadata_port.py
+│   ├── runtime/                   — runtime skeleton（context / event_bus / executor / graph / snapshot / state）
+│   │   ├── __init__.py
+│   │   ├── context.py
+│   │   ├── event_bus.py
+│   │   ├── executor.py
+│   │   ├── graph.py
+│   │   ├── snapshot.py
+│   │   └── state.py
+│   └── use_cases/                 — 离线场景生成 + bundle 校验 + 生成策略 + atomic use case
+│       ├── __init__.py
+│       ├── alarm_generator.py
+│       ├── bundle_validator.py
+│       ├── control_result_generator.py
+│       ├── curve_generation.py
+│       ├── random_generation.py
+│       ├── replay_generation.py
+│       ├── scenario_generator.py  — SeahorseGenerator 5 元组完整生成
+│       ├── seed_whale_metadata.py
+│       ├── strategy_registry.py
+│       └── atomic/                — runtime atomic use case
+│           ├── __init__.py
+│           ├── build_write_batch.py
+│           ├── build_write_plan.py
+│           ├── dispatch_write_batch.py
+│           ├── runtime_smoke_workflow.py  — Round 7 新增
+│           ├── update_runtime_period.py
+│           └── validate_write_plan.py
+├── domain/                        — 纯内存领域模型（不访问文件、DB、CLI framework、Whale ORM、Starfish runtime）
+│   ├── __init__.py
+│   ├── bundle.py                  — ScenarioBundle 16 字段场景包
+│   ├── bundle_checksum.py         — bundle checksum 纯算法
 │   ├── generation.py              — GeneratedSignalValue/AlarmEvent/ControlResult
-│   └── bundle.py                  — ScenarioBundle 16 字段场景包 + _make_serializable
-├── ports/                         — 端口层（抽象接口）
-│   ├── __init__.py               — 导出入口
-│   └── generation_strategy.py    — GenerationStrategy Protocol
-├── strategies/                     — 策略实现层（Round 2 + **Round 20 根因修复**）
-│   ├── __init__.py               — 导出 Random/Curve/Replay 策略 + StrategyRegistry
-│   ├── random_generation.py      — 确定性随机值生成（5 种 generation_hint）
-│   ├── curve_generation.py       — 曲线生成（6 种类型 + 14 组预设模板；**Round 20 根因修复**：`daily_power_curve` 在 noise 叠加后强制 `min(values) >= floor_ratio * baseline = 0.2 * 1500.0 = 300.0`，**未使用 skip/xfail/删除测试/扩大阈值**——从根因消除 `min(values)=90.952 < 100 阈值` 的统计噪声）
-│   ├── replay_generation.py      — rows/JSONL 回放 + 字段映射 + 时间偏移
-│   └── registry.py                — StrategyRegistry（注册/查找/实体类型覆盖）
-├── generators/                     — 生成器层（Round 2）
-│   ├── __init__.py               — 导出 AlarmGenerator/ControlResultGenerator
-│   ├── alarm_generator.py         — 告警生成（4 种类型：阈值/品质/设备状态/通信）
-│   └── control_result_generator.py — 控制回写生成（7 种状态 + 自定义处理器）
-├── orchestration/                 — 编排层
-│   ├── __init__.py               — 导出入口
-│   └── scenario_generator.py     — SeahorseGenerator 5 元组完整生成
-├── exporters/                     — 导出器层（Round 3 + Round 4）
-│   ├── __init__.py               — 导出入口
-│   ├── bundle_exporter.py         — JSON bundle 导出器（原子写入）
-│   ├── timeseries_exporter.py     — JSONL 时序导出器（原子写入）
-│   ├── bundle_validator.py       — 场景包校验器（6 项校验 + ValidationResult）
-│   ├── serialization.py           — SHA256 校验和计算 + dataclass JSON 序列化
-│   ├── server_plan_exporter.py   — ServerPlan handoff 导出（SHA256 payload_hash 原子写入）
-│   └── server_plan_validator.py  — ServerPlan 校验器（9 项校验）
-└── reference_data/                — 参考数据层
-    ├── __init__.py               — 导出入口
-    ├── gbt_30966_fields.py        — GB/T 30966 字段定义
-    ├── protocol_param_data.py     — 16 组协议服务参数模板
-    ├── protocol_view_defs.py      — 协议参数展平只读视图
-    └── sample_data.py             — 13 类端点/16 组服务样例数据
+│   ├── plan.py                    — SeedPlan/ServerPlan 等规划型 dataclass
+│   ├── runtime_contract.py        — runtime/data source/batch 契约
+│   └── scenario.py                — ScenarioConfig/Metadata
+└── infrastructure/                — 基础设施（data source / driver backend / repository / scheduler / telemetry）
+    ├── __init__.py
+    ├── data_sources/
+    │   ├── __init__.py
+    │   └── runtime.py             — 内存 DataSource runtime adapter
+    ├── drivers/
+    │   ├── __init__.py
+    │   ├── backend_factory.py     — driver backend 工厂入口
+    │   └── starfish_writer_backend.py  — 内存 Starfish writer backend
+    ├── repositories/
+    │   ├── __init__.py
+    │   └── whale_metadata_repository.py  — Whale metadata seed 与 WritePlan 读取（Round 7B 改 import whale.shared.persistence.template.*）
+    ├── schedulers/
+    │   ├── __init__.py
+    │   └── clock.py               — ClockPort 实现与同步 step helper
+    └── telemetry/__init__.py
 ```
 
 ```text
-旧路径 wrapper（发出 DeprecationWarning，保留迁移期兼容）：
+Round 7B 硬清理（无 compat wrapper，旧 public import 已不再支持，用户明确预期）：
+物理删除 src/seahorse/{models,exporters,strategies,generators,orchestration,ports,reference_data}/ 共 7 个旧顶层目录 + 35 个旧文件。
+旧路径消费者迁移：
+  - seahorse.models.{scenario,plan,generation,bundle}              → seahorse.domain.*
+  - seahorse.exporters.{bundle_exporter,bundle_validator,serialization,
+                          server_config_exporter,server_config_validator,
+                          server_plan_exporter,server_plan_validator,
+                          timeseries_exporter}                     → seahorse.adapters.{gateways,serializers}.*
+  - seahorse.strategies.{curve_generation,random_generation,replay_generation,registry}
+                                                                     → seahorse.application.use_cases.{curve_generation,random_generation,replay_generation,strategy_registry}
+  - seahorse.generators.{alarm_generator,control_result_generator}  → seahorse.application.use_cases.{alarm_generator,control_result_generator}
+  - seahorse.orchestration.scenario_generator                       → seahorse.application.use_cases.scenario_generator
+  - seahorse.ports.generation_strategy                              → seahorse.application.ports.generation_strategy_port
+  - seahorse.reference_data.{protocol_param_data,protocol_view_defs,sample_data,gbt_30966_fields}
+                                                                     → whale.shared.persistence.template.*
+
+范围外残留（下一轮处理，本轮 handoff forbidden）：
 src/whale/shared/persistence/template/
-├── __init__.py                   — 已改为 wrapper
-├── protocol_param_data.py       — 已改为 wrapper
-├── protocol_view_defs.py        — 已改为 wrapper
-└── sample_data.py               — 已改为 wrapper
+├── __init__.py                   — 仍 from seahorse.reference_data import ...
+├── protocol_param_data.py        — 仍 from seahorse.reference_data.protocol_param_data import ...
+├── protocol_view_defs.py         — 仍 from seahorse.reference_data.protocol_view_defs import ...
+├── gbt_30966_fields.py           — 仍 from seahorse.reference_data.gbt_30966_fields import ...
+└── sample_data.py                — 已删
+
+tests/unit/starfish/
+├── test_server_plan_loader.py    — 仍 6 处 from seahorse.models / orchestration / exporters import
+└── test_starfish_cli.py          — 仍 4 处 from seahorse.exporters / models / orchestration import
 ```

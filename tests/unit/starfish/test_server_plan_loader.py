@@ -550,9 +550,9 @@ class TestSeahorseStarfishContract:
         import sys
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-        from seahorse.models.scenario import ScenarioConfig
-        from seahorse.orchestration import SeahorseGenerator
-        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
+        from seahorse.domain.scenario import ScenarioConfig
+        from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
+        from seahorse.adapters.gateways.server_plan_handoff_gateway import export_server_plan_to_json
 
         config = ScenarioConfig(
             scenario_id="sf_contract_test",
@@ -589,9 +589,9 @@ class TestSeahorseStarfishContract:
         import sys
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-        from seahorse.models.scenario import ScenarioConfig
-        from seahorse.orchestration import SeahorseGenerator
-        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
+        from seahorse.domain.scenario import ScenarioConfig
+        from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
+        from seahorse.adapters.gateways.server_plan_handoff_gateway import export_server_plan_to_json
 
         config = ScenarioConfig(
             scenario_id="sf_modbus_test",
@@ -623,9 +623,9 @@ class TestSeahorseStarfishContract:
         import sys
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-        from seahorse.models.scenario import ScenarioConfig
-        from seahorse.orchestration import SeahorseGenerator
-        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
+        from seahorse.domain.scenario import ScenarioConfig
+        from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
+        from seahorse.adapters.gateways.server_plan_handoff_gateway import export_server_plan_to_json
 
         config = ScenarioConfig(
             scenario_id="sf_iv_test",

@@ -13,15 +13,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from seahorse.models.generation import GeneratedControlResult, GeneratedSignalValue
-from seahorse.models.plan import SeedEntity
-from seahorse.generators.alarm_generator import (
+from seahorse.domain.generation import GeneratedControlResult, GeneratedSignalValue
+from seahorse.domain.plan import SeedEntity
+from seahorse.application.use_cases.alarm_generator import (
     ALARM_TYPE_DEVICE_STATE,
     ALARM_TYPE_QUALITY,
     ALARM_TYPE_THRESHOLD,
     AlarmGenerator,
 )
-from seahorse.generators.control_result_generator import (
+from seahorse.application.use_cases.control_result_generator import (
     CONTROL_STATUS_UNSUPPORTED,
     CONTROL_STATUS_WRITE_DISABLED,
     ControlResultGenerator,

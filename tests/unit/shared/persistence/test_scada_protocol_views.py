@@ -1,8 +1,9 @@
-"""SCADA 协议视图单测.
+"""SCADA 协议视图定义单测.
 
 测试阶段：开发期验证 (unit/mock)。
-这些测试只验证协议视图在本地 SQLite 中可创建、可查询，并能按协议过滤
-第一范式参数值；不证明真实数据库方言兼容性，也不证明真实协议连通性。
+这些测试只验证集中 view 定义在本地 SQLite 中可渲染、可创建、可查询，
+并能按协议过滤第一范式参数值；不证明真实数据库方言兼容性，也不证明
+真实协议连通性。
 """
 
 from __future__ import annotations
@@ -20,7 +21,8 @@ from whale.shared.persistence.orm import (
     ScadaEndpointParamValue,
     ScadaProtocolParamDef,
 )
-from whale.shared.persistence.template.protocol_view_defs import _PROTOCOL_VIEW_DEFS, ensure_protocol_views
+from whale.shared.persistence.views.registry import ALL_VIEW_DEFINITIONS
+from whale.shared.persistence.views.scada_protocol_views import SCADA_PROTOCOL_VIEW_SQL
 
 
 def _make_engine() -> Engine:
@@ -127,8 +129,8 @@ def _seed_ads_endpoints(session: Session) -> tuple[int, int]:
 def test_protocol_views_sql_registry_covers_ads() -> None:
     """协议视图注册表必须包含新增 ADS 视图定义."""
 
-    assert "v_scada_endpoint_beckhoff_ads" in _PROTOCOL_VIEW_DEFS
-    assert "BECKHOFF_ADS" in _PROTOCOL_VIEW_DEFS["v_scada_endpoint_beckhoff_ads"]
+    assert "v_scada_endpoint_beckhoff_ads" in SCADA_PROTOCOL_VIEW_SQL
+    assert "BECKHOFF_ADS" in SCADA_PROTOCOL_VIEW_SQL["v_scada_endpoint_beckhoff_ads"]
 
 
 def test_protocol_views_can_be_created_and_query_ads_endpoint() -> None:
@@ -139,8 +141,9 @@ def test_protocol_views_can_be_created_and_query_ads_endpoint() -> None:
     with Session(engine) as session:
         read_write_endpoint_id, notification_endpoint_id = _seed_ads_endpoints(session)
 
-    ensure_protocol_views(bind=engine)
     with engine.connect() as conn:
+        for view in ALL_VIEW_DEFINITIONS:
+            conn.execute(text(view.create_sql(conn.dialect)))
         view_names = {
             row[0]
             for row in conn.execute(

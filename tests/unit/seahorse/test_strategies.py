@@ -20,15 +20,18 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from seahorse.models.plan import SeedEntity, SignalProfileItemPlan
-from seahorse.ports.generation_strategy import GenerationStrategy
-from seahorse.strategies.random_generation import RandomGenerationStrategy, STRATEGY_ID_RANDOM
-from seahorse.strategies.curve_generation import (
+from seahorse.domain.plan import SeedEntity, SignalProfileItemPlan
+from seahorse.application.ports.generation_strategy_port import GenerationStrategy
+from seahorse.application.use_cases.random_generation import (
+    RandomGenerationStrategy,
+    STRATEGY_ID_RANDOM,
+)
+from seahorse.application.use_cases.curve_generation import (
     CurveGenerationStrategy,
     STRATEGY_ID_CURVE,
 )
-from seahorse.strategies.replay_generation import ReplayGenerationStrategy
-from seahorse.strategies.registry import StrategyRegistry
+from seahorse.application.use_cases.replay_generation import ReplayGenerationStrategy
+from seahorse.application.use_cases.strategy_registry import StrategyRegistry
 
 
 # ── shared fixtures ─────────────────────────────────────────────────────────────

@@ -3,6 +3,10 @@
 > 全量重建日期: 2026-06-28
 > 来源: 仓库真实文件扫描。
 > 用途: 导航索引；不能替代读取真实源码、测试、配置和 schema。
+> 最近增量更新: 2026-06-30（Round 7B + 7C：Seahorse 旧顶层目录硬清理与仓库范围 broken import 收口，无兼容尾巴——
+> - **Round 7B**：物理删除 `src/seahorse/models/`、`exporters/`、`strategies/`、`generators/`、`orchestration/`、`ports/`、`reference_data/` 共 7 个旧顶层目录及其 35 个旧文件；将 `whale_metadata_repository` 改为 import `whale.shared.persistence.template.*`；重写 `tests/unit/seahorse/test_compat_wrappers.py` 与 `test_reference_data_imports.py` 为硬清理验证；`test_seahorse_import_boundary.py` 删除 `LEGACY_WRAPPER_ROOTS`、新增 `LEGACY_TOP_PACKAGES` × 7 个旧顶层目录物理删除、× 7 个旧顶层包不可 import、× 3 个 `src/` 与 `tests/unit/seahorse/` `tests/unit/architecture/` AST 扫描。
+> - **Round 7C（续）**：`src/whale/shared/persistence/template/` 4 个 wrapper 入口改为自持真实数据——`__init__.py` 删除 `from seahorse.reference_data import (...)` 与 `DeprecationWarning`、改为自持真实数据 re-export；`protocol_view_defs.py` 改为从 `whale.shared.persistence.views.scada_protocol_views` 转发；`protocol_param_data.py` 自持 `ParamDef` + 8 协议参数矩阵（BECKHOFF_ADS / HTTP_REST / IEC101 / IEC104 / IEC61850 / MODBUS / MQTT / OPC_UA）；`gbt_30966_fields.py` 自持 `LogicalNodeDef` + `ALL_LOGICAL_NODES = 19` 节点 + `build_field_dict` / `total_field_count` 工具；SCADA view = 11（从 `whale.shared.persistence.views` 转发）。`tests/unit/starfish/test_server_plan_loader.py` 6 处与 `tests/unit/starfish/test_starfish_cli.py` 4 处 `seahorse.*` 旧 import 全部迁移到新路径（`seahorse.domain` / `seahorse.application.use_cases.scenario_generator` / `seahorse.adapters.gateways.server_plan_handoff_gateway`）。`tests/TESTING.md` 删除 `python -m seahorse.reference_data` 旧提示。`test_seahorse_import_boundary.py` 的 `LEGACY_SCAN_ROOTS` 由 3 个根（`src/seahorse/` + `tests/unit/seahorse/` + `tests/unit/architecture/`）扩展到 2 个根（`SRC_ROOT` + `TESTS_ROOT`，覆盖整个 `src/` + `tests/`），并新增 `test_whale_template_does_not_import_seahorse_reference_data` 反向断言。
+> - 旧 public import（`seahorse.models` / `seahorse.exporters` / `seahorse.strategies` / `seahorse.generators` / `seahorse.orchestration` / `seahorse.ports` / `seahorse.reference_data`）自 Round 7B 起已**不再支持**，Round 7C 进一步在仓库全树（`src/` + `tests/`）确认 OFFENDER COUNT = 0；用户明确要求无兼容尾巴；详见 `ai_shared/reports/seahorse_round7b_legacy_no_compat_cleanup.md`（Round 7B）与 `ai_shared/reports/seahorse_round7c_repo_import_closure.md`（Round 7C）。
 
 ## 扫描口径
 
@@ -78,6 +82,10 @@
 │   │   ├── 业务目标与价值愿景.md                        — 项目白皮书：业务目标与价值愿景
 │   │   ├── 总体逻辑设计.md                           — 项目白皮书-总体逻辑设计
 │   ├── reports/ — 任务报告归档
+│   │   ├── seahorse_round6_starfish_writer_dispatch.md — Seahorse Round6 writer dispatch 报告
+│   │   ├── seahorse_round7_runtime_smoke_cleanup.md — Seahorse Round7 内存 runtime smoke workflow 与残留清理报告
+│   │   ├── seahorse_round7b_legacy_no_compat_cleanup.md — Seahorse Round7B 旧顶层目录硬清理，无兼容尾巴报告（Round 7C 上承对象）
+│   │   ├── seahorse_round7c_repo_import_closure.md — Seahorse Round7C 仓库范围 broken import 收口报告（whale.template 自持真实数据 + starfish 单测 10 处旧 import 迁移 + TESTING.md 旧提示清理）
 │   │   ├── starfish_architecture_doc_finalize.md — Starfish Clean Architecture v3.3 文档封板收尾
 │   │   ├── starfish_clean_boundary_refactor.md — Starfish Clean Boundary Refactor
 │   │   ├── starfish_strict_di_refactor.md      — Starfish Strict DI 收敛重构报告
@@ -98,7 +106,9 @@
 │   ├── README                              — 职责 / 解析顺序 / 运行约束 / 本轮验证
 │   ├── env.py                              — 解析 WHALE_DB_URL(真 env 优先,.env 兜底),注入 [whale] sqlalchemy.url
 │   ├── script.py.mako                      — Alembic 模板
-│   ├── versions/                           — Alembic migration 版本(当前为空,alembic upgrade head 为 no-op)
+│   ├── versions/                           — Alembic migration 版本
+│   │   ├── 9b1f4c7d2e6a_manage_shared_persistence_views.py — 管理 shared persistence 只读 views。
+│   │   ├── eb5d458b81c8_init_whale_schema.py — Whale 初始 schema migration。
 │   ├── __pycache__/                        — Python 字节码缓存(自动生成,不要手工提交)
 ├── config/ — 运行配置样例
 │   ├── ingest/
@@ -1518,46 +1528,103 @@
 │   │   │   ├── masking.py                          — Helpers for masking sensitive values before they reach logs or traces.
 │   │   ├── __init__.py                         — 包导出入口
 │   ├── seahorse/ — Seahorse 模块资产
-│   │   ├── exporters/
-│   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── bundle_exporter.py                  — seahorse JSON 包导出器。
-│   │   │   ├── bundle_validator.py                 — Python 模块
-│   │   │   ├── serialization.py                    — seahorse 序列化辅助 —— 校验和计算与规范化 JSON 导出。
-│   │   │   ├── server_config_exporter.py           — seahorse ServerConfig handoff 导出入口。
-│   │   │   ├── server_config_validator.py          — seahorse ServerConfig 契约校验入口。
-│   │   │   ├── server_plan_exporter.py             — seahorse ServerConfig handoff 导出器。
-│   │   │   ├── server_plan_validator.py            — seahorse ServerConfig 契约校验器。
-│   │   │   ├── timeseries_exporter.py              — seahorse JSONL 时序导出器。
-│   │   ├── generators/
-│   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── alarm_generator.py                  — seahorse 告警事件生成器。
-│   │   │   ├── control_result_generator.py         — seahorse 控制回写响应生成器。
-│   │   ├── models/
-│   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── bundle.py                           — seahorse 核心模型 —— 场景包（ScenarioBundle）。
-│   │   │   ├── generation.py                       — seahorse 核心模型 —— 生成结果值。
-│   │   │   ├── plan.py                             — seahorse 核心模型 —— 种子计划与端点规划。
-│   │   │   ├── scenario.py                         — seahorse 核心模型 —— 场景配置、元数据与种子计划。
-│   │   ├── orchestration/
-│   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── scenario_generator.py               — Python 模块
-│   │   ├── ports/ — 抽象端口接口
-│   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── generation_strategy.py              — seahorse 生成策略端口 —— GenerationStrategy Protocol。
-│   │   ├── reference_data/
-│   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── gbt_30966_fields.py                 — Python 模块
-│   │   │   ├── protocol_param_data.py              — Python 模块
-│   │   │   ├── protocol_view_defs.py               — 协议端点参数展平视图定义 —— seahorse 参考数据。
-│   │   │   ├── sample_data.py                      — Python 模块
-│   │   ├── strategies/
-│   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── curve_generation.py                 — Python 模块
-│   │   │   ├── random_generation.py                — seahorse 确定性随机值生成策略。
-│   │   │   ├── registry.py                         — seahorse 生成策略注册表。
-│   │   │   ├── replay_generation.py                — seahorse 回放生成策略。
-│   │   ├── __init__.py                         — 包导出入口
-│   │   ├── __main__.py                         — 模块 CLI 入口
+│   │   ├── adapters/
+│   │   │   ├── controllers/
+│   │   │   │   ├── __init__.py                     — 控制器适配器入口
+│   │   │   │   ├── cli_controller.py               — Seahorse argparse CLI controller
+│   │   │   ├── drivers/
+│   │   │   │   ├── factory/
+│   │   │   │   │   ├── __init__.py                 — driver adapter factory 占位
+│   │   │   │   ├── __init__.py                     — driver adapter 导出入口
+│   │   │   │   ├── backend_ports.py                — adapter-local backend 协议
+│   │   │   │   ├── curve_generation.py             — 曲线策略兼容 adapter
+│   │   │   │   ├── random_generation.py            — 随机策略兼容 adapter
+│   │   │   │   ├── replay_generation.py            — 回放策略兼容 adapter
+│   │   │   ├── gateways/
+│   │   │   │   ├── __init__.py                     — handoff gateway 导出入口
+│   │   │   │   ├── server_config_handoff_gateway.py — ServerConfig handoff 兼容入口
+│   │   │   │   ├── server_config_validator.py      — ServerConfig 校验兼容入口
+│   │   │   │   ├── server_plan_handoff_gateway.py  — Starfish JSON handoff serializer
+│   │   │   │   ├── server_plan_validator.py        — ServerConfig 契约校验器
+│   │   │   │   ├── starfish_writer_gateway.py      — Starfish writer backend 委托 gateway（Round 7 修改：暴露 `history` 字段并在 `__post_init__` 同步 backend.history 引用，供 `RuntimeSmokeWorkflow` 读取 `writer_history_count`）。
+│   │   │   ├── presenters/
+│   │   │   │   ├── __init__.py                     — presenter 占位入口
+│   │   │   ├── serializers/
+│   │   │   │   ├── __init__.py                     — JSON serializer 导出入口
+│   │   │   │   ├── bundle_json_serializer.py       — ScenarioBundle JSON serializer
+│   │   │   │   ├── bundle_serialization.py         — bundle serializer 兼容入口
+│   │   │   │   ├── timeseries_jsonl_serializer.py  — timeseries JSONL serializer
+│   │   │   ├── __init__.py                         — adapter 层入口
+│   │   ├── api/
+│   │   │   ├── __init__.py                         — facade 导出入口
+│   │   │   ├── seahorse_facade.py                  — 离线生成与 handoff facade（Round 7 修改：新增 `run_runtime_smoke`，方法体内延迟 import `build_runtime_smoke_workflow` 避免与 container 形成模块级循环）。
+│   │   ├── application/
+│   │   │   ├── ports/
+│   │   │   │   ├── __init__.py                     — application ports 导出入口
+│   │   │   │   ├── clock_port.py                   — monotonic/wall clock 端口契约
+│   │   │   │   ├── data_source_port.py             — 数据源批量取值端口契约
+│   │   │   │   ├── generation_strategy_port.py     — 生成策略端口契约
+│   │   │   │   ├── scheduler_port.py               — scheduler 配置端口
+│   │   │   │   ├── starfish_writer_port.py         — Starfish batch 写入端口
+│   │   │   │   ├── telemetry_port.py               — telemetry 端口
+│   │   │   │   ├── whale_metadata_port.py          — Whale metadata 读取端口
+│   │   │   ├── runtime/
+│   │   │   │   ├── __init__.py                     — runtime skeleton 导出入口
+│   │   │   │   ├── context.py                      — RuntimeContext 强类型 root
+│   │   │   │   ├── event_bus.py                    — 内存事件记录骨架
+│   │   │   │   ├── executor.py                     — 内存 tick 与可选 dispatch executor
+│   │   │   │   ├── graph.py                        — WritePlan runtime 拓扑图
+│   │   │   │   ├── snapshot.py                     — runtime 诊断快照与指标
+│   │   │   │   ├── state.py                        — runtime 状态转移契约
+│   │   │   ├── use_cases/
+│   │   │   │   ├── atomic/
+│   │   │   │   │   ├── __init__.py                 — atomic use case 导出入口
+│   │   │   │   │   ├── build_write_batch.py        — WriteBatch 生成用例
+│   │   │   │   │   ├── build_write_plan.py         — WritePlan 构建、默认策略与校验
+│   │   │   │   │   ├── dispatch_write_batch.py     — WriteBatch writer 分发用例
+│   │   │   │   │   ├── runtime_smoke_workflow.py   — 内存 RuntimeSmokeWorkflow + RuntimeSmokeReport（Round 7 新增；RuntimeExecutor 在 TYPE_CHECKING 守卫内 import，避免循环导入）
+│   │   │   │   │   ├── update_runtime_period.py    — 周期配置更新用例
+│   │   │   │   │   ├── validate_write_plan.py      — WritePlan 校验用例
+│   │   │   │   ├── __init__.py                     — use case 导出入口
+│   │   │   │   ├── alarm_generator.py              — 告警生成用例
+│   │   │   │   ├── bundle_validator.py             — bundle 校验用例
+│   │   │   │   ├── control_result_generator.py     — 控制结果生成用例
+│   │   │   │   ├── curve_generation.py             — 曲线生成策略
+│   │   │   │   ├── random_generation.py            — 随机生成策略
+│   │   │   │   ├── replay_generation.py            — 回放生成策略
+│   │   │   │   ├── scenario_generator.py           — 离线场景生成用例
+│   │   │   │   ├── seed_whale_metadata.py          — Whale metadata seed 用例
+│   │   │   │   ├── strategy_registry.py            — 策略注册表
+│   │   │   ├── __init__.py                         — application 层入口
+│   │   │   ├── exceptions.py                       — 应用层稳定异常
+│   │   ├── domain/
+│   │   │   ├── __init__.py                         — domain 模型导出入口
+│   │   │   ├── bundle.py                           — ScenarioBundle 领域模型
+│   │   │   ├── bundle_checksum.py                  — bundle checksum 纯算法
+│   │   │   ├── generation.py                       — 生成结果领域模型
+│   │   │   ├── plan.py                             — seed/server plan 领域模型
+│   │   │   ├── runtime_contract.py                 — runtime/data source/batch 契约
+│   │   │   ├── scenario.py                         — ScenarioConfig/Metadata 模型
+│   │   ├── infrastructure/
+│   │   │   ├── data_sources/
+│   │   │   │   ├── __init__.py                     — data source 基础设施入口
+│   │   │   │   ├── runtime.py                      — 内存 DataSource runtime adapter
+│   │   │   ├── drivers/
+│   │   │   │   ├── __init__.py                     — driver backend 入口
+│   │   │   │   ├── backend_factory.py              — driver backend 工厂入口
+│   │   │   │   ├── starfish_writer_backend.py      — 内存 Starfish writer backend
+│   │   │   ├── repositories/
+│   │   │   │   ├── __init__.py                     — repository 导出入口
+│   │   │   │   ├── whale_metadata_repository.py    — Whale metadata seed 与 WritePlan 读取（Round 7B 修改：改为 import `whale.shared.persistence.template.*`，不再走旧 `seahorse.reference_data.*` 入口；Round 7C 后 `whale.shared.persistence.template.*` 改为自持真实数据）
+│   │   │   ├── schedulers/
+│   │   │   │   ├── __init__.py                     — scheduler 基础设施入口
+│   │   │   │   ├── clock.py                        — ClockPort 实现与同步 step helper
+│   │   │   ├── telemetry/
+│   │   │   │   ├── __init__.py                     — telemetry 基础设施占位
+│   │   │   ├── __init__.py                         — infrastructure 层入口
+│   │   ├── __init__.py                             — 包导出入口
+│   │   ├── __main__.py                             — CLI 薄入口
+│   │   ├── container.py                            — Seahorse facade/runtime/writer 装配（Round 7 修改：新增 `build_runtime_smoke_workflow`，串联 `RuntimeSmokeWorkflow` + 内存 backend/gateway/dispatch）。
 │   ├── starfish/ — Starfish 模块资产
 │   │   ├── adapters/ — 接口适配器实现
 │   │   │   ├── config/ — 运行配置样例
@@ -1990,16 +2057,22 @@
 │   │   │   │   │   ├── organization.py                     — 组织模块.
 │   │   │   │   │   ├── scada_ingest.py                     — Python 模块
 │   │   │   │   │   ├── scada_protocol_param.py             — SCADA 协议参数模型 — 第一范式协议参数定义与值存储.
-│   │   │   │   ├── template/
+│   │   │   │   ├── template/                              — Round 7C 起改为自持真实数据：ALL_LOGICAL_NODES=19、SCADA view=11、ParamDef 8 协议；不再依赖 seahorse.* 路径
 │   │   │   │   │   ├── OPCUA_client_connections.yaml       — YAML 配置
-│   │   │   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   │   │   ├── gbt_30966_fields.py                 — 已废弃的 GB/T 30966 字段定义模块。
-│   │   │   │   │   ├── protocol_param_data.py              — 已废弃的协议参数定义模块。
-│   │   │   │   │   ├── protocol_view_defs.py               — 已废弃的协议视图定义模块。
-│   │   │   │   │   ├── sample_data.py                      — 已废弃的 SCADA 样例数据模块。
+│   │   │   │   │   ├── __init__.py                         — 包导出入口（Round 7C：删除 `from seahorse.reference_data import (...)` wrapper 与 `DeprecationWarning`；改为自持真实数据 re-export，导出 ALL_LOGICAL_NODES / LogicalNodeDef / LogicalNodeField / build_field_dict / total_field_count / ENDPOINT_PARAM_DEFS / SIGNAL_PARAM_DEFS / ParamDef / get_endpoint_params / get_signal_params / SCADA_PROTOCOL_VIEW_DEFINITIONS / SCADA_PROTOCOL_VIEW_SQL / ViewDefinition 共 13 个符号）
+│   │   │   │   │   ├── gbt_30966_fields.py                 — GB/T 30966.2-2022 逻辑节点与字段定义（Round 7C：自持 LogicalNodeDef / LogicalNodeField dataclass + ALL_LOGICAL_NODES = 19 节点 + build_field_dict / total_field_count 工具；不再 import seahorse.reference_data）
+│   │   │   │   │   ├── protocol_param_data.py              — 多协议端点/信号参数模板（Round 7C：自持 ParamDef dataclass + ENDPOINT_PARAM_DEFS / SIGNAL_PARAM_DEFS，覆盖 BECKHOFF_ADS / HTTP_REST / IEC101 / IEC104 / IEC61850 / MODBUS / MQTT / OPC_UA 8 种协议 × 2 类参数；不再 import seahorse.reference_data）
+│   │   │   │   │   ├── protocol_view_defs.py               — SCADA 协议视图定义转发（Round 7C：从 whale.shared.persistence.views.scada_protocol_views 转发 ViewDefinition / SCADA_PROTOCOL_VIEW_DEFINITIONS / SCADA_PROTOCOL_VIEW_SQL；不再 import seahorse.reference_data）
+│   │   │   │   │   ├── sample_data.py                      — 已废弃的 SCADA 样例数据模块（Round 7B 已物理删除）
+│   │   │   │   ├── views/
+│   │   │   │   │   ├── __init__.py                         — shared persistence view 定义导出。
+│   │   │   │   │   ├── definition.py                       — view 通用定义与 DDL 渲染。
+│   │   │   │   │   ├── registry.py                         — Alembic view 定义汇总注册表。
+│   │   │   │   │   ├── scada_protocol_views.py             — SCADA 协议端点参数 view 定义。
+│   │   │   │   │   ├── scada_server_view.py                — SCADA server 汇总 view 定义。
 │   │   │   │   ├── __init__.py                         — 包导出入口
 │   │   │   │   ├── base.py                             — SQLAlchemy declarative base for all Whale ORM models.
-│   │   │   │   ├── init_db.py                          — shared persistence 数据库初始化入口。
+│   │   │   │   ├── init_db.py                          — shared persistence 本地测试库清理入口。
 │   │   │   │   ├── session.py                          — shared persistence 层的 SQLAlchemy engine 与 session 工具。
 │   │   │   ├── source/
 │   │   │   │   ├── access/
@@ -2212,23 +2285,29 @@
 │   ├── unit/ — 单元测试
 │   │   ├── architecture/
 │   │   │   ├── __init__.py                         — 包导出入口
-│   │   │   ├── test_seahorse_import_boundary.py    — seahorse / ingest / starfish import boundary 门禁测试。
+│   │   │   ├── test_seahorse_import_boundary.py    — seahorse / ingest / starfish import boundary 门禁测试（Round 7B 加强：删除 `LEGACY_WRAPPER_ROOTS`；新增 `LEGACY_TOP_PACKAGES` 与 `LEGACY_SCAN_ROOTS` —— ×7 `test_legacy_top_directories_removed`、×7 `test_legacy_top_packages_not_importable`、×3 `test_no_legacy_seahorse_imports_in_repo`；Round 7 既有 hot path `write_one`、`StarfishWriterPort` 无 `write_one`、infra 协议边界 AST 检测、starfish 目录存在性；**Round 7C 扩展：`LEGACY_SCAN_ROOTS` 由 3 个根（`src/seahorse/` + `tests/unit/seahorse/` + `tests/unit/architecture/`）扩展到 2 个根（`SRC_ROOT` + `TESTS_ROOT`，覆盖整个 `src/` + `tests/`），并新增 `test_whale_template_does_not_import_seahorse_reference_data` 反向断言——AST 扫描 `src/whale/shared/persistence/template/*.py`，确保无 `seahorse.reference_data` import**）。
 │   │   │   ├── test_starfish_import_boundary.py    — starfish import boundary 门禁测试。
 │   │   ├── seahorse/ — Seahorse 模块资产
 │   │   │   ├── __init__.py                         — 包导出入口
 │   │   │   ├── test_bundle.py                      — Python 模块
-│   │   │   ├── test_compat_wrappers.py             — 旧路径兼容包装器测试。
+│   │   │   ├── test_compat_wrappers.py             — Round 7B 重写为"旧顶层目录物理删除 + 旧顶层包不可 import + 旧同名单文件不可 import + seahorse 包根目录不含旧路径 + domain/use_cases __doc__ 不再含旧路径说明 + 真实参考数据归属 Whale template"硬约束验证（不再有 compat wrapper）。
+│   │   │   ├── test_datasource_runtime.py          — DataSource runtime 与 batch 单测
 │   │   │   ├── test_generators.py                  — seahorse 生成器测试 —— 告警与控制回写。
 │   │   │   ├── test_models.py                      — seahorse 核心模型序列化与确定性种子测试。
 │   │   │   ├── test_orchestrator.py                — seahorse 最小编排器测试。
-│   │   │   ├── test_reference_data_imports.py      — seahorse reference_data 新路径 import 测试。
+│   │   │   ├── test_reference_data_imports.py      — Round 7B 重写为"seahorse.reference_data 顶层目录物理删除 + 旧 reference_data 5 个模块不可 import + 协议参数/视图/GBT 字段真实数据归属 Whale shared persistence + whale_metadata_repository 不再 import seahorse.reference_data"硬约束验证。
+│   │   │   ├── test_runtime_contract.py            — Seahorse runtime contract 单元测试
+│   │   │   ├── test_scheduler_executor.py          — scheduler executor 单元测试
 │   │   │   ├── test_server_plan.py                 — seahorse ServerConfig 契约校验、handoff 导出与 CLI 测试。
+│   │   │   ├── test_starfish_writer_dispatch.py    — Starfish writer batch dispatch 单测
+│   │   │   ├── test_runtime_smoke_workflow.py      — RuntimeSmokeWorkflow + RuntimeSmokeReport 9 项单测（Round 7 新增）。
 │   │   │   ├── test_strategies.py                  — Python 模块
+│   │   │   ├── test_whale_write_plan_read_chain.py — Whale metadata 到 WritePlan 读取链路单测
 │   │   ├── shared/
 │   │   │   ├── persistence/
 │   │   │   │   ├── test_model_asset_orm.py             — model_asset ORM 表定义与约束单元测试。
 │   │   │   │   ├── test_scada_protocol_params.py       — SCADA 协议参数模板与 ORM 单测.
-│   │   │   │   ├── test_scada_protocol_views.py        — SCADA 协议视图单测.
+│   │   │   │   ├── test_scada_protocol_views.py        — SCADA 协议视图定义单测.
 │   │   │   │   ├── test_scada_sample_data_protocol_coverage.py — SCADA 多协议样例数据覆盖单测.
 │   │   ├── starfish/ — Starfish 模块资产
 │   │   │   ├── __init__.py                         — 包导出入口
@@ -2250,9 +2329,9 @@
 │   │   │   ├── test_runtime_api.py                 — starfish 高层运行时 API 测试。
 │   │   │   ├── test_runtime_observability.py       — Runtime observability v1 单元测试。
 │   │   │   ├── test_runtime_v2.py                  — Runtime v2.2 运行图与实例化契约测试。
-│   │   │   ├── test_server_plan_loader.py          — Python 模块
+│   │   │   ├── test_server_plan_loader.py          — Python 模块（Round 7C：6 处 `seahorse.*` 旧 import 全部迁移到新路径——`seahorse.models.scenario` → `seahorse.domain.scenario`、`seahorse.orchestration.scenario_generator` → `seahorse.application.use_cases.scenario_generator`、`seahorse.exporters.server_plan_exporter` → `seahorse.adapters.gateways.server_plan_handoff_gateway`）
 │   │   │   ├── test_server_simulator_facade.py     — starfish ServerSimulatorDriverAdapter 测试。
-│   │   │   ├── test_starfish_cli.py                — starfish CLI 测试。
+│   │   │   ├── test_starfish_cli.py                — starfish CLI 测试（Round 7C：4 处 `seahorse.*` 旧 import 全部迁移到新路径——`seahorse.exporters.server_plan_exporter` → `seahorse.adapters.gateways.server_plan_handoff_gateway`、`seahorse.models.scenario` → `seahorse.domain.scenario`、`seahorse.orchestration.scenario_generator` → `seahorse.application.use_cases.scenario_generator`）。
 │   │   ├── __init__.py                         — 包导出入口
 │   │   ├── test_acquisition_job_handler.py     — AcquisitionJobHandler 单元测试。
 │   │   ├── test_config.py                      — Unit tests for ingest configuration resolution.
@@ -2344,7 +2423,7 @@
 │   │   ├── test_subscription_reconnect_runtime.py — Subscription runtime reconnect/backoff/max-retry tests.
 │   │   ├── test_turtle_octopus_import_boundary.py — turtle/octopus 与 platform_shared 的 import boundary 门禁测试。
 │   │   ├── test_worker_runtime_do_execute.py   — WorkerRuntime._do_execute handler dispatch 单元测试。
-│   ├── TESTING.md                          — Whale 主平台测试指南
+│   ├── TESTING.md                          — Whale 主平台测试指南（Round 7C：删除 `python -m seahorse.reference_data` 旧提示语——该入口自 Round 7B 起已物理删除，不再作为测试引导）
 │   ├── __init__.py                         — 包导出入口
 │   ├── conftest.py                         — Shared pytest fixtures for ingest integration tests.
 │   ├── issue_trace.md                      — 测试问题追踪

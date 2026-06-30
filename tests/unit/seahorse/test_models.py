@@ -14,8 +14,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime, timezone
 
-from seahorse.models.scenario import ScenarioConfig, ScenarioMetadata
-from seahorse.models.plan import (
+from seahorse.domain.scenario import ScenarioConfig, ScenarioMetadata
+from seahorse.domain.plan import (
     AcquisitionTaskPlan,
     EndpointPlan,
     SeedEntity,
@@ -26,7 +26,7 @@ from seahorse.models.plan import (
     SignalProfileItemPlan,
     SignalProfilePlan,
 )
-from seahorse.models.generation import (
+from seahorse.domain.generation import (
     GeneratedAlarmEvent,
     GeneratedControlResult,
     GeneratedSignalValue,
@@ -303,13 +303,19 @@ def test_models_serialize_to_json_safe() -> None:
 
 
 def test_models_import_boundary_no_ingest() -> None:
-    """核心模型模块不得 import whale.ingest。"""
+    """核心模型模块不得 import whale.ingest。
+
+    ``seahorse.models`` 兼容目录已在 Round 7B 删除；该检查改为断言
+    ``seahorse.domain`` 子树不得 import whale.ingest。
+    """
     import ast
     from pathlib import Path
 
-    models_root = Path(__file__).resolve().parents[3] / "src" / "seahorse" / "models"
+    domain_root = Path(__file__).resolve().parents[3] / "src" / "seahorse" / "domain"
+    assert domain_root.is_dir(), "seahorse.domain 目录必须存在"
+
     offenders = []
-    for fp in models_root.rglob("*.py"):
+    for fp in domain_root.rglob("*.py"):
         tree = ast.parse(fp.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
@@ -319,4 +325,4 @@ def test_models_import_boundary_no_ingest() -> None:
                 for alias in node.names:
                     if alias.name.startswith("whale.ingest"):
                         offenders.append(str(fp))
-    assert offenders == [], f"seahorse models import whale.ingest: {offenders}"
+    assert offenders == [], f"seahorse domain import whale.ingest: {offenders}"

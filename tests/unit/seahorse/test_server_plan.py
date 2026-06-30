@@ -24,27 +24,27 @@ from pathlib import Path
 
 import pytest
 
-from seahorse.models.scenario import ScenarioConfig
-from seahorse.models.plan import (
+from seahorse.domain.scenario import ScenarioConfig
+from seahorse.domain.plan import (
     ServerConfig,
     ServerEndpointConfig,
     ServerMemberConfig,
     ServerPointConfig,
 )
-from seahorse.models.bundle import ScenarioBundle
-from seahorse.exporters.server_config_validator import (
+from seahorse.domain.bundle import ScenarioBundle
+from seahorse.adapters.gateways.server_config_validator import (
     validate_server_config,
     validate_server_config_from_dict,
 )
-from seahorse.exporters.server_config_exporter import (
+from seahorse.adapters.gateways.server_config_handoff_gateway import (
     build_server_config_payload,
     export_server_config_to_json,
     export_server_config_from_bundle,
     save_server_config,
     save_server_config_from_bundle,
 )
-from seahorse.exporters.serialization import compute_bundle_checksum
-from seahorse.orchestration import SeahorseGenerator
+from seahorse.domain.bundle_checksum import compute_bundle_checksum
+from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────

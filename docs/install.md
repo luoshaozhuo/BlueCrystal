@@ -8,6 +8,14 @@ docker run -d \
   --restart always \
   postgres:latest
 
-# 初始化数据库
+# 数据库管理
+## 初始化
+### 初始化ORM
 alembic -c alembic.ini revision --autogenerate -m "init whale schema"
+alembic -c alembic.ini upgrade head
+### 初始化view
+//注意这里不要用 --autogenerate。
+//--autogenerate 主要比较 Base.metadata 里的表结构，默认不会可靠管理 view。
+alembic -c alembic.ini revision -m "add whale views"
+//修改新增的xxx_add_whale_views.py代码文件再执行下面的指令
 alembic -c alembic.ini upgrade head

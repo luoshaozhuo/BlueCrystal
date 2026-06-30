@@ -2,7 +2,7 @@
 
 测试阶段：跨模块联调期验证 (integration)。
 本测试通过真实 `python -m whale.shared.persistence.template.sample_data` 子进程
-在安全创建的 PostgreSQL 临时测试库上执行 `init_db + sample_data`，验证 shared
+在安全创建的 PostgreSQL 临时测试库上执行 `sample_data`，验证 shared
 persistence 输入基线已真实落到 PostgreSQL，而不是继续由 SQLite 冒充最终验收。
 它不证明真实协议驱动、simulator 或现场设备连通性。
 """

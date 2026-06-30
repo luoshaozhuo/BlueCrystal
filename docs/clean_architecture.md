@@ -1,45 +1,49 @@
-# Clean Architecture Blueprint & Standard Specification
-# 版本：3.3（面向 Python 中大型可演进系统） | 适用语言：Python 3.10+
+# Clean Architecture Blueprint & Codex Constraint Specification
 
-本规范定义一种面向 Python 中大型工程的 Clean Architecture 工程结构，适用于需要长期演进、边界清晰、外部依赖可替换、运行状态可管理的系统。
-
-适用场景包括但不限于：
-
-- 业务应用、平台服务、领域服务；
-- 长生命周期 runtime / daemon 服务；
-- 任务调度、执行引擎、仿真运行时；
-- 数据采集、设备接入、协议网关、边缘服务；
-- 多后端驱动、多外部系统集成、多技术栈适配工程；
-- 需要隔离 domain、application、adapter、infrastructure 的复杂 Python 系统。
-
-本规范不绑定任何具体业务领域。文中涉及协议、驱动、C/C++ Native、设备、仿真等表述，均作为高外部依赖、高运行态复杂度场景的示例，不构成本规范的适用前提。
-
-本规范使用以下约束级别：
-
-- **MUST / 必须**：强制规则，违反即视为架构错误。
-- **MUST NOT / 禁止**：强制禁令，违反即视为架构错误。
-- **SHOULD / 应当**：默认规则。只有存在明确工程理由、且不破坏依赖方向时，才允许偏离。
-- **MAY / 可以**：允许选项。使用时仍必须满足本规范的依赖边界和目录边界。
-- **示例**：仅用于解释规则，不得反向推导为强制业务前提。
-
-核心目标：
-
-1. 保持 Domain 与 Application 的稳定性；
-2. 隔离外部技术栈、物理驱动、框架、数据库、网络 I/O、Native 模块与第三方 SDK；
-3. 通过 API / Facade 提供稳定公共入口；
-4. 通过 Ports 实现依赖倒置；
-5. 支持 Coding Agent 基于明确目录、依赖规则、类型规则和边界断言进行可验证改造。
+版本：4.0  
+适用语言：Python 3.10+  
+目标：易读、稳定、可约束 Coding Agent、适用于一般中大型 Python 工程。
 
 ---
 
-## 一、 架构分层设计与边界约束
+# 0. 总则
 
-### 0. 依赖方向总则
+本规范定义 Python 工程的 Clean Architecture 目录结构、依赖方向、命名规则和 Coding Agent 执行约束。
+
+本规范的核心目标：
+
+1. 固定目录结构，避免随意新增 `services/`、`helpers/`、`managers/`、`common/` 等含混目录；
+2. 固定依赖方向，避免 Domain / Application 直接依赖数据库、ORM、SDK、driver、framework；
+3. 固定文件落位规则，避免同类职责在不同模块中反复漂移；
+4. 固定外部能力接入方式，统一通过 `application/ports/` 抽象；
+5. 固定装配位置，统一通过 `container.py` 完成 wiring；
+6. 支持 Codex / Coding Agent 按机械规则修改项目，而不是自由发挥。
+
+---
+
+# 1. 约束等级
+
+本文使用以下约束词：
+
+| 关键词 | 含义 |
+|---|---|
+| MUST / 必须 | 强制规则，违反即视为架构错误 |
+| MUST NOT / 禁止 | 强制禁令，违反即视为架构错误 |
+| SHOULD / 应当 | 默认规则，只有明确工程理由且不破坏依赖方向时才可偏离 |
+| MAY / 可以 | 允许选项，但必须满足目录白名单和依赖规则 |
+| PROFILE | 项目选择的架构形态，一旦选择即冻结对应目录结构 |
+
+Coding Agent 必须优先满足 `MUST / MUST NOT`。  
+测试失败时，禁止通过破坏架构边界来绕过失败。
+
+---
+
+# 2. 核心依赖方向
 
 系统依赖方向必须向内：
 
 ```text
-Presentation / Interface Adapters
+Interface Adapters / Presentation
         ↓
 API / Facade
         ↓
@@ -48,248 +52,114 @@ Application
 Domain
 ```
 
-Infrastructure 是最外层的具体技术实现。Application 只能通过 `application/ports/` 中定义的抽象契约访问外部能力。Infrastructure 可以实现这些 Ports，但 Application 和 Domain 禁止直接依赖 Infrastructure。
+Infrastructure 是最外层的具体技术实现。  
+Application 只能通过 `application/ports/` 访问外部能力。  
+Domain 和 Application 禁止直接依赖 Infrastructure。
+
+允许关系：
 
 ```text
-                  ┌──────────────────────────────────────────────┐
-                  │  Infrastructure                              │
-                  │  DB / FS / Network / Native / SDK / Drivers   │
-                  └──────────────────────────────────────────────┘
-                                    ▲
-                                    │ implements
-                                    │
-Presentation / Interface Adapters ──┼──▶ API / Facade ──▶ Application ──▶ Domain
-                                    │
-                                    │ via application/ports only
-                                    ▼
-                              External Capabilities
+adapters         → api / application
+api              → application
+application      → domain
+infrastructure   → application.ports / domain
+container.py     → all layers
 ```
 
-`API / Facade` 是公共稳定入口。它不是 Domain 内层，也不是具体 UI / Web / CLI 框架层。Controller、CLI、Web Handler、测试脚本和外部 SDK 消费者应当依赖 API / Facade，而不是绕过它直接依赖 Application 内部用例。
+禁止关系：
+
+```text
+domain           → application / api / adapters / infrastructure
+application      → api / adapters / infrastructure
+api              → infrastructure concrete implementation
+infrastructure   → adapters
+```
+
+`container.py` 是唯一允许同时 import Application、Adapters、Infrastructure 的集中装配点。
 
 ---
 
-### 1. Domain 层（核心模型 / 规则层）
+# 3. 架构 Profile
 
-#### 1.1 职责
+每个模块必须在 `README.md` 或 `architecture.md` 中声明一个 Profile。  
+未声明 Profile 时，默认采用 `application_profile`。
 
-Domain 层必须承载系统最核心、最稳定、与外部技术无关的业务模型、业务规则、纯算法、纯状态转移逻辑与纯协议/格式计算逻辑。
+## 3.1 library_profile
 
-在不同系统中，Domain 可包含：
+适用于纯算法库、纯模型库、纯领域规则库。
 
-- 业务实体与聚合；
-- 值对象；
-- 领域服务；
-- 纯算法；
-- 纯规则校验；
-- 纯状态机；
-- 纯编解码逻辑；
-- 不依赖外部 I/O 的策略计算。
+允许目录：
 
-在协议仿真、网关、设备接入等系统中，协议帧结构、寄存器编码、ASDU、Frame、Quality、点位值规范等纯模型与纯编解码逻辑属于 Domain。该类内容只是示例，不限定本规范只用于协议系统。
+```text
+src/<package_name>/
+├── README.md
+├── __init__.py
+└── domain/
+```
 
-#### 1.2 包含元素
+可选目录：
 
-##### Entities（实体）
+```text
+tests/
+```
 
-实体必须具有业务身份标识。实体生命周期内可以发生状态变化，但状态变化必须体现领域规则。
+禁止：
 
-实体内部方法只能处理该实体自身的状态流转、约束校验与领域不变量维护。
+```text
+api/
+application/
+adapters/
+infrastructure/
+container.py
+```
 
-##### Value Objects（值对象）
-
-值对象必须通过值相等表达业务等价性。值对象应当不可变。
-
-值对象可以包含局部计算逻辑。值对象不得持有数据库连接、Socket、文件句柄、线程、进程、driver、repository、session 等外部资源。
-
-高频数据或协议载荷场景中，值对象可以使用 `bytes`、只读 `memoryview` 等表达零拷贝或低拷贝数据视图。可变 `bytearray` 只能用于明确标注的内部缓冲对象，不得伪装成不可变值对象。
-
-##### Domain Services（领域服务）
-
-领域服务必须是无状态的纯规则或纯算法服务。
-
-当某项核心规则涉及多个实体或值对象，且不适合放入单一实体或值对象时，必须放入 Domain Service。
-
-#### 1.3 禁止规则
-
-Domain 层禁止：
-
-1. import Web 框架、CLI 框架、ORM、数据库客户端、消息队列客户端、网络库、物理驱动库、C FFI 库、第三方 SDK；
-2. 读取文件、写文件、访问数据库、打开 Socket、启动进程、创建线程；
-3. 初始化 event loop、创建 asyncio task、调用 `asyncio.sleep()`、`asyncio.Event`、`asyncio.Queue` 等运行时调度原语；
-4. 持有或传递 infrastructure 对象；
-5. 引入任何由外部技术栈决定的数据模型作为领域模型父类。
-
-#### 1.4 异步与时间建模规则
-
-Domain 可以使用 `async def` 表达纯异步接口，但该函数不得依赖 asyncio 运行时原语，不得触发 I/O，不得创建 event loop，不得调度 task。
-
-Domain 中的时间驱动逻辑必须通过抽象时间表达，例如：
-
-- `tick(now)`；
-- `deadline`；
-- `timestamp`；
-- `duration`；
-- domain event；
-- caller-provided clock value。
-
-协议超时、重传、过期、定时状态迁移等逻辑应当建模为纯状态转移，不得在 Domain 中直接 sleep 或等待事件。
+除非该库开始接入外部系统或提供运行入口。
 
 ---
 
-### 2. Application 层（应用执行层）
+## 3.2 application_profile
 
-#### 2.1 职责
+适用于一般业务模块、平台服务、领域服务、CLI 工具、数据处理模块。
 
-Application 层是系统用例执行与运行时编排层。它必须负责编排 Domain 模型与外部能力抽象，以完成一个具体的用户意图或系统意图。
+必须目录：
 
-Application 层只关心：
+```text
+src/<package_name>/
+├── README.md
+├── __init__.py
+├── __main__.py
+├── container.py
+├── api/
+├── domain/
+├── application/
+├── adapters/
+└── infrastructure/
+```
 
-- 做什么；
-- 按什么流程做；
-- 依赖哪些抽象能力；
-- 如何维护本进程内执行状态；
-- 如何将失败收敛成应用层异常。
-
-Application 层禁止关心外部能力如何实现。数据库、文件系统、网络服务、Native C/C++ 模块、第三方 API、协议 driver 等具体实现必须通过 Ports 间接访问。
-
-#### 2.2 Application 层唯一合法一级子目录
-
-Application 层下只能使用以下三个一级子目录承载核心代码：
+其中 `application/` 必须固定为：
 
 ```text
 application/
+├── __init__.py
+├── exceptions.py
 ├── use_cases/
 ├── ports/
 └── runtime/
 ```
 
-允许存在 `application/__init__.py`、`application/exceptions.py` 等少量跨切面根模块。禁止新增 `services/`、`orchestration/`、`managers/`、`helpers/`、`misc/` 等语义含混的一级目录。
+如果项目没有长生命周期运行态，`application/runtime/` 可以只保留空包和说明文件，但禁止改名为 `services/`、`orchestration/`、`manager/`。
 
 ---
 
-#### 2.3 use_cases
+## 3.3 runtime_engine_profile
 
-##### 2.3.1 职责
+适用于 daemon、调度器、执行引擎、仿真运行时、采集运行时、协议网关、设备接入模块。
 
-`use_cases/` 必须承载系统所有应用行为入口。
-
-这里的 Use Case 是广义概念，表示 Application 层对外表达的一个执行意图。它包含：
-
-- 原子 UseCase；
-- Workflow / Composite UseCase；
-- UseCase 输入输出 DTO；
-- UseCase 内部组合规则。
-
-##### 2.3.2 原子 UseCase
-
-原子 UseCase 是最小执行单元。
-
-原子 UseCase 必须满足：
-
-1. 必须以明确的类、函数或可调用对象表达；
-2. 类形式的 UseCase 必须提供 `execute()` 方法；
-3. 必须只表达单一执行意图；
-4. 禁止直接 import infrastructure；
-5. 禁止直接创建 driver、repository、socket、process、native handle；
-6. 必须通过 `application/ports/` 访问外部能力；
-7. 输入输出必须使用明确类型，禁止无约束 `dict` 横向传播。
-
-##### 2.3.3 Workflow / Composite UseCase
-
-Workflow 是 UseCase 的组合执行模式，不是独立架构层。
-
-Workflow 必须满足：
-
-1. 必须放在 `application/use_cases/` 内部；
-2. 可以放在 `application/use_cases/workflows/`；
-3. 必须通过调用原子 UseCase 或其他明确的应用行为完成组合；
-4. 禁止绕过 UseCase 直接调用 infrastructure；
-5. 禁止成为与 `use_cases/`、`ports/`、`runtime/` 平级的新目录；
-6. 禁止被命名为独立 layer。
-
-因此，`use_cases/` 不是“只允许原子用例”的目录，而是 Application 行为表达目录。原子 UseCase 与 Workflow 都属于 Use Case 范畴：前者是最小执行单元，后者是组合执行单元。这不违反 Clean Architecture。
-
-##### 2.3.4 DTO
-
-DTO 是跨边界或跨 UseCase 传递数据的结构，不是 runtime state，不是 domain entity。
-
-Application DTO 必须满足：
-
-1. SHOULD 使用 `dataclasses.dataclass(frozen=True)` 定义；
-2. API / Adapter 边界 DTO MAY 使用 Pydantic frozen model；
-3. MUST 不包含业务逻辑方法；
-4. MUST 不持有 driver、repository、session、socket、process handle、native pointer；
-5. MUST 不继承 ORM 模型、Web request model、driver model 或第三方 SDK model；
-6. MUST 具有完整类型注解；
-7. MUST 不使用动态属性挂载；
-8. MUST 不作为 runtime context 使用。
-
----
-
-#### 2.4 ports
-
-##### 2.4.1 职责
-
-`ports/` 必须定义 Application 访问外部能力所依赖的抽象契约。
-
-Application ports 是 UseCase 层面向外部能力的 outport 抽象。Application 只依赖 application ports，Infrastructure 或 Interface Adapter 负责实现这些 ports。
-
-application ports 只表达业务执行所需的外部能力，例如配置加载、driver 装配、repository、事件发布、外部系统调用等。它们不是 adapter 内部 backend 协议，也不描述 socket、subprocess、native runner、SDK client 等物理实现细节。
-
-##### 2.4.2 强制规则
-
-Ports 必须满足：
-
-1. MUST 使用 `abc.ABC`、`typing.Protocol` 或等价抽象形式；
-2. MUST 只包含接口契约，不得包含具体实现；
-3. MUST 具备完整类型提示与返回值注解；
-4. MUST 不 import infrastructure；
-5. MUST 不 import adapters；
-6. MUST 不 import Web / CLI / ORM / driver / native / SDK；
-7. MUST 只被 `application/use_cases/`、`application/runtime/` 或 application 内部装配对象依赖，不得被当作具体实现容器；
-8. MUST 不引用 adapter-local backend protocol，例如 `adapters/drivers/backend_ports.py`；
-9. MUST 不使用 `Any`，除非该值被明确建模为不透明载荷；
-10. 使用不透明值时，MUST 定义类型别名并说明语义，例如 `PointValue = Any`、`OpaquePayload = bytes | memoryview`。
-
-##### 2.4.3 性能与批量边界
-
-当系统存在高频 I/O、批量数据处理、Native FFI、协议帧编解码、点位批量读写、消息批处理或流式数据通道时，Ports 必须优先提供批量或缓冲区级别接口。
-
-禁止在 hot path 中设计以下接口模式：
-
-```text
-for item in items:
-    port.write_one(item)
-```
-
-应当设计为：
-
-```text
-port.write_batch(items)
-port.write_frame(frame)
-port.write_buffer(buffer)
-port.read_batch(query)
-```
-
-跨进程、跨网络、跨 FFI、跨数据库、跨 SDK 的边界调用必须尽量减少调用次数，避免单字节、单寄存器、单点位、单事件频繁跨层调用。
-
----
-
-#### 2.5 runtime
-
-##### 2.5.1 职责
-
-`runtime/` 是 Application 层内部的进程内执行内核状态系统。
-
-runtime 只用于管理当前进程中的执行状态、运行图、事件流、状态机、快照、上下文等对象。它不是 DTO，不是 Domain，不是 API contract，不是 Infrastructure。
-
-##### 2.5.2 必须包含的核心概念
-
-runtime 可以包含以下模块：
+在 `application_profile` 基础上，必须启用：
 
 ```text
 application/runtime/
+├── __init__.py
 ├── context.py
 ├── state.py
 ├── graph.py
@@ -297,490 +167,1036 @@ application/runtime/
 └── snapshot.py
 ```
 
-其中：
+可以按需增加：
 
-- `context.py`：Runtime Kernel Root Object，运行态唯一入口；
-- `state.py`：运行状态机；
-- `graph.py`：执行拓扑、依赖图、运行图；
-- `event_bus.py`：进程内事件分发；
-- `snapshot.py`：运行态快照、诊断视图或恢复视图。
-
-##### 2.5.3 RuntimeContext 强约束
-
-RuntimeContext 必须满足：
-
-1. MUST 是显式强类型 root object；
-2. MUST 显式声明其包含的子上下文或运行组件类型；
-3. MUST NOT 使用 `kwargs`、`setattr`、动态属性挂载运行期对象；
-4. MUST NOT 作为 DTO 传出 API / Facade；
-5. MUST NOT 被 adapters 当作 response schema；
-6. MUST NOT 包含业务规则；
-7. MAY 持有可变 runtime component，但状态变更必须委托给 `state`、`graph`、`event_bus` 等专门组件；
-8. MUST 不 import infrastructure。
-
-示例：
-
-```python
-class RuntimeContext:
-    state: RuntimeStateMachine
-    graph: ExecutionGraph
-    event_bus: InProcessEventBus
+```text
+application/runtime/
+├── engine.py
+├── task_group.py
+├── lifecycle.py
+├── scheduler_state.py
+└── diagnostics.py
 ```
 
-##### 2.5.4 runtime 边界
-
-runtime 只能被 Application 内部和 API / Facade 的运行入口持有或间接使用。Controller、Presenter、Web Handler、CLI Controller 禁止直接依赖 runtime 结构。
+但这些文件必须仍在 `application/runtime/` 下，禁止新建包根一级 `engine/`、`scheduler/`、`runtime_engine/`。
 
 ---
 
-### 3. API / Facade 层（公共应用入口层）
+## 3.4 strict_driver_di_profile
 
-#### 3.1 职责
+适用于多协议、多 driver、native、SDK、外部 simulator、OS 进程、C/C++ 后端等强外部依赖模块。
 
-API / Facade 是系统的稳定公共入口。它负责向外部程序、CLI、Web Controller、测试框架、自动化脚本或 SDK 消费者暴露简洁、稳定、面向用例的接口。
+在 `application_profile` 或 `runtime_engine_profile` 基础上，必须启用：
 
-API / Facade 必须隐藏 Application 内部的 UseCase 拆分、RuntimeContext 结构、Ports 结构、Infrastructure 装配细节。
+```text
+adapters/drivers/
+├── __init__.py
+├── backend_ports.py
+├── factory/
+└── <driver_adapter>.py
 
-#### 3.2 规则
+infrastructure/drivers/
+├── __init__.py
+├── backend_factory.py
+└── <driver_backend>.py
+```
 
-API / Facade 必须满足：
+规则：
 
-1. MUST 暴露稳定公共方法；
-2. MUST 调用 Application use cases 或通过 composition root 获取 Application runtime；
-3. MUST 不暴露 RuntimeContext 作为公共契约；
-4. MUST 不把 infrastructure exception 原样抛给调用方；
-5. SHOULD 只返回稳定 DTO、dict view、value object 或明确 response model；
-6. MUST 不要求外部消费者理解内部 UseCase 目录结构；
-7. MUST 不直接调用具体 C library、driver、database、network client。
-
-#### 3.3 Composition Root
-
-`container.py` 或等价 composition root 可以位于包根目录。Composition Root 是唯一允许同时 import Application、Infrastructure、Adapters 的组装点。
-
-API / Facade 可以通过 Composition Root 构建运行态对象，但 API / Facade 自身不得散落具体依赖组装逻辑。
-
-Composition Root 负责 wiring，而不是业务规则。典型职责包括：
-
-1. 创建 config loader；
-2. 创建 infrastructure backend factory；
-3. 创建 driver adapter factory；
-4. 将 backend 注入 adapter；
-5. 调用 Application workflow 构建 runtime context。
-
-Composition Root 可以 import adapters 与 infrastructure；除 Composition Root 和明确的 infrastructure factory 外，业务路径不得把具体 backend 创建逻辑散落到 API、UseCase、runtime 或 adapter wrapper 中。
+1. `adapters/drivers/` 只做转换、委托和端口适配；
+2. `adapters/drivers/` 禁止直接创建 socket、process、native handle、SDK client；
+3. 真实 backend 只能由 `infrastructure/drivers/backend_factory.py` 或 `container.py` 创建；
+4. `adapters/drivers/backend_ports.py` 是 adapter-local backend protocol，不是 application port；
+5. UseCase 禁止依赖 `adapters/drivers/backend_ports.py`。
 
 ---
 
-### 4. Interface Adapters 层（接口适配器层）
+# 4. 标准目录白名单
 
-#### 4.1 职责
+## 4.1 包根目录白名单
 
-Interface Adapters 层是内外层之间的数据转译层。
-
-它负责将外部输入转换为 API / Facade 或 Application 可理解的数据结构，并将内部输出转换为外部展示、传输或响应格式。
-
-#### 4.2 包含元素
-
-Interface Adapters 可包含：
-
-- CLI Controller；
-- Web Controller；
-- RPC Handler；
-- Message Consumer；
-- Presenter；
-- Serializer / Deserializer；
-- Gateway / Repository Adapter；
-- Port implementation wrapper。
-
-#### 4.3 规则
-
-Interface Adapters 必须满足：
-
-1. Controller 必须调用 API / Facade，禁止直接跨过 API / Facade 调用深层 use case，除非该工程明确不提供 API / Facade；
-2. Presenter 只负责格式转换，不得执行业务规则；
-3. Adapter 可实现 Application Port，但不得把具体技术模型泄漏到 Application；
-4. Adapter 可以调用 Infrastructure，但必须把 Infrastructure 返回值转换为 Application 所需模型；
-5. Adapter 必须捕获外部输入格式错误，并转换为稳定的应用层错误；
-6. Adapter 禁止持有 Domain 不允许出现的物理资源作为领域对象成员。
-
-#### 4.4 Strict Driver DI 变体
-
-当系统采用驱动后端注入模式时，Driver Adapter 必须满足更严格边界：
-
-1. Adapter 禁止直接 import Infrastructure；
-2. Adapter 只依赖本层本地 Protocol 或 Application Port；
-3. 具体 backend 必须由 `container.py`、Infrastructure backend factory 或等价 composition root 创建；
-4. Adapter 必须通过构造函数接收 backend，不得自行创建 socket、process、native runner 或具体 SDK 对象；
-5. 测试必须能注入 fake backend 或替换 composition root。
-
-`adapters/drivers/backend_ports.py` 属于 adapter-local backend protocol，只用于隔离 adapter wrapper 与 infrastructure backend。它不属于 application port，不得被 UseCase 当作业务 outport 使用，也不得进入 `application/ports/`。
-
-adapter-local backend protocol 可以描述 adapter 委托所需的 backend 操作，例如 `start()`、`stop()`、`read()`、`write()`、`health()`、`capabilities()`、环境探测或 backend 创建接口。该 protocol 的语义是“adapter 到 backend 的局部委托契约”，不是“Application 到外部能力的业务契约”。
-
----
-
-### 5. Infrastructure 层（基础设施层）
-
-#### 5.1 职责
-
-Infrastructure 层承载所有具体技术实现和物理外部依赖。
-
-包括但不限于：
-
-- 数据库；
-- 文件系统；
-- 网络 I/O；
-- Web 框架底座；
-- CLI 框架底座；
-- 消息队列；
-- 第三方 SDK；
-- Native C/C++/Rust 模块；
-- OS 进程、线程、信号；
-- 硬件设备；
-- 协议 driver；
-- 缓存、对象存储、搜索引擎；
-- 运行时监控和底层日志接入。
-
-#### 5.2 规则
-
-Infrastructure 必须满足：
-
-1. MAY import Application Ports 并实现它们；
-2. MAY import 第三方库、driver、native binding、framework；
-3. MUST NOT 被 Domain 直接依赖；
-4. MUST NOT 被 Application 直接依赖，除 Composition Root 外；
-5. MUST 捕获 native/network/OS/framework exception，并转换为 application-level 或 domain-level exception；
-6. MUST 不把底层异常穿透到 API / Facade；
-7. SHOULD 把高频跨边界操作设计为 batch / buffer / stream；
-8. SHOULD 隔离 ctypes / cffi / subprocess / socket / database session 等资源生命周期。
-
-#### 5.3 Infrastructure backend factory
-
-`infrastructure/drivers/backend_factory.py` 或等价 infrastructure backend factory 负责创建真实 backend，并集中处理 socket、PTY、native runner、subprocess、环境变量、二进制探测、第三方 SDK client 等物理实现细节。
-
-Infrastructure backend factory 必须满足：
-
-1. MAY import 具体 infrastructure backend、第三方库、native/process/socket 支撑模块；
-2. MUST NOT 被 Domain 或 Application import；
-3. MUST 不把 socket、process handle、native pointer、SDK client 等物理细节泄漏给 adapters 的 public API；
-4. SHOULD 返回符合 adapter-local backend protocol 的对象；
-5. SHOULD 把环境探测结果收敛为稳定 mode、reason 或结构化结果，供 adapter factory 使用；
-6. MUST 不承载业务规则。
-
----
-
-## 二、 工程树结构
-
-以下工程树是通用模板。`<package_name>` 应替换为实际项目包名。示例中的协议、驱动、native、device、runtime 等命名用于说明高外部依赖系统如何落位；普通业务系统可以替换为 database、payment、notification、workflow、reporting、search 等业务命名，但不得改变分层边界和依赖方向。
+`application_profile`、`runtime_engine_profile`、`strict_driver_di_profile` 下，包根只允许：
 
 ```text
 src/<package_name>/
-├── README.md                        — 包级架构、运行方式、公共入口说明
-├── __init__.py                      — 对外只导出稳定 API / Facade，不导出内部 use case
-├── __main__.py                      — 可选：CLI 启动入口，只调用 adapters 或 api/facade
-├── container.py                     — Composition Root；唯一允许集中组装 Application 与 Infrastructure 的位置
-│
-├── api/                             # ===== API / FACADE 层：公共稳定入口 =====
-│   ├── __init__.py                  — 导出公共 Facade
-│   └── runtime_facade.py            — 示例：class XxxRuntime / XxxManager / XxxClientFacade
-│
-├── domain/                          # ===== DOMAIN 层：纯核心模型、规则、算法 =====
-│   ├── __init__.py
-│   ├── exceptions.py                — 领域规则异常；不得承载底层 I/O 异常
-│   ├── entities/                    — 具有业务身份和生命周期的实体
-│   │   └── <entity>.py
-│   ├── value_objects/               — 不可变值对象
-│   │   └── <value_object>.py
-│   ├── services/                    — 无状态领域服务；纯业务/纯算法/纯编解码
-│   │   └── <domain_service>.py
-│   └── protocols/                   — 可选：纯协议/格式/帧/编码模型；无网络 I/O
-│       └── <protocol_name>/
-│           ├── frame.py
-│           ├── codec.py
-│           └── types.py
-│
-├── application/                     # ===== APPLICATION 层：用例执行、端口、运行态 =====
-│   ├── __init__.py
-│   ├── exceptions.py                — 应用执行异常；对 infrastructure 异常进行收敛后的稳定异常
-│   │
-│   ├── use_cases/                   # ===== 行为入口：原子 UseCase + Workflow + DTO =====
-│   │   ├── __init__.py
-│   │   ├── dtos.py                  — UseCase 输入/输出 DTO；优先 frozen dataclass
-│   │   ├── atomic/                  — 原子用例；每个用例表达单一执行意图
-│   │   │   ├── __init__.py
-│   │   │   ├── start.py             — 示例：启动类动作
-│   │   │   ├── stop.py              — 示例：停止类动作
-│   │   │   ├── status.py            — 示例：状态查询类动作
-│   │   │   └── describe.py          — 示例：结构描述类动作
-│   │   └── workflows/               — Composite UseCase；组合原子 UseCase，不是独立层
-│   │       ├── __init__.py
-│   │       └── <workflow>.py
-│   │
-│   ├── ports/                       # ===== 输出端口：Application 依赖外部能力的抽象契约 =====
-│   │   ├── __init__.py
-│   │   ├── config_loader_port.py    — 示例：配置/计划加载抽象
-│   │   ├── driver_port.py           — 示例：外部执行驱动抽象
-│   │   ├── repository_port.py       — 示例：持久化抽象
-│   │   └── event_publisher_port.py  — 示例：事件发布抽象
-│   │
-│   └── runtime/                     # ===== Execution Kernel：进程内运行态模型 =====
-│       ├── __init__.py
-│       ├── context.py               — RuntimeContext；runtime root object
-│       ├── state.py                 — 状态机 / 生命周期状态
-│       ├── graph.py                 — 执行图 / 拓扑图 / 依赖图
-│       ├── event_bus.py             — 进程内事件分发
-│       └── snapshot.py              — 快照 / 诊断视图 / 恢复视图
-│
-├── adapters/                        # ===== INTERFACE ADAPTERS 层：输入输出转译 =====
-│   ├── __init__.py
-│   ├── controllers/                 — CLI / Web / RPC / Message controllers
-│   │   ├── __init__.py
-│   │   └── cli_controller.py
-│   ├── presenters/                  — 输出格式化
-│   │   ├── __init__.py
-│   │   └── status_presenter.py
-│   ├── serializers/                 — 外部格式与 DTO 转换
-│   │   ├── __init__.py
-│   │   └── json_serializer.py
-│   ├── gateways/                    — Port 实现外壳；可委托 infrastructure
-│   │   ├── __init__.py
-│   │   └── <gateway_adapter>.py
-│   └── drivers/                     — DriverPort adapter；只做转换、委托和端口适配
-│       ├── __init__.py
-│       ├── backend_ports.py         — adapter-local backend protocol；不是 application port
-│       ├── factory/
-│       │   ├── __init__.py          — driver adapter factory；接收 backend factory 注入
-│       └── <driver_adapter>.py
-│
-└── infrastructure/                  # ===== INFRASTRUCTURE 层：具体技术实现 =====
-    ├── __init__.py
-    ├── file_loaders/                — 文件系统配置/计划加载实现
-    │   ├── __init__.py
-    │   └── json_config_loader.py
-    ├── repositories/                — 数据库 / 缓存 / 对象存储实现
-    │   ├── __init__.py
-    │   └── <repository_impl>.py
-    ├── drivers/                     — socket / PTY / subprocess / SDK / native backend 实现
-    │   ├── __init__.py
-    │   ├── backend_factory.py       — 创建真实 backend；集中物理探测与 backend wiring
-    │   └── <driver_backend>.py
-    ├── native/                      — 可选：C/C++/Rust/二进制/子进程/FFI 底座
-    │   ├── __init__.py
-    │   ├── process_handle.py
-    │   ├── bindings.py
-    │   └── bin/
-    ├── messaging/                   — 可选：MQ / Event streaming 具体实现
-    │   ├── __init__.py
-    │   └── <message_client>.py
-    └── web/                         — 可选：FastAPI / Flask / ASGI 等框架底座
-        ├── __init__.py
-        └── app.py
+├── README.md
+├── __init__.py
+├── __main__.py
+├── container.py
+├── api/
+├── domain/
+├── application/
+├── adapters/
+└── infrastructure/
 ```
 
-工程树约束：
-
-1. `application/` 下核心子目录必须稳定为 `use_cases/`、`ports/`、`runtime/`。
-2. Workflow 必须归入 `application/use_cases/workflows/`，禁止作为 application 一级目录。
-3. DTO 必须归入 `application/use_cases/dtos.py` 或 `application/use_cases/dtos/`，禁止作为 application 一级目录。
-4. Ports 必须归入 `application/ports/`，禁止放入 infrastructure。
-5. runtime 必须归入 `application/runtime/`，禁止归入 DTO、Domain 或 Infrastructure。
-6. Composition Root 必须集中在 `container.py` 或等价位置，禁止散落在 manager、controller、use case 中。
-7. 具体技术实现必须归入 `infrastructure/`，外部输入输出转换必须归入 `adapters/`。
-8. 包根 `__init__.py` 只能导出公共 API / Facade，不得导出 Application 内部对象。
-
----
-
-## 三、 研发守则
-
-### 1. 依赖方向守则
-
-1. Domain 禁止依赖 Application、API、Adapters、Infrastructure。
-2. Application 禁止依赖 API、Adapters、Infrastructure。
-3. Application 只能通过 Ports 表达外部能力需求。
-4. API / Facade 可以依赖 Application，但禁止依赖具体 Infrastructure 实现。
-5. Adapters 可以依赖 API / Facade、Application DTO、Application Ports。
-6. Infrastructure 可以依赖 Application Ports 并实现它们。
-7. Composition Root 可以 import 所有层，但只能负责装配，不得承载业务逻辑。
-8. Strict Driver DI 模式下，Adapters 禁止直接 import Infrastructure，必须通过 adapter-local backend protocol 与构造注入委托 backend。
-9. adapter-local backend protocol 不等于 Application outport；UseCase 不得依赖 `adapters/drivers/backend_ports.py`。
-10. backend 创建只能发生在 `container.py`、`infrastructure/drivers/backend_factory.py` 或等价 composition root / infrastructure factory。
-
----
-
-### 2. 自动化边界校验守则
-
-项目必须支持架构边界的静态校验。
-
-建议使用：
-
-- import-linter；
-- deptry；
-- ruff；
-- mypy / pyright；
-- pytest import boundary tests。
-
-CI 中应当至少校验：
-
-1. Domain 不 import 外层；
-2. Application 不 import Infrastructure；
-3. Application 不 import Adapters；
-4. Ports 不 import Infrastructure；
-5. Ports 不 import Adapters；
-6. Strict Driver DI 模式下，Adapters 不 import Infrastructure；
-7. Infrastructure 不 import Adapters；
-8. API 不暴露 RuntimeContext；
-9. infrastructure exception 不穿透 API；
-10. public API 和 ports 无未解释的 `Any`。
-
-可使用 grep、import-linter 或等价工具固化以下检查：
+禁止在包根新增：
 
 ```text
-rg "from <package>.infrastructure|import <package>.infrastructure" src/<package>/adapters
-rg "from <package>.adapters|import <package>.adapters|from <package>.infrastructure|import <package>.infrastructure" src/<package>/application src/<package>/domain
-rg "from <package>.adapters|import <package>.adapters" src/<package>/infrastructure
+core/
+common/
+utils/
+helpers/
+services/
+service/
+managers/
+manager/
+orchestration/
+engine/
+runtime/
+scheduler/
+clients/
+repositories/
+drivers/
 ```
 
-Coding Agent 生成或移动文件后，必须执行边界检查；边界检查失败时，必须优先修复架构边界，而不是修改测试规避失败。
+如确需新增包根一级目录，必须先修改 `architecture.md` 的白名单，并说明原因。
 
 ---
 
-### 3. API / Facade 守则
+## 4.2 domain 白名单
 
-1. 外部消费者必须通过包根或 `api/` 暴露的 Facade 使用系统。
-2. CLI、Web、测试脚本不得直接调用 `application/use_cases/atomic/` 内部文件。
-3. API / Facade 不得暴露 RuntimeContext。
-4. API / Facade 不得暴露 infrastructure 原生异常。
-5. API / Facade 的 public method 必须有完整类型提示和返回值注解。
-6. API / Facade 返回值必须稳定，禁止返回内部可变状态对象。
+```text
+domain/
+├── __init__.py
+├── exceptions.py
+├── entities/
+├── value_objects/
+├── services/
+└── protocols/
+```
 
----
+说明：
 
-### 4. UseCase 守则
+1. `domain/entities/`：有业务身份和生命周期的实体；
+2. `domain/value_objects/`：不可变值对象；
+3. `domain/services/`：无状态纯规则、纯算法、纯编解码；
+4. `domain/protocols/`：可选，纯协议模型、帧结构、编码规则，不含网络 I/O。
 
-1. 原子 UseCase 必须表达单一执行意图。
-2. Workflow 是 Composite UseCase，必须放在 `use_cases/workflows/`。
-3. Workflow 不得成为独立架构层。
-4. UseCase 不得直接创建或调用具体 driver、DB、socket、C library、SDK。
-5. UseCase 必须通过 Ports 使用外部能力。
-6. UseCase 中不得出现框架绑定代码，例如 Typer、FastAPI、Click、SQLAlchemy session、ctypes binding。
-7. UseCase 的输入输出必须具有明确类型。
-8. UseCase 异常必须收敛为 application-level exception。
+Domain 禁止：
 
----
-
-### 5. DTO 守则
-
-1. Application DTO SHOULD 使用 `dataclass(frozen=True)`。
-2. API / Adapter 边界 DTO MAY 使用 Pydantic frozen model。
-3. DTO 禁止包含业务逻辑。
-4. DTO 禁止持有依赖注入对象。
-5. DTO 禁止继承 ORM、Web Request、Driver Model、SDK Model。
-6. DTO 禁止作为 runtime state 使用。
-7. DTO 必须具备完整类型注解。
-8. DTO 禁止通过 `dict[str, Any]` 长距离传递，除非该结构被显式定义为稳定 schema。
-
----
-
-### 6. Ports 守则
-
-1. Ports 必须是 ABC、Protocol 或等价抽象契约。
-2. Ports 必须包含完整类型提示和返回值注解。
-3. Ports 禁止包含具体实现。
-4. Ports 禁止 import infrastructure。
-5. Ports 禁止 import adapters。
-6. Ports 禁止 import framework。
-7. Ports 是 Application outport，只能表达 UseCase 所需外部能力，不得表达 adapter-local backend 委托细节。
-8. Ports 禁止使用未解释的 `Any`。
-9. 高频路径 Ports 必须优先设计 batch / buffer / frame-level 接口。
-10. 新增业务外部能力时，必须先定义 application port，再实现 Infrastructure 或 Adapter。
+```text
+ORM
+database session
+socket
+file I/O
+thread
+process
+asyncio runtime primitive
+framework
+SDK client
+driver object
+infrastructure object
+```
 
 ---
 
-### 7. Runtime 守则
+## 4.3 application 白名单
 
-1. runtime 是 Application 内部执行内核状态系统。
-2. RuntimeContext 是 runtime root object。
-3. RuntimeContext 必须显式声明所有子组件类型。
-4. RuntimeContext 禁止使用 kwargs / setattr 动态挂载。
-5. RuntimeContext 禁止作为 DTO、API response、adapter schema。
-6. runtime 禁止 import infrastructure。
-7. runtime 可维护状态，但业务规则不得堆入 RuntimeContext。
-8. runtime 状态变化必须由 state、graph、event_bus 等专门组件承担。
+```text
+application/
+├── __init__.py
+├── exceptions.py
+├── use_cases/
+├── ports/
+└── runtime/
+```
 
----
+application 一级目录禁止新增：
 
-### 8. Domain 纯洁度守则
+```text
+services/
+service/
+orchestration/
+workflow/
+workflows/
+manager/
+managers/
+helper/
+helpers/
+common/
+utils/
+engine/
+scheduler/
+```
 
-1. Domain 禁止 import 外部技术栈。
-2. Domain 禁止执行 I/O。
-3. Domain 禁止创建线程、进程、Socket、event loop。
-4. Domain 禁止 import asyncio 运行时原语。
-5. Domain 可以建模抽象时间、deadline、tick、duration。
-6. Domain 可以使用纯 Python 内存结构表达高性能数据视图。
-7. Domain 中的协议、格式、算法、状态机必须可脱离外部环境单元测试。
-8. Domain exception 只能表示领域规则或协议规则违反。
+这些职责必须归入：
 
----
-
-### 9. Infrastructure 守则
-
-1. Infrastructure 承载所有具体技术实现。
-2. Infrastructure 可以 import 第三方库、driver、native binding、framework。
-3. Infrastructure 必须实现 Application Ports 或被 Adapter 委托调用。
-4. Infrastructure 必须管理底层资源生命周期。
-5. Infrastructure 必须捕获底层异常并转换为 application/domain exception。
-6. Infrastructure 禁止把底层模型直接泄漏到 Application。
-7. Infrastructure 高频操作必须优先使用 batch / buffer / stream。
-8. Native / FFI 调用必须避免单元素频繁跨边界调用。
-9. Infrastructure backend factory 负责创建真实 backend 和执行物理探测。
-10. Infrastructure backend factory 禁止被 Application / Domain import。
-11. Infrastructure backend factory 不得把物理资源对象泄漏到 Adapter public API。
+```text
+application/use_cases/
+application/ports/
+application/runtime/
+```
 
 ---
 
-### 10. Interface Adapter 守则
+## 4.4 application/use_cases 白名单
 
-1. Controller 负责外部输入解析，不负责业务逻辑。
-2. Presenter 负责输出格式化，不负责业务逻辑。
-3. Serializer 负责格式转换，不负责业务逻辑。
-4. Adapter 可以实现 Port，但不得让具体技术模型越过 Port 边界。
-5. Adapter 必须调用 API / Facade 或稳定 Application contract。
-6. Adapter 不得绕过 API / Facade 直接操作 runtime。
-7. Adapter 捕获外部输入错误后，必须转换为稳定错误模型。
-8. Strict Driver DI 模式下，Adapter 禁止直接 import Infrastructure。
-9. Adapter-local backend protocol 只隔离 Adapter 与 backend，不得作为 UseCase outport。
-10. Driver Adapter 必须通过构造函数接收 backend，不得自行创建真实 backend。
+```text
+application/use_cases/
+├── __init__.py
+├── dtos.py
+├── atomic/
+└── workflows/
+```
 
-### 10.1 Composition Root 守则
+允许扩展：
 
-1. `container.py` 是默认 composition root。
-2. Composition Root 可以同时 import Application、Adapters 与 Infrastructure。
-3. Composition Root 负责 wiring config loader、backend factory、driver adapter factory 与 runtime context。
-4. Composition Root 不得包含业务规则、协议规则或领域状态转移逻辑。
-5. Composition Root 不得替代 Application UseCase；它只负责组装并调用 UseCase / workflow。
+```text
+application/use_cases/dtos/
+application/use_cases/common/
+```
 
----
+规则：
 
-### 11. 异常收敛守则
-
-1. Domain exception 表示领域规则、协议规则、核心不变量违反。
-2. Application exception 表示用例执行失败、外部能力不可用、runtime 装配失败。
-3. Infrastructure 原生异常必须被捕获。
-4. Native crash、socket error、database error、SDK error、filesystem error 不得穿透到 API / Facade。
-5. API / Facade 只能暴露稳定异常、错误码或错误响应模型。
-6. 不得在上层代码中依赖底层第三方异常类型。
+1. 原子 UseCase 放入 `atomic/`；
+2. 组合流程放入 `workflows/`；
+3. DTO 放入 `dtos.py` 或 `dtos/`；
+4. UseCase 类必须提供 `execute()` 方法；
+5. UseCase 禁止直接 import infrastructure、adapters、framework、ORM、driver、SDK；
+6. UseCase 必须通过 `application/ports/` 访问外部能力。
 
 ---
 
-### 12. Agent 自动化与类型提示守则
+## 4.5 application/ports 白名单
 
-1. Coding Agent 新增能力时，必须先定位目标层，再创建文件。
-2. Coding Agent 禁止创建 `services/`、`helpers/`、`misc/`、`common/` 等含混目录来逃避分层。
-3. Coding Agent 新增外部能力时，必须先定义 `application/ports/` 契约，再实现 `infrastructure/`。
-4. Coding Agent 新增 UseCase 时，必须同步补充 DTO、测试和异常路径。
-5. `api/` 和 `ports/` 层 public method 必须 100% 具备类型提示和返回值注解。
-6. 禁止在 public API 和 ports 中生成未解释的 `Any`。
-7. 若必须使用不透明值，必须定义类型别名并写明语义。
-8. Coding Agent 修改目录结构后，必须更新工程树文档和边界校验。
-9. Coding Agent 不得因测试失败而放宽架构边界。
-10. Coding Agent 不得将 framework、driver、native、ORM 模型直接塞入 DTO 或 Domain。
+```text
+application/ports/
+├── __init__.py
+├── <capability>_port.py
+└── types.py
+```
+
+规则：
+
+1. Port 必须使用 `abc.ABC`、`typing.Protocol` 或等价抽象；
+2. Port 只定义契约，不包含具体实现；
+3. Port 必须有完整类型注解；
+4. Port 禁止 import infrastructure；
+5. Port 禁止 import adapters；
+6. Port 禁止 import framework、ORM、driver、SDK、native binding；
+7. 高频 I/O 必须优先设计 batch / buffer / stream 接口。
+
+禁止 hot path 设计：
+
+```python
+for item in items:
+    port.write_one(item)
+```
+
+推荐：
+
+```python
+port.write_batch(items)
+port.write_frame(frame)
+port.write_buffer(buffer)
+port.read_batch(query)
+```
+
+---
+
+## 4.6 application/runtime 白名单
+
+```text
+application/runtime/
+├── __init__.py
+├── context.py
+├── state.py
+├── graph.py
+├── event_bus.py
+└── snapshot.py
+```
+
+可选：
+
+```text
+engine.py
+task_group.py
+lifecycle.py
+diagnostics.py
+scheduler_state.py
+```
+
+规则：
+
+1. RuntimeContext 是运行态 root object；
+2. RuntimeContext 必须显式声明子组件类型；
+3. 禁止使用 `kwargs`、`setattr` 动态挂载运行期对象；
+4. RuntimeContext 禁止作为 API response、DTO、adapter schema；
+5. runtime 禁止 import infrastructure；
+6. runtime 可以维护进程内状态，但业务规则不得堆入 RuntimeContext；
+7. 状态变化应交给 `state.py`、`graph.py`、`event_bus.py` 等专门组件。
+
+---
+
+## 4.7 api 白名单
+
+```text
+api/
+├── __init__.py
+└── <package>_facade.py
+```
+
+规则：
+
+1. API / Facade 是公共稳定入口；
+2. CLI、Web、测试脚本、外部 SDK 消费者应调用 API / Facade；
+3. API / Facade 不暴露 RuntimeContext；
+4. API / Facade 不暴露 infrastructure exception；
+5. API / Facade 不要求调用者理解内部 UseCase 拆分；
+6. 包根 `__init__.py` 只导出稳定 Facade，不导出内部 UseCase、RuntimeContext、Port 实现。
+
+---
+
+## 4.8 adapters 白名单
+
+```text
+adapters/
+├── __init__.py
+├── controllers/
+├── presenters/
+├── serializers/
+├── gateways/
+└── drivers/
+```
+
+职责：
+
+| 目录 | 职责 |
+|---|---|
+| `controllers/` | CLI / Web / RPC / Message controller，负责输入解析 |
+| `presenters/` | 输出格式化 |
+| `serializers/` | JSON / YAML / CSV / JSONL / 外部格式转换 |
+| `gateways/` | Application Port 的适配外壳 |
+| `drivers/` | DriverPort adapter，做转换、委托和 backend protocol 适配 |
+
+规则：
+
+1. Controller 应调用 API / Facade；
+2. Presenter 不得包含业务规则；
+3. Serializer 不得访问数据库、driver、runtime；
+4. Gateway 可以实现 Application Port；
+5. Adapter 不得把外部技术模型泄漏到 Application；
+6. Strict Driver DI 下，`adapters/drivers/` 禁止直接 import infrastructure。
+
+---
+
+## 4.9 infrastructure 白名单
+
+```text
+infrastructure/
+├── __init__.py
+├── repositories/
+├── file_loaders/
+├── drivers/
+├── native/
+├── messaging/
+├── data_sources/
+├── schedulers/
+├── telemetry/
+└── web/
+```
+
+说明：
+
+| 目录 | 职责 |
+|---|---|
+| `repositories/` | 数据库、缓存、对象存储实现 |
+| `file_loaders/` | 文件系统配置读取 |
+| `drivers/` | socket、SDK、native、process、protocol backend |
+| `native/` | C/C++/Rust、FFI、二进制、子进程底座 |
+| `messaging/` | MQ、Kafka、事件流客户端 |
+| `data_sources/` | 外部数据源、replay、采样、文件流 |
+| `schedulers/` | 真实调度器、sleep、timer、event loop、thread |
+| `telemetry/` | 日志、指标、trace、诊断后端 |
+| `web/` | FastAPI、Flask、ASGI 等框架底座 |
+
+规则：
+
+1. Infrastructure 承载所有具体技术实现；
+2. Infrastructure 可以 import 第三方库、ORM、SDK、driver、native binding；
+3. Infrastructure 可以实现 Application Port；
+4. Infrastructure 禁止被 Domain / Application 直接 import；
+5. Infrastructure 必须收敛底层异常；
+6. Infrastructure 不得把底层模型直接泄漏到 Application。
+
+---
+
+# 5. 文件落位决策表
+
+Coding Agent 新增文件前，必须先查此表。
+
+| 目标职责 | 固定位置 |
+|---|---|
+| 领域实体 | `domain/entities/` |
+| 值对象 | `domain/value_objects/` |
+| 纯业务规则 | `domain/services/` |
+| 纯算法 | `domain/services/` |
+| 纯协议帧 / 编码模型 | `domain/protocols/` |
+| 原子用例 | `application/use_cases/atomic/` |
+| 组合用例 / workflow | `application/use_cases/workflows/` |
+| UseCase 输入输出 DTO | `application/use_cases/dtos.py` 或 `application/use_cases/dtos/` |
+| 外部能力抽象 | `application/ports/<capability>_port.py` |
+| 运行态上下文 | `application/runtime/context.py` |
+| 运行态状态机 | `application/runtime/state.py` |
+| 执行图 / 拓扑图 | `application/runtime/graph.py` |
+| 进程内事件总线 | `application/runtime/event_bus.py` |
+| 运行态快照 / 诊断视图 | `application/runtime/snapshot.py` |
+| CLI 参数解析 | `adapters/controllers/` |
+| Web / RPC 输入转换 | `adapters/controllers/` |
+| 输出展示格式化 | `adapters/presenters/` |
+| JSON / JSONL / YAML / CSV 转换 | `adapters/serializers/` |
+| Application Port 实现外壳 | `adapters/gateways/` |
+| driver adapter | `adapters/drivers/` |
+| adapter-local backend protocol | `adapters/drivers/backend_ports.py` |
+| 数据库实现 | `infrastructure/repositories/` |
+| 文件读取实现 | `infrastructure/file_loaders/` |
+| 真实 driver / SDK / socket / process backend | `infrastructure/drivers/` |
+| native / FFI / binary 支撑 | `infrastructure/native/` |
+| MQ / Kafka / Event Stream 客户端 | `infrastructure/messaging/` |
+| 真实数据源实现 | `infrastructure/data_sources/` |
+| 真实调度器实现 | `infrastructure/schedulers/` |
+| 日志 / 指标 / trace 后端 | `infrastructure/telemetry/` |
+| Web framework 底座 | `infrastructure/web/` |
+| 依赖组装 | `container.py` |
+| 公共入口 | `api/` |
+
+如果表中没有对应项，禁止直接新增目录。  
+必须先更新本文档的目录白名单和落位表。
+
+---
+
+# 6. 命名规则
+
+## 6.1 目录命名
+
+固定使用：
+
+```text
+api
+domain
+application
+use_cases
+ports
+runtime
+adapters
+controllers
+presenters
+serializers
+gateways
+drivers
+infrastructure
+repositories
+file_loaders
+native
+messaging
+data_sources
+schedulers
+telemetry
+```
+
+禁止同义替换：
+
+| 禁止 | 应改为 |
+|---|---|
+| `usecases` | `use_cases` |
+| `service` / `services` under application | `use_cases` / `runtime` / `domain/services` |
+| `manager` / `managers` | 按职责落入 `use_cases` 或 `runtime` |
+| `helper` / `helpers` | 按职责落入明确目录 |
+| `common` / `utils` | 按职责落入明确目录 |
+| `orchestration` under application | `application/use_cases/workflows` |
+| `engine` at package root | `application/runtime/engine.py` |
+| `scheduler` at package root | `infrastructure/schedulers` 或 `application/runtime/scheduler_state.py` |
+| `client` at package root | `infrastructure/<capability>/` 或 `adapters/gateways/` |
+
+---
+
+## 6.2 文件命名
+
+| 类型 | 命名格式 |
+|---|---|
+| Port | `<capability>_port.py` |
+| UseCase | 动词短语，例如 `start_runtime.py`、`build_write_plan.py` |
+| Workflow | 业务流程名，例如 `run_scenario.py` |
+| DTO | `dtos.py` 或 `<name>_dto.py` |
+| Gateway | `<capability>_gateway.py` |
+| Serializer | `<format>_serializer.py` 或 `<object>_serializer.py` |
+| Backend | `<capability>_backend.py` |
+| Factory | `<capability>_factory.py` |
+| Runtime state | `state.py` |
+| Runtime context | `context.py` |
+
+禁止：
+
+```text
+xxx_helper.py
+xxx_utils.py
+xxx_manager.py
+xxx_service.py  # application 下禁止；domain/services 下允许
+misc.py
+common.py
+temp.py
+new.py
+test2.py
+```
+
+---
+
+# 7. 分层职责
+
+## 7.1 Domain
+
+Domain 负责最核心、最稳定、与外部技术无关的模型和规则。
+
+允许：
+
+```text
+entity
+value object
+domain service
+pure algorithm
+pure validation
+pure state transition
+pure codec / protocol format calculation
+```
+
+禁止：
+
+```text
+database
+ORM
+file I/O
+network I/O
+socket
+thread
+process
+asyncio task
+SDK client
+driver
+framework
+infrastructure model
+```
+
+Domain 可以表达抽象时间：
+
+```python
+tick(now)
+deadline
+timestamp
+duration
+```
+
+Domain 禁止直接 sleep、等待事件或创建 event loop。
+
+---
+
+## 7.2 Application
+
+Application 负责用例执行、流程编排、端口调用和运行态管理。
+
+允许：
+
+```text
+use case
+workflow
+DTO
+port
+runtime context
+runtime state
+runtime graph
+runtime event bus
+application exception
+```
+
+禁止：
+
+```text
+ORM session
+database client
+socket
+SDK client
+driver object
+native handle
+framework binding
+CLI parser
+Web request object
+```
+
+Application 只能通过 `application/ports/` 访问外部能力。
+
+---
+
+## 7.3 API / Facade
+
+API / Facade 负责提供稳定公共入口。
+
+规则：
+
+1. 外部消费者调用 API / Facade；
+2. API / Facade 可以调用 UseCase 或通过 `container.py` 获取运行入口；
+3. API / Facade 禁止暴露 RuntimeContext；
+4. API / Facade 禁止暴露底层异常；
+5. API / Facade 返回稳定 DTO、value object、dict view 或 response model；
+6. API / Facade 不包含具体 wiring 细节。
+
+---
+
+## 7.4 Adapters
+
+Adapters 负责内外数据转换。
+
+允许：
+
+```text
+CLI controller
+Web controller
+RPC handler
+message consumer
+presenter
+serializer
+gateway
+driver adapter
+```
+
+禁止：
+
+```text
+业务规则
+领域状态转移
+直接堆运行态状态
+把 ORM / SDK / driver model 泄漏到 Application
+```
+
+---
+
+## 7.5 Infrastructure
+
+Infrastructure 负责所有具体技术实现。
+
+允许：
+
+```text
+database
+ORM
+file system
+network
+socket
+SDK
+driver
+native binding
+subprocess
+thread
+event loop
+message queue
+framework
+monitoring backend
+```
+
+规则：
+
+1. Infrastructure 可以实现 Application Port；
+2. Infrastructure 可以依赖第三方库；
+3. Infrastructure 禁止被 Domain / Application import；
+4. Infrastructure 必须捕获底层异常并转换；
+5. 高频边界必须优先 batch / buffer / stream。
+
+---
+
+# 8. Import 边界矩阵
+
+| From \ To | domain | application | api | adapters | infrastructure |
+|---|---:|---:|---:|---:|---:|
+| domain | ✅ | ❌ | ❌ | ❌ | ❌ |
+| application | ✅ | ✅ | ❌ | ❌ | ❌ |
+| api | ✅ | ✅ | ✅ | ❌ | ❌ |
+| adapters | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| infrastructure | ✅ | ✅ ports only | ❌ | ❌ | ✅ |
+| container.py | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+说明：
+
+1. `infrastructure → application` 只允许依赖 `application/ports/` 和稳定 DTO；
+2. `adapters → infrastructure` 默认允许 gateway 委托场景使用；
+3. 启用 `strict_driver_di_profile` 后，`adapters/drivers/ → infrastructure` 禁止；
+4. `container.py` 可以 import 所有层，但只能负责装配，禁止承载业务规则。
+
+---
+
+# 9. Codex 执行规则
+
+Coding Agent 修改项目时，必须遵守以下流程。
+
+## 9.1 新增能力流程
+
+新增能力必须按顺序执行：
+
+```text
+1. 判断能力类型
+2. 查询文件落位决策表
+3. 若涉及外部能力，先定义 application/ports/
+4. 再实现 adapters 或 infrastructure
+5. 在 container.py 组装
+6. 通过 api/facade 暴露
+7. 更新 README.md 或 architecture.md 的目录树
+8. 运行边界检查
+```
+
+禁止：
+
+```text
+先创建 helpers/utils/common 放临时代码
+在 use case 中直接创建 DB / driver / SDK
+在 application 下新建 services/managers/orchestration
+在包根新建 clients/repositories/drivers
+绕过 api/facade 让 CLI 直接调用深层 use case
+```
+
+---
+
+## 9.2 修改目录结构流程
+
+如需移动或新增目录，必须：
+
+```text
+1. 先确认当前模块 Profile
+2. 检查目标目录是否在白名单中
+3. 若不在白名单，先修改本规范或模块 architecture.md
+4. 迁移 import
+5. 更新 __init__.py 导出
+6. 更新 README.md 目录树
+7. 运行边界检查
+```
+
+禁止 Codex 为了解决一个局部问题随意创建新一级目录。
+
+---
+
+## 9.3 外部能力接入流程
+
+外部能力包括：
+
+```text
+database
+file system
+network
+message queue
+SDK
+driver
+native binding
+subprocess
+scheduler
+clock
+telemetry
+external API
+```
+
+接入流程：
+
+```text
+1. 在 application/ports/ 定义 port
+2. 在 infrastructure/ 或 adapters/ 实现 port
+3. 在 container.py 注入 use case 或 runtime
+4. UseCase 只依赖 port
+5. Runtime 只依赖 port 或已装配组件
+```
+
+禁止：
+
+```python
+# 禁止
+from package.infrastructure.repositories.xxx import XxxRepository
+
+class SomeUseCase:
+    ...
+```
+
+推荐：
+
+```python
+# 推荐
+from package.application.ports.xxx_repository_port import XxxRepositoryPort
+
+class SomeUseCase:
+    def __init__(self, repository: XxxRepositoryPort) -> None:
+        self._repository = repository
+```
+
+---
+
+# 10. 边界检查
+
+项目必须提供静态边界检查。
+
+最低要求：
+
+```bash
+rg "from <package>.infrastructure|import <package>.infrastructure" src/<package>/domain src/<package>/application
+rg "from <package>.adapters|import <package>.adapters" src/<package>/domain src/<package>/application src/<package>/infrastructure
+rg "from <package>.api|import <package>.api" src/<package>/domain src/<package>/application src/<package>/infrastructure
+```
+
+启用 `strict_driver_di_profile` 时，增加：
+
+```bash
+rg "from <package>.infrastructure|import <package>.infrastructure" src/<package>/adapters/drivers
+```
+
+CI 至少检查：
+
+```text
+1. Domain 不 import 外层
+2. Application 不 import API / Adapters / Infrastructure
+3. Ports 不 import Adapters / Infrastructure / Framework / SDK
+4. Infrastructure 不 import Adapters
+5. API 不暴露 RuntimeContext
+6. UseCase 不直接创建 driver / repository / socket / SDK client
+7. application 下无 services / helpers / managers / orchestration 一级目录
+8. 包根无未登记一级目录
+9. public API 和 ports 有完整类型注解
+10. hot path port 使用 batch / buffer / stream 接口
+```
+
+边界检查失败时，必须修复架构边界，禁止修改检查规则来绕过失败。
+
+---
+
+# 11. 标准工程树
+
+## 11.1 application_profile 标准树
+
+```text
+src/<package_name>/
+├── README.md
+├── __init__.py
+├── __main__.py
+├── container.py
+│
+├── api/
+│   ├── __init__.py
+│   └── <package>_facade.py
+│
+├── domain/
+│   ├── __init__.py
+│   ├── exceptions.py
+│   ├── entities/
+│   ├── value_objects/
+│   └── services/
+│
+├── application/
+│   ├── __init__.py
+│   ├── exceptions.py
+│   ├── use_cases/
+│   │   ├── __init__.py
+│   │   ├── dtos.py
+│   │   ├── atomic/
+│   │   └── workflows/
+│   ├── ports/
+│   │   ├── __init__.py
+│   │   └── <capability>_port.py
+│   └── runtime/
+│       ├── __init__.py
+│       ├── context.py
+│       ├── state.py
+│       ├── graph.py
+│       ├── event_bus.py
+│       └── snapshot.py
+│
+├── adapters/
+│   ├── __init__.py
+│   ├── controllers/
+│   ├── presenters/
+│   ├── serializers/
+│   ├── gateways/
+│   └── drivers/
+│
+└── infrastructure/
+    ├── __init__.py
+    ├── repositories/
+    ├── file_loaders/
+    ├── drivers/
+    ├── messaging/
+    ├── data_sources/
+    ├── schedulers/
+    └── telemetry/
+```
+
+---
+
+## 11.2 runtime_engine_profile 标准树
+
+```text
+src/<package_name>/
+├── README.md
+├── __init__.py
+├── __main__.py
+├── container.py
+│
+├── api/
+│   ├── __init__.py
+│   └── <package>_facade.py
+│
+├── domain/
+│   ├── __init__.py
+│   ├── exceptions.py
+│   ├── entities/
+│   ├── value_objects/
+│   └── services/
+│
+├── application/
+│   ├── __init__.py
+│   ├── exceptions.py
+│   ├── use_cases/
+│   │   ├── __init__.py
+│   │   ├── dtos.py
+│   │   ├── atomic/
+│   │   └── workflows/
+│   ├── ports/
+│   │   ├── __init__.py
+│   │   ├── clock_port.py
+│   │   ├── scheduler_port.py
+│   │   ├── event_port.py
+│   │   └── telemetry_port.py
+│   └── runtime/
+│       ├── __init__.py
+│       ├── context.py
+│       ├── state.py
+│       ├── graph.py
+│       ├── event_bus.py
+│       ├── snapshot.py
+│       ├── engine.py
+│       ├── task_group.py
+│       ├── lifecycle.py
+│       └── diagnostics.py
+│
+├── adapters/
+│   ├── __init__.py
+│   ├── controllers/
+│   ├── presenters/
+│   ├── serializers/
+│   ├── gateways/
+│   └── drivers/
+│
+└── infrastructure/
+    ├── __init__.py
+    ├── repositories/
+    ├── file_loaders/
+    ├── drivers/
+    ├── messaging/
+    ├── data_sources/
+    ├── schedulers/
+    └── telemetry/
+```
+
+---
+
+## 11.3 strict_driver_di_profile 增强树
+
+```text
+src/<package_name>/
+├── adapters/
+│   └── drivers/
+│       ├── __init__.py
+│       ├── backend_ports.py
+│       ├── factory/
+│       │   ├── __init__.py
+│       │   └── driver_adapter_factory.py
+│       └── <driver_adapter>.py
+│
+└── infrastructure/
+    └── drivers/
+        ├── __init__.py
+        ├── backend_factory.py
+        └── <driver_backend>.py
+```
+
+规则：
+
+```text
+UseCase → application/ports/<driver>_port.py
+Gateway / DriverAdapter → adapters/drivers/backend_ports.py
+BackendFactory → infrastructure/drivers/backend_factory.py
+ConcreteBackend → infrastructure/drivers/<driver_backend>.py
+Wiring → container.py
+```
+
+---
+
+# 12. 例外机制
+
+允许例外，但必须显式登记。
+
+例外必须写入 `architecture.md`：
+
+```text
+## Architecture Exceptions
+
+| 日期 | 例外项 | 原因 | 影响范围 | 负责人 | 回收条件 |
+|---|---|---|---|---|---|
+| YYYY-MM-DD | xxx | xxx | xxx | xxx | xxx |
+```
+
+禁止无记录例外。
+
+以下情况不能作为例外理由：
+
+```text
+Codex 自动生成
+临时方便
+测试能过
+文件太少
+以后再整理
+不知道放哪里
+```
+
+如果不知道放哪里，必须先查文件落位决策表。
+
+---
+
+# 13. 最小 Codex Prompt 约束模板
+
+给 Coding Agent 下发任务时，应附带以下约束：
+
+```text
+请严格遵守项目 clean_architecture.md。
+
+要求：
+1. 不得新增未登记一级目录。
+2. application 下只能使用 use_cases、ports、runtime。
+3. 新增外部能力必须先定义 application/ports。
+4. UseCase 禁止 import infrastructure、adapters、framework、ORM、SDK、driver。
+5. 具体技术实现必须放入 infrastructure。
+6. 输入输出转换放入 adapters。
+7. 依赖装配只允许放在 container.py。
+8. 不得创建 services、helpers、managers、common、utils、orchestration 等含混目录。
+9. 修改目录后必须更新 README.md 或 architecture.md 的目录树。
+10. 完成后执行 import 边界检查。
+```
+
+---
+
+# 14. 最终判定规则
+
+当目录设计有争议时，按以下优先级判定：
+
+```text
+1. 依赖方向是否正确
+2. 是否在 Profile 白名单内
+3. 是否符合文件落位决策表
+4. 是否避免含混命名
+5. 是否通过 import 边界检查
+6. 是否对外保持 API / Facade 稳定
+7. 是否减少未来目录漂移
+```
+
+如果一个设计会导致 Codex 后续频繁新增同义目录、重复目录或绕过端口，则该设计不合格。
+
+本规范的最终目标不是追求目录数量最少，而是追求：
+
+```text
+职责稳定
+命名稳定
+依赖稳定
+入口稳定
+装配稳定
+Codex 修改稳定
+```

@@ -25,8 +25,8 @@ from pathlib import Path
 
 import pytest
 
-from seahorse.models.scenario import ScenarioConfig, ScenarioMetadata
-from seahorse.models.plan import (
+from seahorse.domain.scenario import ScenarioConfig, ScenarioMetadata
+from seahorse.domain.plan import (
     SeedPlan,
     SeedEntity,
     ServerConfig,
@@ -38,24 +38,30 @@ from seahorse.models.plan import (
     EndpointPlan,
     AcquisitionTaskPlan,
 )
-from seahorse.models.generation import (
+from seahorse.domain.generation import (
     GeneratedSignalValue,
     GeneratedAlarmEvent,
     GeneratedControlResult,
 )
-from seahorse.models.bundle import ScenarioBundle, _make_serializable
-from seahorse.exporters.serialization import compute_bundle_checksum, bundle_to_serializable
-from seahorse.exporters.bundle_exporter import export_bundle_to_json, save_bundle
-from seahorse.exporters.timeseries_exporter import (
+from seahorse.domain.bundle import ScenarioBundle, _make_serializable
+from seahorse.adapters.serializers.bundle_serialization import (
+    compute_bundle_checksum,
+    bundle_to_serializable,
+)
+from seahorse.adapters.serializers.bundle_json_serializer import (
+    export_bundle_to_json,
+    save_bundle,
+)
+from seahorse.adapters.serializers.timeseries_jsonl_serializer import (
     export_timeseries_to_jsonl,
     save_timeseries,
 )
-from seahorse.exporters.bundle_validator import (
+from seahorse.application.use_cases.bundle_validator import (
     ValidationResult,
     validate_bundle,
     validate_bundle_from_dict,
 )
-from seahorse.orchestration import SeahorseGenerator
+from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
 
 
 # ── Fixtures ────────────────────────────────────────────────────────────────────

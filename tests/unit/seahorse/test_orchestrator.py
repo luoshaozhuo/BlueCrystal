@@ -12,13 +12,13 @@
 """
 from __future__ import annotations
 
-from seahorse.models.scenario import ScenarioConfig
-from seahorse.models.plan import (
+from seahorse.domain.scenario import ScenarioConfig
+from seahorse.domain.plan import (
     SeedPlan,
     ServerConfig,
     SignalProfileItemPlan,
 )
-from seahorse.orchestration import SeahorseGenerator
+from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
 
 
 def test_generator_instantiation() -> None:
@@ -202,7 +202,7 @@ def test_generate_returns_5_tuple() -> None:
     gen = SeahorseGenerator(cfg)
     seed_plan, server_config, signals, alarms, controls = gen.generate()
 
-    from seahorse.models.plan import SeedPlan, ServerConfig
+    from seahorse.domain.plan import SeedPlan, ServerConfig
 
     assert isinstance(seed_plan, SeedPlan)
     assert isinstance(server_config, ServerConfig)
@@ -259,7 +259,7 @@ def test_generate_minimal_backward_compatible() -> None:
     gen = SeahorseGenerator(cfg)
     seed_plan, server_config = gen.generate_minimal()
 
-    from seahorse.models.plan import SeedPlan, ServerConfig
+    from seahorse.domain.plan import SeedPlan, ServerConfig
     assert isinstance(seed_plan, SeedPlan)
     assert isinstance(server_config, ServerConfig)
     assert len(seed_plan.entities) == 2
@@ -280,8 +280,8 @@ def test_metadata_stats_updated_after_generate() -> None:
 
 def test_generate_with_registered_strategy() -> None:
     """注入 StrategyRegistry 后 generate() 应使用注册策略生成信号。"""
-    from seahorse.strategies.registry import StrategyRegistry
-    from seahorse.strategies.curve_generation import CurveGenerationStrategy
+    from seahorse.application.use_cases.strategy_registry import StrategyRegistry
+    from seahorse.application.use_cases.curve_generation import CurveGenerationStrategy
 
     reg = StrategyRegistry()
     curve = CurveGenerationStrategy(scenario_id="cs", source_id="OPC_UA")
@@ -293,13 +293,13 @@ def test_generate_with_registered_strategy() -> None:
 
     assert len(signals) > 0
     # 曲线策略标识
-    from seahorse.strategies.curve_generation import STRATEGY_ID_CURVE
+    from seahorse.application.use_cases.curve_generation import STRATEGY_ID_CURVE
     assert signals[0].strategy_id == STRATEGY_ID_CURVE
 
 
 def test_generate_with_default_strategy() -> None:
     """注入默认策略后 generate() 应使用该策略。"""
-    from seahorse.strategies.random_generation import RandomGenerationStrategy
+    from seahorse.application.use_cases.random_generation import RandomGenerationStrategy
 
     strategy = RandomGenerationStrategy(scenario_id="ds", source_id="OPC_UA")
     cfg = ScenarioConfig(scenario_id="def_strat", asset_count=1, duration_seconds=0.5, protocol_targets=["OPC_UA"])
@@ -363,8 +363,8 @@ def test_generated_controls_have_proper_structure() -> None:
 
 def test_registry_entity_override_in_generator() -> None:
     """注册表的实体类型覆盖应影响不同实体的信号生成策略。"""
-    from seahorse.strategies.registry import StrategyRegistry
-    from seahorse.strategies.random_generation import RandomGenerationStrategy, STRATEGY_ID_RANDOM
+    from seahorse.application.use_cases.strategy_registry import StrategyRegistry
+    from seahorse.application.use_cases.random_generation import RandomGenerationStrategy, STRATEGY_ID_RANDOM
 
     reg = StrategyRegistry()
     rand_strat = RandomGenerationStrategy(scenario_id="test", source_id="OPC_UA")

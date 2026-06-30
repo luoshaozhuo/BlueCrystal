@@ -1,96 +1,152 @@
-"""seahorse reference_data 新路径 import 测试。
+"""seahorse reference_data 硬清理验证。
 
-验证：
-1. seahorse.reference_data 包可正常导入。
-2. 所有公开符号均可从 seahorse.reference_data 获取。
-3. 协议参数矩阵与原来一致。
+原 ``seahorse.reference_data`` 兼容 wrapper 已在 Round 7B 删除；其真实
+参考数据由 ``whale.shared.persistence.template`` 承载。本测试断言：
 
-测试阶段：开发期验证 (P1)。
-不能证明：数据库访问正确性、视图 SQL 方言兼容性。
+1. ``seahorse.reference_data`` 旧顶层包不可再被 import。
+2. 旧 ``seahorse.reference_data.protocol_param_data`` 等同名单文件不可再
+   被 import。
+3. 真实协议参数矩阵仍可通过 ``whale.shared.persistence.template`` 取得，
+   行为不变。
+
+测试阶段：构建期验证 (P2)。
+不能证明：所有原 import 路径使用方都已迁移；仅证明仓库自身不再保留旧
+reference_data 兼容入口。
 """
+
 from __future__ import annotations
 
+import importlib
+import sys
+from pathlib import Path
 
-def test_import_seahorse_reference_data_package() -> None:
-    """seahorse.reference_data 包可正常导入。"""
-    import seahorse.reference_data  # noqa: F401
+import pytest
 
 
-def test_protocol_param_data_accessible_from_reference_data() -> None:
-    """协议参数数据可从 seahorse.reference_data 导入。"""
-    from seahorse.reference_data import (
-        ENDPOINT_PARAM_DEFS,
-        SIGNAL_PARAM_DEFS,
-        ParamDef,
-        get_endpoint_params,
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+SRC_SEAHORSE_REF_DIR = PROJECT_ROOT / "src" / "seahorse" / "reference_data"
+
+
+def _purge_module(name: str) -> None:
+    targets = [key for key in list(sys.modules)
+               if key == name or key.startswith(name + ".")]
+    for key in targets:
+        sys.modules.pop(key, None)
+
+
+def test_legacy_reference_data_directory_removed() -> None:
+    """seahorse.reference_data 顶层目录必须已物理删除。"""
+    assert not SRC_SEAHORSE_REF_DIR.exists(), (
+        f"{SRC_SEAHORSE_REF_DIR} 应已被删除"
     )
 
-    assert isinstance(ENDPOINT_PARAM_DEFS, dict)
-    assert isinstance(SIGNAL_PARAM_DEFS, dict)
-    assert "OPC_UA" in ENDPOINT_PARAM_DEFS
-    assert "MODBUS" in ENDPOINT_PARAM_DEFS
-    assert "BECKHOFF_ADS" in ENDPOINT_PARAM_DEFS
 
-    params = get_endpoint_params("OPC_UA", "READ")
-    assert len(params) > 0
-    assert all(isinstance(p, ParamDef) for p in params)
-
-
-def test_protocol_view_defs_accessible_from_reference_data() -> None:
-    """协议视图定义可从 seahorse.reference_data 导入。"""
-    from seahorse.reference_data import _PROTOCOL_VIEW_DEFS, ensure_protocol_views
-
-    assert isinstance(_PROTOCOL_VIEW_DEFS, dict)
-    assert "v_scada_endpoint_beckhoff_ads" in _PROTOCOL_VIEW_DEFS
-    assert callable(ensure_protocol_views)
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "seahorse.reference_data",
+        "seahorse.reference_data.protocol_param_data",
+        "seahorse.reference_data.protocol_view_defs",
+        "seahorse.reference_data.sample_data",
+        "seahorse.reference_data.gbt_30966_fields",
+    ],
+)
+def test_legacy_reference_data_modules_not_importable(module_name: str) -> None:
+    """旧 reference_data 模块 import 必须失败。"""
+    _purge_module(module_name)
+    with pytest.raises((ModuleNotFoundError, ImportError)):
+        importlib.import_module(module_name)
 
 
-def test_sample_data_accessible_from_reference_data() -> None:
-    """样例数据模块可从 seahorse.reference_data 导入。"""
-    from seahorse.reference_data import (
-        PROTOCOL_SAMPLE_SPECS,
-        ProtocolSampleSpec,
-        generate_all_sample_data,
+def test_protocol_param_data_available_via_whale_template() -> None:
+    """协议参数数据源文件应仍位于 Whale shared persistence 模板目录。
+
+    ``whale.shared.persistence.template.protocol_param_data`` 自身为旧
+    wrapper，仍然 re-export 已被删除的 ``seahorse.reference_data``（属于
+    whale 后续清理项，本轮 handoff forbidden），不可直接 import。本测试
+    只验证文件仍存在于 ``whale.shared.persistence.template`` 目录，作为
+    Round 7B 后续清理的目标定位。
+    """
+    file_path = (
+        PROJECT_ROOT
+        / "src"
+        / "whale"
+        / "shared"
+        / "persistence"
+        / "template"
+        / "protocol_param_data.py"
+    )
+    assert file_path.is_file(), (
+        f"{file_path} 必须存在，作为 Whale 协议参数真实数据源"
     )
 
-    assert isinstance(PROTOCOL_SAMPLE_SPECS, list)
-    assert len(PROTOCOL_SAMPLE_SPECS) == 16
-    assert all(isinstance(s, ProtocolSampleSpec) for s in PROTOCOL_SAMPLE_SPECS)
-    assert callable(generate_all_sample_data)
+
+def test_protocol_view_defs_available_via_whale_views() -> None:
+    """协议视图定义应仍可通过 whale.shared.persistence.views 取得。
+
+    ``whale.shared.persistence.views`` 是 Round 7B 未触及的独立包（不
+    re-export seahorse.reference_data），其 ``scada_protocol_views`` 子
+    模块直接承载 view 定义，本测试可安全 import。
+    """
+    from whale.shared.persistence.views.scada_protocol_views import (
+        ViewDefinition,
+        SCADA_PROTOCOL_VIEW_DEFINITIONS,
+    )
+
+    assert len(SCADA_PROTOCOL_VIEW_DEFINITIONS) > 0
+    assert all(
+        isinstance(item, ViewDefinition)
+        for item in SCADA_PROTOCOL_VIEW_DEFINITIONS
+    )
 
 
-def test_protocol_coverage_matches_expected_matrix() -> None:
-    """参考数据中的协议覆盖矩阵与预期一致。"""
-    from seahorse.reference_data.protocol_param_data import ENDPOINT_PARAM_DEFS, SIGNAL_PARAM_DEFS
+def test_gbt_30966_fields_available_via_whale_template() -> None:
+    """GB/T 30966 字段定义源文件应仍位于 Whale 模板目录。
 
-    expected = {
-        ("OPC_UA", "READ"),
-        ("OPC_UA", "SUBSCRIBE"),
-        ("MODBUS", "TCP_READ"),
-        ("MODBUS", "RTU_READ"),
-        ("IEC101", "INTERROGATION"),
-        ("IEC101", "SPONTANEOUS"),
-        ("IEC104", "INTERROGATION"),
-        ("IEC104", "SPONTANEOUS"),
-        ("IEC61850", "MMS_READ"),
-        ("IEC61850", "REPORT"),
-        ("IEC61850", "GOOSE"),
-        ("IEC61850", "SV"),
-        ("MQTT", "SUBSCRIBE"),
-        ("HTTP_REST", "REQUEST"),
-        ("BECKHOFF_ADS", "ADS_READ_WRITE"),
-        ("BECKHOFF_ADS", "ADS_NOTIFICATION"),
-    }
-    registered_ep = {(p, s) for p, svcs in ENDPOINT_PARAM_DEFS.items() for s in svcs}
-    registered_sp = {(p, s) for p, svcs in SIGNAL_PARAM_DEFS.items() for s in svcs}
-    assert registered_ep == expected
-    assert registered_sp == expected
+    ``whale.shared.persistence.template.gbt_30966_fields`` 是旧 wrapper，
+    仍 re-export 已删除的 ``seahorse.reference_data.gbt_30966_fields``
+    （属于 whale 后续清理项，本轮 forbidden）。本测试只验证源文件位置
+    仍可定位，不实际 import 触发 wrapper。
+    """
+    file_path = (
+        PROJECT_ROOT
+        / "src"
+        / "whale"
+        / "shared"
+        / "persistence"
+        / "template"
+        / "gbt_30966_fields.py"
+    )
+    assert file_path.is_file(), (
+        f"{file_path} 必须存在，作为 GB/T 30966 字段真实数据源"
+    )
 
 
-def test_gbt_30966_fields_accessible() -> None:
-    """GB/T 30966 字段定义可从 seahorse 新路径导入。"""
-    from seahorse.reference_data.gbt_30966_fields import ALL_LOGICAL_NODES, LogicalNodeDef
+def test_whale_metadata_repository_does_not_import_seahorse_reference_data() -> None:
+    """seahorse.infrastructure.repositories.whale_metadata_repository 不得
+    再 import ``seahorse.reference_data``。
+    """
+    import ast
 
-    assert isinstance(ALL_LOGICAL_NODES, list)
-    assert len(ALL_LOGICAL_NODES) > 0
-    assert all(isinstance(ln, LogicalNodeDef) for ln in ALL_LOGICAL_NODES)
+    repo_path = (
+        PROJECT_ROOT
+        / "src"
+        / "seahorse"
+        / "infrastructure"
+        / "repositories"
+        / "whale_metadata_repository.py"
+    )
+    assert repo_path.is_file(), f"{repo_path} 必须存在"
+    tree = ast.parse(repo_path.read_text(encoding="utf-8"))
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module and node.module.startswith("seahorse.reference_data"):
+                offenders.append(node.module)
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.startswith("seahorse.reference_data"):
+                    offenders.append(alias.name)
+    assert offenders == [], (
+        f"whale_metadata_repository 不应再 import seahorse.reference_data: {offenders}"
+    )

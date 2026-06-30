@@ -297,9 +297,9 @@ class TestSeahorseStarfishCLIIntegration:
     def test_cli_runs_seahorse_exported_json_with_positional_config(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
-        from seahorse.models.scenario import ScenarioConfig
-        from seahorse.orchestration import SeahorseGenerator
+        from seahorse.adapters.gateways.server_plan_handoff_gateway import export_server_plan_to_json
+        from seahorse.domain.scenario import ScenarioConfig
+        from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
 
         config = ScenarioConfig(
             scenario_id="cli_integration",
@@ -319,9 +319,9 @@ class TestSeahorseStarfishCLIIntegration:
     def test_cli_runs_seahorse_exported_json(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-        from seahorse.exporters.server_plan_exporter import export_server_plan_to_json
-        from seahorse.models.scenario import ScenarioConfig
-        from seahorse.orchestration import SeahorseGenerator
+        from seahorse.adapters.gateways.server_plan_handoff_gateway import export_server_plan_to_json
+        from seahorse.domain.scenario import ScenarioConfig
+        from seahorse.application.use_cases.scenario_generator import SeahorseGenerator
 
         config = ScenarioConfig(
             scenario_id="cli_run_integration",
