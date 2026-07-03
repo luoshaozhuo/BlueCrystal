@@ -357,3 +357,388 @@ def test_whale_template_does_not_import_seahorse_reference_data() -> None:
         "whale.shared.persistence.template 仍 import seahorse.reference_data: "
         f"{offenders}"
     )
+
+
+# ── Round 8 v4.1 对齐：controllers / drivers 收紧 ─────────────────────────
+
+
+SEAHORSE_MAIN_FILE = SEAHORSE_ROOT / "__main__.py"
+
+
+def _read_text(path: Path) -> str:
+    """读取文件 UTF-8 文本，统一错误处理。
+
+    Args:
+        path: 目标文件绝对路径。
+
+    Returns:
+        文件正文文本。
+    """
+    return path.read_text(encoding="utf-8")
+
+
+def test_seahorse_controllers_directory_removed() -> None:
+    """src/seahorse/adapters/controllers 必须物理删除。
+
+    v4.1 输入侧不再默认承载 CLI controller；CLI 收敛到 ``__main__.py``。
+    """
+    controllers_dir = SEAHORSE_ADAPTERS_ROOT / "controllers"
+    assert not controllers_dir.exists(), (
+        f"{controllers_dir} 应已被删除；CLI 不应放入 adapters/controllers。"
+    )
+
+
+def test_seahorse_adapters_has_no_controllers_subdir() -> None:
+    """src/seahorse/adapters 下不应存在 controllers 子目录（名称层面）。"""
+    if not SEAHORSE_ADAPTERS_ROOT.is_dir():
+        pytest.skip(f"{SEAHORSE_ADAPTERS_ROOT} 不存在")
+    current = {p.name for p in SEAHORSE_ADAPTERS_ROOT.iterdir() if p.is_dir()}
+    assert "controllers" not in current, (
+        f"seahorse/adapters 子目录仍含 controllers: {sorted(current)}"
+    )
+
+
+@pytest.mark.parametrize(
+    "legacy_driver_file",
+    [
+        SEAHORSE_ADAPTERS_ROOT / "drivers" / "curve_generation.py",
+        SEAHORSE_ADAPTERS_ROOT / "drivers" / "random_generation.py",
+        SEAHORSE_ADAPTERS_ROOT / "drivers" / "replay_generation.py",
+    ],
+    ids=lambda p: p.name,
+)
+def test_seahorse_drivers_shim_generation_files_removed(
+    legacy_driver_file: Path,
+) -> None:
+    """adapters/drivers 下不应残留 curve_generation / random_generation /
+    replay_generation 等应用层生成策略 shim。
+
+    这些是历史 driver adapter 兼容入口（已确认是 re-export shim），
+    真实策略实现位于 ``seahorse.application.use_cases``；v4.1 收紧后
+    不再保留于 ``adapters/drivers``。
+    """
+    assert not legacy_driver_file.exists(), (
+        f"{legacy_driver_file} 应已被删除；真实策略实现位于 "
+        "seahorse.application.use_cases。"
+    )
+
+
+def test_seahorse_main_does_not_import_application_adapters_infrastructure() -> None:
+    """``__main__.py`` 不得 import ``seahorse.application`` /
+    ``seahorse.adapters`` / ``seahorse.infrastructure``。
+
+    薄入口必须只依赖 ``seahorse.api``（包括 ``seahorse_cli`` /
+    ``seahorse_facade``）或同等 CLI 框架自身。
+    """
+    assert SEAHORSE_MAIN_FILE.is_file(), (
+        f"{SEAHORSE_MAIN_FILE} 必须存在"
+    )
+    text = _read_text(SEAHORSE_MAIN_FILE)
+    tree = ast.parse(text)
+    forbidden_prefixes = (
+        "seahorse.application",
+        "seahorse.adapters",
+        "seahorse.infrastructure",
+    )
+    offenders: list[tuple[str, str]] = []
+    for node in ast.walk(tree):
+        module: str | None = None
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module = alias.name
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module
+        if module is None:
+            continue
+        for prefix in forbidden_prefixes:
+            if module == prefix or module.startswith(prefix + "."):
+                offenders.append((str(SEAHORSE_MAIN_FILE), module))
+                break
+    assert offenders == [], (
+        "__main__.py 不应 import seahorse.application / adapters / "
+        f"infrastructure: {offenders}"
+    )
+
+
+def test_seahorse_main_does_not_create_backend_or_runtime() -> None:
+    """``__main__.py`` 不得创建 backend / scheduler / repository / writer。
+
+    薄入口仅解析命令行参数并调用 facade，构造与装配必须放在
+    ``container.py`` 或 ``seahorse.api`` 内部。
+    """
+    assert SEAHORSE_MAIN_FILE.is_file(), (
+        f"{SEAHORSE_MAIN_FILE} 必须存在"
+    )
+    text = _read_text(SEAHORSE_MAIN_FILE)
+    forbidden_constructs = (
+        "InMemoryStarfishWriterBackend",
+        "InMemoryDataSourceRuntime",
+        "DeterministicScheduler",
+        "MonotonicClock",
+        "WhaleMetadataRepository",
+        "build_starfish_writer_gateway",
+        "build_write_plan_use_case",
+        "build_dispatch_write_batch_use_case",
+        "build_runtime_smoke_workflow",
+        "build_seahorse_facade",
+    )
+    offenders = [name for name in forbidden_constructs if name in text]
+    assert offenders == [], (
+        "__main__.py 不应直接构造 backend / scheduler / repository / writer "
+        f"或调用 container.build_* 装配函数: {offenders}"
+    )
+
+
+def test_application_domain_do_not_import_adapters_infrastructure_api() -> None:
+    """``seahorse.application`` / ``seahorse.domain`` 不得 import
+    adapters / infrastructure / api。
+
+    该断言在 v4.1 下继续生效：domain / application 只能依赖自身与
+    ports；不允许穿越到 adapters / infrastructure / api。
+    """
+    offenders: list[tuple[str, Path]] = []
+    for root in (SEAHORSE_DOMAIN_ROOT, SEAHORSE_APPLICATION_ROOT):
+        if not root.is_dir():
+            pytest.skip(f"{root} 不存在")
+        modules = _collect_import_modules(root)
+        for module in modules:
+            if (
+                module.startswith("seahorse.adapters")
+                or module.startswith("seahorse.infrastructure")
+                or module.startswith("seahorse.api")
+            ):
+                offenders.append((module, root))
+    assert offenders == [], (
+        "domain/application 不应 import adapters/infrastructure/api: "
+        f"{offenders}"
+    )
+
+
+def test_seahorse_root_does_not_import_starfish() -> None:
+    """``src/seahorse`` 任何模块均不得 import starfish。
+
+    Round 8 复查：除 ``__init__.py`` 文档说明中显式声明"不得
+    import starfish"的字符串外，AST 层面亦必须无真实 starfish
+    import 语句。
+    """
+    assert SEAHORSE_ROOT.is_dir(), f"{SEAHORSE_ROOT} 必须存在"
+
+    offenders: list[tuple[str, str]] = []
+    for file_path in SEAHORSE_ROOT.rglob("*.py"):
+        tree = ast.parse(file_path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            module: str | None = None
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    module = alias.name
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module
+            if module is None:
+                continue
+            if module == "starfish" or module.startswith("starfish."):
+                offenders.append((str(file_path), module))
+    assert offenders == [], (
+        f"src/seahorse 不应 import starfish: {offenders}"
+    )
+
+
+# ── v4.2 蓝图：CLI 统一 Typer，且 CLI 只在 __main__.py ─────────────────────────
+
+
+SEAHORSE_API_DIR = SEAHORSE_ROOT / "api"
+
+
+def test_seahorse_api_has_no_cli_helper_files() -> None:
+    """``src/seahorse/api`` 不得出现 ``*_cli.py`` / ``cli.py``。
+
+    v4.2 蓝图 §5.3 api 白名单仅允许 ``__init__.py`` 与
+    ``<package>_facade.py``；CLI 必须收敛到 ``__main__.py``。
+    """
+    if not SEAHORSE_API_DIR.is_dir():
+        pytest.skip(f"{SEAHORSE_API_DIR} 不存在")
+
+    offenders: list[Path] = []
+    for file_path in SEAHORSE_API_DIR.iterdir():
+        if not file_path.is_file():
+            continue
+        if file_path.suffix != ".py":
+            continue
+        if file_path.name in {"__init__.py", "seahorse_facade.py"}:
+            continue
+        offenders.append(file_path)
+    assert offenders == [], (
+        f"src/seahorse/api 下不应有 CLI helper / 控制器 / 额外 facade: "
+        f"{[p.name for p in offenders]}"
+    )
+
+
+@pytest.mark.parametrize(
+    "forbidden_name",
+    ["seahorse_cli.py", "cli.py", "controllers.py"],
+)
+def test_seahorse_api_forbidden_filename_absent(forbidden_name: str) -> None:
+    """``src/seahorse/api`` 不得出现 ``seahorse_cli.py`` /
+    ``cli.py`` / ``controllers.py``。
+
+    v4.2 蓝图 §5.3 明确禁止 ``api/<package>_cli.py`` /
+    ``api/cli.py`` / ``api/controllers.py``。
+    """
+    if not SEAHORSE_API_DIR.is_dir():
+        pytest.skip(f"{SEAHORSE_API_DIR} 不存在")
+    target = SEAHORSE_API_DIR / forbidden_name
+    assert not target.exists(), f"{target} 不应存在（v4.2 api 白名单禁止）"
+
+
+def test_seahorse_main_uses_typer_not_argparse() -> None:
+    """``__main__.py`` 必须使用 Typer，且不得使用 argparse。
+
+    v4.2 蓝图 §5.2 / §8.1 / §11：CLI 统一 Typer，不允许 argparse。
+    """
+    assert SEAHORSE_MAIN_FILE.is_file(), f"{SEAHORSE_MAIN_FILE} 必须存在"
+    text = SEAHORSE_MAIN_FILE.read_text(encoding="utf-8")
+    assert "import typer" in text, "__main__.py 必须 import typer"
+    assert "argparse" not in text, "__main__.py 不得 import 或使用 argparse"
+    assert "ArgumentParser" not in text, "__main__.py 不得使用 argparse.ArgumentParser"
+
+
+def test_seahorse_main_only_depends_on_typer_and_api() -> None:
+    """``__main__.py`` 只允许依赖标准库 / typer / ``seahorse.api``。
+
+    v4.2 蓝图 §2.1 / §5.2 / §9：CLI 薄入口只能 import api、Typer
+    和标准库；不得 import domain / application / adapters /
+    infrastructure，也不得 import 任何第三方 CLI 框架（click / argparse）。
+    """
+    import sys as _sys
+
+    assert SEAHORSE_MAIN_FILE.is_file(), f"{SEAHORSE_MAIN_FILE} 必须存在"
+    tree = ast.parse(SEAHORSE_MAIN_FILE.read_text(encoding="utf-8"))
+    stdlib_names = set(_sys.stdlib_module_names)
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        module: str | None = None
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module = alias.name.split(".")[0]
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                module = node.module.split(".")[0]
+        if not module:
+            continue
+        if module in stdlib_names:
+            continue
+        if module in {"typer", "seahorse", "__future__"}:
+            continue
+        offenders.append(module)
+    assert offenders == [], (
+        "__main__.py 只允许 import 标准库 / typer / seahorse；违规: "
+        f"{sorted(set(offenders))}"
+    )
+
+
+def test_seahorse_main_forbids_inner_layer_imports() -> None:
+    """``__main__.py`` AST 层面不得 import 内层模块。
+
+    v4.2 蓝图 §2.1 / §9：CLI 薄入口禁止 import ``seahorse.domain`` /
+    ``seahorse.application`` / ``seahorse.adapters`` /
+    ``seahorse.infrastructure``。
+    """
+    assert SEAHORSE_MAIN_FILE.is_file(), f"{SEAHORSE_MAIN_FILE} 必须存在"
+    tree = ast.parse(SEAHORSE_MAIN_FILE.read_text(encoding="utf-8"))
+    forbidden_prefixes = (
+        "seahorse.domain",
+        "seahorse.application",
+        "seahorse.adapters",
+        "seahorse.infrastructure",
+    )
+    offenders: list[tuple[str, str]] = []
+    for node in ast.walk(tree):
+        module: str | None = None
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module = alias.name
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module
+        if module is None:
+            continue
+        for prefix in forbidden_prefixes:
+            if module == prefix or module.startswith(prefix + "."):
+                offenders.append((prefix, module))
+                break
+    assert offenders == [], (
+        "__main__.py 不应 import 内层模块: "
+        f"{sorted(set(module for _, module in offenders))}"
+    )
+
+
+def test_seahorse_main_does_not_construct_scenario_config_directly() -> None:
+    """``__main__.py`` AST 层不得引用 ``ScenarioConfig``。
+
+    v4.2 蓝图 §2.1.5：CLI 应以 primitives / Path / list / dict 传给
+    Facade，由 Facade 在内部装配 domain model。docstring 中提到
+    "ScenarioConfig" 仅作为规则说明，不算违规。
+    """
+    assert SEAHORSE_MAIN_FILE.is_file(), f"{SEAHORSE_MAIN_FILE} 必须存在"
+    tree = ast.parse(SEAHORSE_MAIN_FILE.read_text(encoding="utf-8"))
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "ScenarioConfig" or alias.name.endswith(".ScenarioConfig"):
+                    offenders.append(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and (
+                node.module == "ScenarioConfig"
+                or node.module.endswith(".ScenarioConfig")
+            ):
+                offenders.append(node.module)
+        if isinstance(node, ast.Name) and node.id == "ScenarioConfig":
+            offenders.append(f"Name[{node.lineno}]")
+        if isinstance(node, ast.Attribute) and node.attr == "ScenarioConfig":
+            offenders.append(f"Attribute[{node.lineno}]")
+    assert offenders == [], (
+        "__main__.py AST 层不得引用 ScenarioConfig；"
+        f"应通过 SeahorseFacade wrapper 间接装配 domain model。违规: {offenders}"
+    )
+
+
+def test_seahorse_main_does_not_create_backend_or_runtime() -> None:
+    """``__main__.py`` 不得直接构造 backend / scheduler / repository / writer。
+
+    v4.2 蓝图 §5.2：CLI 薄入口禁止构造 backend；装配只允许在
+    ``container.py`` 或 facade 内部完成。
+    """
+    assert SEAHORSE_MAIN_FILE.is_file(), f"{SEAHORSE_MAIN_FILE} 必须存在"
+    text = SEAHORSE_MAIN_FILE.read_text(encoding="utf-8")
+    forbidden_constructs = (
+        "InMemoryStarfishWriterBackend",
+        "InMemoryDataSourceRuntime",
+        "DeterministicScheduler",
+        "MonotonicClock",
+        "WhaleMetadataRepository",
+        "build_starfish_writer_gateway",
+        "build_write_plan_use_case",
+        "build_dispatch_write_batch_use_case",
+        "build_runtime_smoke_workflow",
+        "build_seahorse_facade",
+    )
+    offenders = [name for name in forbidden_constructs if name in text]
+    assert offenders == [], (
+        "__main__.py 不应直接构造 backend / scheduler / repository / writer "
+        f"或调用 container.build_*: {offenders}"
+    )
+
+
+def test_seahorse_facade_exposes_cli_wrapper_methods() -> None:
+    """``SeahorseFacade`` 必须暴露 CLI 用的 primitives wrapper 方法。
+
+    v4.2 蓝图 §2.1.5：CLI 不得直接构造 ``ScenarioConfig``，由 Facade
+    wrapper 在内部装配。新增 wrapper：
+    ``generate_bundle_from_cli_params`` /
+    ``generate_minimal_server_config_from_cli_params``。
+    """
+    from seahorse.api.seahorse_facade import SeahorseFacade
+
+    assert hasattr(SeahorseFacade, "generate_bundle_from_cli_params")
+    assert hasattr(SeahorseFacade, "generate_minimal_server_config_from_cli_params")
+    assert callable(SeahorseFacade.generate_bundle_from_cli_params)
+    assert callable(SeahorseFacade.generate_minimal_server_config_from_cli_params)

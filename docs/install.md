@@ -1,3 +1,8 @@
+# 安装whale
+pip uninstall -y bluecrystal
+pip install -e /home/luosh/BlueCrystal
+pip show bluecrystal
+
 # 运行db容器
 docker run -d \
   --name bluecrystal\

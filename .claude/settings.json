@@ -26,7 +26,15 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(PYTHONPATH=src python3 -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
       "Bash(python3 -c ' *)",
-      "Bash(codex --version)"
+      "Bash(codex --version)",
+      "Bash(python -c \"from whale.shared.persistence.template import PROTOCOL_SAMPLE_SPECS, generate_all_sample_data, reset_sample_data\")",
+      "Bash(python -c \"from seahorse.infrastructure.repositories import WhaleMetadataRepository, WhaleMetadataToWritePlanMapper, WhaleMetadataMappingError\")",
+      "Bash(python -c \"from whale.ingest.framework.persistence.init_db import load_default_sample_data\")",
+      "Bash(python -c ' *)",
+      "Bash(WHALE_DB_URL='sqlite:////tmp/tools_smoke.db' python -c \"from tools.sqlalchemy_session import engine, session_scope, get_session, SessionLocal, DB_URL_ENV; assert DB_URL_ENV == 'WHALE_DB_URL'; print\\('url =', engine.url\\)\")",
+      "Bash(unset WHALE_DB_URL)",
+      "Bash(python -c \"import tools.sqlalchemy_session\")",
+      "Bash(python -c \"import whale.shared.persistence.session\")"
     ],
     "deny": [
       "Read(./.env)",

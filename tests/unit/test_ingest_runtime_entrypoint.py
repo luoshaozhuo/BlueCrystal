@@ -20,8 +20,7 @@ def test_runtime_entrypoint_api_smoke(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("WHALE_INGEST_REDIS_STATE_HASH_KEY", "whale:test:runtime")
     monkeypatch.setenv("WHALE_INGEST_STATION_ID", "station-runtime")
     monkeypatch.setenv("WHALE_INGEST_DB_PATH", str(tmp_path / "runtime.sqlite"))
-    monkeypatch.setenv("WHALE_SHARED_DB_BACKEND", "sqlite")
-    monkeypatch.setenv("WHALE_SHARED_DB_PATH", str(tmp_path / "shared.sqlite"))
+    monkeypatch.setenv("WHALE_DB_URL", f"sqlite:///{tmp_path / 'shared.sqlite'}")
 
     result = runner.invoke(app, ["api", "--smoke-exit"])
 

@@ -25,8 +25,7 @@ services:
       WHALE_INGEST_REDIS_STATE_HASH_KEY: whale:ingest:state
       WHALE_INGEST_STATION_ID: whale-dev
       WHALE_INGEST_MESSAGE_BACKEND: relational_outbox
-      WHALE_SHARED_DB_BACKEND: sqlite
-      WHALE_SHARED_DB_PATH: /app/data/shared/whale.db
+      WHALE_DB_URL: sqlite:////app/data/shared/whale.db
     depends_on:
       postgres:
         condition: service_healthy

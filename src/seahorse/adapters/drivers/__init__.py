@@ -1,14 +1,6 @@
 """Seahorse driver adapter 层。
 
-当前只承载离线生成策略适配器与内存 writer backend 契约，不创建外部连接。
+当前只承载与外部 driver 边界相关的适配契约（``backend_ports.py``
+和 factory 占位包），不创建外部 backend 与 socket/SDK 调用。
+真实 backend 与 SDK 由 ``seahorse.infrastructure.drivers`` 提供。
 """
-
-from seahorse.adapters.drivers.curve_generation import CurveGenerationStrategy
-from seahorse.adapters.drivers.random_generation import RandomGenerationStrategy
-from seahorse.adapters.drivers.replay_generation import ReplayGenerationStrategy
-
-__all__ = [
-    "CurveGenerationStrategy",
-    "RandomGenerationStrategy",
-    "ReplayGenerationStrategy",
-]

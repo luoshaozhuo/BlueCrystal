@@ -1,12 +1,18 @@
 """shared persistence SCADA sample DB 测试辅助函数。
 
-测试阶段：
-- SQLite 路径只提供跨模块联调期验证 级隔离样例库，方便 source_lab
+测试阶段:
+- SQLite 路径只提供跨模块联调期验证级隔离样例库,方便 source_lab
   本地测试真实消费统一输入契约。
-- PostgreSQL 路径提供本轮最终验收所需的跨模块联调期验证 临时测试库；它会显式
-  创建带安全标识的临时数据库，并在测试结束后清理，避免误连默认库。
+- PostgreSQL 路径提供本轮最终验收所需的跨模块联调期验证临时测试库;它会显式
+  创建带安全标识的临时数据库,并在测试结束后清理,避免误连默认库。
 
 本文件不证明真实协议 runtime、simulator 或现场设备连通性。
+
+环境变量约束:
+- 仅通过 ``WHALE_DB_URL`` 与子进程 ``sample_data`` 通信;PostgreSQL 测试也
+  仅从 ``WHALE_DB_URL`` 读取基础连接(必须是 postgresql+psycopg:// 协议),
+  解析出 host / port / username / password 后,再用随机数据库名重建 URL。
+- 不再使用任何散环境变量(后端 / 路径 / 主机 / 端口 / 库名 / 用户名 / 密码)。
 """
 
 from __future__ import annotations
@@ -21,11 +27,12 @@ from pathlib import Path
 from typing import Iterator
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, make_url
 
 _SAFE_DB_MARKERS = ("test", "tmp", "ci", "local_dev_test")
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SRC_ROOT = _REPO_ROOT / "src"
+_DB_URL_ENV = "WHALE_DB_URL"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,13 +57,12 @@ def create_isolated_scada_sample_db(tmp_path: Path) -> Path:
     """
 
     db_path = tmp_path / "shared-persistence.sqlite"
+    db_url = f"sqlite:///{db_path}"
     _run_sample_data(
         env={
             **os.environ,
             "PYTHONPATH": str(_SRC_ROOT),
-            "WHALE_SHARED_DB_BACKEND": "sqlite",
-            "WHALE_SHARED_DB_PATH": str(db_path),
-            "WHALE_SHARED_DB_URL": "",
+            _DB_URL_ENV: db_url,
         }
     )
     return db_path
@@ -66,19 +72,25 @@ def create_isolated_scada_sample_db(tmp_path: Path) -> Path:
 def postgres_scada_sample_db() -> Iterator[PostgresSampleDb]:
     """创建一份安全的 PostgreSQL 临时样例库并在退出时销毁。
 
+    从 ``WHALE_DB_URL``(必须 postgresql+psycopg://)解析 host / port /
+    username / password,在 PostgreSQL 上创建一个带安全标识的临时
+    数据库,把 ``WHALE_DB_URL`` 改写为指向该临时库,运行 ``sample_data``
+    初始化,退出时强制断开连接并 ``DROP DATABASE``。
+
     Returns:
         包含数据库名与连接 URL 的临时库句柄。
 
     Raises:
-        RuntimeError: 当 PostgreSQL 环境缺失、库名不安全、建库失败或样例初始化失败时抛出。
+        RuntimeError: 当 ``WHALE_DB_URL`` 缺失 / 协议非 postgresql /
+        库名不安全 / 建库或样例初始化失败时抛出。
     """
 
-    settings = _resolve_postgres_settings()
+    base_settings = _resolve_postgres_settings()
     database_name = f"whale_shared_test_{uuid.uuid4().hex[:10]}"
     if not _is_safe_database_name(database_name):
         raise RuntimeError(f"generated unsafe PostgreSQL test database name: {database_name}")
 
-    admin_engine = create_engine(settings.admin_url, isolation_level="AUTOCOMMIT", pool_pre_ping=True)
+    admin_engine = create_engine(base_settings.admin_url, isolation_level="AUTOCOMMIT", pool_pre_ping=True)
     try:
         try:
             with admin_engine.connect() as conn:
@@ -88,18 +100,12 @@ def postgres_scada_sample_db() -> Iterator[PostgresSampleDb]:
                 "shared persistence PostgreSQL test environment unavailable during CREATE DATABASE: "
                 f"{exc}"
             ) from exc
-        database_url = settings.database_url(database_name)
+        database_url = base_settings.database_url(database_name)
         _run_sample_data(
             env={
                 **os.environ,
                 "PYTHONPATH": str(_SRC_ROOT),
-                "WHALE_SHARED_DB_URL": database_url,
-                "WHALE_SHARED_DB_BACKEND": "postgresql",
-                "WHALE_SHARED_DB_HOST": settings.host,
-                "WHALE_SHARED_DB_PORT": str(settings.port),
-                "WHALE_SHARED_DB_NAME": database_name,
-                "WHALE_SHARED_DB_USERNAME": settings.username,
-                "WHALE_SHARED_DB_PASSWORD": settings.password,
+                _DB_URL_ENV: database_url,
             }
         )
         yield PostgresSampleDb(database_name=database_name, database_url=database_url)
@@ -110,7 +116,7 @@ def postgres_scada_sample_db() -> Iterator[PostgresSampleDb]:
 
 @dataclass(frozen=True, slots=True)
 class _PostgresSettings:
-    """shared persistence PostgreSQL 测试环境配置。"""
+    """shared persistence PostgreSQL 测试环境配置,全部从 ``WHALE_DB_URL`` 解析。"""
 
     host: str
     port: int
@@ -130,33 +136,63 @@ class _PostgresSettings:
 
 
 def _resolve_postgres_settings() -> _PostgresSettings:
-    """读取 shared persistence PostgreSQL 凭据。"""
+    """从 ``WHALE_DB_URL`` 解析 PostgreSQL 测试连接凭据。
 
-    required = {
-        "WHALE_SHARED_DB_HOST": os.environ.get("WHALE_SHARED_DB_HOST", "").strip(),
-        "WHALE_SHARED_DB_USERNAME": os.environ.get("WHALE_SHARED_DB_USERNAME", "").strip(),
-        "WHALE_SHARED_DB_PASSWORD": os.environ.get("WHALE_SHARED_DB_PASSWORD", "").strip(),
-    }
-    missing = [name for name, value in required.items() if not value]
+    Returns:
+        已校验的 ``_PostgresSettings``。
+
+    Raises:
+        RuntimeError: ``WHALE_DB_URL`` 未设置 / drivername 非 postgresql /
+        缺 host / username 等字段时抛出。
+    """
+
+    raw = os.environ.get(_DB_URL_ENV, "").strip()
+    if not raw:
+        raise RuntimeError(
+            "shared persistence PostgreSQL integration requires WHALE_DB_URL to be set"
+            " to a postgresql+psycopg:// URL."
+        )
+    try:
+        url = make_url(raw)
+    except Exception as exc:  # noqa: BLE001 — 上抛 sqlalchemy 解析异常到稳定错误
+        raise RuntimeError(f"invalid WHALE_DB_URL for PostgreSQL test: {raw!r}: {exc}") from exc
+
+    if not url.drivername.startswith("postgresql"):
+        raise RuntimeError(
+            "shared persistence PostgreSQL integration requires WHALE_DB_URL drivername"
+            f" to be postgresql+, got {url.drivername!r}."
+        )
+
+    host = url.host
+    username = url.username
+    password = url.password
+    database = url.database
+    missing = [
+        name
+        for name, value in (
+            ("host", host),
+            ("username", username),
+            ("password", password),
+        )
+        if not value
+    ]
     if missing:
         raise RuntimeError(
-            "shared persistence PostgreSQL integration requires env vars: "
+            "shared persistence PostgreSQL integration requires WHALE_DB_URL to contain "
             + ", ".join(missing)
         )
 
-    port_raw = os.environ.get("WHALE_SHARED_DB_PORT", "5432").strip() or "5432"
     try:
-        port = int(port_raw)
+        port = url.port or 5432
     except ValueError as exc:
-        raise RuntimeError(f"invalid WHALE_SHARED_DB_PORT: {port_raw!r}") from exc
+        raise RuntimeError(f"invalid port in WHALE_DB_URL: {exc}") from exc
 
-    admin_db = os.environ.get("WHALE_SHARED_TEST_ADMIN_DB", "postgres").strip() or "postgres"
     return _PostgresSettings(
-        host=required["WHALE_SHARED_DB_HOST"],
+        host=host,
         port=port,
-        username=required["WHALE_SHARED_DB_USERNAME"],
-        password=required["WHALE_SHARED_DB_PASSWORD"],
-        admin_db=admin_db,
+        username=username,
+        password=password,
+        admin_db=database or "postgres",
     )
 
 
@@ -168,7 +204,7 @@ def _is_safe_database_name(database_name: str) -> bool:
 
 
 def _run_sample_data(*, env: dict[str, str]) -> None:
-    """执行 `sample_data` 子进程并在失败时抛出稳定错误。"""
+    """执行 ``sample_data`` 子进程并在失败时抛出稳定错误。"""
 
     result = subprocess.run(
         [sys.executable, "-m", "whale.shared.persistence.template.sample_data"],

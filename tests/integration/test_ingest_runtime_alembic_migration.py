@@ -26,7 +26,7 @@ def test_migrate_entrypoint_runs_upgrade_head(tmp_path, monkeypatch) -> None:
     runner = CliRunner()
     monkeypatch.setenv("WHALE_INGEST_DATABASE_BACKEND", "sqlite")
     monkeypatch.setenv("WHALE_INGEST_DB_PATH", str(tmp_path / "runtime.sqlite"))
-    monkeypatch.setenv("WHALE_SHARED_DB_PATH", str(tmp_path / "shared.sqlite"))
+    monkeypatch.setenv("WHALE_DB_URL", f"sqlite:///{tmp_path / 'shared.sqlite'}")
     monkeypatch.setenv("WHALE_INGEST_REDIS_HOST", "127.0.0.1")
     monkeypatch.setenv("WHALE_INGEST_REDIS_STATE_HASH_KEY", "whale:test:runtime")
     monkeypatch.setenv("WHALE_INGEST_STATION_ID", "station-runtime")

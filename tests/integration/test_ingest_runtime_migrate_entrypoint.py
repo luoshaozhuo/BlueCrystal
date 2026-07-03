@@ -20,7 +20,7 @@ def test_migrate_entrypoint_runs_via_alembic(tmp_path) -> None:
         env={
             "WHALE_INGEST_DATABASE_BACKEND": "sqlite",
             "WHALE_INGEST_DB_PATH": str(db_path),
-            "WHALE_SHARED_DB_PATH": str(tmp_path / "shared.sqlite"),
+            "WHALE_DB_URL": f"sqlite:///{tmp_path / 'shared.sqlite'}",
             "WHALE_INGEST_REDIS_HOST": "127.0.0.1",
             "WHALE_INGEST_REDIS_STATE_HASH_KEY": "whale:test:migrate",
             "WHALE_INGEST_STATION_ID": "station-migrate",

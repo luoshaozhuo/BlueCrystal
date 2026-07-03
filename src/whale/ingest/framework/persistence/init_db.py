@@ -49,7 +49,7 @@ def reset_db() -> None:
 
 def load_default_sample_data() -> None:
     """将内置示例数据模板加载到当前 ingest 数据库。"""
-    from whale.shared.persistence.template.sample_data import generate_all_sample_data
+    from whale.shared.persistence.sample_data import generate_all_sample_data
 
     generate_all_sample_data()
 

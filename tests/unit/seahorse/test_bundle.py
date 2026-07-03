@@ -684,83 +684,107 @@ def test_generator_bundle_deterministic() -> None:
 
 def test_cli_generate_scenario_help() -> None:
     """generate-scenario --help 应正常输出用法。"""
-    from seahorse.__main__ import main
-    with pytest.raises(SystemExit) as exc_info:
-        main(["generate-scenario", "--help"])
-    assert exc_info.value.code == 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["generate-scenario", "--help"])
+    assert result.exit_code == 0
+    assert "generate-scenario" in result.output
+    assert "--scenario-id" in result.output
 
 
 def test_cli_export_bundle_help() -> None:
     """export-bundle --help 应正常输出用法。"""
-    from seahorse.__main__ import main
-    with pytest.raises(SystemExit) as exc_info:
-        main(["export-bundle", "--help"])
-    assert exc_info.value.code == 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["export-bundle", "--help"])
+    assert result.exit_code == 0
+    assert "export-bundle" in result.output
+    assert "--input" in result.output
 
 
 def test_cli_validate_bundle_help() -> None:
     """validate-bundle --help 应正常输出用法。"""
-    from seahorse.__main__ import main
-    with pytest.raises(SystemExit) as exc_info:
-        main(["validate-bundle", "--help"])
-    assert exc_info.value.code == 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["validate-bundle", "--help"])
+    assert result.exit_code == 0
+    assert "validate-bundle" in result.output
 
 
 def test_cli_generate_and_validate_roundtrip() -> None:
     """CLI generate-scenario 产出应可通过 validate-bundle 校验。"""
-    from seahorse.__main__ import main
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
 
+    runner = CliRunner()
     with tempfile.TemporaryDirectory() as tmpdir:
-        # 生成场景
-        rc = main([
-            "generate-scenario",
-            "--scenario-id", "cli_test",
-            "--seed", "99",
-            "--asset-count", "1",
-            "--duration", "0.5",
-            "--output-dir", tmpdir,
-            "--start-time", "2024-01-01T00:00:00+00:00",
-        ])
-        assert rc == 0
+        gen_result = runner.invoke(
+            app,
+            [
+                "generate-scenario",
+                "--scenario-id", "cli_test",
+                "--seed", "99",
+                "--asset-count", "1",
+                "--duration", "0.5",
+                "--output-dir", tmpdir,
+                "--start-time", "2024-01-01T00:00:00+00:00",
+            ],
+        )
+        assert gen_result.exit_code == 0, gen_result.output
 
-        # 检查输出文件
         bundle_path = Path(tmpdir) / "cli_test_bundle.json"
         assert bundle_path.exists()
 
         ts_path = Path(tmpdir) / "cli_test_timeseries.jsonl"
         assert ts_path.exists()
 
-        # 校验生成的 bundle
-        rc2 = main([
-            "validate-bundle",
-            "--input", str(bundle_path),
-        ])
-        assert rc2 == 0
+        val_result = runner.invoke(
+            app,
+            ["validate-bundle", "--input", str(bundle_path)],
+        )
+        assert val_result.exit_code == 0, val_result.output
 
 
 def test_cli_validate_missing_file() -> None:
     """校验不存在的文件应返回非零退出码。"""
-    from seahorse.__main__ import main
-    rc = main([
-        "validate-bundle",
-        "--input", "/nonexistent/path/bundle.json",
-    ])
-    assert rc != 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["validate-bundle", "--input", "/nonexistent/path/bundle.json"],
+    )
+    assert result.exit_code != 0
 
 
 def test_cli_export_missing_file() -> None:
     """导出不存在的文件应返回非零退出码。"""
-    from seahorse.__main__ import main
-    rc = main([
-        "export-bundle",
-        "--input", "/nonexistent/path/bundle.json",
-    ])
-    assert rc != 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["export-bundle", "--input", "/nonexistent/path/bundle.json"],
+    )
+    assert result.exit_code != 0
 
 
 def test_cli_no_command_shows_help() -> None:
-    """无子命令时 main() 应返回非零退出码（打印帮助后）。"""
-    from seahorse.__main__ import main
-    # 无子命令时 main() 打印帮助并返回 1（非 SystemExit）
-    rc = main([])
-    assert rc != 0, "无子命令时应返回非零退出码"
+    """无子命令时 Typer app 应打印帮助并以非零退出码退出。"""
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, [])
+    # Typer 的 ``no_args_is_help=True`` 行为：无子命令时打印帮助。
+    # CliRunner 会捕获 ``SystemExit(2)`` 并作为 ``exit_code`` 返回。
+    assert result.exit_code != 0
+    assert "generate-scenario" in result.output

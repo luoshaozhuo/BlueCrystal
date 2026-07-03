@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from whale.shared.persistence import Base
 from whale.shared.persistence.orm import CommunicationEndpoint, ScadaEndpointParamValue, ScadaSignalProfileItemParamValue, SignalProfile
-from whale.shared.persistence.template.sample_data import (
+from whale.shared.persistence.sample_data import (
     PROTOCOL_SAMPLE_SPECS,
     _create_acquisition_tasks,
     _create_asset_types_and_models,

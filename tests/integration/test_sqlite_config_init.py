@@ -34,8 +34,7 @@ def test_sqlite_config_init_script_creates_db_from_default_templates(
             "PYTHONPATH": str(Path.cwd() / "src"),
             "WHALE_INGEST_DATABASE_BACKEND": "sqlite",
             "WHALE_INGEST_DB_PATH": str(db_path),
-            "WHALE_SHARED_DB_BACKEND": "sqlite",
-            "WHALE_SHARED_DB_PATH": str(db_path),
+            "WHALE_DB_URL": f"sqlite:///{db_path}",
         },
     )
 

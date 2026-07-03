@@ -74,7 +74,7 @@ def seed_postgres_for_e2e(
     from sqlalchemy import select as _select
 
     # Use the shared session_scope for acq_task access
-    from whale.shared.persistence.session import session_scope as _shared_scope
+    from tools.sqlalchemy_session import session_scope as _shared_scope
 
     with _shared_scope() as session:
         task = session.execute(

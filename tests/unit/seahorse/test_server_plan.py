@@ -443,39 +443,50 @@ def test_export_from_bundle_none_server_config_raises() -> None:
 
 def test_cli_export_server_config_help() -> None:
     """export-server-config --help 应正常输出。"""
-    from seahorse.__main__ import main
-    with pytest.raises(SystemExit) as exc_info:
-        main(["export-server-config", "--help"])
-    assert exc_info.value.code == 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["export-server-config", "--help"])
+    assert result.exit_code == 0
+    assert "export-server-config" in result.output
 
 
 def test_cli_export_server_config_from_bundle() -> None:
     """从已有 bundle 导出 ServerConfig 的 CLI 路径。"""
-    from seahorse.__main__ import main
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
 
+    runner = CliRunner()
     with tempfile.TemporaryDirectory() as tmpdir:
-        # 先生成 bundle
-        rc = main([
-            "generate-scenario",
-            "--scenario-id", "cli_sp_bundle",
-            "--seed", "42",
-            "--asset-count", "1",
-            "--duration", "0.5",
-            "--output-dir", tmpdir,
-            "--start-time", "2024-01-01T00:00:00+00:00",
-        ])
-        assert rc == 0
+        gen_result = runner.invoke(
+            app,
+            [
+                "generate-scenario",
+                "--scenario-id", "cli_sp_bundle",
+                "--seed", "42",
+                "--asset-count", "1",
+                "--duration", "0.5",
+                "--output-dir", tmpdir,
+                "--start-time", "2024-01-01T00:00:00+00:00",
+            ],
+        )
+        assert gen_result.exit_code == 0, gen_result.output
 
         bundle_path = Path(tmpdir) / "cli_sp_bundle_bundle.json"
         assert bundle_path.exists()
 
-        # 从 bundle 导出 ServerConfig
-        rc2 = main([
-            "export-server-config",
-            "--input", str(bundle_path),
-            "--output-dir", tmpdir,
-        ])
-        assert rc2 == 0, f"CLI export-server-config 失败 (exit={rc2})"
+        export_result = runner.invoke(
+            app,
+            [
+                "export-server-config",
+                "--input", str(bundle_path),
+                "--output-dir", tmpdir,
+            ],
+        )
+        assert export_result.exit_code == 0, (
+            f"CLI export-server-config 失败: {export_result.output}"
+        )
 
         sp_path = Path(tmpdir) / "cli_sp_bundle_server_config.json"
         assert sp_path.exists()
@@ -486,18 +497,25 @@ def test_cli_export_server_config_from_bundle() -> None:
 
 def test_cli_export_server_config_direct_generate() -> None:
     """直接通过参数生成 ServerConfig 的 CLI 路径。"""
-    from seahorse.__main__ import main
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
 
+    runner = CliRunner()
     with tempfile.TemporaryDirectory() as tmpdir:
-        rc = main([
-            "export-server-config",
-            "--scenario-id", "cli_direct_sp",
-            "--seed", "77",
-            "--asset-count", "2",
-            "--protocol-targets", "OPC_UA", "MODBUS_TCP",
-            "--output-dir", tmpdir,
-        ])
-        assert rc == 0, f"CLI direct generate export-server-config 失败 (exit={rc})"
+        result = runner.invoke(
+            app,
+            [
+                "export-server-config",
+                "--scenario-id", "cli_direct_sp",
+                "--seed", "77",
+                "--asset-count", "2",
+                "--protocol-targets", "OPC_UA,MODBUS_TCP",
+                "--output-dir", tmpdir,
+            ],
+        )
+        assert result.exit_code == 0, (
+            f"CLI direct generate export-server-config 失败: {result.output}"
+        )
 
         sp_path = Path(tmpdir) / "cli_direct_sp_server_config.json"
         assert sp_path.exists()
@@ -510,23 +528,32 @@ def test_cli_export_server_config_direct_generate() -> None:
 
 def test_cli_export_server_config_no_input_no_scenario_id() -> None:
     """既未指定 --input 也未指定 --scenario-id 时应失败。"""
-    from seahorse.__main__ import main
-    rc = main([
-        "export-server-config",
-        "--output-dir", "/tmp",
-    ])
-    assert rc != 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["export-server-config", "--output-dir", "/tmp"],
+    )
+    assert result.exit_code != 0
 
 
 def test_cli_export_server_config_missing_input_file() -> None:
     """指定不存在的 --input 文件时应返回非零。"""
-    from seahorse.__main__ import main
-    rc = main([
-        "export-server-config",
-        "--input", "/nonexistent/bundle.json",
-        "--output-dir", "/tmp",
-    ])
-    assert rc != 0
+    from typer.testing import CliRunner
+    from seahorse.__main__ import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "export-server-config",
+            "--input", "/nonexistent/bundle.json",
+            "--output-dir", "/tmp",
+        ],
+    )
+    assert result.exit_code != 0
 
 
 # ── validate_server_config_from_dict ─────────────────────────────────────────────
