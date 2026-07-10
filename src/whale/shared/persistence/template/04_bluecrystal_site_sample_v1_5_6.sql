@@ -1,9 +1,9 @@
--- BlueCrystal simulated-site sample data v1_5_4
+-- BlueCrystal simulated-site sample data v1_5_6
 -- Database: bluecrystal
 -- Schema: whale
 -- Purpose: a complete virtual wind-PV-storage plant for development, integration,
 --          protocol simulation, data generation, UI demonstration, and testing.
--- Dependency: 02_bluecrystal_schema_ddl_v1_5_4.sql, then bluecrystal_basic_data_v1_5_4.sql
+-- Dependency: 02_bluecrystal_schema_ddl_v1_5_6.sql, then bluecrystal_basic_data_v1_5_6.sql
 -- Client: Navicat or any PostgreSQL SQL client; connect to database bluecrystal first.
 
 
@@ -371,19 +371,19 @@ END LOOP;
 i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier LIKE 'ext_bess_%' ORDER BY measurement_identifier LOOP i := i + 1;
 INSERT INTO cfg_opcua_point_item(cfg_opcua_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, namespace_uri, node_id, browse_path, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_opcua_point_table_id FROM cfg_opcua_point_table WHERE point_table_identifier='CONN_BESS_CONTAINER_001_PT'), r.cfg_measurement_semantic_id, 'BESS_CONTAINER_001' || '_' || r.measurement_identifier, r.name_zh, r.name_en, 'urn:bluecrystal:extension', 'ns=2;s=' || 'BESS_CONTAINER_001' || '.' || r.measurement_identifier, '/' || 'BESS_CONTAINER_001' || '/' || r.measurement_identifier, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'BESS_CONTAINER_001 扩展语义点。', 'extension point.');
 END LOOP;
-i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier LIKE 'ext_dispatch_%' ORDER BY measurement_identifier LOOP i := i + 1;
+i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier IN ('ext_grid_001','ext_grid_002','ext_grid_003','ext_grid_004','ext_grid_005') ORDER BY measurement_identifier LOOP i := i + 1;
 INSERT INTO cfg_opcua_point_item(cfg_opcua_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, namespace_uri, node_id, browse_path, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_opcua_point_table_id FROM cfg_opcua_point_table WHERE point_table_identifier='CONN_EMS_001_PT'), r.cfg_measurement_semantic_id, 'EMS_001' || '_' || r.measurement_identifier, r.name_zh, r.name_en, 'urn:bluecrystal:extension', 'ns=2;s=' || 'EMS_001' || '.' || r.measurement_identifier, '/' || 'EMS_001' || '/' || r.measurement_identifier, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'EMS_001 扩展语义点。', 'extension point.');
 END LOOP;
 i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier LIKE 'ext_it_%' ORDER BY measurement_identifier LOOP i := i + 1;
 INSERT INTO cfg_opcua_point_item(cfg_opcua_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, namespace_uri, node_id, browse_path, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_opcua_point_table_id FROM cfg_opcua_point_table WHERE point_table_identifier='CONN_SCADA_001_PT'), r.cfg_measurement_semantic_id, 'SCADA_001' || '_' || r.measurement_identifier, r.name_zh, r.name_en, 'urn:bluecrystal:extension', 'ns=2;s=' || 'SCADA_001' || '.' || r.measurement_identifier, '/' || 'SCADA_001' || '/' || r.measurement_identifier, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'SCADA_001 扩展语义点。', 'extension point.');
 END LOOP;
-i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier LIKE 'ext_dispatch_%' ORDER BY measurement_identifier LOOP i := i + 1;
+i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier IN ('ext_grid_001','ext_grid_002','ext_grid_003','ext_grid_004','ext_grid_005') ORDER BY measurement_identifier LOOP i := i + 1;
 INSERT INTO cfg_iec101_point_item(cfg_iec101_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, type_id_ref_id, common_address, information_object_address, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_iec101_point_table_id FROM cfg_iec101_point_table WHERE point_table_identifier='CONN_RTU_LEGACY_001_PT'), r.cfg_measurement_semantic_id, 'RTU_LEGACY_001' || '_' || r.measurement_identifier, r.name_zh, r.name_en, ref_code_id('IEC101_TYPE_ID','M_ME_NC_1'), 1, 1000+i, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'RTU_LEGACY_001 IEC101语义点。', 'IEC101 point.');
 END LOOP;
-i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier LIKE 'ext_dispatch_%' ORDER BY measurement_identifier LOOP i := i + 1;
+i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier IN ('ext_grid_001','ext_grid_002','ext_grid_003','ext_grid_004','ext_grid_005') ORDER BY measurement_identifier LOOP i := i + 1;
 INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, type_id_ref_id, common_address, information_object_address, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT'), r.cfg_measurement_semantic_id, 'GRID_DISPATCH_PRIMARY' || '_' || r.measurement_identifier, r.name_zh, r.name_en, ref_code_id('IEC104_TYPE_ID','M_ME_NC_1'), 1, 2000+i, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'GRID_DISPATCH_PRIMARY IEC104语义点。', 'IEC104 point.');
 END LOOP;
-i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier LIKE 'ext_dispatch_%' ORDER BY measurement_identifier LOOP i := i + 1;
+i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier IN ('ext_grid_001','ext_grid_002','ext_grid_003','ext_grid_004','ext_grid_005') ORDER BY measurement_identifier LOOP i := i + 1;
 INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, type_id_ref_id, common_address, information_object_address, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_AGC_AVC_CONTROLLER_001_PT'), r.cfg_measurement_semantic_id, 'AGC_AVC_CONTROLLER_001' || '_' || r.measurement_identifier, r.name_zh, r.name_en, ref_code_id('IEC104_TYPE_ID','M_ME_NC_1'), 1, 2000+i, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'AGC_AVC_CONTROLLER_001 IEC104语义点。', 'IEC104 point.');
 END LOOP;
 i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier LIKE 'ext_it_%' ORDER BY measurement_identifier LOOP i := i + 1;
@@ -1215,5 +1215,61 @@ ORDER BY a.asset_identifier;
 
 INSERT INTO ast_asset_maintenance_event(asset_id, event_type_ref_id, event_status_ref_id, occurred_at, completed_at, title_zh, title_en, description_zh, description_en, work_order_identifier)
 VALUES (asset_id('WTG_001'), ref_code_id('ASSET_MAINTENANCE_EVENT_TYPE','INSPECTION'), ref_code_id('EVENT_STATUS','CLOSED'), now() - interval '7 days', now() - interval '7 days' + interval '2 hours', 'WTG_001 例行巡检', 'WTG_001 routine inspection', '样例巡检事件。', 'Sample inspection event.', 'WO-2024-0001');
+
+
+-- 14. Mandatory sample-data coverage validation
+-- Every supported protocol is used exactly as one representative complete chain at minimum.
+DO $$
+DECLARE
+    v_missing TEXT;
+BEGIN
+    WITH protocol_point_count(protocol, point_count) AS (
+        VALUES
+            ('MODBUS',         (SELECT count(*) FROM whale.cfg_modbus_point_item)),
+            ('IEC101',         (SELECT count(*) FROM whale.cfg_iec101_point_item)),
+            ('IEC104',         (SELECT count(*) FROM whale.cfg_iec104_point_item)),
+            ('IEC61850_MMS',   (SELECT count(*) FROM whale.cfg_iec61850_mms_point_item)),
+            ('IEC61850_GOOSE', (SELECT count(*) FROM whale.cfg_iec61850_goose_point_item)),
+            ('IEC61850_SV',    (SELECT count(*) FROM whale.cfg_iec61850_sv_point_item)),
+            ('OPCUA',          (SELECT count(*) FROM whale.cfg_opcua_point_item)),
+            ('MQTT',           (SELECT count(*) FROM whale.cfg_mqtt_point_item)),
+            ('ADS',            (SELECT count(*) FROM whale.cfg_ads_point_item)),
+            ('HTTP_REST',      (SELECT count(*) FROM whale.cfg_http_rest_point_item))
+    )
+    SELECT string_agg(protocol, ', ' ORDER BY protocol)
+      INTO v_missing
+      FROM protocol_point_count
+     WHERE point_count = 0;
+
+    IF v_missing IS NOT NULL THEN
+        RAISE EXCEPTION 'site_sample protocol point-item coverage failed; empty protocols: %', v_missing;
+    END IF;
+
+    SELECT string_agg(protocol, ', ' ORDER BY protocol)
+      INTO v_missing
+      FROM (
+          SELECT p.code AS protocol
+          FROM whale.ref_code p
+          LEFT JOIN whale.cfg_protocol_table_registry r
+                 ON r.protocol_ref_id = p.ref_code_id
+                AND r.table_role_ref_id = whale.ref_code_id('PROTOCOL_TABLE_ROLE', 'POINT_ITEM_VIEW')
+                AND r.enabled = TRUE AND r.valid_to IS NULL
+          WHERE p.ref_type = 'PROTOCOL' AND p.enabled = TRUE
+            AND p.code IN ('MODBUS','IEC101','IEC104','IEC61850_MMS','IEC61850_GOOSE','IEC61850_SV','OPCUA','MQTT','ADS','HTTP_REST')
+            AND r.cfg_protocol_table_registry_id IS NULL
+      ) q;
+
+    IF v_missing IS NOT NULL THEN
+        RAISE EXCEPTION 'POINT_ITEM_VIEW registry coverage failed; missing protocols: %', v_missing;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM whale.vw_connection_object_full
+        WHERE point_item_view_name IS NULL
+    ) THEN
+        RAISE EXCEPTION 'vw_connection_object_full contains connection rows without registered point_item_view_name';
+    END IF;
+END;
+$$;
 
 COMMIT;

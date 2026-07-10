@@ -1,4 +1,4 @@
--- BlueCrystal schema and object DDL v1_5_4
+-- BlueCrystal schema and object DDL v1_5_6
 -- Database: bluecrystal
 -- Schema: whale
 -- Client: Navicat or any PostgreSQL SQL client
@@ -633,12 +633,12 @@ CREATE TABLE whale.cfg_protocol_table_registry (
     created_by TEXT NOT NULL DEFAULT 'system',
     UNIQUE(protocol_ref_id, table_role_ref_id, record_revision)
 );
-COMMENT ON TABLE whale.cfg_protocol_table_registry IS '【元数据】协议物理表注册表。表达协议类型与连接参数表、点表表头、点表采集点表之间的映射关系。';
+COMMENT ON TABLE whale.cfg_protocol_table_registry IS '【元数据】协议数据库对象注册表。显式登记每种协议实际使用的连接参数表、点表、点位表和点位执行视图；对象名不得通过协议名拼接推导。';
 COMMENT ON COLUMN whale.cfg_protocol_table_registry.cfg_protocol_table_registry_id IS '自增代理主键，列名统一为表名_id，满足 SQLAlchemy ORM 映射要求。';
 COMMENT ON COLUMN whale.cfg_protocol_table_registry.protocol_ref_id IS '协议类型，取值来自 ref_code.ref_type=PROTOCOL。';
 COMMENT ON COLUMN whale.cfg_protocol_table_registry.table_role_ref_id IS '协议表角色，取值来自 ref_code.ref_type=PROTOCOL_TABLE_ROLE。';
 COMMENT ON COLUMN whale.cfg_protocol_table_registry.table_schema IS '协议物理表所在 schema。';
-COMMENT ON COLUMN whale.cfg_protocol_table_registry.table_name IS '协议物理表名。';
+COMMENT ON COLUMN whale.cfg_protocol_table_registry.table_name IS '协议实际数据库对象名；可为表或执行视图，必须与 PostgreSQL 中真实对象名一致。';
 COMMENT ON COLUMN whale.cfg_protocol_table_registry.description_zh IS '协议表映射中文说明。';
 COMMENT ON COLUMN whale.cfg_protocol_table_registry.description_en IS '协议表映射英文说明。';
 COMMENT ON COLUMN whale.cfg_protocol_table_registry.record_revision IS '追加式不可变快照修订号。同一业务稳定标识变更时新增记录并递增修订号，不更新旧记录。';
@@ -2609,8 +2609,6 @@ SELECT
     at.code AS asset_type_code,
     at.name_zh AS asset_type_name,
     p.code AS protocol,
-    CASE p.code WHEN 'MODBUS' THEN 'cfg_modbus_conn' WHEN 'OPCUA' THEN 'cfg_opcua_conn' WHEN 'ADS' THEN 'cfg_ads_conn' WHEN 'IEC101' THEN 'cfg_iec101_conn' WHEN 'IEC104' THEN 'cfg_iec104_conn' WHEN 'IEC61850_MMS' THEN 'cfg_iec61850_mms_conn' WHEN 'IEC61850_GOOSE' THEN 'cfg_iec61850_goose_conn' WHEN 'IEC61850_SV' THEN 'cfg_iec61850_sv_conn' WHEN 'MQTT' THEN 'cfg_mqtt_conn' WHEN 'HTTP_REST' THEN 'cfg_http_rest_conn' END AS cfg_xxx_conn_table_name,
-    COALESCE(mb.cfg_modbus_conn_id, opc.cfg_opcua_conn_id, ads.cfg_ads_conn_id, i101.cfg_iec101_conn_id, i104.cfg_iec104_conn_id, mms.cfg_iec61850_mms_conn_id, goose.cfg_iec61850_goose_conn_id, sv.cfg_iec61850_sv_conn_id, mqtt.cfg_mqtt_conn_id, http.cfg_http_rest_conn_id) AS cfg_xxx_conn_id,
     CASE p.code
         WHEN 'MODBUS' THEN jsonb_build_object('host', mb.host::text, 'port', mb.port, 'slave_id', mb.slave_id, 'transport', mb_transport.code, 'timeout_ms', mb.timeout_ms)
         WHEN 'OPCUA' THEN jsonb_build_object('endpoint_url', opc.endpoint_url, 'security_policy', opc_sec_policy.code, 'security_mode', opc_sec_mode.code, 'username', opc.username, 'timeout_ms', opc.timeout_ms)
@@ -2623,11 +2621,20 @@ SELECT
         WHEN 'MQTT' THEN jsonb_build_object('broker_url', mqtt.broker_url, 'client_id', mqtt.client_id, 'username', mqtt.username, 'qos', mqtt.qos, 'clean_session', mqtt.clean_session, 'timeout_ms', mqtt.timeout_ms)
         WHEN 'HTTP_REST' THEN jsonb_build_object('base_url', http.base_url, 'host_address', http.host_address::text, 'port', http.port, 'auth_type', http_auth.code, 'username', http.username, 'timeout_ms', http.timeout_ms)
     END AS connection_params_json,
-    CASE p.code WHEN 'MODBUS' THEN 'vw_modbus_point_item' WHEN 'OPCUA' THEN 'vw_opcua_point_item' WHEN 'ADS' THEN 'vw_ads_point_item' WHEN 'IEC101' THEN 'vw_iec101_point_item' WHEN 'IEC104' THEN 'vw_iec104_point_item' WHEN 'IEC61850_MMS' THEN 'vw_iec61850_mms_point_item' WHEN 'IEC61850_GOOSE' THEN 'vw_iec61850_goose_point_item' WHEN 'IEC61850_SV' THEN 'vw_iec61850_sv_point_item' WHEN 'MQTT' THEN 'vw_mqtt_point_item' WHEN 'HTTP_REST' THEN 'vw_http_rest_point_item' END AS point_item_view_name
+    point_view.table_name AS point_item_view_name
 FROM whale.cfg_connection c
 JOIN whale.ast_asset a ON a.ast_asset_id = c.asset_id
 JOIN whale.ref_code at ON at.ref_code_id = a.asset_type_ref_id
 JOIN whale.ref_code p ON p.ref_code_id = c.protocol_ref_id
+LEFT JOIN whale.cfg_protocol_table_registry point_view
+       ON point_view.protocol_ref_id = p.ref_code_id
+      AND point_view.table_role_ref_id = (
+          SELECT ref_code_id FROM whale.ref_code
+          WHERE ref_type = 'PROTOCOL_TABLE_ROLE' AND code = 'POINT_ITEM_VIEW' AND enabled = TRUE
+          ORDER BY ref_code_id DESC LIMIT 1
+      )
+      AND point_view.enabled = TRUE
+      AND point_view.valid_to IS NULL
 LEFT JOIN whale.cfg_modbus_conn mb ON mb.cfg_modbus_conn_id = c.cfg_connection_id
 LEFT JOIN whale.ref_code mb_transport ON mb_transport.ref_code_id = mb.transport_ref_id
 LEFT JOIN whale.cfg_opcua_conn opc ON opc.cfg_opcua_conn_id = c.cfg_connection_id
@@ -2644,7 +2651,7 @@ LEFT JOIN whale.cfg_http_rest_conn http ON http.cfg_http_rest_conn_id = c.cfg_co
 LEFT JOIN whale.ref_code http_auth ON http_auth.ref_code_id = http.auth_type_ref_id
 WHERE c.enabled = TRUE AND c.valid_to IS NULL
 ORDER BY p.sort_order, at.sort_order, a.asset_identifier, c.cfg_connection_id;
-COMMENT ON VIEW whale.vw_connection_object_full IS '【配置数据】连接对象执行视图。外部程序通过 connection_id 获取资产、协议、协议连接表定位与 connection_params_json。';
+COMMENT ON VIEW whale.vw_connection_object_full IS '【配置数据】连接对象执行视图。外部程序通过 connection_id 获取资产、协议、连接参数及协议注册表中显式登记的点位执行视图名。';
 COMMENT ON COLUMN whale.vw_connection_object_full.connection_id IS '通用连接主键，来自 cfg_connection.cfg_connection_id；用于关联 vw_task_full.connection_id。';
 COMMENT ON COLUMN whale.vw_connection_object_full.asset_id IS '连接对象资产主键，来自 ast_asset.ast_asset_id。';
 COMMENT ON COLUMN whale.vw_connection_object_full.asset_identifier IS '连接对象资产业务标识，来自 ast_asset.asset_identifier。';
@@ -2652,10 +2659,8 @@ COMMENT ON COLUMN whale.vw_connection_object_full.asset_name IS '连接对象资
 COMMENT ON COLUMN whale.vw_connection_object_full.asset_type_code IS '资产类型 code，来自 ref_code.ref_type=ASSET_TYPE。';
 COMMENT ON COLUMN whale.vw_connection_object_full.asset_type_name IS '资产类型中文名，来自 ref_code.name_zh。';
 COMMENT ON COLUMN whale.vw_connection_object_full.protocol IS '连接使用的协议 code，来自 ref_code.ref_type=PROTOCOL。';
-COMMENT ON COLUMN whale.vw_connection_object_full.cfg_xxx_conn_table_name IS '协议专属连接参数表名，例如 cfg_modbus_conn。';
-COMMENT ON COLUMN whale.vw_connection_object_full.cfg_xxx_conn_id IS '协议专属连接表主键，同时等于 cfg_connection_id。';
 COMMENT ON COLUMN whale.vw_connection_object_full.connection_params_json IS '协议连接参数 JSON，外部程序可直接用于建立协议连接。';
-COMMENT ON COLUMN whale.vw_connection_object_full.point_item_view_name IS '该协议对应的点位执行视图名。';
+COMMENT ON COLUMN whale.vw_connection_object_full.point_item_view_name IS '点位执行视图真实名称，来自 cfg_protocol_table_registry 的 POINT_ITEM_VIEW 注册记录；不得由协议名称拼接推导。';
 
 
 CREATE OR REPLACE VIEW whale.vw_task_full AS

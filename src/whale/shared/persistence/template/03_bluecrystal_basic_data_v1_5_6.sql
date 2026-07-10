@@ -1,9 +1,9 @@
--- BlueCrystal shared basic data v1_5_4
+-- BlueCrystal shared basic data v1_5_6
 -- Database: bluecrystal
 -- Schema: whale
 -- Purpose: platform-wide reference codes, standard semantics, protocol metadata,
 --          standard permissions, standard roles, and protocol operation mappings.
--- Dependency: 02_bluecrystal_schema_ddl_v1_5_4.sql
+-- Dependency: 02_bluecrystal_schema_ddl_v1_5_6.sql
 -- Client: Navicat or any PostgreSQL SQL client; connect to database bluecrystal first.
 
 
@@ -45,6 +45,7 @@ INSERT INTO ref_code(ref_type, code, name_zh, name_en, abbr_en, description_zh, 
 ('PROTOCOL_TABLE_ROLE', 'CONN', '协议连接参数表', 'CONN', NULL, '协议连接参数表', 'CONN', 1, true),
 ('PROTOCOL_TABLE_ROLE', 'POINT_TABLE', '协议能力点表表头', 'POINT_TABLE', NULL, '协议能力点表表头', 'POINT_TABLE', 2, true),
 ('PROTOCOL_TABLE_ROLE', 'POINT_ITEM', '协议能力点明细表', 'POINT_ITEM', NULL, '协议能力点明细表', 'POINT_ITEM', 3, true),
+('PROTOCOL_TABLE_ROLE', 'POINT_ITEM_VIEW', '协议点位执行视图', 'Point item execution view', NULL, '协议驱动读取点位配置时使用的真实执行视图；名称必须显式注册，不得按协议名推导。', 'Actual point-item execution view used by protocol drivers; the name must be registered explicitly.', 4, true),
 ('ASSET_TYPE', 'WIND_TURBINE', '风力发电机组', 'WIND_TURBINE', NULL, '风力发电机组', 'WIND_TURBINE', 1, true),
 ('ASSET_TYPE', 'MAIN_CONTROLLER', '主控系统', 'MAIN_CONTROLLER', NULL, '主控系统', 'MAIN_CONTROLLER', 2, true),
 ('ASSET_TYPE', 'CONVERTER', '变流器', 'CONVERTER', NULL, '变流器', 'CONVERTER', 3, true),
@@ -860,7 +861,17 @@ INSERT INTO cfg_protocol_table_registry(protocol_ref_id, table_role_ref_id, tabl
 (ref_code_id('PROTOCOL','ADS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM'), 'whale', 'cfg_ads_point_item', 'ADS POINT_ITEM 物理表。', 'ADS POINT_ITEM table.'),
 (ref_code_id('PROTOCOL','HTTP_REST'), ref_code_id('PROTOCOL_TABLE_ROLE','CONN'), 'whale', 'cfg_http_rest_conn', 'HTTP_REST CONN 物理表。', 'HTTP_REST CONN table.'),
 (ref_code_id('PROTOCOL','HTTP_REST'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_TABLE'), 'whale', 'cfg_http_rest_point_table', 'HTTP_REST POINT_TABLE 物理表。', 'HTTP_REST POINT_TABLE table.'),
-(ref_code_id('PROTOCOL','HTTP_REST'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM'), 'whale', 'cfg_http_rest_point_item', 'HTTP_REST POINT_ITEM 物理表。', 'HTTP_REST POINT_ITEM table.');
+(ref_code_id('PROTOCOL','HTTP_REST'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM'), 'whale', 'cfg_http_rest_point_item', 'HTTP_REST POINT_ITEM 物理表。', 'HTTP_REST POINT_ITEM table.'),
+(ref_code_id('PROTOCOL','MODBUS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_modbus_point_item', 'MODBUS 点位执行视图。', 'MODBUS point-item execution view.'),
+(ref_code_id('PROTOCOL','IEC101'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec101_point_item', 'IEC101 点位执行视图。', 'IEC101 point-item execution view.'),
+(ref_code_id('PROTOCOL','IEC104'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec104_point_item', 'IEC104 点位执行视图。', 'IEC104 point-item execution view.'),
+(ref_code_id('PROTOCOL','IEC61850_MMS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec61850_mms_point_item', 'IEC61850_MMS 点位执行视图。', 'IEC61850_MMS point-item execution view.'),
+(ref_code_id('PROTOCOL','IEC61850_GOOSE'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec61850_goose_point_item', 'IEC61850_GOOSE 点位执行视图。', 'IEC61850_GOOSE point-item execution view.'),
+(ref_code_id('PROTOCOL','IEC61850_SV'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec61850_sv_point_item', 'IEC61850_SV 点位执行视图。', 'IEC61850_SV point-item execution view.'),
+(ref_code_id('PROTOCOL','OPCUA'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_opcua_point_item', 'OPCUA 点位执行视图。', 'OPCUA point-item execution view.'),
+(ref_code_id('PROTOCOL','MQTT'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_mqtt_point_item', 'MQTT 点位执行视图。', 'MQTT point-item execution view.'),
+(ref_code_id('PROTOCOL','ADS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_ads_point_item', 'ADS 点位执行视图。', 'ADS point-item execution view.'),
+(ref_code_id('PROTOCOL','HTTP_REST'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_http_rest_point_item', 'HTTP_REST 点位执行视图。', 'HTTP_REST point-item execution view.');
 
 -- 5. Standard permissions, standard roles, and role-permission templates
 -- 9. security permissions, roles, employees
