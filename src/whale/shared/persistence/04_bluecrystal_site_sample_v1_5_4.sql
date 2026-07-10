@@ -1,10 +1,10 @@
--- BlueWhale simulated-site sample data v1_5_3
--- Database: bluewhale
+-- BlueCrystal simulated-site sample data v1_5_4
+-- Database: bluecrystal
 -- Schema: whale
 -- Purpose: a complete virtual wind-PV-storage plant for development, integration,
 --          protocol simulation, data generation, UI demonstration, and testing.
--- Dependency: 02_bluewhale_schema_ddl_v1_5_3.sql, then bluewhale_basic_data_v1_5_3.sql
--- Client: Navicat or any PostgreSQL SQL client; connect to database bluewhale first.
+-- Dependency: 02_bluecrystal_schema_ddl_v1_5_4.sql, then bluecrystal_basic_data_v1_5_4.sql
+-- Client: Navicat or any PostgreSQL SQL client; connect to database bluecrystal first.
 
 
 BEGIN;

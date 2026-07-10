@@ -1,4 +1,4 @@
-# BlueWhale 数据模型正式版 v1.5.3
+# BlueCrystal 数据模型正式版 v1.5.4
 
 ## 0. Navicat 执行约束
 
@@ -6,10 +6,10 @@ PostgreSQL 不支持在普通 SQL 中切换数据库；`\connect`、`\set`、`\g
 
 因此正式初始化包拆成四个阶段：
 
-1. 连接维护库 `postgres`，执行 `01_bluewhale_create_database_v1_5_3.sql`。
-2. 在 Navicat 中新建或刷新 `bluewhale` 连接，连接到数据库 `bluewhale`。
-3. 依次执行 `02_bluewhale_schema_ddl_v1_5_3.sql`、`03_bluewhale_basic_data_v1_5_3.sql`。
-4. 仅在开发、测试、演示环境执行 `04_bluewhale_site_sample_v1_5_3.sql`。
+1. 连接维护库 `postgres`，执行 `01_bluecrystal_create_database_v1_5_4.sql`。
+2. 在 Navicat 中新建或刷新 `bluecrystal` 连接，连接到数据库 `bluecrystal`。
+3. 依次执行 `02_bluecrystal_schema_ddl_v1_5_4.sql`、`03_bluecrystal_basic_data_v1_5_4.sql`。
+4. 仅在开发、测试、演示环境执行 `04_bluecrystal_site_sample_v1_5_4.sql`。
 
 `01` 文件只执行一次。由于 PostgreSQL 没有 `CREATE DATABASE IF NOT EXISTS`，数据库已经存在时不得重复执行。
 
@@ -17,18 +17,20 @@ PostgreSQL 不支持在普通 SQL 中切换数据库；`\connect`、`\set`、`\g
 
 | 项目 | 正式值 |
 |---|---|
-| PostgreSQL 数据库名 | `bluewhale` |
+| PostgreSQL 数据库名 | `bluecrystal` |
 | PostgreSQL schema 名 | `whale` |
-| DDL | `bluewhale_ddl_v1_5_3.sql` |
-| 公共基础数据 | `bluewhale_basic_data_v1_5_3.sql` |
-| 模拟现场样例数据 | `bluewhale_site_sample_v1_5_3.sql` |
+| 建库脚本 | `01_bluecrystal_create_database_v1_5_4.sql` |
+| Schema DDL | `02_bluecrystal_schema_ddl_v1_5_4.sql` |
+| 公共基础数据 | `03_bluecrystal_basic_data_v1_5_4.sql` |
+| 模拟现场样例数据 | `04_bluecrystal_site_sample_v1_5_4.sql` |
 
 推荐执行顺序：
 
 ```bash
-psql -U <database_admin> -d postgres -f bluewhale_ddl_v1_5_3.sql
-psql -U <database_user> -d bluewhale -f bluewhale_basic_data_v1_5_3.sql
-psql -U <database_user> -d bluewhale -f bluewhale_site_sample_v1_5_3.sql
+psql -U <database_admin> -d postgres -f 01_bluecrystal_create_database_v1_5_4.sql
+psql -U <database_user> -d bluecrystal -f 02_bluecrystal_schema_ddl_v1_5_4.sql
+psql -U <database_user> -d bluecrystal -f 03_bluecrystal_basic_data_v1_5_4.sql
+psql -U <database_user> -d bluecrystal -f 04_bluecrystal_site_sample_v1_5_4.sql
 ```
 
 依赖关系：
@@ -43,17 +45,17 @@ site_sample
 
 ## 2. 本版变更
 
-1. 数据库正式命名为 `bluewhale`，schema 正式命名为 `whale`。
+1. 数据库正式命名为 `bluecrystal`，schema 正式命名为 `whale`。
 2. 原单一 sample DML 拆分为公共基础数据和模拟现场样例数据。
 3. 公共基础数据只表达“平台认识什么”，不得依赖组织、场站、资产、员工、连接或任务实例。
 4. 模拟现场样例数据表达“虚拟场站具体有什么、如何连接、如何运行”。
 5. `ref_code_id()`、`asset_id()`、`model_id()`、`connection_id()`、`semantic_id()`、拓扑元素查找函数和协议数据类型查找函数由 DML 迁入 DDL。
-6. DDL、基础数据和现场样例统一使用 `bluewhale.whale`。
+6. DDL、基础数据和现场样例统一使用 `bluecrystal.whale`。
 7. 保留 v1.4.10 已确定的测量语义、协议点位和访问能力边界，不改变业务表结构。
 
 ## 2.1 公共基础数据边界
 
-`bluewhale_basic_data_v1_5_3.sql` 包含：
+`03_bluecrystal_basic_data_v1_5_4.sql` 包含：
 
 1. 全部平台参考代码 `ref_code`；
 2. 标准测量语义 `cfg_measurement_semantic`；
@@ -66,7 +68,7 @@ site_sample
 
 ## 2.2 模拟现场样例数据边界
 
-`bluewhale_site_sample_v1_5_3.sql` 包含：
+`04_bluecrystal_site_sample_v1_5_4.sql` 包含：
 
 1. 模拟组织、场站和班组；
 2. 模拟厂商、型号和资产实例；
@@ -182,11 +184,11 @@ site_sample
 
 ## 8. 自检要求
 
-1. DDL 包含数据库 `bluewhale` 的条件创建逻辑，且建库语句位于事务之外。
+1. 建库脚本使用独立的 `CREATE DATABASE bluecrystal`，并在维护库（通常为 `postgres`）中单独执行。
 2. DDL 创建 schema `whale`，并包含全部稳定标识查找函数。
 3. 基础数据只依赖 DDL，不引用组织、场站、资产、员工、连接、任务或拓扑实例。
 4. 现场样例可以引用基础数据，但不得重复插入公共参考代码、标准语义、协议注册、标准权限角色或协议操作定义。
-5. 三个 SQL 文件均使用 `\set ON_ERROR_STOP on` 和 `\connect bluewhale`。
+5. 所有 SQL 均为纯 PostgreSQL SQL，不包含 `\set`、`\gexec`、`\connect` 等 `psql` 元命令。
 6. 三个 SQL 文件不再出现 `whale_guard`。
 7. DDL、基础数据和现场样例末尾均包含 `COMMIT`；DDL 的 `CREATE DATABASE` 位于 `BEGIN` 之前。
 8. `cfg_measurement_semantic.name_zh` 不出现无业务含义的占位名称。

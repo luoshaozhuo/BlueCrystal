@@ -1,14 +1,14 @@
--- BlueWhale schema and object DDL v1_5_3
--- Database: bluewhale
+-- BlueCrystal schema and object DDL v1_5_4
+-- Database: bluecrystal
 -- Schema: whale
 -- Client: Navicat or any PostgreSQL SQL client
--- Prerequisite: connect Navicat to database bluewhale before executing this file.
+-- Prerequisite: connect Navicat to database bluecrystal before executing this file.
 -- WARNING: this file drops and recreates schema whale.
 
 BEGIN;
 DROP SCHEMA IF EXISTS whale CASCADE;
 CREATE SCHEMA whale;
-COMMENT ON SCHEMA whale IS 'BlueWhale 正式业务数据 schema。';
+COMMENT ON SCHEMA whale IS 'BlueCrystal 正式业务数据 schema。';
 SET search_path TO whale, public;
 
 

@@ -1,10 +1,10 @@
--- BlueWhale shared basic data v1_5_3
--- Database: bluewhale
+-- BlueCrystal shared basic data v1_5_4
+-- Database: bluecrystal
 -- Schema: whale
 -- Purpose: platform-wide reference codes, standard semantics, protocol metadata,
 --          standard permissions, standard roles, and protocol operation mappings.
--- Dependency: 02_bluewhale_schema_ddl_v1_5_3.sql
--- Client: Navicat or any PostgreSQL SQL client; connect to database bluewhale first.
+-- Dependency: 02_bluecrystal_schema_ddl_v1_5_4.sql
+-- Client: Navicat or any PostgreSQL SQL client; connect to database bluecrystal first.
 
 
 BEGIN;
