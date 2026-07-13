@@ -1,34 +1,18 @@
 """starfish 对外包入口。
 
-starfish 是多协议 server simulator/manager 核心。
-它读取 Seahorse 导出的 `starfish_server_plan.json`（历史文件名），
-装配协议驱动，并对外暴露统一的 `StarfishServerManager`。
-
-当前正式分层只有：
-- `api`
-- `application`
-- `domain`
-- `drivers`
-- `native`
-- `protocols`
-
-明确不再放在 `starfish` 内部的能力：
-- `probe`
-- `profile`
-- `capacity`
-
-上述诊断工具已迁移到 `whale.ingest.diagnostics`，因为它们属于
-“消费 server manager 的外部工具”，而不是 starfish 核心职责。
+Starfish 是 simulator runtime orchestrator。它采用 Hexagonal Architecture：
+CLI 作为 inbound adapter，core manager 管理 server workers，DB view 与
+IEC104 native backend 作为 outbound adapters。
 
 硬边界：
 - 不得 import `seahorse`
 - 不得 import `whale.ingest`
 - 不得 import `whale.shared.source`
-- 所有运行数据均为 `synthetic`
+- 当前 Python 主路径只保留 IEC104 simulator
 """
 
 from __future__ import annotations
 
-from starfish.api import StarfishServerManager
+from starfish.core import StarfishServerManager
 
 __all__ = ["StarfishServerManager"]

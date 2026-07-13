@@ -1,7 +1,7 @@
 """Starfish adapters 层入口。
 
-adapters 实现 application ports，并承载文件 I/O、协议 driver backend、
-协议 runtime binding 与环境探测等外部边界差异。
+adapters 实现 core ports，并承载 DB view 读取、IEC104 server backend、
+native runner 绑定与环境探测等外部边界差异。
 """
 
 from __future__ import annotations

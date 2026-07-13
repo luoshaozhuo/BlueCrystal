@@ -1,0 +1,17 @@
+"""Starfish core ports。
+
+Ports 由 core 拥有，adapter 负责实现。Core 只依赖这些协议，不直接依赖
+DB view、协议 backend 或 native runner。
+"""
+
+from __future__ import annotations
+
+from starfish.core.ports.protocol_server import StarfishServerPort
+from starfish.core.ports.server_factory import ServerFactoryPort
+from starfish.core.ports.server_loader import ServerDefinitionLoaderPort
+
+__all__ = [
+    "ServerDefinitionLoaderPort",
+    "ServerFactoryPort",
+    "StarfishServerPort",
+]

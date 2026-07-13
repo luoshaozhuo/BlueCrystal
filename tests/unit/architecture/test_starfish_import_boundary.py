@@ -193,25 +193,27 @@ class TestStarfishDirectoryStructure:
 
     def test_starfish_subpackages_exist(self) -> None:
         """子包 directory 应存在。"""
-        for sub in [
-            "domain",
-            "application",
-            "adapters",
-            "api",
-            "infrastructure",
-        ]:
+        for sub in ["core", "adapters"]:
             assert (STARFISH_ROOT / sub).is_dir(), f"缺少子目录: {sub}"
             assert (STARFISH_ROOT / sub / "__init__.py").is_file(), (
                 f"缺少 __init__.py: {sub}"
             )
 
     def test_legacy_drivers_package_removed(self) -> None:
-        """旧 drivers package 必须被完全移除。"""
-        assert not (STARFISH_ROOT / "drivers").exists()
+        """旧分层和 driver package 必须被完全移除。"""
+        for legacy_path in [
+            "application",
+            "domain",
+            "infrastructure",
+            "api",
+            "drivers",
+            "adapters/drivers",
+        ]:
+            assert not (STARFISH_ROOT / legacy_path).exists()
 
 
-class TestStarfishCliDependsOnApi:
-    """CLI 应通过高层 API 进入 application，而不是直接耦合旧底层包。"""
+class TestStarfishCliDependsOnComposition:
+    """CLI 应通过 composition root 装配 core，不直接耦合具体 adapter。"""
 
     def test_main_module_does_not_import_legacy_loader_or_registry(self) -> None:
         """`starfish.__main__` 不应再直接 import `loader` 或 `registry`。"""
@@ -225,6 +227,7 @@ class TestStarfishCliDependsOnApi:
             if isinstance(node, ast.ImportFrom) and node.module:
                 modules.add(node.module)
 
-        assert "starfish.api" in modules
+        assert "starfish.composition" in modules
+        assert "starfish.core" in modules
         legacy_driver_module = ".".join(("starfish", "drivers"))
         assert legacy_driver_module not in modules

@@ -1,35 +1,36 @@
-"""starfish CLI 入口 —— 通过高层 API 启动 Starfish simulator。
+"""starfish CLI 入口 —— 通过 Whale DB view 启动 Starfish simulator。
 
 使用方式：
 
 ```text
-python -m starfish run <server_config.json>
-python -m starfish run --input <server_config.json> --duration 30
+python -m starfish run -id 1001
+python -m starfish run -a --duration 30
 ```
 
 模块职责：
-- 只暴露 `run` 子命令，旧诊断入口不再作为隐藏命令保留。
-- 统一经 `starfish.api` 进入 application usecase，而不是直接耦合 loader/registry。
+- 只暴露 `run` 子命令，旧诊断入口不再作为隐藏命令保留；
+- 从 `WHALE_DB_URL` 指向的数据库执行视图加载 simulator 配置；
+- 统一经 composition root 装配 core manager，不直接耦合 loader 或协议 worker。
 - 提供独立可单元测试的 `main(argv) -> int` 入口，封装 typer 的
   `SystemExit` 行为，错误路径以返回值表达退出码。
 
 定位说明：
-- 这是面向单份 server 配置的 server manager CLI。
+- 这是面向 simulator 生命周期的 server manager CLI。
 - 测试逻辑应放在 `tests/` 中，由 pytest 驱动。
 - 本 CLI 不再承担 smoke/probe/profile/capacity 这类测试入口职责。
 
 不负责：
 - 替代 pytest。
-- 生产数据写入、落库或生产链路编排。
-- 协议 frame 编解码实现（由 `starfish.domain.protocols` 负责）。
+- 生产数据写入、落库或生产链路编排；server 数据更新由 Seahorse 负责。
+- IEC104 frame 编解码实现（由 native runner 负责）。
 """
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
-from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 import typer.main
@@ -37,8 +38,12 @@ from click.exceptions import Exit as ClickExit
 from click.exceptions import UsageError as ClickUsageError
 from typer._click.exceptions import UsageError as TyperUsageError
 
-from starfish.api import StarfishServerManager
-from starfish.application import ServerManagerBuildError
+from starfish.adapters.db_views import DbViewLoadError
+from starfish.composition import (
+    build_server_manager_from_db,
+    list_connection_ids_from_db,
+)
+from starfish.core import StarfishServerManager
 
 
 _PROG_NAME = "starfish"
@@ -51,68 +56,49 @@ app = typer.Typer(
 )
 
 
-def _open_manager_or_print_error(config_path: Path) -> StarfishServerManager | None:
-    """加载配置并创建统一 server manager 对象。"""
-    if config_path is None:
-        print("错误：缺少 server 配置 JSON 文件路径", file=sys.stderr)
+def _open_manager_or_print_error(
+    *,
+    connection_id: int | None,
+    load_all: bool,
+) -> StarfishServerManager | None:
+    """从 DB view 创建 simulator manager，并将加载错误转为 CLI 输出。"""
+    db_url = os.environ.get("WHALE_DB_URL", "").strip()
+    if not db_url:
+        print("错误：缺少环境变量 WHALE_DB_URL", file=sys.stderr)
         return None
     try:
-        return StarfishServerManager(config_path)
-    except FileNotFoundError:
-        print(f"错误：文件不存在: {config_path}", file=sys.stderr)
-        return None
-    except ServerManagerBuildError as exc:
-        print(f"错误：{exc}")
-        validation = exc.validation
-        if validation is not None and validation.errors:
-            for err in validation.errors:
-                print(f"  [ERROR] {err}")
+        connection_ids = (
+            list_connection_ids_from_db(db_url)
+            if load_all
+            else ([connection_id] if connection_id is not None else [])
+        )
+        if not connection_ids:
+            raise DbViewLoadError("vw_connection_object_full 中没有可启动的 connection")
+        return build_server_manager_from_db(
+            db_url,
+            connection_ids,
+        )
+    except DbViewLoadError as exc:
+        print(f"错误：{exc}", file=sys.stderr)
         return None
     except Exception as exc:
-        print(f"错误：加载失败: {exc}", file=sys.stderr)
+        print(f"错误：加载 simulator 配置失败: {exc}", file=sys.stderr)
         return None
 
 
-def _print_config_summary(config: Any) -> None:
-    """打印 server 配置摘要。"""
-    print(f"scenario_id: {config.scenario_id}")
-    config_name = getattr(config, "config_name", getattr(config, "server_name", ""))
-    servers = getattr(config, "servers", None)
-    if servers is None:
-        endpoint_count = len(getattr(config, "endpoints", []))
-        point_count = len(getattr(config, "points", []))
-        server_count = 1
-    else:
-        endpoint_count = sum(len(server.endpoints) for server in servers)
-        point_count = sum(len(server.points) for server in servers)
-        server_count = len(servers)
-    print(f"config_name: {config_name}")
-    print(f"servers:     {server_count}")
-    print(f"endpoints:   {endpoint_count}")
-    print(f"points:      {point_count}")
-    print(f"synthetic:   {config.synthetic}")
-
-
-def _print_registry_summary(config: Any, registry: Any) -> None:
-    """打印 facade 装配结果摘要。"""
-    print("Facade 装配结果:")
-    for entry in registry.entries:
-        endpoint = entry.endpoint
-        server = entry.server
-        bind_host = endpoint.bind_host or endpoint.host
-        bind_port = endpoint.bind_port or endpoint.port
-        print(f"  server:     {server.server_id or server.server_name}")
-        print(f"  endpoint:   {endpoint.endpoint_id}")
-        print(f"    protocol: {endpoint.protocol}")
-        print(f"    bind:     {bind_host}:{bind_port}")
-        print(f"    mode:     {entry.mode}")
-        print(f"    available:{entry.available}")
-        if entry.reason:
-            print(f"    reason:   {entry.reason}")
-        if entry.driver is not None:
-            health = entry.driver.health()
-            print(f"    points:   {health.get('point_count', len(server.points))}")
-            print(f"    caps:     {health.get('capabilities', server.capabilities)}")
+def _print_manager_summary(manager: StarfishServerManager) -> None:
+    """打印 manager 当前装配的 server 摘要。"""
+    description = manager.describe()
+    print(f"servers: {description['server_count']}")
+    print("Server 装配结果:")
+    for server in description["servers"]:
+        print(f"  connection_id: {server['connection_id']}")
+        print(f"    name:        {server['name']}")
+        print(f"    protocol:    {server['protocol']}")
+        print(f"    bind:        {server['bind_host']}:{server['bind_port']}")
+        print(f"    points:      {server['point_count']}")
+        print(f"    tasks:       {server['task_count']}")
+        print(f"    caps:        {server['capabilities']}")
 
 
 def main(argv: list[str]) -> int:
@@ -149,39 +135,53 @@ def cli(ctx: typer.Context) -> None:
         raise typer.Exit(2)
 
 
+def _selected_manager_count(manager: StarfishServerManager) -> int:
+    """返回当前 manager 持有的 server 数量。"""
+    return manager.server_count
+
+
 @app.command("run")
 def run_command(
-    config_path: Annotated[
-        Path | None,
-        typer.Argument(help="server 配置 JSON 文件路径"),
+    connection_id: Annotated[
+        int | None,
+        typer.Option(
+            "-id",
+            "--connection-id",
+            min=1,
+            help="按 vw_connection_object_full.connection_id 启动单个simulator",
+        ),
     ] = None,
-    input_path: Annotated[
-        Path | None,
-        typer.Option("--input", help="server 配置 JSON 文件路径（兼容旧用法）"),
-    ] = None,
+    load_all: Annotated[
+        bool,
+        typer.Option("-a", "--all", help="启动 DB view 中所有simulator"),
+    ] = False,
     duration: Annotated[
         float | None,
         typer.Option("--duration", min=0.0, help="运行秒数；不传则持续运行直到 Ctrl+C"),
     ] = None,
 ) -> int:
-    """启动全部可用 simulator facade 并保持运行。
+    """按 DB view 启动 simulator 并保持运行。
 
     Args:
-        config_path: 推荐的位置参数配置路径。
-        input_path: 兼容既有 `--input` run 用法的配置路径。
+        connection_id: 单个 connection_id。
+        load_all: 是否启动全部 connection。
         duration: 可选运行时长；None 表示持续运行直到收到中断。
 
     Returns:
         Typer 使用的进程退出码。
     """
-    selected_path = input_path or config_path
-    manager = _open_manager_or_print_error(selected_path)
+    if (connection_id is None) == (not load_all):
+        print("错误：必须且只能提供 -id <connection_id> 或 -a", file=sys.stderr)
+        return 1
+
+    manager = _open_manager_or_print_error(
+        connection_id=connection_id,
+        load_all=load_all,
+    )
     if manager is None:
         return 1
 
-    _print_config_summary(manager.config)
-    print()
-    _print_registry_summary(manager.config, manager.registry)
+    _print_manager_summary(manager)
 
     try:
         manager.start()
@@ -189,12 +189,7 @@ def run_command(
         print(f"错误：启动 simulator 失败: {exc}", file=sys.stderr)
         return 1
 
-    started_count = len(
-        [
-            entry for entry in manager.registry.entries
-            if entry.available and entry.driver is not None
-        ]
-    )
+    started_count = _selected_manager_count(manager)
     print(f"\n已启动 {started_count} 个 simulator endpoint。")
     print("按 Ctrl+C 停止。" if duration is None else f"将运行 {duration:.2f} 秒后自动停止。")
 
