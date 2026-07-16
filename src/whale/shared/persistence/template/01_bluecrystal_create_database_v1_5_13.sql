@@ -1,4 +1,4 @@
--- BlueCrystal database bootstrap v1_5_6
+-- BlueCrystal database bootstrap v1_5_13
 -- Client: Navicat or any PostgreSQL SQL client
 -- Execute once while connected to an existing maintenance database, normally postgres.
 -- PostgreSQL does not support CREATE DATABASE IF NOT EXISTS.

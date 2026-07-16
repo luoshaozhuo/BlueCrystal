@@ -1,4 +1,4 @@
-# BlueCrystal 数据模型正式版 v1.5.6
+# BlueCrystal 数据模型正式版 v1.5.13
 
 ## 0. Navicat 执行约束
 
@@ -6,10 +6,10 @@ PostgreSQL 不支持在普通 SQL 中切换数据库；`\connect`、`\set`、`\g
 
 因此正式初始化包拆成四个阶段：
 
-1. 连接维护库 `postgres`，执行 `01_bluecrystal_create_database_v1_5_6.sql`。
+1. 连接维护库 `postgres`，执行 `01_bluecrystal_create_database_v1_5_13.sql`。
 2. 在 Navicat 中新建或刷新 `bluecrystal` 连接，连接到数据库 `bluecrystal`。
-3. 依次执行 `02_bluecrystal_schema_ddl_v1_5_6.sql`、`03_bluecrystal_basic_data_v1_5_6.sql`。
-4. 仅在开发、测试、演示环境执行 `04_bluecrystal_site_sample_v1_5_6.sql`。
+3. 依次执行 `02_bluecrystal_schema_ddl_v1_5_13.sql`、`03_bluecrystal_basic_data_v1_5_13.sql`。
+4. 仅在开发、测试、演示环境执行 `04_bluecrystal_site_sample_v1_5_13.sql`。
 
 `01` 文件只执行一次。由于 PostgreSQL 没有 `CREATE DATABASE IF NOT EXISTS`，数据库已经存在时不得重复执行。
 
@@ -19,18 +19,18 @@ PostgreSQL 不支持在普通 SQL 中切换数据库；`\connect`、`\set`、`\g
 |---|---|
 | PostgreSQL 数据库名 | `bluecrystal` |
 | PostgreSQL schema 名 | `whale` |
-| 建库脚本 | `01_bluecrystal_create_database_v1_5_6.sql` |
-| Schema DDL | `02_bluecrystal_schema_ddl_v1_5_6.sql` |
-| 公共基础数据 | `03_bluecrystal_basic_data_v1_5_6.sql` |
-| 模拟现场样例数据 | `04_bluecrystal_site_sample_v1_5_6.sql` |
+| 建库脚本 | `01_bluecrystal_create_database_v1_5_13.sql` |
+| Schema DDL | `02_bluecrystal_schema_ddl_v1_5_13.sql` |
+| 公共基础数据 | `03_bluecrystal_basic_data_v1_5_13.sql` |
+| 模拟现场样例数据 | `04_bluecrystal_site_sample_v1_5_13.sql` |
 
 推荐执行顺序：
 
 ```bash
-psql -U <database_admin> -d postgres -f 01_bluecrystal_create_database_v1_5_6.sql
-psql -U <database_user> -d bluecrystal -f 02_bluecrystal_schema_ddl_v1_5_6.sql
-psql -U <database_user> -d bluecrystal -f 03_bluecrystal_basic_data_v1_5_6.sql
-psql -U <database_user> -d bluecrystal -f 04_bluecrystal_site_sample_v1_5_6.sql
+psql -U <database_admin> -d postgres -f 01_bluecrystal_create_database_v1_5_13.sql
+psql -U <database_user> -d bluecrystal -f 02_bluecrystal_schema_ddl_v1_5_13.sql
+psql -U <database_user> -d bluecrystal -f 03_bluecrystal_basic_data_v1_5_13.sql
+psql -U <database_user> -d bluecrystal -f 04_bluecrystal_site_sample_v1_5_13.sql
 ```
 
 依赖关系：
@@ -45,44 +45,53 @@ site_sample
 
 ## 2. 本版变更
 
-1. 修复 IEC101、IEC104 样例点位为空：原生成条件错误引用不存在的 `ext_dispatch_%` 语义前缀，现显式使用 `ext_grid_001`～`ext_grid_005` 并网点有功、无功、电压、电流、频率语义。
-2. EMS、传统 RTU、调度主站及 AGC/AVC 控制器的样例点位统一引用已存在的并网点标准工程语义，避免条件插入静默产生 0 行。
-3. 保留协议点位非空强制校验；IEC101、IEC104 若仍未生成点位，脚本继续抛错并回滚。
-
-1. 数据库正式命名为 `bluecrystal`，schema 正式命名为 `whale`。
-2. 原单一 sample DML 拆分为公共基础数据和模拟现场样例数据。
-3. 公共基础数据只表达“平台认识什么”，不得依赖组织、场站、资产、员工、连接或任务实例。
-4. 模拟现场样例数据表达“虚拟场站具体有什么、如何连接、如何运行”。
-5. `ref_code_id()`、`asset_id()`、`model_id()`、`connection_id()`、`semantic_id()`、拓扑元素查找函数和协议数据类型查找函数由 DML 迁入 DDL。
-6. DDL、基础数据和现场样例统一使用 `bluecrystal.whale`。
-7. 保留 v1.4.10 已确定的测量语义、协议点位和访问能力边界，不改变业务表结构。
+1. 删除 `task`，将连接、协议操作、协议角色、任务点表、触发方式、超时和重试字段合并到 `task`；一个 `task` 记录即一个完整任务版本。
+2. 删除平台通用 `TASK_TYPE`、`TASK_CATEGORY`、`TASK_DIRECTION` 及 `cfg_protocol_task_type_mapping`，新增 `cfg_protocol_operation_role`，只保存协议原生操作与协议规范角色的合法组合。
+3. `task` 新增 `protocol_role_ref_id`；IEC104 使用 `IEC104_CONTROLLING_STATION`、`IEC104_CONTROLLED_STATION`，不使用 CLIENT/SERVER 代替业务角色。
+4. `TASK_STATUS` 新增 `FAILED`（失败退出），表示任务因不可恢复错误停止。
+5. 重构 `vw_task_full`：只返回当前任务版本、任务角色、版本、资产、连接、`task_point_table_id`、参数 JSON、状态及生效日期，不再聚合点位明细。
+6. 新增 `vw_task_point_item`，显式保留 `task_point_table_id`，支持多个任务复用同一任务点表。
+7. `task_param_value`、`task_run` 改为直接引用 `task_id`。
+8. `meta_schema_version` 收敛为单字段表，仅保存当前正式 DDL 版本 `1.5.13`。
+9. IEC104 协议原理、`iec104-python` API 能力与限制移至独立文档 `06_IEC_60870-5-104_v1_5_13.md`；本文件只维护数据库模型边界。
 
 ## 2.1 公共基础数据边界
 
-`03_bluecrystal_basic_data_v1_5_6.sql` 包含：
+`03_bluecrystal_basic_data_v1_5_13.sql` 包含：
 
 1. 全部平台参考代码 `ref_code`；
 2. 标准测量语义 `cfg_measurement_semantic`；
 3. 协议物理表注册 `cfg_protocol_table_registry`；
 4. 标准权限、标准角色和角色权限模板；
 5. 协议操作定义 `cfg_protocol_operation_def`；
-6. 协议操作与任务类型映射 `cfg_protocol_task_type_mapping`。
+6. 协议操作与角色组合 `cfg_protocol_operation_role`。
 
 该文件只能依赖 DDL，可以独立用于正式项目初始化。
 
 ## 2.2 模拟现场样例数据边界
 
-`04_bluecrystal_site_sample_v1_5_6.sql` 包含：
+`04_bluecrystal_site_sample_v1_5_13.sql` 包含：
 
 1. 模拟组织、场站和班组；
 2. 模拟厂商、型号和资产实例；
 3. 模拟员工及角色分配；
 4. 协议连接、连接参数、点表和点位；
 5. 电气拓扑、通信拓扑和地理位置；
-6. 任务点表、任务配置、参数和少量运行记录；
+6. 任务、任务点表、参数和少量运行记录；
 7. 连接状态事件和资产检修事件。
 
 该文件必须在公共基础数据之后执行，不用于生产项目的公共初始化。
+
+## 2.3 Schema 版本与 IEC104 Type 元数据
+
+```text
+meta_schema_version
+  记录当前 whale schema 语义版本；应用启动时可校验兼容版本。
+
+cfg_iec104_type_def
+  覆盖 iec104-python 当前公开的全部 55 个 c104.Type；
+  Type ID 能力判断以该表为准，不再使用 M_/C_ 前缀推断。
+```
 
 ## 3. 数据边界
 
@@ -115,7 +124,7 @@ site_sample
 
 协议点位表不再保存统一的 `access_mode`、`point_access_mode_ref_id`、`platform_access_mode_ref_id`。
 
-访问能力由协议自身字段、`task_type`、任务参数、连接角色、驱动 facade 和安全治理策略推导。
+访问能力由协议自身字段、任务参数、连接角色、驱动 facade 和安全治理策略推导。IEC104 Type ID 类别与当前包能力统一来自 `cfg_iec104_type_def`。
 
 ## 5. 协议是否具有原生 access mode
 
@@ -175,16 +184,79 @@ site_sample
 | HTTP_REST | `params_path` / `json_body_path` / `response_json_path` | 定位请求参数、请求体和响应体中的变量。 |
 | HTTP_REST | `schema_type` / `data_type` | OpenAPI / JSON Schema 层面的类型，不是 HTTP 原生字段。 |
 
+## 6.1 任务模型与合法性约束
+
+任务不再拆分为 `task` 与 `task`。一个 `task` 记录就是一个完整、不可变的任务版本：
+
+```text
+task
+├── task_identifier             跨版本稳定标识
+├── record_revision             版本号
+├── cfg_connection_id           连接
+├── protocol_operation_def_id   协议原生操作
+├── protocol_role_ref_id        协议规范角色
+├── task_point_table_id         可复用任务点表
+├── trigger_mode_ref_id         触发方式
+├── timeout_ms / retry_count    固定任务参数
+├── task_status_ref_id          当前状态
+└── valid_from / valid_to       版本生效区间
+```
+
+当前版本由 `valid_to IS NULL` 标识，并通过部分唯一索引保证同一个 `task_identifier` 只能存在一个当前版本。变更任务配置时新增一条 `record_revision + 1` 的记录，并通过 `supersedes_id` 指向上一版。
+
+协议角色必须采用协议规范术语并带协议命名空间，例如：
+
+```text
+IEC104_CONTROLLING_STATION
+IEC104_CONTROLLED_STATION
+IEC101_CONTROLLING_STATION
+IEC101_CONTROLLED_STATION
+OPCUA_CLIENT
+MQTT_PUBLISHER
+MQTT_SUBSCRIBER
+```
+
+任务合法性由以下数据库对象共同保证：
+
+```text
+cfg_protocol_operation_def      协议原生操作
+cfg_protocol_operation_role     操作与协议角色合法组合
+cfg_value_domain                可复用取值域
+cfg_task_field_constraint       trigger、点角色、采样方式、Type ID 约束
+task_param_def                  参数类型、单位、范围、默认值和必填性
+cfg_task_param_dependency_rule  条件必填/禁止规则
+task_param_value                任务版本的显式参数值
+```
+
+`TASK_STATUS.FAILED` 表示任务因不可恢复错误失败退出；正常人工停止使用 `STOPPED`。重试过程属于运行期状态，不应立即将任务状态写成 `FAILED`。
+
+`vw_task_full` 不展开点位：
+
+```text
+vw_task_full.task_point_table_id
+    ↓
+vw_task_point_item.task_point_table_id
+    ↓
+protocol_point_table_id + protocol_point_item_id
+    ↓
+vw_xxx_point_item
+```
+
+因此 `task_point_table` 仍是可复用配置实体；View 只是消除调用方直接访问原表的需要，不删除这一层关系。
+
+
 ## 7. 外部程序访问流程
 
 ```text
-1. 查询 vw_task_full，获取 task_type、connection_id、task_params_json、point_item_view_name、point_item_ids_json。
-2. 用 connection_id 查询 vw_connection_object_full，获取 protocol 与 connection_params_json。
-3. 根据 point_item_view_name 查询对应 vw_xxx_point_item，并用 point_item_id 匹配 vw_task_full.point_item_ids_json。
-4. 驱动 facade 根据 protocol + task_type + connection_params_json + point item 字段调用协议包 API。
-5. 工程值换算：engineering_value = raw_value * scale + offset_value。
-6. 值域校验：连续量检查 value_min/value_max，离散量检查 allowed_values。
+1. 查询 vw_task_full，读取当前任务版本、protocol、operation_identifier、task_role、conn_id、task_point_table_id 和 task_params_json。
+2. 使用 conn_id 查询 vw_connection_object_full，获得完整连接参数。
+3. 使用 task_point_table_id 查询 vw_task_point_item，获得协议物理点表和点项主键。
+4. 根据 protocol 查询 cfg_protocol_table_registry 中注册的 POINT_ITEM_VIEW，再读取对应 vw_xxx_point_item。
+5. Adapter 按 protocol + operation_identifier + task_role 调用协议包公开 API。
 ```
+
+`vw_task_full` 与 `vw_task_point_item` 不互相复制数据，二者通过 `task_point_table_id` 对应。
+
 
 ## 8. 自检要求
 
@@ -194,7 +266,7 @@ site_sample
 4. 现场样例可以引用基础数据，但不得重复插入公共参考代码、标准语义、协议注册、标准权限角色或协议操作定义。
 5. 所有 SQL 均为纯 PostgreSQL SQL，不包含 `\set`、`\gexec`、`\connect` 等 `psql` 元命令。
 6. 三个 SQL 文件不再出现 `whale_guard`。
-7. DDL、基础数据和现场样例末尾均包含 `COMMIT`；DDL 的 `CREATE DATABASE` 位于 `BEGIN` 之前。
+7. 建库脚本单独执行；Schema DDL、基础数据和现场样例均以事务包裹并以 `COMMIT` 结束。
 8. `cfg_measurement_semantic.name_zh` 不出现无业务含义的占位名称。
 9. `cfg_measurement_semantic.standard_unit_ref_id` 与业务语义匹配。
 10. 协议点位引用的 `measurement_semantic_id` 全部存在。
@@ -256,7 +328,7 @@ DDL → basic_data → site_sample
 2. `sec_role` 必须覆盖系统管理员、数据管理员、数据治理、场站负责人、值长、运行、风机、光伏、储能、电气、继保、自动化、通信、安全、审计只读等职责。
 3. `sec_role_permission` 必须遵守最小权限原则；控制、配置、维护和审计权限必须分离。
 4. `cfg_protocol_operation_def` 只定义协议真实支持的原生操作。
-5. `cfg_protocol_task_type_mapping` 必须保证任务类型与协议 operation 的方向和语义正确。
+5. `cfg_protocol_operation_role` 必须保证协议角色与协议 operation 的方向和语义正确。
 6. heartbeat、link check、association check 等健康检查不得归入采集任务类型。
 
 ### 9.3 `site_sample.sql` 内容要求
@@ -325,10 +397,11 @@ MODBUS、IEC101、IEC104、IEC61850_MMS、IEC61850_GOOSE、IEC61850_SV、OPCUA�
 4. 连接状态事件覆盖在线、离线、故障和恢复。
 5. 维护事件覆盖巡检、故障、检修、更换和恢复。
 
-### 9.4 全部 64 张表的数据归属与覆盖要求
+### 9.4 全部 69 张表的数据归属与覆盖要求
 
 | 表名 | 归属 | 最低覆盖要求 |
 |---|---|---|
+| `meta_schema_version` | DDL | 仅保存当前 Whale schema 正式版本号。 |
 | `ref_code` | basic_data | 覆盖全部引用类型、平台枚举和协议专属枚举。 |
 | `org_unit` | site_sample | 完整集团至场站层级。 |
 | `org_power_plant` | site_sample | 至少一个并网型风光储一体化电场。 |
@@ -346,6 +419,7 @@ MODBUS、IEC101、IEC104、IEC61850_MMS、IEC61850_GOOSE、IEC61850_SV、OPCUA�
 | `ast_asset_maintenance_event` | site_sample | 少量巡检、故障、检修和恢复记录。 |
 | `geo_location` | site_sample | 关键资产和区域均有合理坐标。 |
 | `cfg_protocol_table_registry` | basic_data | 每协议登记 CONN、POINT_TABLE、POINT_ITEM、POINT_ITEM_VIEW。 |
+| `cfg_iec104_type_def` | basic_data | 完整覆盖 iec104-python 当前公开的 55 个 Type ID 及其能力元数据。 |
 | `cfg_measurement_semantic` | basic_data | 完整覆盖并网型风光储业务标准语义。 |
 | `cfg_connection` | site_sample | 每个支持协议至少一个连接。 |
 | `cfg_grid_dispatch_connection` | site_sample | 覆盖调度主通道及 AGC/AVC 并网业务。 |
@@ -354,9 +428,9 @@ MODBUS、IEC101、IEC104、IEC61850_MMS、IEC61850_GOOSE、IEC61850_SV、OPCUA�
 | `cfg_modbus_point_item` | site_sample | 非空，地址、功能码、字节序和单位合理。 |
 | `cfg_modbus_conn` | site_sample | 至少一个完整 MODBUS 连接。 |
 | `cfg_iec101_point_table` | site_sample | 至少一个 IEC101 点表。 |
-| `cfg_iec101_point_item` | site_sample | 非空，type_id、CA、IOA、COT 合理。 |
+| `cfg_iec101_point_item` | site_sample | 非空，type_id、CA、IOA、时标和质量位配置合理；COT 由任务运行时生成。 |
 | `cfg_iec104_point_table` | site_sample | 至少一个 IEC104 点表。 |
-| `cfg_iec104_point_item` | site_sample | 非空，type_id、CA、IOA、COT、时标合理。 |
+| `cfg_iec104_point_item` | site_sample | 非空，type_id、CA、IOA、时标和质量位配置合理；COT 由任务运行时生成。 |
 | `cfg_iec101_conn` | site_sample | 至少一个 IEC101 串行连接。 |
 | `cfg_iec104_conn` | site_sample | 至少一个 IEC104 网络连接。 |
 | `cfg_iec61850_mms_point_table` | site_sample | 至少一个 MMS 点表。 |
@@ -381,13 +455,16 @@ MODBUS、IEC101、IEC104、IEC61850_MMS、IEC61850_GOOSE、IEC61850_SV、OPCUA�
 | `cfg_ads_point_item` | site_sample | 非空，symbol 或 index group/offset 合理。 |
 | `cfg_ads_conn` | site_sample | 至少一个 ADS 连接。 |
 | `cfg_protocol_operation_def` | basic_data | 每协议覆盖真实读、写、订阅、报告或控制操作。 |
-| `cfg_protocol_task_type_mapping` | basic_data | 操作与任务类型映射完整且方向正确。 |
+| `cfg_protocol_operation_role` | basic_data | 操作与协议角色组合完整且方向正确。 |
 | `task_point_table` | site_sample | 每种协议代表性任务均关联点表。 |
 | `task_point_item` | site_sample | 每项引用真实点位，且执行视图可查询。 |
-| `task` | site_sample | 覆盖周期读取、事件接收、发布和控制代表场景。 |
-| `task_config` | site_sample | 每项任务具有有效运行配置。 |
-| `task_param_def` | site_sample | 覆盖任务实际使用的参数定义。 |
-| `task_param_value` | site_sample | 参数值与定义和任务配置一致。 |
+| `task` | site_sample | 覆盖周期读取、事件接收、发布和控制代表场景；每项记录本身包含完整运行配置。 |
+| `cfg_value_domain` | basic_data | 定义任务核心字段和参数可复用的有限取值域；ref_code 支撑域必须限定 ref_code_type。 |
+| `cfg_value_domain_item` | basic_data | 定义取值域成员；引用 ref_code 时由数据库校验 code 一致。 |
+| `cfg_task_field_constraint` | basic_data | 按协议原生 operation 映射约束 trigger、点角色、采样方式和协议类型标识。 |
+| `task_param_def` | basic_data | 完整定义 operation 可调参数的类型、单位、范围、正则格式、取值域、默认值和必填性。 |
+| `cfg_task_param_dependency_rule` | basic_data | 定义有限结构化的条件必填或禁止规则。 |
+| `task_param_value` | site_sample | 参数值与定义和任务版本一致。 |
 | `task_run` | site_sample | 少量成功、失败和部分成功记录。 |
 | `topo_elec_element` | site_sample | 覆盖风光储、母线、主变、开关和并网点。 |
 | `topo_elec_connection` | site_sample | 所有风光储链路闭合至并网点。 |
@@ -396,7 +473,7 @@ MODBUS、IEC101、IEC104、IEC61850_MMS、IEC61850_GOOSE、IEC61850_SV、OPCUA�
 
 ### 9.5 强制验收规则
 
-1. 64 张表均有明确的数据归属或运行期生成规则。
+1. 69 张表均有明确的数据归属或运行期生成规则。
 2. 所有 basic_data 表均不依赖场站实例。
 3. 所有 site_sample 外键均有效。
 4. 十种协议均至少形成一套完整链路，且每种协议点位表非空。
@@ -407,3 +484,18 @@ MODBUS、IEC101、IEC104、IEC61850_MMS、IEC61850_GOOSE、IEC61850_SV、OPCUA�
 9. 关键资产具有组织归属、地理位置以及电气或通信关系。
 10. 禁止孤立资产、孤立拓扑节点、空点表、空角色、空权限和占位语义。
 11. 标准来源、协议字段、单位、数据类型和业务语义必须可追溯且相互一致。
+
+---
+
+## 10. 协议文档边界
+
+本文件只描述 IEC104 在 Whale 中的表、字段、约束和执行视图。以下内容由独立协议文档维护：
+
+- IEC104 APDU、ASDU、Type ID、COT、QOI；
+- 控制站与被控站语义；
+- `iec104-python` 当前公开 API；
+- QOI=20 总召实现和 QOI=21～36 未实现限制；
+- CYCLIC、SPONTANEOUS、BACKGROUND_SCAN 的运行机制；
+- 多 Common Address 虚拟多个 Station 的工程方案。
+
+对应文件：`06_IEC_60870-5-104_v1_5_13.md`。

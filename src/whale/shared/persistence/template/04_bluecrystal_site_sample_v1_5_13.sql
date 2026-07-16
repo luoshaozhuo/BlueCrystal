@@ -1,9 +1,9 @@
--- BlueCrystal simulated-site sample data v1_5_6
+-- BlueCrystal simulated-site sample data v1_5_13
 -- Database: bluecrystal
 -- Schema: whale
 -- Purpose: a complete virtual wind-PV-storage plant for development, integration,
 --          protocol simulation, data generation, UI demonstration, and testing.
--- Dependency: 02_bluecrystal_schema_ddl_v1_5_6.sql, then bluecrystal_basic_data_v1_5_6.sql
+-- Dependency: 02_bluecrystal_schema_ddl_v1_5_13.sql, then bluecrystal_basic_data_v1_5_13.sql
 -- Client: Navicat or any PostgreSQL SQL client; connect to database bluecrystal first.
 
 
@@ -258,7 +258,7 @@ INSERT INTO cfg_connection(asset_id, protocol_ref_id, connection_identifier, nam
 INSERT INTO cfg_iec101_conn(cfg_iec101_conn_id, cfg_iec101_point_table_id, serial_port, baud_rate, link_address, common_address, balanced_mode, description_zh, description_en) VALUES (connection_id('CONN_RTU_LEGACY_001'), (SELECT cfg_iec101_point_table_id FROM cfg_iec101_point_table WHERE point_table_identifier='CONN_RTU_LEGACY_001_PT'), '/dev/ttyS1', 9600, 1, 1, false, 'CONN_RTU_LEGACY_001 参数。', 'CONN_RTU_LEGACY_001.');
 INSERT INTO cfg_iec104_point_table(point_table_identifier, name_zh, name_en, description_zh, description_en) VALUES ('CONN_GRID_DISPATCH_PRIMARY_PT', 'GRID_DISPATCH_PRIMARY IEC104 点表', 'CONN_GRID_DISPATCH_PRIMARY_PT', 'GRID_DISPATCH_PRIMARY IEC104 能力点表。', 'CONN_GRID_DISPATCH_PRIMARY_PT.');
 INSERT INTO cfg_connection(asset_id, protocol_ref_id, connection_identifier, name_zh, name_en, description_zh, description_en) VALUES (asset_id('GRID_DISPATCH_PRIMARY'), ref_code_id('PROTOCOL','IEC104'), 'CONN_GRID_DISPATCH_PRIMARY', 'GRID_DISPATCH_PRIMARY IEC104 连接', 'CONN_GRID_DISPATCH_PRIMARY', 'GRID_DISPATCH_PRIMARY IEC104 连接。', 'CONN_GRID_DISPATCH_PRIMARY.');
-INSERT INTO cfg_iec104_conn(cfg_iec104_conn_id, cfg_iec104_point_table_id, host, port, common_address, description_zh, description_en) VALUES (connection_id('CONN_GRID_DISPATCH_PRIMARY'), (SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT'), '127.0.0.1'::inet, 61012, 1, 'CONN_GRID_DISPATCH_PRIMARY 参数。', 'CONN_GRID_DISPATCH_PRIMARY.');
+INSERT INTO cfg_iec104_conn(cfg_iec104_conn_id, cfg_iec104_point_table_id, station_role_ref_id, host, port, common_address, reconnect_enabled, max_client_count, description_zh, description_en) VALUES (connection_id('CONN_GRID_DISPATCH_PRIMARY'), (SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT'), ref_code_id('IEC104_STATION_ROLE','CONTROLLED_STATION'), '127.0.0.1'::inet, 61012, 1, false, 2, '场站作为 IEC104 子站监听省调主站连接。', 'Plant IEC104 controlled-station listener for the dispatch master.');
 INSERT INTO cfg_iec61850_mms_point_table(point_table_identifier, name_zh, name_en, description_zh, description_en) VALUES ('CONN_COMM_GATEWAY_001_PT', 'COMM_GATEWAY_001 IEC61850_MMS 点表', 'CONN_COMM_GATEWAY_001_PT', 'COMM_GATEWAY_001 IEC61850_MMS 能力点表。', 'CONN_COMM_GATEWAY_001_PT.');
 INSERT INTO cfg_connection(asset_id, protocol_ref_id, connection_identifier, name_zh, name_en, description_zh, description_en) VALUES (asset_id('COMM_GATEWAY_001'), ref_code_id('PROTOCOL','IEC61850_MMS'), 'CONN_COMM_GATEWAY_001', 'COMM_GATEWAY_001 IEC61850_MMS 连接', 'CONN_COMM_GATEWAY_001', 'COMM_GATEWAY_001 IEC61850_MMS 连接。', 'CONN_COMM_GATEWAY_001.');
 INSERT INTO cfg_iec61850_mms_conn(cfg_iec61850_mms_conn_id, cfg_iec61850_mms_point_table_id, host, port, ied_name, access_point, description_zh, description_en) VALUES (connection_id('CONN_COMM_GATEWAY_001'), (SELECT cfg_iec61850_mms_point_table_id FROM cfg_iec61850_mms_point_table WHERE point_table_identifier='CONN_COMM_GATEWAY_001_PT'), '127.0.0.1'::inet, 61013, 'COMM_GATEWAY_001_IED', 'AP1', 'CONN_COMM_GATEWAY_001 参数。', 'CONN_COMM_GATEWAY_001.');
@@ -297,7 +297,7 @@ INSERT INTO cfg_connection(asset_id, protocol_ref_id, connection_identifier, nam
 INSERT INTO cfg_modbus_conn(cfg_modbus_conn_id, cfg_modbus_point_table_id, host, port, slave_id, transport_ref_id, description_zh, description_en) VALUES (connection_id('CONN_WEATHER_STATION_001'), (SELECT cfg_modbus_point_table_id FROM cfg_modbus_point_table WHERE point_table_identifier='CONN_WEATHER_STATION_001_PT'), '127.0.0.1'::inet, 61024, 25, ref_code_id('TRANSPORT','TCP'), 'CONN_WEATHER_STATION_001 参数。', 'CONN_WEATHER_STATION_001.');
 INSERT INTO cfg_iec104_point_table(point_table_identifier, name_zh, name_en, description_zh, description_en) VALUES ('CONN_AGC_AVC_CONTROLLER_001_PT', 'AGC_AVC_CONTROLLER_001 IEC104 点表', 'CONN_AGC_AVC_CONTROLLER_001_PT', 'AGC_AVC_CONTROLLER_001 IEC104 能力点表。', 'CONN_AGC_AVC_CONTROLLER_001_PT.');
 INSERT INTO cfg_connection(asset_id, protocol_ref_id, connection_identifier, name_zh, name_en, description_zh, description_en) VALUES (asset_id('AGC_AVC_CONTROLLER_001'), ref_code_id('PROTOCOL','IEC104'), 'CONN_AGC_AVC_CONTROLLER_001', 'AGC_AVC_CONTROLLER_001 IEC104 连接', 'CONN_AGC_AVC_CONTROLLER_001', 'AGC_AVC_CONTROLLER_001 IEC104 连接。', 'CONN_AGC_AVC_CONTROLLER_001.');
-INSERT INTO cfg_iec104_conn(cfg_iec104_conn_id, cfg_iec104_point_table_id, host, port, common_address, description_zh, description_en) VALUES (connection_id('CONN_AGC_AVC_CONTROLLER_001'), (SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_AGC_AVC_CONTROLLER_001_PT'), '127.0.0.1'::inet, 61025, 1, 'CONN_AGC_AVC_CONTROLLER_001 参数。', 'CONN_AGC_AVC_CONTROLLER_001.');
+INSERT INTO cfg_iec104_conn(cfg_iec104_conn_id, cfg_iec104_point_table_id, station_role_ref_id, host, port, common_address, reconnect_enabled, reconnect_interval_ms, max_client_count, description_zh, description_en) VALUES (connection_id('CONN_AGC_AVC_CONTROLLER_001'), (SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_AGC_AVC_CONTROLLER_001_PT'), ref_code_id('IEC104_STATION_ROLE','CONTROLLING_STATION'), '127.0.0.1'::inet, 61025, 1, true, 5000, 1, 'Whale 作为 IEC104 主站连接 AGC/AVC 控制器。', 'Whale IEC104 controlling-station client for the AGC/AVC controller.');
 INSERT INTO cfg_http_rest_point_table(point_table_identifier, name_zh, name_en, description_zh, description_en) VALUES ('CONN_THIRD_PARTY_FORECAST_SYS_PT', 'THIRD_PARTY_FORECAST_SYS HTTP_REST 点表', 'CONN_THIRD_PARTY_FORECAST_SYS_PT', 'THIRD_PARTY_FORECAST_SYS HTTP_REST 能力点表。', 'CONN_THIRD_PARTY_FORECAST_SYS_PT.');
 INSERT INTO cfg_connection(asset_id, protocol_ref_id, connection_identifier, name_zh, name_en, description_zh, description_en) VALUES (asset_id('THIRD_PARTY_FORECAST_SYS'), ref_code_id('PROTOCOL','HTTP_REST'), 'CONN_THIRD_PARTY_FORECAST_SYS', 'THIRD_PARTY_FORECAST_SYS HTTP_REST 连接', 'CONN_THIRD_PARTY_FORECAST_SYS', 'THIRD_PARTY_FORECAST_SYS HTTP_REST 连接。', 'CONN_THIRD_PARTY_FORECAST_SYS.');
 INSERT INTO cfg_http_rest_conn(cfg_http_rest_conn_id, cfg_http_rest_point_table_id, base_url, host_address, port, auth_type_ref_id, username, description_zh, description_en) VALUES (connection_id('CONN_THIRD_PARTY_FORECAST_SYS'), (SELECT cfg_http_rest_point_table_id FROM cfg_http_rest_point_table WHERE point_table_identifier='CONN_THIRD_PARTY_FORECAST_SYS_PT'), 'http://127.0.0.1:61026/third_party_forecast_sys', '127.0.0.1'::inet, 61026, ref_code_id('HTTP_AUTH_TYPE','NONE'), NULL, 'CONN_THIRD_PARTY_FORECAST_SYS 参数。', 'CONN_THIRD_PARTY_FORECAST_SYS.');
@@ -381,7 +381,7 @@ i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identi
 INSERT INTO cfg_iec101_point_item(cfg_iec101_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, type_id_ref_id, common_address, information_object_address, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_iec101_point_table_id FROM cfg_iec101_point_table WHERE point_table_identifier='CONN_RTU_LEGACY_001_PT'), r.cfg_measurement_semantic_id, 'RTU_LEGACY_001' || '_' || r.measurement_identifier, r.name_zh, r.name_en, ref_code_id('IEC101_TYPE_ID','M_ME_NC_1'), 1, 1000+i, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'RTU_LEGACY_001 IEC101语义点。', 'IEC101 point.');
 END LOOP;
 i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier IN ('ext_grid_001','ext_grid_002','ext_grid_003','ext_grid_004','ext_grid_005') ORDER BY measurement_identifier LOOP i := i + 1;
-INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, type_id_ref_id, common_address, information_object_address, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT'), r.cfg_measurement_semantic_id, 'GRID_DISPATCH_PRIMARY' || '_' || r.measurement_identifier, r.name_zh, r.name_en, ref_code_id('IEC104_TYPE_ID','M_ME_NC_1'), 1, 2000+i, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'GRID_DISPATCH_PRIMARY IEC104语义点。', 'IEC104 point.');
+INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, type_id_ref_id, common_address, information_object_address, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT'), r.cfg_measurement_semantic_id, 'GRID_DISPATCH_PRIMARY' || '_' || r.measurement_identifier, r.name_zh, r.name_en, ref_code_id('IEC104_TYPE_ID','M_ME_TF_1'), 1, 2000+i, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'GRID_DISPATCH_PRIMARY IEC104语义点。', 'IEC104 point.');
 END LOOP;
 i := 0; FOR r IN SELECT * FROM cfg_measurement_semantic WHERE measurement_identifier IN ('ext_grid_001','ext_grid_002','ext_grid_003','ext_grid_004','ext_grid_005') ORDER BY measurement_identifier LOOP i := i + 1;
 INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id, measurement_semantic_id, point_identifier, name_zh, name_en, type_id_ref_id, common_address, information_object_address, protocol_data_type_ref_id, engineering_unit_ref_id, description_zh, description_en) VALUES ((SELECT cfg_iec104_point_table_id FROM cfg_iec104_point_table WHERE point_table_identifier='CONN_AGC_AVC_CONTROLLER_001_PT'), r.cfg_measurement_semantic_id, 'AGC_AVC_CONTROLLER_001' || '_' || r.measurement_identifier, r.name_zh, r.name_en, ref_code_id('IEC104_TYPE_ID','M_ME_NC_1'), 1, 2000+i, protocol_data_type_id(r.standard_data_type_ref_id), r.standard_unit_ref_id, 'AGC_AVC_CONTROLLER_001 IEC104语义点。', 'IEC104 point.');
@@ -465,9 +465,105 @@ SET cause_of_transmission_ref_id = ref_code_id('IEC101_COT','CYCLIC'),
     quality_descriptor_enabled = TRUE;
 
 UPDATE cfg_iec104_point_item item
-SET cause_of_transmission_ref_id = ref_code_id('IEC104_COT','CYCLIC'),
-    quality_descriptor_enabled = TRUE,
-    time_tag_enabled = TRUE;
+SET quality_descriptor_enabled = TRUE;
+
+
+-- iec104-python c104.Point parameters and adapter-managed spontaneous transmission parameters
+UPDATE cfg_iec104_point_item item
+SET report_ms = CASE WHEN td.periodic_transmission_supported THEN 5000 ELSE 0 END,
+    spontaneous_deadband = CASE WHEN td.spontaneous_transmission_supported THEN 0.2 ELSE 0 END,
+    spontaneous_min_interval_ms = CASE WHEN td.spontaneous_transmission_supported THEN 1000 ELSE 0 END,
+    command_mode_ref_id = CASE WHEN td.command_mode_supported THEN ref_code_id('IEC104_COMMAND_MODE','DIRECT') ELSE NULL END
+FROM cfg_iec104_type_def td
+WHERE td.type_id_ref_id=item.type_id_ref_id;
+
+
+-- IEC104 control/setpoint points for both station roles
+INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id,measurement_semantic_id,point_identifier,name_zh,name_en,type_id_ref_id,common_address,information_object_address,command_mode_ref_id,quality_descriptor_enabled,protocol_data_type_ref_id,engineering_unit_ref_id,scale_factor,offset_value,value_min,value_max,allowed_values,description_zh,description_en)
+SELECT pt.cfg_iec104_point_table_id,s.cfg_measurement_semantic_id,'GRID_DISPATCH_PRIMARY_'||s.measurement_identifier,s.name_zh,s.name_en,
+       CASE WHEN s.measurement_identifier='ext_grid_034' THEN ref_code_id('IEC104_TYPE_ID','C_SC_NA_1') ELSE ref_code_id('IEC104_TYPE_ID','C_SE_NC_1') END,
+       1,CASE WHEN s.measurement_identifier='ext_grid_034' THEN 5001 ELSE 5002 END,
+       CASE WHEN s.measurement_identifier='ext_grid_034' THEN ref_code_id('IEC104_COMMAND_MODE','DIRECT') ELSE ref_code_id('IEC104_COMMAND_MODE','SELECT_AND_EXECUTE') END,false,
+       protocol_data_type_id(s.standard_data_type_ref_id),s.standard_unit_ref_id,1,0,
+       CASE WHEN s.measurement_identifier='ext_grid_034' THEN NULL ELSE -1000 END,
+       CASE WHEN s.measurement_identifier='ext_grid_034' THEN NULL ELSE 1000 END,
+       CASE WHEN s.measurement_identifier='ext_grid_034' THEN '0,1' ELSE NULL END,
+       '调度下发控制点。','Dispatch command point.'
+FROM cfg_iec104_point_table pt JOIN cfg_measurement_semantic s ON s.measurement_identifier IN ('ext_grid_034','ext_grid_035')
+WHERE pt.point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT';
+
+INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id,measurement_semantic_id,point_identifier,name_zh,name_en,type_id_ref_id,common_address,information_object_address,command_mode_ref_id,quality_descriptor_enabled,protocol_data_type_ref_id,engineering_unit_ref_id,scale_factor,offset_value,value_min,value_max,allowed_values,description_zh,description_en)
+SELECT pt.cfg_iec104_point_table_id,s.cfg_measurement_semantic_id,'AGC_AVC_CONTROLLER_001_'||s.measurement_identifier,s.name_zh,s.name_en,
+       CASE WHEN s.measurement_identifier='gbt30966_wapc_009' THEN ref_code_id('IEC104_TYPE_ID','C_SC_NA_1') ELSE ref_code_id('IEC104_TYPE_ID','C_SE_NC_1') END,
+       1,CASE WHEN s.measurement_identifier='gbt30966_wapc_009' THEN 5101 ELSE 5102 END,
+       CASE WHEN s.measurement_identifier='gbt30966_wapc_009' THEN ref_code_id('IEC104_COMMAND_MODE','DIRECT') ELSE ref_code_id('IEC104_COMMAND_MODE','SELECT_AND_EXECUTE') END,false,
+       protocol_data_type_id(s.standard_data_type_ref_id),s.standard_unit_ref_id,1,0,
+       CASE WHEN s.measurement_identifier='gbt30966_wapc_009' THEN NULL ELSE 0 END,
+       CASE WHEN s.measurement_identifier='gbt30966_wapc_009' THEN NULL ELSE 300 END,
+       CASE WHEN s.measurement_identifier='gbt30966_wapc_009' THEN '0,1' ELSE NULL END,
+       'Whale 主站下发控制点。','Whale controlling-station command point.'
+FROM cfg_iec104_point_table pt JOIN cfg_measurement_semantic s ON s.measurement_identifier IN ('gbt30966_wapc_002','gbt30966_wapc_009')
+WHERE pt.point_table_identifier='CONN_AGC_AVC_CONTROLLER_001_PT';
+
+-- IEC104 double-command points: C_DC_NA_1 is a distinct protocol command type and therefore uses a distinct point item.
+INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id,measurement_semantic_id,point_identifier,name_zh,name_en,type_id_ref_id,common_address,information_object_address,command_mode_ref_id,quality_descriptor_enabled,protocol_data_type_ref_id,engineering_unit_ref_id,scale_factor,offset_value,value_min,value_max,allowed_values,description_zh,description_en)
+SELECT pt.cfg_iec104_point_table_id,s.cfg_measurement_semantic_id,
+       'GRID_DISPATCH_PRIMARY_'||s.measurement_identifier||'_DOUBLE',s.name_zh||'（双点）',s.name_en||' (double command)',
+       ref_code_id('IEC104_TYPE_ID','C_DC_NA_1'),1,5003,ref_code_id('IEC104_COMMAND_MODE','DIRECT'),false,
+       protocol_data_type_id(s.standard_data_type_ref_id),s.standard_unit_ref_id,1,0,NULL,NULL,'0,1,2,3',
+       '调度下发双点遥控点。','Dispatch double-command point.'
+FROM cfg_iec104_point_table pt
+JOIN cfg_measurement_semantic s ON s.measurement_identifier='ext_grid_034'
+WHERE pt.point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT';
+
+INSERT INTO cfg_iec104_point_item(cfg_iec104_point_table_id,measurement_semantic_id,point_identifier,name_zh,name_en,type_id_ref_id,common_address,information_object_address,command_mode_ref_id,quality_descriptor_enabled,protocol_data_type_ref_id,engineering_unit_ref_id,scale_factor,offset_value,value_min,value_max,allowed_values,description_zh,description_en)
+SELECT pt.cfg_iec104_point_table_id,s.cfg_measurement_semantic_id,
+       'AGC_AVC_CONTROLLER_001_'||s.measurement_identifier||'_DOUBLE',s.name_zh||'（双点）',s.name_en||' (double command)',
+       ref_code_id('IEC104_TYPE_ID','C_DC_NA_1'),1,5103,ref_code_id('IEC104_COMMAND_MODE','DIRECT'),false,
+       protocol_data_type_id(s.standard_data_type_ref_id),s.standard_unit_ref_id,1,0,NULL,NULL,'0,1,2,3',
+       'Whale 主站下发双点遥控点。','Whale controlling-station double-command point.'
+FROM cfg_iec104_point_table pt
+JOIN cfg_measurement_semantic s ON s.measurement_identifier='gbt30966_wapc_009'
+WHERE pt.point_table_identifier='CONN_AGC_AVC_CONTROLLER_001_PT';
+
+-- Complete c104 control-point parameters after monitoring and control points have both been inserted.
+UPDATE cfg_iec104_point_item item
+SET command_mode_ref_id = CASE
+        WHEN item.information_object_address IN (5002,5102) THEN ref_code_id('IEC104_COMMAND_MODE','SELECT_AND_EXECUTE')
+        ELSE ref_code_id('IEC104_COMMAND_MODE','DIRECT')
+    END,
+    related_io_address = CASE
+        WHEN item.common_address=1 AND item.information_object_address BETWEEN 5001 AND 5003 THEN 2001
+        WHEN item.common_address=1 AND item.information_object_address BETWEEN 5101 AND 5103 THEN 2001
+        ELSE NULL
+    END,
+    related_io_autoreturn = TRUE
+FROM cfg_iec104_type_def td
+WHERE td.type_id_ref_id=item.type_id_ref_id
+  AND td.command_mode_supported=TRUE;
+
+-- The unmodified iec104-python Server supports only station interrogation QOI=20 and returns all supported monitoring Points registered under the requested CA.
+-- CA=2 therefore represents a second logical Station and exposes a deliberately smaller station-interrogation snapshot.
+INSERT INTO cfg_iec104_point_item(
+    cfg_iec104_point_table_id,measurement_semantic_id,point_identifier,name_zh,name_en,type_id_ref_id,
+    common_address,information_object_address,command_mode_ref_id,report_ms,spontaneous_deadband,
+    spontaneous_min_interval_ms,related_io_address,related_io_autoreturn,quality_descriptor_enabled,
+    protocol_data_type_ref_id,engineering_unit_ref_id,scale_factor,offset_value,value_min,value_max,
+    allowed_values,description_zh,description_en
+)
+SELECT item.cfg_iec104_point_table_id,item.measurement_semantic_id,item.point_identifier||'_CA2_GI',
+       item.name_zh||'（CA2总召站）',item.name_en||' (CA2 interrogation station)',item.type_id_ref_id,
+       2,item.information_object_address,NULL,0,0,0,NULL,FALSE,item.quality_descriptor_enabled,
+       item.protocol_data_type_ref_id,item.engineering_unit_ref_id,item.scale_factor,item.offset_value,
+       item.value_min,item.value_max,item.allowed_values,
+       '同一业务语义在 CA=2 虚拟 Station 中的站总召 Point。','Station-interrogation Point in virtual Station CA=2.'
+FROM cfg_iec104_point_item item
+JOIN cfg_iec104_point_table pt ON pt.cfg_iec104_point_table_id=item.cfg_iec104_point_table_id
+JOIN cfg_iec104_type_def td ON td.type_id_ref_id=item.type_id_ref_id
+WHERE pt.point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT'
+  AND item.common_address=1
+  AND td.general_interrogation_supported=TRUE
+  AND item.information_object_address IN (2001,2002,2003);
 
 UPDATE cfg_iec61850_mms_point_item item
 SET logical_device = split_part(object_reference, '/', 1),
@@ -1026,150 +1122,121 @@ INSERT INTO emp_employee(power_plant_id, work_team_id, employee_identifier, name
 INSERT INTO sec_employee_role(employee_id, role_id) VALUES ((SELECT emp_employee_id FROM emp_employee WHERE employee_identifier='EMP_005'), (SELECT sec_role_id FROM sec_role WHERE role_identifier='OPERATOR'));
 
 -- 5. Simulated task configuration, runtime records, events, maintenance, and geolocation
--- 11. task point tables and task point items for every connection
-INSERT INTO task_point_table(point_table_identifier, point_table_usage_ref_id, name_zh, name_en, description_zh, description_en)
-SELECT 'TPT_' || c.connection_identifier, ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), c.name_zh || ' 任务点表', 'TPT_' || c.connection_identifier, c.name_zh || ' 任务点表。', 'Task point table for ' || c.connection_identifier || '.'
+-- 11. Task identities: protocol-native operation semantics remain the runtime authority
+INSERT INTO task_point_table(point_table_identifier,point_table_usage_ref_id,name_zh,name_en,description_zh,description_en)
+SELECT 'TPT_TASK_'||c.connection_identifier||'_'||op.operation_identifier,
+       r.point_table_usage_ref_id,
+       c.name_zh||' '||op.name_zh||'点集',
+       'TPT_TASK_'||c.connection_identifier||'_'||op.operation_identifier,
+       c.name_zh||' '||op.description_zh,
+       op.description_en
 FROM cfg_connection c
-ORDER BY c.connection_identifier;
+JOIN cfg_protocol_operation_def op ON op.protocol_ref_id=c.protocol_ref_id AND op.enabled AND op.valid_to IS NULL
+JOIN cfg_protocol_operation_role r ON r.protocol_operation_def_id=op.cfg_protocol_operation_def_id AND r.allowed AND r.enabled AND r.valid_to IS NULL
+LEFT JOIN cfg_iec104_conn ic ON ic.cfg_iec104_conn_id=c.cfg_connection_id
+LEFT JOIN ref_code sr ON sr.ref_code_id=ic.station_role_ref_id
+JOIN ref_code role ON role.ref_code_id=r.protocol_role_ref_id
+WHERE c.protocol_ref_id<>ref_code_id('PROTOCOL','IEC104')
+   OR (sr.code='CONTROLLING_STATION' AND role.code='IEC104_CONTROLLING_STATION')
+   OR (sr.code='CONTROLLED_STATION' AND role.code='IEC104_CONTROLLED_STATION')
+ORDER BY c.connection_identifier,op.operation_identifier;
 
--- Modbus task points
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_modbus_point_table_id, item.cfg_modbus_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_modbus_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_modbus_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_modbus_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_modbus_point_item item ON item.cfg_modbus_point_table_id=conn.cfg_modbus_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_iec101_point_table_id, item.cfg_iec101_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_iec101_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_iec101_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_iec101_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_iec101_point_item item ON item.cfg_iec101_point_table_id=conn.cfg_iec101_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_iec104_point_table_id, item.cfg_iec104_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_iec104_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_iec104_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_iec104_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_iec104_point_item item ON item.cfg_iec104_point_table_id=conn.cfg_iec104_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_iec61850_mms_point_table_id, item.cfg_iec61850_mms_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_iec61850_mms_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_iec61850_mms_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_iec61850_mms_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_iec61850_mms_point_item item ON item.cfg_iec61850_mms_point_table_id=conn.cfg_iec61850_mms_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_iec61850_goose_point_table_id, item.cfg_iec61850_goose_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_iec61850_goose_point_item_id), ref_code_id('SAMPLE_MODE','EVENT'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_iec61850_goose_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_iec61850_goose_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_iec61850_goose_point_item item ON item.cfg_iec61850_goose_point_table_id=conn.cfg_iec61850_goose_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_iec61850_sv_point_table_id, item.cfg_iec61850_sv_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_iec61850_sv_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_iec61850_sv_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_iec61850_sv_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_iec61850_sv_point_item item ON item.cfg_iec61850_sv_point_table_id=conn.cfg_iec61850_sv_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_opcua_point_table_id, item.cfg_opcua_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_opcua_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_opcua_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_opcua_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_opcua_point_item item ON item.cfg_opcua_point_table_id=conn.cfg_opcua_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_mqtt_point_table_id, item.cfg_mqtt_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_mqtt_point_item_id), ref_code_id('SAMPLE_MODE','EVENT'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_mqtt_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_mqtt_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_mqtt_point_item item ON item.cfg_mqtt_point_table_id=conn.cfg_mqtt_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_http_rest_point_table_id, item.cfg_http_rest_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_http_rest_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_http_rest_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_http_rest_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_http_rest_point_item item ON item.cfg_http_rest_point_table_id=conn.cfg_http_rest_point_table_id;
-
-INSERT INTO task_point_item(task_point_table_id, protocol_ref_id, protocol_point_table_id, protocol_point_item_id, point_role_ref_id, scan_order, sample_mode_ref_id, description_zh, description_en)
-SELECT tpt.task_point_table_id, c.protocol_ref_id, conn.cfg_ads_point_table_id, item.cfg_ads_point_item_id,
-       ref_code_id('TASK_POINT_ROLE','READ_SOURCE'),
-       row_number() OVER (PARTITION BY c.cfg_connection_id ORDER BY item.cfg_ads_point_item_id), ref_code_id('SAMPLE_MODE','CYCLIC'), item.name_zh || ' 任务点。', item.name_en || ' task point.'
-FROM cfg_ads_conn conn JOIN cfg_connection c ON c.cfg_connection_id=conn.cfg_ads_conn_id
-JOIN task_point_table tpt ON tpt.point_table_identifier='TPT_'||c.connection_identifier
-JOIN cfg_ads_point_item item ON item.cfg_ads_point_table_id=conn.cfg_ads_point_table_id;
-
--- 12. task identity, config, params, runs
-INSERT INTO task(task_identifier, name_zh, name_en, task_status_ref_id, description_zh, description_en)
-SELECT 'TASK_' || c.connection_identifier || '_' || tt.code,
-       c.name_zh || ' ' || tt.name_zh || '任务',
-       'TASK_' || c.connection_identifier || '_' || tt.code,
+INSERT INTO task(task_identifier,name_zh,name_en,cfg_connection_id,protocol_operation_def_id,protocol_role_ref_id,task_point_table_id,trigger_mode_ref_id,timeout_ms,retry_count,task_status_ref_id,description_zh,description_en)
+SELECT 'TASK_'||c.connection_identifier||'_'||op.operation_identifier,
+       c.name_zh||' '||op.name_zh,
+       c.name_en||' '||op.name_en,
+       c.cfg_connection_id,
+       op.cfg_protocol_operation_def_id,
+       r.protocol_role_ref_id,
+       pt.task_point_table_id,
+       ref_code_id('TRIGGER_MODE',fc.default_value_code),
+       CASE
+         WHEN op.operation_identifier='IEC104_RESPOND_GENERAL_INTERROGATION' OR op.operation_identifier='IEC104_SEND_GENERAL_INTERROGATION' THEN 15000
+         WHEN op.operation_identifier IN ('IEC104_SEND_SETPOINT_COMMAND','IEC104_SEND_SINGLE_COMMAND','IEC104_SEND_DOUBLE_COMMAND','IEC104_ACCEPT_SETPOINT_COMMAND','IEC104_ACCEPT_SINGLE_COMMAND','IEC104_ACCEPT_DOUBLE_COMMAND') THEN 10000
+         ELSE 5000
+       END,
+       3,
        ref_code_id('TASK_STATUS','SCHEDULED'),
-       c.name_zh || ' ' || tt.name_zh || '任务。',
-       'Task for ' || c.connection_identifier || ' ' || tt.code || '.'
+       c.name_zh||' '||op.description_zh,
+       op.description_en
 FROM cfg_connection c
-JOIN cfg_protocol_task_type_mapping map ON map.protocol_ref_id = c.protocol_ref_id AND map.allowed AND map.enabled
-JOIN ref_code tt ON tt.ref_code_id = map.task_type_ref_id
-ORDER BY c.connection_identifier, tt.sort_order;
+JOIN cfg_protocol_operation_def op ON op.protocol_ref_id=c.protocol_ref_id AND op.enabled AND op.valid_to IS NULL
+JOIN cfg_protocol_operation_role r ON r.protocol_operation_def_id=op.cfg_protocol_operation_def_id AND r.allowed AND r.enabled AND r.valid_to IS NULL
+JOIN task_point_table pt ON pt.point_table_identifier='TPT_TASK_'||c.connection_identifier||'_'||op.operation_identifier
+JOIN cfg_task_field_constraint fc ON fc.cfg_protocol_operation_role_id=r.cfg_protocol_operation_role_id
+JOIN ref_code f ON f.ref_code_id=fc.constrained_field_ref_id AND f.code='TRIGGER_MODE'
+LEFT JOIN cfg_iec104_conn ic ON ic.cfg_iec104_conn_id=c.cfg_connection_id
+LEFT JOIN ref_code sr ON sr.ref_code_id=ic.station_role_ref_id
+JOIN ref_code role ON role.ref_code_id=r.protocol_role_ref_id
+WHERE c.protocol_ref_id<>ref_code_id('PROTOCOL','IEC104')
+   OR (sr.code='CONTROLLING_STATION' AND role.code='IEC104_CONTROLLING_STATION')
+   OR (sr.code='CONTROLLED_STATION' AND role.code='IEC104_CONTROLLED_STATION')
+ORDER BY c.connection_identifier,op.operation_identifier;
 
-INSERT INTO task_config(task_id, cfg_connection_id, cfg_protocol_task_type_mapping_id, task_point_table_id, trigger_mode_ref_id, timeout_ms, retry_count, description_zh, description_en)
-SELECT t.task_id, c.cfg_connection_id, map.cfg_protocol_task_type_mapping_id, tpt.task_point_table_id, ref_code_id('TRIGGER_MODE','SCHEDULED'), 5000, 3,
-       t.name_zh || '配置。', t.name_en || ' config.'
-FROM cfg_connection c
-JOIN cfg_protocol_task_type_mapping map ON map.protocol_ref_id = c.protocol_ref_id AND map.allowed AND map.enabled
-JOIN ref_code tt ON tt.ref_code_id = map.task_type_ref_id
-JOIN task t ON t.task_identifier = 'TASK_' || c.connection_identifier || '_' || tt.code
-JOIN task_point_table tpt ON tpt.point_table_identifier = 'TPT_' || c.connection_identifier;
+-- Populate task point-table members. Multiple tasks may reuse a task_point_table_id; the member view preserves this layer.
+DO $$
+DECLARE r RECORD; sql_text TEXT; item_table TEXT; item_pk TEXT; point_table_fk TEXT; conn_table TEXT; conn_pk TEXT; conn_pt_fk TEXT;
+BEGIN
+ FOR r IN
+   SELECT c.cfg_connection_id,c.protocol_ref_id,p.code AS protocol,t.task_id,t.task_point_table_id,
+          cr.cfg_protocol_operation_role_id,op.operation_identifier,
+          pr.default_value_code AS point_role,sm.default_value_code AS sample_mode
+   FROM task t
+   JOIN cfg_connection c ON c.cfg_connection_id=t.cfg_connection_id
+   JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=t.protocol_operation_def_id
+   JOIN cfg_protocol_operation_role cr
+     ON cr.protocol_operation_def_id=t.protocol_operation_def_id
+    AND cr.protocol_role_ref_id=t.protocol_role_ref_id
+    AND cr.allowed AND cr.enabled AND cr.valid_to IS NULL
+   JOIN ref_code p ON p.ref_code_id=op.protocol_ref_id
+   JOIN cfg_task_field_constraint pr ON pr.cfg_protocol_operation_role_id=cr.cfg_protocol_operation_role_id
+   JOIN ref_code prf ON prf.ref_code_id=pr.constrained_field_ref_id AND prf.code='POINT_ROLE'
+   JOIN cfg_task_field_constraint sm ON sm.cfg_protocol_operation_role_id=cr.cfg_protocol_operation_role_id
+   JOIN ref_code smf ON smf.ref_code_id=sm.constrained_field_ref_id AND smf.code='SAMPLE_MODE'
+   WHERE t.valid_to IS NULL
+ LOOP
+   SELECT table_name INTO item_table FROM cfg_protocol_table_registry WHERE protocol_ref_id=r.protocol_ref_id AND table_role_ref_id=ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM') AND enabled AND valid_to IS NULL;
+   SELECT table_name INTO conn_table FROM cfg_protocol_table_registry WHERE protocol_ref_id=r.protocol_ref_id AND table_role_ref_id=ref_code_id('PROTOCOL_TABLE_ROLE','CONN') AND enabled AND valid_to IS NULL;
+   item_pk:=item_table||'_id'; conn_pk:=conn_table||'_id'; point_table_fk:=replace(item_table,'_point_item','_point_table_id'); conn_pt_fk:=replace(conn_table,'_conn','_point_table_id');
+   sql_text:=format('INSERT INTO task_point_item(task_point_table_id,protocol_ref_id,protocol_point_table_id,protocol_point_item_id,point_role_ref_id,scan_order,sample_mode_ref_id,description_zh,description_en) SELECT %s,%s,ci.%I,pi.%I,ref_code_id(''TASK_POINT_ROLE'',%L),row_number() OVER(ORDER BY pi.%I),ref_code_id(''SAMPLE_MODE'',%L),pi.name_zh||'' 任务点。'',pi.name_en||'' task point.'' FROM %I ci JOIN %I pi ON pi.%I=ci.%I WHERE ci.%I=%s',
+      r.task_point_table_id,r.protocol_ref_id,conn_pt_fk,item_pk,r.point_role,item_pk,r.sample_mode,conn_table,item_table,point_table_fk,conn_pt_fk,conn_pk,r.cfg_connection_id);
+   IF r.protocol='IEC104' AND r.operation_identifier NOT IN ('IEC104_SEND_CLOCK_SYNCHRONIZATION','IEC104_ACCEPT_CLOCK_SYNCHRONIZATION') THEN
+      sql_text:=sql_text||format(' AND pi.type_id_ref_id IN (SELECT di.ref_code_id FROM cfg_task_field_constraint fc JOIN ref_code f ON f.ref_code_id=fc.constrained_field_ref_id AND f.code=''PROTOCOL_TYPE_ID'' JOIN cfg_value_domain_item di ON di.cfg_value_domain_id=fc.cfg_value_domain_id WHERE fc.cfg_protocol_operation_role_id=%s AND fc.enabled AND fc.valid_to IS NULL AND di.enabled AND di.valid_to IS NULL)',r.cfg_protocol_operation_role_id);
+      IF r.operation_identifier='IEC104_SEND_SPONTANEOUS_DATA' THEN
+         sql_text:=sql_text||' AND pi.spontaneous_min_interval_ms>0';
+      ELSIF r.operation_identifier='IEC104_SEND_CYCLIC_DATA' THEN
+         sql_text:=sql_text||' AND pi.report_ms>0';
+      END IF;
+   END IF;
+   -- C_CS_NA_1 is a system command, not an ordinary process Point.
+   IF r.operation_identifier IN ('IEC104_SEND_CLOCK_SYNCHRONIZATION','IEC104_ACCEPT_CLOCK_SYNCHRONIZATION') THEN
+      CONTINUE;
+   END IF;
+   EXECUTE sql_text;
+ END LOOP;
+END $$;
 
-INSERT INTO task_param_def(task_type_ref_id, param_identifier, name_zh, name_en, data_type_ref_id, required, default_value, description_zh, description_en)
-SELECT ref_code_id('TASK_TYPE', code), 'schedule_expression', '调度表达式', 'schedule_expression', ref_code_id('DATA_TYPE','STRING'), false, 'manual', '任务调度表达式。', 'Task schedule expression.'
-FROM ref_code WHERE ref_type='TASK_TYPE' ORDER BY sort_order;
+-- Explicit parameter values; defaults are resolved by vw_task_full.
+INSERT INTO task_param_value(task_id,task_param_def_id,param_value)
+SELECT t.task_id,d.task_param_def_id,
+       CASE
+         WHEN d.param_identifier='schedule_expression' AND op.operation_identifier='IEC104_SEND_BACKGROUND_DATA' THEN 'rate(60s)'
+         WHEN d.param_identifier='schedule_expression' THEN 'rate(5s)'
+         ELSE NULL
+       END
+FROM task t
+JOIN cfg_protocol_operation_role r
+  ON r.protocol_operation_def_id=t.protocol_operation_def_id
+ AND r.protocol_role_ref_id=t.protocol_role_ref_id
+JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=t.protocol_operation_def_id
+JOIN task_param_def d ON d.cfg_protocol_operation_role_id=r.cfg_protocol_operation_role_id
+JOIN ref_code tr ON tr.ref_code_id=t.trigger_mode_ref_id
+WHERE d.param_identifier='schedule_expression' AND tr.code='SCHEDULED';
 
-INSERT INTO task_param_value(task_config_id, task_param_def_id, param_value)
-SELECT tc.task_config_id, d.task_param_def_id,
-       CASE WHEN tt.code IN ('POLL_READ','SUBSCRIBE','SERVE_REPORT','PUBLISH') THEN 'rate(5s)' ELSE 'manual' END
-FROM task_config tc
-JOIN cfg_protocol_task_type_mapping map ON map.cfg_protocol_task_type_mapping_id = tc.cfg_protocol_task_type_mapping_id
-JOIN ref_code tt ON tt.ref_code_id = map.task_type_ref_id
-JOIN task_param_def d ON d.task_type_ref_id = tt.ref_code_id AND d.param_identifier='schedule_expression';
+INSERT INTO task_run(task_id,run_identifier,run_scope_ref_id,run_status_ref_id,started_at,finished_at,success_count,failure_count,message_zh,message_en)
+SELECT t.task_id,'RUN_'||t.task_id::text,ref_code_id('TASK_RUN_SCOPE','SINGLE'),ref_code_id('TASK_RUN_STATUS','SUCCESS'),now(),now(),1,0,'样例运行成功。','Sample run succeeded.'
+FROM task t;
 
-
--- task runtime parameters moved out of protocol point item tables
-INSERT INTO task_param_def(task_type_ref_id, param_identifier, name_zh, name_en, data_type_ref_id, required, default_value, description_zh, description_en)
-VALUES
-(ref_code_id('TASK_TYPE','POLL_READ'), 'poll_interval_ms', '轮询周期毫秒', 'poll_interval_ms', ref_code_id('DATA_TYPE','INT32'), false, '5000', '周期读取任务的轮询周期；不属于变量描述。', 'Polling interval for POLL_READ task.'),
-(ref_code_id('TASK_TYPE','SUBSCRIBE'), 'sampling_interval_ms', '订阅采样周期毫秒', 'sampling_interval_ms', ref_code_id('DATA_TYPE','INT32'), false, '1000', '订阅类任务的采样周期；不属于变量描述。', 'Sampling interval for subscription task.'),
-(ref_code_id('TASK_TYPE','SUBSCRIBE'), 'publishing_interval_ms', '订阅发布周期毫秒', 'publishing_interval_ms', ref_code_id('DATA_TYPE','INT32'), false, '1000', '订阅类任务的发布周期；不属于变量描述。', 'Publishing interval for subscription task.'),
-(ref_code_id('TASK_TYPE','SUBSCRIBE'), 'notification_cycle_ms', '通知周期毫秒', 'notification_cycle_ms', ref_code_id('DATA_TYPE','INT32'), false, '1000', 'ADS/事件通知类任务周期；不属于变量描述。', 'Notification cycle for subscription task.'),
-(ref_code_id('TASK_TYPE','SERVE_REPORT'), 'report_integrity_period_ms', '报告完整性周期毫秒', 'report_integrity_period_ms', ref_code_id('DATA_TYPE','INT32'), false, '60000', '报告/上送类任务的完整性上送周期；不属于变量描述。', 'Integrity period for report task.'),
-(ref_code_id('TASK_TYPE','PUBLISH'), 'qos', '发布 QoS', 'qos', ref_code_id('DATA_TYPE','INT32'), false, '0', '发布类任务的 QoS；不属于变量描述。', 'QoS for publish task.'),
-(ref_code_id('TASK_TYPE','PUBLISH'), 'retain', '保留消息', 'retain', ref_code_id('DATA_TYPE','BOOL'), false, 'false', 'MQTT 发布保留消息标志；不属于变量描述。', 'Retain flag for publish task.');
-
-INSERT INTO task_param_value(task_config_id, task_param_def_id, param_value)
-SELECT tc.task_config_id, d.task_param_def_id, d.default_value
-FROM task_config tc
-JOIN cfg_protocol_task_type_mapping map ON map.cfg_protocol_task_type_mapping_id = tc.cfg_protocol_task_type_mapping_id
-JOIN ref_code tt ON tt.ref_code_id = map.task_type_ref_id
-JOIN task_param_def d ON d.task_type_ref_id = tt.ref_code_id
-WHERE d.param_identifier <> 'schedule_expression';
-
-INSERT INTO task_run(task_config_id, run_identifier, run_scope_ref_id, run_status_ref_id, started_at, finished_at, success_count, failure_count, message_zh, message_en)
-SELECT tc.task_config_id, 'RUN_' || tc.task_config_id::text, ref_code_id('TASK_RUN_SCOPE','SINGLE'), ref_code_id('TASK_RUN_STATUS','SUCCESS'), now(), now(), 1, 0, '样例运行成功。', 'Sample run succeeded.'
-FROM task_config tc;
 
 -- 13. connection status events, asset maintenance, and geolocation
 INSERT INTO cfg_connection_status_event(cfg_connection_id, connection_status_ref_id, message_zh, message_en)
@@ -1255,12 +1322,115 @@ BEGIN
                 AND r.table_role_ref_id = whale.ref_code_id('PROTOCOL_TABLE_ROLE', 'POINT_ITEM_VIEW')
                 AND r.enabled = TRUE AND r.valid_to IS NULL
           WHERE p.ref_type = 'PROTOCOL' AND p.enabled = TRUE
-            AND p.code IN ('MODBUS','IEC101','IEC104','IEC61850_MMS','IEC61850_GOOSE','IEC61850_SV','OPCUA','MQTT','ADS','HTTP_REST')
+            AND p.code IN ('MODBUS','IEC101','IEC61850_MMS','IEC61850_GOOSE','IEC61850_SV','OPCUA','MQTT','ADS','HTTP_REST')
             AND r.cfg_protocol_table_registry_id IS NULL
       ) q;
 
     IF v_missing IS NOT NULL THEN
         RAISE EXCEPTION 'POINT_ITEM_VIEW registry coverage failed; missing protocols: %', v_missing;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM whale.cfg_protocol_table_registry r
+        WHERE r.protocol_ref_id=whale.ref_code_id('PROTOCOL','IEC104')
+          AND r.table_role_ref_id=whale.ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW')
+          AND r.table_name='vw_iec104_point_item' AND r.enabled AND r.valid_to IS NULL
+    ) THEN RAISE EXCEPTION 'IEC104 unified POINT_ITEM_VIEW registry coverage failed'; END IF;
+
+    IF (SELECT count(DISTINCT role.code)
+        FROM whale.cfg_iec104_conn conn
+        JOIN whale.ref_code role ON role.ref_code_id = conn.station_role_ref_id
+        WHERE role.ref_type = 'IEC104_STATION_ROLE') < 2 THEN
+        RAISE EXCEPTION 'IEC104 sample must cover both CONTROLLING_STATION and CONTROLLED_STATION';
+    END IF;
+
+    IF (SELECT count(DISTINCT operation_identifier)
+        FROM whale.vw_task_full
+        WHERE protocol='IEC104'
+          AND task_role='IEC104_CONTROLLED_STATION'
+          AND operation_identifier IN (
+              'IEC104_RESPOND_GENERAL_INTERROGATION',
+                            'IEC104_SEND_CYCLIC_DATA',
+              'IEC104_SEND_SPONTANEOUS_DATA',
+              'IEC104_SEND_BACKGROUND_DATA'
+          )) < 4 THEN
+        RAISE EXCEPTION 'IEC104 controlled-station sample must contain general-interrogation, cyclic, spontaneous, and background operations';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM whale.vw_task_full
+        WHERE protocol='IEC104'
+          AND operation_identifier='IEC104_RESPOND_GENERAL_INTERROGATION'
+          AND task_params_json ? 'qoi'
+    ) THEN
+        RAISE EXCEPTION 'IEC104 general-interrogation response uses fixed QOI=20 and must not define qoi parameter';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM whale.vw_task_full
+        WHERE protocol='IEC104'
+          AND (
+              (operation_identifier IN ('IEC104_RESPOND_GENERAL_INTERROGATION','IEC104_SEND_SPONTANEOUS_DATA','IEC104_SEND_CYCLIC_DATA')
+               AND task_params_json->>'trigger_mode'<>'EVENT')
+              OR (operation_identifier='IEC104_SEND_BACKGROUND_DATA'
+                  AND task_params_json->>'trigger_mode'<>'SCHEDULED')
+          )
+    ) THEN
+        RAISE EXCEPTION 'IEC104 controlled-station task trigger mode violates operation constraints';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM whale.vw_task_full
+        WHERE protocol='IEC104' AND operation_identifier='IEC104_RECEIVE_MONITOR_DATA'
+    ) THEN
+        RAISE EXCEPTION 'IEC104 controlling-station receive-monitor-data task is missing';
+    END IF;
+    IF EXISTS (
+        SELECT 1
+        FROM whale.task_param_value v
+        JOIN whale.task t ON t.task_id=v.task_id
+        JOIN whale.task_param_def d ON d.task_param_def_id=v.task_param_def_id
+        JOIN whale.cfg_protocol_operation_role r
+          ON r.protocol_operation_def_id=t.protocol_operation_def_id
+         AND r.protocol_role_ref_id=t.protocol_role_ref_id
+        WHERE d.cfg_protocol_operation_role_id<>r.cfg_protocol_operation_role_id
+    ) THEN
+        RAISE EXCEPTION 'task parameter definition/value operation-role mismatch';
+    END IF;
+
+    SELECT string_agg(t.task_identifier || ':' || d.param_identifier, ', ' ORDER BY t.task_identifier, d.param_identifier)
+      INTO v_missing
+      FROM whale.task t
+      JOIN whale.cfg_protocol_operation_role r
+        ON r.protocol_operation_def_id=t.protocol_operation_def_id
+       AND r.protocol_role_ref_id=t.protocol_role_ref_id
+      JOIN whale.task_param_def d
+        ON d.cfg_protocol_operation_role_id=r.cfg_protocol_operation_role_id
+       AND d.required=TRUE AND d.default_value IS NULL
+       AND d.enabled=TRUE AND d.valid_to IS NULL
+     WHERE t.valid_to IS NULL
+       AND NOT EXISTS (
+           SELECT 1 FROM whale.task_param_value v
+            WHERE v.task_id=t.task_id
+              AND v.task_param_def_id=d.task_param_def_id
+              AND v.enabled=TRUE AND v.valid_to IS NULL
+       );
+    IF v_missing IS NOT NULL THEN
+        RAISE EXCEPTION 'task has missing required parameter values without defaults: %', v_missing;
+    END IF;
+
+    SELECT string_agg(t.task_identifier || ':' || op.operation_identifier, ', ' ORDER BY t.task_identifier)
+      INTO v_missing
+      FROM whale.task t
+      JOIN whale.cfg_protocol_operation_role r
+        ON r.protocol_operation_def_id=t.protocol_operation_def_id
+       AND r.protocol_role_ref_id=t.protocol_role_ref_id
+      JOIN whale.cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=t.protocol_operation_def_id
+     WHERE t.valid_to IS NULL
+       AND r.requires_point_table=TRUE
+       AND NOT EXISTS (
+           SELECT 1 FROM whale.vw_task_point_item v
+            WHERE v.task_point_table_id=t.task_point_table_id
+       );
+    IF v_missing IS NOT NULL THEN
+        RAISE EXCEPTION 'task execution view contains empty required task point sets: %', v_missing;
     END IF;
 
     IF EXISTS (
@@ -1271,5 +1441,36 @@ BEGIN
     END IF;
 END;
 $$;
+
+
+
+DO $$
+DECLARE v_count INTEGER;
+BEGIN
+    SELECT count(*) INTO v_count FROM whale.cfg_iec104_type_def WHERE enabled=TRUE;
+    IF v_count <> 55 THEN
+        RAISE EXCEPTION 'cfg_iec104_type_def coverage failed: expected 55, actual %', v_count;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM whale.cfg_iec104_point_item
+        WHERE information_object_address NOT BETWEEN 0 AND 16777215
+    ) THEN
+        RAISE EXCEPTION 'IEC104 IOA range validation failed';
+    END IF;
+    IF (SELECT count(DISTINCT common_address)
+        FROM whale.cfg_iec104_point_item item
+        JOIN whale.cfg_iec104_point_table pt ON pt.cfg_iec104_point_table_id=item.cfg_iec104_point_table_id
+        WHERE pt.point_table_identifier='CONN_GRID_DISPATCH_PRIMARY_PT'
+          AND item.enabled=TRUE AND item.valid_to IS NULL) < 2 THEN
+        RAISE EXCEPTION 'IEC104 controlled-station sample must expose at least two common addresses';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM whale.cfg_iec104_point_item item
+        JOIN whale.cfg_iec104_type_def td ON td.type_id_ref_id=item.type_id_ref_id
+        WHERE td.command_mode_supported=TRUE AND item.command_mode_ref_id IS NULL
+    ) THEN
+        RAISE EXCEPTION 'IEC104 command Point is missing command_mode';
+    END IF;
+END $$;
 
 COMMIT;

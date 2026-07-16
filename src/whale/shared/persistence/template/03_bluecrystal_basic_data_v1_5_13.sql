@@ -1,9 +1,9 @@
--- BlueCrystal shared basic data v1_5_6
+-- BlueCrystal shared basic data v1_5_13
 -- Database: bluecrystal
 -- Schema: whale
 -- Purpose: platform-wide reference codes, standard semantics, protocol metadata,
 --          standard permissions, standard roles, and protocol operation mappings.
--- Dependency: 02_bluecrystal_schema_ddl_v1_5_6.sql
+-- Dependency: 02_bluecrystal_schema_ddl_v1_5_13.sql
 -- Client: Navicat or any PostgreSQL SQL client; connect to database bluecrystal first.
 
 
@@ -192,14 +192,102 @@ INSERT INTO ref_code(ref_type, code, name_zh, name_en, abbr_en, description_zh, 
 ('IEC101_TYPE_ID', 'C_DC_NA_1', 'C_DC_NA_1', 'C_DC_NA_1', NULL, 'C_DC_NA_1', 'C_DC_NA_1', 6, true),
 ('IEC101_TYPE_ID', 'C_SE_NC_1', 'C_SE_NC_1', 'C_SE_NC_1', NULL, 'C_SE_NC_1', 'C_SE_NC_1', 7, true),
 ('IEC101_TYPE_ID', 'C_CS_NA_1', 'C_CS_NA_1', 'C_CS_NA_1', NULL, 'C_CS_NA_1', 'C_CS_NA_1', 8, true),
-('IEC104_TYPE_ID', 'M_SP_NA_1', 'M_SP_NA_1', 'M_SP_NA_1', NULL, 'M_SP_NA_1', 'M_SP_NA_1', 1, true),
-('IEC104_TYPE_ID', 'M_DP_NA_1', 'M_DP_NA_1', 'M_DP_NA_1', NULL, 'M_DP_NA_1', 'M_DP_NA_1', 2, true),
-('IEC104_TYPE_ID', 'M_ME_NC_1', 'M_ME_NC_1', 'M_ME_NC_1', NULL, 'M_ME_NC_1', 'M_ME_NC_1', 3, true),
-('IEC104_TYPE_ID', 'M_IT_NA_1', 'M_IT_NA_1', 'M_IT_NA_1', NULL, 'M_IT_NA_1', 'M_IT_NA_1', 4, true),
-('IEC104_TYPE_ID', 'C_SC_NA_1', 'C_SC_NA_1', 'C_SC_NA_1', NULL, 'C_SC_NA_1', 'C_SC_NA_1', 5, true),
-('IEC104_TYPE_ID', 'C_DC_NA_1', 'C_DC_NA_1', 'C_DC_NA_1', NULL, 'C_DC_NA_1', 'C_DC_NA_1', 6, true),
-('IEC104_TYPE_ID', 'C_SE_NC_1', 'C_SE_NC_1', 'C_SE_NC_1', NULL, 'C_SE_NC_1', 'C_SE_NC_1', 7, true),
-('IEC104_TYPE_ID', 'C_CS_NA_1', 'C_CS_NA_1', 'C_CS_NA_1', NULL, 'C_CS_NA_1', 'C_CS_NA_1', 8, true),
+('IEC104_TYPE_CATEGORY', 'PROCESS_MONITOR', '过程监视', 'Process monitor', NULL, '过程监视。', 'Process monitor.', 1, true),
+('IEC104_TYPE_CATEGORY', 'COUNTER_MONITOR', '累计量监视', 'Counter monitor', NULL, '累计量监视。', 'Counter monitor.', 2, true),
+('IEC104_TYPE_CATEGORY', 'PROTECTION_MONITOR', '保护监视', 'Protection monitor', NULL, '保护监视。', 'Protection monitor.', 3, true),
+('IEC104_TYPE_CATEGORY', 'CONTROL_COMMAND', '控制命令', 'Control command', NULL, '控制命令。', 'Control command.', 4, true),
+('IEC104_TYPE_CATEGORY', 'INITIALIZATION', '初始化通知', 'Initialization', NULL, '初始化通知。', 'Initialization.', 5, true),
+('IEC104_TYPE_CATEGORY', 'SYSTEM_COMMAND', '系统命令', 'System command', NULL, '系统命令。', 'System command.', 6, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'SINGLE_POINT', 'SINGLE POINT', 'SINGLE POINT', NULL, 'SINGLE POINT。', 'SINGLE POINT.', 1, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'DOUBLE_POINT', 'DOUBLE POINT', 'DOUBLE POINT', NULL, 'DOUBLE POINT。', 'DOUBLE POINT.', 2, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'STEP_POSITION', 'STEP POSITION', 'STEP POSITION', NULL, 'STEP POSITION。', 'STEP POSITION.', 3, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'BITSTRING32', 'BITSTRING32', 'BITSTRING32', NULL, 'BITSTRING32。', 'BITSTRING32.', 4, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'NORMALIZED_VALUE', 'NORMALIZED VALUE', 'NORMALIZED VALUE', NULL, 'NORMALIZED VALUE。', 'NORMALIZED VALUE.', 5, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'SCALED_VALUE', 'SCALED VALUE', 'SCALED VALUE', NULL, 'SCALED VALUE。', 'SCALED VALUE.', 6, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'SHORT_FLOAT', 'SHORT FLOAT', 'SHORT FLOAT', NULL, 'SHORT FLOAT。', 'SHORT FLOAT.', 7, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'BINARY_COUNTER', 'BINARY COUNTER', 'BINARY COUNTER', NULL, 'BINARY COUNTER。', 'BINARY COUNTER.', 8, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'PROTECTION_EVENT', 'PROTECTION EVENT', 'PROTECTION EVENT', NULL, 'PROTECTION EVENT。', 'PROTECTION EVENT.', 9, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'PROTECTION_START', 'PROTECTION START', 'PROTECTION START', NULL, 'PROTECTION START。', 'PROTECTION START.', 10, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'PROTECTION_OUTPUT', 'PROTECTION OUTPUT', 'PROTECTION OUTPUT', NULL, 'PROTECTION OUTPUT。', 'PROTECTION OUTPUT.', 11, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'PACKED_SINGLE_POINT', 'PACKED SINGLE POINT', 'PACKED SINGLE POINT', NULL, 'PACKED SINGLE POINT。', 'PACKED SINGLE POINT.', 12, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'SINGLE_COMMAND', 'SINGLE COMMAND', 'SINGLE COMMAND', NULL, 'SINGLE COMMAND。', 'SINGLE COMMAND.', 13, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'DOUBLE_COMMAND', 'DOUBLE COMMAND', 'DOUBLE COMMAND', NULL, 'DOUBLE COMMAND。', 'DOUBLE COMMAND.', 14, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'REGULATING_STEP_COMMAND', 'REGULATING STEP COMMAND', 'REGULATING STEP COMMAND', NULL, 'REGULATING STEP COMMAND。', 'REGULATING STEP COMMAND.', 15, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'NORMALIZED_COMMAND', 'NORMALIZED COMMAND', 'NORMALIZED COMMAND', NULL, 'NORMALIZED COMMAND。', 'NORMALIZED COMMAND.', 16, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'SCALED_COMMAND', 'SCALED COMMAND', 'SCALED COMMAND', NULL, 'SCALED COMMAND。', 'SCALED COMMAND.', 17, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'SHORT_FLOAT_COMMAND', 'SHORT FLOAT COMMAND', 'SHORT FLOAT COMMAND', NULL, 'SHORT FLOAT COMMAND。', 'SHORT FLOAT COMMAND.', 18, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'BITSTRING32_COMMAND', 'BITSTRING32 COMMAND', 'BITSTRING32 COMMAND', NULL, 'BITSTRING32 COMMAND。', 'BITSTRING32 COMMAND.', 19, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'NONE', 'NONE', 'NONE', NULL, 'NONE。', 'NONE.', 20, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'INTERROGATION_COMMAND', 'INTERROGATION COMMAND', 'INTERROGATION COMMAND', NULL, 'INTERROGATION COMMAND。', 'INTERROGATION COMMAND.', 21, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'COUNTER_INTERROGATION_COMMAND', 'COUNTER INTERROGATION COMMAND', 'COUNTER INTERROGATION COMMAND', NULL, 'COUNTER INTERROGATION COMMAND。', 'COUNTER INTERROGATION COMMAND.', 22, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'READ_COMMAND', 'READ COMMAND', 'READ COMMAND', NULL, 'READ COMMAND。', 'READ COMMAND.', 23, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'CLOCK_SYNC_COMMAND', 'CLOCK SYNC COMMAND', 'CLOCK SYNC COMMAND', NULL, 'CLOCK SYNC COMMAND。', 'CLOCK SYNC COMMAND.', 24, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'TEST_COMMAND', 'TEST COMMAND', 'TEST COMMAND', NULL, 'TEST COMMAND。', 'TEST COMMAND.', 25, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'RESET_PROCESS_COMMAND', 'RESET PROCESS COMMAND', 'RESET PROCESS COMMAND', NULL, 'RESET PROCESS COMMAND。', 'RESET PROCESS COMMAND.', 26, true),
+('IEC104_INFORMATION_VALUE_TYPE', 'DELAY_ACQUISITION_COMMAND', 'DELAY ACQUISITION COMMAND', 'DELAY ACQUISITION COMMAND', NULL, 'DELAY ACQUISITION COMMAND。', 'DELAY ACQUISITION COMMAND.', 27, true),
+('IEC104_TIME_TAG_TYPE', 'NONE', '无时标', 'No time tag', NULL, '无时标。', 'No time tag.', 1, true),
+('IEC104_TIME_TAG_TYPE', 'CP16TIME2A', 'CP16Time2a', 'CP16Time2a', NULL, 'CP16Time2a。', 'CP16Time2a.', 2, true),
+('IEC104_TIME_TAG_TYPE', 'CP24TIME2A', 'CP24Time2a', 'CP24Time2a', NULL, 'CP24Time2a。', 'CP24Time2a.', 3, true),
+('IEC104_TIME_TAG_TYPE', 'CP56TIME2A', 'CP56Time2a', 'CP56Time2a', NULL, 'CP56Time2a。', 'CP56Time2a.', 4, true),
+('IEC104_COMMAND_MODE', 'DIRECT', '直接执行', 'Direct', NULL, '直接执行。', 'Direct.', 1, true),
+('IEC104_COMMAND_MODE', 'SELECT_AND_EXECUTE', '选择后执行', 'Select and execute', NULL, '选择后执行。', 'Select and execute.', 2, true),
+('IEC104_TYPE_ID', 'M_SP_NA_1', '单点信息，无时标', 'Single-point information without time tag', 'M_SP_NA_1', 'IEC104 Type ID 1。', 'IEC104 Type ID 1.', 1, true),
+('IEC104_TYPE_ID', 'M_SP_TA_1', '单点信息，CP24Time2a', 'Single-point information with CP24Time2a', 'M_SP_TA_1', 'IEC104 Type ID 2。', 'IEC104 Type ID 2.', 2, true),
+('IEC104_TYPE_ID', 'M_DP_NA_1', '双点信息，无时标', 'Double-point information without time tag', 'M_DP_NA_1', 'IEC104 Type ID 3。', 'IEC104 Type ID 3.', 3, true),
+('IEC104_TYPE_ID', 'M_DP_TA_1', '双点信息，CP24Time2a', 'Double-point information with CP24Time2a', 'M_DP_TA_1', 'IEC104 Type ID 4。', 'IEC104 Type ID 4.', 4, true),
+('IEC104_TYPE_ID', 'M_ST_NA_1', '步位置信息，无时标', 'Step-position information without time tag', 'M_ST_NA_1', 'IEC104 Type ID 5。', 'IEC104 Type ID 5.', 5, true),
+('IEC104_TYPE_ID', 'M_ST_TA_1', '步位置信息，CP24Time2a', 'Step-position information with CP24Time2a', 'M_ST_TA_1', 'IEC104 Type ID 6。', 'IEC104 Type ID 6.', 6, true),
+('IEC104_TYPE_ID', 'M_BO_NA_1', '32位比特串，无时标', 'Bitstring of 32 bits without time tag', 'M_BO_NA_1', 'IEC104 Type ID 7。', 'IEC104 Type ID 7.', 7, true),
+('IEC104_TYPE_ID', 'M_BO_TA_1', '32位比特串，CP24Time2a', 'Bitstring of 32 bits with CP24Time2a', 'M_BO_TA_1', 'IEC104 Type ID 8。', 'IEC104 Type ID 8.', 8, true),
+('IEC104_TYPE_ID', 'M_ME_NA_1', '归一化遥测值，无时标', 'Normalized measured value without time tag', 'M_ME_NA_1', 'IEC104 Type ID 9。', 'IEC104 Type ID 9.', 9, true),
+('IEC104_TYPE_ID', 'M_ME_TA_1', '归一化遥测值，CP24Time2a', 'Normalized measured value with CP24Time2a', 'M_ME_TA_1', 'IEC104 Type ID 10。', 'IEC104 Type ID 10.', 10, true),
+('IEC104_TYPE_ID', 'M_ME_NB_1', '标度化遥测值，无时标', 'Scaled measured value without time tag', 'M_ME_NB_1', 'IEC104 Type ID 11。', 'IEC104 Type ID 11.', 11, true),
+('IEC104_TYPE_ID', 'M_ME_TB_1', '标度化遥测值，CP24Time2a', 'Scaled measured value with CP24Time2a', 'M_ME_TB_1', 'IEC104 Type ID 12。', 'IEC104 Type ID 12.', 12, true),
+('IEC104_TYPE_ID', 'M_ME_NC_1', '短浮点遥测，无时标', 'Short floating-point measured value without time tag', 'M_ME_NC_1', 'IEC104 Type ID 13。', 'IEC104 Type ID 13.', 13, true),
+('IEC104_TYPE_ID', 'M_ME_TC_1', '短浮点遥测，CP24Time2a', 'Short floating-point measured value with CP24Time2a', 'M_ME_TC_1', 'IEC104 Type ID 14。', 'IEC104 Type ID 14.', 14, true),
+('IEC104_TYPE_ID', 'M_IT_NA_1', '累计量，无时标', 'Integrated total without time tag', 'M_IT_NA_1', 'IEC104 Type ID 15。', 'IEC104 Type ID 15.', 15, true),
+('IEC104_TYPE_ID', 'M_IT_TA_1', '累计量，CP24Time2a', 'Integrated total with CP24Time2a', 'M_IT_TA_1', 'IEC104 Type ID 16。', 'IEC104 Type ID 16.', 16, true),
+('IEC104_TYPE_ID', 'M_EP_TA_1', '继电保护事件，CP24Time2a', 'Protection event with CP24Time2a', 'M_EP_TA_1', 'IEC104 Type ID 17。', 'IEC104 Type ID 17.', 17, true),
+('IEC104_TYPE_ID', 'M_EP_TB_1', '继电保护启动事件，CP24Time2a', 'Protection start event with CP24Time2a', 'M_EP_TB_1', 'IEC104 Type ID 18。', 'IEC104 Type ID 18.', 18, true),
+('IEC104_TYPE_ID', 'M_EP_TC_1', '继电保护输出回路信息，CP24Time2a', 'Protection output-circuit information with CP24Time2a', 'M_EP_TC_1', 'IEC104 Type ID 19。', 'IEC104 Type ID 19.', 19, true),
+('IEC104_TYPE_ID', 'M_PS_NA_1', '带状态变位检测的成组单点信息', 'Packed single-point information with status change detection', 'M_PS_NA_1', 'IEC104 Type ID 20。', 'IEC104 Type ID 20.', 20, true),
+('IEC104_TYPE_ID', 'M_ME_ND_1', '不带质量描述词的归一化遥测', 'Normalized measured value without quality descriptor', 'M_ME_ND_1', 'IEC104 Type ID 21。', 'IEC104 Type ID 21.', 21, true),
+('IEC104_TYPE_ID', 'M_SP_TB_1', '单点信息，CP56Time2a', 'Single-point information with CP56Time2a', 'M_SP_TB_1', 'IEC104 Type ID 30。', 'IEC104 Type ID 30.', 30, true),
+('IEC104_TYPE_ID', 'M_DP_TB_1', '双点信息，CP56Time2a', 'Double-point information with CP56Time2a', 'M_DP_TB_1', 'IEC104 Type ID 31。', 'IEC104 Type ID 31.', 31, true),
+('IEC104_TYPE_ID', 'M_ST_TB_1', '步位置信息，CP56Time2a', 'Step-position information with CP56Time2a', 'M_ST_TB_1', 'IEC104 Type ID 32。', 'IEC104 Type ID 32.', 32, true),
+('IEC104_TYPE_ID', 'M_BO_TB_1', '32位比特串，CP56Time2a', 'Bitstring of 32 bits with CP56Time2a', 'M_BO_TB_1', 'IEC104 Type ID 33。', 'IEC104 Type ID 33.', 33, true),
+('IEC104_TYPE_ID', 'M_ME_TD_1', '归一化遥测，CP56Time2a', 'Normalized measured value with CP56Time2a', 'M_ME_TD_1', 'IEC104 Type ID 34。', 'IEC104 Type ID 34.', 34, true),
+('IEC104_TYPE_ID', 'M_ME_TE_1', '标度化遥测，CP56Time2a', 'Scaled measured value with CP56Time2a', 'M_ME_TE_1', 'IEC104 Type ID 35。', 'IEC104 Type ID 35.', 35, true),
+('IEC104_TYPE_ID', 'M_ME_TF_1', '短浮点遥测，CP56Time2a', 'Short floating-point measured value with CP56Time2a', 'M_ME_TF_1', 'IEC104 Type ID 36。', 'IEC104 Type ID 36.', 36, true),
+('IEC104_TYPE_ID', 'M_IT_TB_1', '累计量，CP56Time2a', 'Integrated total with CP56Time2a', 'M_IT_TB_1', 'IEC104 Type ID 37。', 'IEC104 Type ID 37.', 37, true),
+('IEC104_TYPE_ID', 'M_EP_TD_1', '继电保护事件，CP56Time2a', 'Protection event with CP56Time2a', 'M_EP_TD_1', 'IEC104 Type ID 38。', 'IEC104 Type ID 38.', 38, true),
+('IEC104_TYPE_ID', 'M_EP_TE_1', '继电保护启动事件，CP56Time2a', 'Protection start event with CP56Time2a', 'M_EP_TE_1', 'IEC104 Type ID 39。', 'IEC104 Type ID 39.', 39, true),
+('IEC104_TYPE_ID', 'M_EP_TF_1', '继电保护输出回路信息，CP56Time2a', 'Protection output-circuit information with CP56Time2a', 'M_EP_TF_1', 'IEC104 Type ID 40。', 'IEC104 Type ID 40.', 40, true),
+('IEC104_TYPE_ID', 'C_SC_NA_1', '单点遥控命令', 'Single command', 'C_SC_NA_1', 'IEC104 Type ID 45。', 'IEC104 Type ID 45.', 45, true),
+('IEC104_TYPE_ID', 'C_DC_NA_1', '双点遥控命令', 'Double command', 'C_DC_NA_1', 'IEC104 Type ID 46。', 'IEC104 Type ID 46.', 46, true),
+('IEC104_TYPE_ID', 'C_RC_NA_1', '升降步调节命令', 'Regulating step command', 'C_RC_NA_1', 'IEC104 Type ID 47。', 'IEC104 Type ID 47.', 47, true),
+('IEC104_TYPE_ID', 'C_SE_NA_1', '归一化设点命令', 'Normalized set-point command', 'C_SE_NA_1', 'IEC104 Type ID 48。', 'IEC104 Type ID 48.', 48, true),
+('IEC104_TYPE_ID', 'C_SE_NB_1', '标度化设点命令', 'Scaled set-point command', 'C_SE_NB_1', 'IEC104 Type ID 49。', 'IEC104 Type ID 49.', 49, true),
+('IEC104_TYPE_ID', 'C_SE_NC_1', '短浮点设点命令', 'Short floating-point set-point command', 'C_SE_NC_1', 'IEC104 Type ID 50。', 'IEC104 Type ID 50.', 50, true),
+('IEC104_TYPE_ID', 'C_BO_NA_1', '32位比特串命令', 'Bitstring of 32 bits command', 'C_BO_NA_1', 'IEC104 Type ID 51。', 'IEC104 Type ID 51.', 51, true),
+('IEC104_TYPE_ID', 'C_SC_TA_1', '单点遥控，CP56Time2a', 'Single command with CP56Time2a', 'C_SC_TA_1', 'IEC104 Type ID 58。', 'IEC104 Type ID 58.', 58, true),
+('IEC104_TYPE_ID', 'C_DC_TA_1', '双点遥控，CP56Time2a', 'Double command with CP56Time2a', 'C_DC_TA_1', 'IEC104 Type ID 59。', 'IEC104 Type ID 59.', 59, true),
+('IEC104_TYPE_ID', 'C_RC_TA_1', '升降步调节，CP56Time2a', 'Regulating step command with CP56Time2a', 'C_RC_TA_1', 'IEC104 Type ID 60。', 'IEC104 Type ID 60.', 60, true),
+('IEC104_TYPE_ID', 'C_SE_TA_1', '归一化设点，CP56Time2a', 'Normalized set-point command with CP56Time2a', 'C_SE_TA_1', 'IEC104 Type ID 61。', 'IEC104 Type ID 61.', 61, true),
+('IEC104_TYPE_ID', 'C_SE_TB_1', '标度化设点，CP56Time2a', 'Scaled set-point command with CP56Time2a', 'C_SE_TB_1', 'IEC104 Type ID 62。', 'IEC104 Type ID 62.', 62, true),
+('IEC104_TYPE_ID', 'C_SE_TC_1', '短浮点设点，CP56Time2a', 'Short floating-point set-point command with CP56Time2a', 'C_SE_TC_1', 'IEC104 Type ID 63。', 'IEC104 Type ID 63.', 63, true),
+('IEC104_TYPE_ID', 'C_BO_TA_1', '32位比特串命令，CP56Time2a', 'Bitstring of 32 bits command with CP56Time2a', 'C_BO_TA_1', 'IEC104 Type ID 64。', 'IEC104 Type ID 64.', 64, true),
+('IEC104_TYPE_ID', 'M_EI_NA_1', '初始化结束通知', 'End of initialization', 'M_EI_NA_1', 'IEC104 Type ID 70。', 'IEC104 Type ID 70.', 70, true),
+('IEC104_TYPE_ID', 'C_IC_NA_1', '总召/组召命令', 'Interrogation command', 'C_IC_NA_1', 'IEC104 Type ID 100。', 'IEC104 Type ID 100.', 100, true),
+('IEC104_TYPE_ID', 'C_CI_NA_1', '累计量召唤命令', 'Counter interrogation command', 'C_CI_NA_1', 'IEC104 Type ID 101。', 'IEC104 Type ID 101.', 101, true),
+('IEC104_TYPE_ID', 'C_RD_NA_1', '读指定信息对象', 'Read command', 'C_RD_NA_1', 'IEC104 Type ID 102。', 'IEC104 Type ID 102.', 102, true),
+('IEC104_TYPE_ID', 'C_CS_NA_1', '时钟同步命令', 'Clock synchronization command', 'C_CS_NA_1', 'IEC104 Type ID 103。', 'IEC104 Type ID 103.', 103, true),
+('IEC104_TYPE_ID', 'C_TS_NA_1', '测试命令', 'Test command', 'C_TS_NA_1', 'IEC104 Type ID 104。', 'IEC104 Type ID 104.', 104, true),
+('IEC104_TYPE_ID', 'C_RP_NA_1', '复位进程命令', 'Reset process command', 'C_RP_NA_1', 'IEC104 Type ID 105。', 'IEC104 Type ID 105.', 105, true),
+('IEC104_TYPE_ID', 'C_CD_NA_1', '延时采集命令', 'Delay acquisition command', 'C_CD_NA_1', 'IEC104 Type ID 106。', 'IEC104 Type ID 106.', 106, true),
+('IEC104_TYPE_ID', 'C_TS_TA_1', '带CP56Time2a的测试命令', 'Test command with CP56Time2a', 'C_TS_TA_1', 'IEC104 Type ID 107。', 'IEC104 Type ID 107.', 107, true),
+('IEC104_STATION_ROLE', 'CONTROLLING_STATION', '控制站/主站', 'Controlling station', 'CLIENT', '主动建立 TCP 连接、发送 STARTDT、召唤和控制命令，并接收监视数据。', 'Initiates TCP, sends STARTDT/interrogation/control commands, and receives monitor data.', 1, true),
+('IEC104_STATION_ROLE', 'CONTROLLED_STATION', '被控站/子站', 'Controlled station', 'SERVER', '监听 TCP 端口，响应 STARTDT、总召和控制命令，并主动上送监视数据。', 'Listens on TCP, responds to STARTDT/interrogation/control, and publishes monitor data.', 2, true),
 ('IEC61850_FC', 'ST', 'ST', 'ST', NULL, 'ST', 'ST', 1, true),
 ('IEC61850_FC', 'MX', 'MX', 'MX', NULL, 'MX', 'MX', 2, true),
 ('IEC61850_FC', 'CO', 'CO', 'CO', NULL, 'CO', 'CO', 3, true),
@@ -232,27 +320,21 @@ INSERT INTO ref_code(ref_type, code, name_zh, name_en, abbr_en, description_zh, 
 ('HTTP_AUTH_TYPE', 'NONE', 'NONE', 'NONE', NULL, 'NONE', 'NONE', 1, true),
 ('HTTP_AUTH_TYPE', 'BASIC', 'BASIC', 'BASIC', NULL, 'BASIC', 'BASIC', 2, true),
 ('HTTP_AUTH_TYPE', 'BEARER', 'BEARER', 'BEARER', NULL, 'BEARER', 'BEARER', 3, true),
-('TASK_TYPE', 'READ_ONCE', 'READ_ONCE', 'READ_ONCE', NULL, 'READ_ONCE', 'READ_ONCE', 1, true),
-('TASK_TYPE', 'POLL_READ', 'POLL_READ', 'POLL_READ', NULL, 'POLL_READ', 'POLL_READ', 2, true),
-('TASK_TYPE', 'SUBSCRIBE', 'SUBSCRIBE', 'SUBSCRIBE', NULL, 'SUBSCRIBE', 'SUBSCRIBE', 3, true),
-('TASK_TYPE', 'WRITE_ONCE', 'WRITE_ONCE', 'WRITE_ONCE', NULL, 'WRITE_ONCE', 'WRITE_ONCE', 4, true),
-('TASK_TYPE', 'CONTROL', 'CONTROL', 'CONTROL', NULL, 'CONTROL', 'CONTROL', 5, true),
-('TASK_TYPE', 'PUBLISH', 'PUBLISH', 'PUBLISH', NULL, 'PUBLISH', 'PUBLISH', 6, true),
-('TASK_TYPE', 'CALL_METHOD', 'CALL_METHOD', 'CALL_METHOD', NULL, 'CALL_METHOD', 'CALL_METHOD', 7, true),
-('TASK_TYPE', 'RESPOND_READ', 'RESPOND_READ', 'RESPOND_READ', NULL, 'RESPOND_READ', 'RESPOND_READ', 8, true),
-('TASK_TYPE', 'SERVE_REPORT', 'SERVE_REPORT', 'SERVE_REPORT', NULL, 'SERVE_REPORT', 'SERVE_REPORT', 9, true),
-('TASK_CATEGORY', 'ACQUIRE', 'ACQUIRE', 'ACQUIRE', NULL, 'ACQUIRE', 'ACQUIRE', 1, true),
-('TASK_CATEGORY', 'COMMAND', 'COMMAND', 'COMMAND', NULL, 'COMMAND', 'COMMAND', 2, true),
-('TASK_CATEGORY', 'PUBLISH', 'PUBLISH', 'PUBLISH', NULL, 'PUBLISH', 'PUBLISH', 3, true),
-('TASK_CATEGORY', 'SERVE', 'SERVE', 'SERVE', NULL, 'SERVE', 'SERVE', 4, true),
-('TASK_DIRECTION', 'INBOUND', 'INBOUND', 'INBOUND', NULL, 'INBOUND', 'INBOUND', 1, true),
-('TASK_DIRECTION', 'OUTBOUND', 'OUTBOUND', 'OUTBOUND', NULL, 'OUTBOUND', 'OUTBOUND', 2, true),
-('TASK_PROTOCOL_ROLE', 'CLIENT', 'CLIENT', 'CLIENT', NULL, 'CLIENT', 'CLIENT', 1, true),
-('TASK_PROTOCOL_ROLE', 'SERVER', 'SERVER', 'SERVER', NULL, 'SERVER', 'SERVER', 2, true),
-('TASK_PROTOCOL_ROLE', 'MASTER', 'MASTER', 'MASTER', NULL, 'MASTER', 'MASTER', 3, true),
-('TASK_PROTOCOL_ROLE', 'SLAVE', 'SLAVE', 'SLAVE', NULL, 'SLAVE', 'SLAVE', 4, true),
-('TASK_PROTOCOL_ROLE', 'PUBLISHER', 'PUBLISHER', 'PUBLISHER', NULL, 'PUBLISHER', 'PUBLISHER', 5, true),
-('TASK_PROTOCOL_ROLE', 'SUBSCRIBER', 'SUBSCRIBER', 'SUBSCRIBER', NULL, 'SUBSCRIBER', 'SUBSCRIBER', 6, true),
+('PROTOCOL_ROLE', 'MODBUS_CLIENT', '客户端', 'Client', NULL, 'MODBUS 客户端，主动发起读写请求。', 'MODBUS client initiating read/write requests.', 1, true),
+('PROTOCOL_ROLE', 'OPCUA_CLIENT', '客户端', 'Client', NULL, 'OPC UA Client。', 'OPC UA Client.', 2, true),
+('PROTOCOL_ROLE', 'ADS_CLIENT', '客户端', 'Client', NULL, 'ADS Client。', 'ADS Client.', 3, true),
+('PROTOCOL_ROLE', 'IEC101_CONTROLLING_STATION', '控制站（主站）', 'Controlling station', NULL, 'IEC101 控制站。', 'IEC101 controlling station.', 4, true),
+('PROTOCOL_ROLE', 'IEC101_CONTROLLED_STATION', '被控站（子站）', 'Controlled station', NULL, 'IEC101 被控站。', 'IEC101 controlled station.', 5, true),
+('PROTOCOL_ROLE', 'IEC104_CONTROLLING_STATION', '控制站（主站）', 'Controlling station', NULL, 'IEC104 控制站。', 'IEC104 controlling station.', 6, true),
+('PROTOCOL_ROLE', 'IEC104_CONTROLLED_STATION', '被控站（子站）', 'Controlled station', NULL, 'IEC104 被控站。', 'IEC104 controlled station.', 7, true),
+('PROTOCOL_ROLE', 'IEC61850_MMS_CLIENT', 'MMS客户端', 'MMS client', NULL, 'IEC 61850 MMS Client。', 'IEC 61850 MMS client.', 8, true),
+('PROTOCOL_ROLE', 'IEC61850_GOOSE_PUBLISHER', 'GOOSE发布者', 'GOOSE publisher', NULL, 'IEC 61850 GOOSE Publisher。', 'IEC 61850 GOOSE publisher.', 9, true),
+('PROTOCOL_ROLE', 'IEC61850_GOOSE_SUBSCRIBER', 'GOOSE订阅者', 'GOOSE subscriber', NULL, 'IEC 61850 GOOSE Subscriber。', 'IEC 61850 GOOSE subscriber.', 10, true),
+('PROTOCOL_ROLE', 'IEC61850_SV_PUBLISHER', 'SV发布者', 'SV publisher', NULL, 'IEC 61850 SV Publisher。', 'IEC 61850 SV publisher.', 11, true),
+('PROTOCOL_ROLE', 'IEC61850_SV_SUBSCRIBER', 'SV订阅者', 'SV subscriber', NULL, 'IEC 61850 SV Subscriber。', 'IEC 61850 SV subscriber.', 12, true),
+('PROTOCOL_ROLE', 'MQTT_PUBLISHER', '发布者', 'Publisher', NULL, 'MQTT Publisher。', 'MQTT publisher.', 13, true),
+('PROTOCOL_ROLE', 'MQTT_SUBSCRIBER', '订阅者', 'Subscriber', NULL, 'MQTT Subscriber。', 'MQTT subscriber.', 14, true),
+('PROTOCOL_ROLE', 'HTTP_REST_CLIENT', '客户端', 'Client', NULL, 'HTTP REST Client。', 'HTTP REST client.', 15, true),
 ('POINT_TABLE_USAGE', 'ACQUIRE_POINT_SET', 'ACQUIRE_POINT_SET', 'ACQUIRE_POINT_SET', NULL, 'ACQUIRE_POINT_SET', 'ACQUIRE_POINT_SET', 1, true),
 ('POINT_TABLE_USAGE', 'COMMAND_TARGET_SET', 'COMMAND_TARGET_SET', 'COMMAND_TARGET_SET', NULL, 'COMMAND_TARGET_SET', 'COMMAND_TARGET_SET', 2, true),
 ('POINT_TABLE_USAGE', 'CONTROL_TARGET_SET', 'CONTROL_TARGET_SET', 'CONTROL_TARGET_SET', NULL, 'CONTROL_TARGET_SET', 'CONTROL_TARGET_SET', 3, true),
@@ -282,6 +364,14 @@ INSERT INTO ref_code(ref_type, code, name_zh, name_en, abbr_en, description_zh, 
 ('TRIGGER_MODE', 'SCHEDULED', 'SCHEDULED', 'SCHEDULED', NULL, 'SCHEDULED', 'SCHEDULED', 1, true),
 ('TRIGGER_MODE', 'MANUAL', 'MANUAL', 'MANUAL', NULL, 'MANUAL', 'MANUAL', 2, true),
 ('TRIGGER_MODE', 'EVENT', 'EVENT', 'EVENT', NULL, 'EVENT', 'EVENT', 3, true),
+('TASK_CONSTRAINT_FIELD', 'TRIGGER_MODE', '触发方式', 'Trigger mode', NULL, '约束 task.trigger_mode_ref_id。', 'Constrains task.trigger_mode_ref_id.', 1, true),
+('TASK_CONSTRAINT_FIELD', 'POINT_ROLE', '任务点角色', 'Task point role', NULL, '约束 task_point_item.point_role_ref_id。', 'Constrains task_point_item.point_role_ref_id.', 2, true),
+('TASK_CONSTRAINT_FIELD', 'SAMPLE_MODE', '采样方式', 'Sample mode', NULL, '约束 task_point_item.sample_mode_ref_id。', 'Constrains task_point_item.sample_mode_ref_id.', 3, true),
+('TASK_CONSTRAINT_FIELD', 'PROTOCOL_TYPE_ID', '协议类型标识', 'Protocol type identifier', NULL, '约束协议点位的 Type ID 等协议专属类型标识。', 'Constrains protocol-specific point type identifiers such as IEC104 Type ID.', 4, true),
+('VALIDATION_OPERATOR', 'EQUALS', '等于', 'Equals', NULL, '条件字段等于指定值。', 'Condition field equals the specified value.', 1, true),
+('VALIDATION_OPERATOR', 'NOT_EQUALS', '不等于', 'Not equals', NULL, '条件字段不等于指定值。', 'Condition field does not equal the specified value.', 2, true),
+('PARAM_RULE_ACTION', 'REQUIRED', '必填', 'Required', NULL, '条件成立时目标参数必须存在或具有有效默认值。', 'The target parameter is required when the condition is true.', 1, true),
+('PARAM_RULE_ACTION', 'FORBIDDEN', '禁止', 'Forbidden', NULL, '条件成立时目标参数不得显式配置。', 'The target parameter must not be explicitly configured when the condition is true.', 2, true),
 ('TASK_RUN_SCOPE', 'SINGLE', 'SINGLE', 'SINGLE', NULL, 'SINGLE', 'SINGLE', 1, true),
 ('TASK_RUN_SCOPE', 'BATCH', 'BATCH', 'BATCH', NULL, 'BATCH', 'BATCH', 2, true),
 ('TASK_RUN_STATUS', 'SUCCESS', 'SUCCESS', 'SUCCESS', NULL, 'SUCCESS', 'SUCCESS', 1, true),
@@ -359,6 +449,26 @@ INSERT INTO ref_code(ref_type, code, name_zh, name_en, abbr_en, description_zh, 
 ('IEC104_COT','SPONTANEOUS','突发上送','SPONTANEOUS',NULL,'IEC104 突发上送传送原因。','IEC104 spontaneous COT.',2,true),
 ('IEC104_COT','CYCLIC','周期上送','CYCLIC',NULL,'IEC104 周期上送传送原因。','IEC104 cyclic COT.',3,true),
 ('IEC104_COT','ACTIVATION','激活命令','ACTIVATION',NULL,'IEC104 命令激活传送原因。','IEC104 activation COT.',4,true),
+('IEC104_COT','BACKGROUND','背景扫描','BACKGROUND',NULL,'子站按后台扫描策略低频刷新当前值。','Controlled station sends a low-priority background refresh.',5,true),
+('IEC104_COT','INTERROGATED_BY_STATION','站总召响应','INTERROGATED_BY_STATION',NULL,'QOI=20 的数据响应传送原因。','Data response COT for QOI=20.',6,true),
+('IEC104_COT','ACTIVATION_CONFIRMATION','激活确认','ACTIVATION_CONFIRMATION',NULL,'对激活请求的确认。','Confirmation of an activation request.',7,true),
+('IEC104_COT','ACTIVATION_TERMINATION','激活终止','ACTIVATION_TERMINATION',NULL,'激活流程执行结束。','Termination of an activation procedure.',8,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_1','第1组召唤响应','INTERROGATED_BY_GROUP_1',NULL,'QOI=21 的数据响应传送原因。','Data response COT for QOI=21.',9,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_2','第2组召唤响应','INTERROGATED_BY_GROUP_2',NULL,'QOI=22 的数据响应传送原因。','Data response COT for QOI=22.',10,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_3','第3组召唤响应','INTERROGATED_BY_GROUP_3',NULL,'QOI=23 的数据响应传送原因。','Data response COT for QOI=23.',11,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_4','第4组召唤响应','INTERROGATED_BY_GROUP_4',NULL,'QOI=24 的数据响应传送原因。','Data response COT for QOI=24.',12,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_5','第5组召唤响应','INTERROGATED_BY_GROUP_5',NULL,'QOI=25 的数据响应传送原因。','Data response COT for QOI=25.',13,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_6','第6组召唤响应','INTERROGATED_BY_GROUP_6',NULL,'QOI=26 的数据响应传送原因。','Data response COT for QOI=26.',14,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_7','第7组召唤响应','INTERROGATED_BY_GROUP_7',NULL,'QOI=27 的数据响应传送原因。','Data response COT for QOI=27.',15,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_8','第8组召唤响应','INTERROGATED_BY_GROUP_8',NULL,'QOI=28 的数据响应传送原因。','Data response COT for QOI=28.',16,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_9','第9组召唤响应','INTERROGATED_BY_GROUP_9',NULL,'QOI=29 的数据响应传送原因。','Data response COT for QOI=29.',17,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_10','第10组召唤响应','INTERROGATED_BY_GROUP_10',NULL,'QOI=30 的数据响应传送原因。','Data response COT for QOI=30.',18,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_11','第11组召唤响应','INTERROGATED_BY_GROUP_11',NULL,'QOI=31 的数据响应传送原因。','Data response COT for QOI=31.',19,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_12','第12组召唤响应','INTERROGATED_BY_GROUP_12',NULL,'QOI=32 的数据响应传送原因。','Data response COT for QOI=32.',20,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_13','第13组召唤响应','INTERROGATED_BY_GROUP_13',NULL,'QOI=33 的数据响应传送原因。','Data response COT for QOI=33.',21,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_14','第14组召唤响应','INTERROGATED_BY_GROUP_14',NULL,'QOI=34 的数据响应传送原因。','Data response COT for QOI=34.',22,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_15','第15组召唤响应','INTERROGATED_BY_GROUP_15',NULL,'QOI=35 的数据响应传送原因。','Data response COT for QOI=35.',23,true),
+('IEC104_COT','INTERROGATED_BY_GROUP_16','第16组召唤响应','INTERROGATED_BY_GROUP_16',NULL,'QOI=36 的数据响应传送原因。','Data response COT for QOI=36.',24,true),
 ('PHASE','A','A相','A',NULL,'A 相。','Phase A.',1,true),
 ('PHASE','B','B相','B',NULL,'B 相。','Phase B.',2,true),
 ('PHASE','C','C相','C',NULL,'C 相。','Phase C.',3,true),
@@ -372,14 +482,14 @@ UPDATE ref_code
 SET description_zh = '含义：' || name_zh || '。来源：' ||
     CASE
       WHEN ref_type IN ('PROTOCOL','MODBUS_FUNCTION_CODE','IEC101_TYPE_ID','IEC104_TYPE_ID','IEC61850_FC','IEC61850_CDC','HTTP_METHOD','BYTE_ORDER','WORD_ORDER') THEN '协议标准或协议驱动包约定'
-      WHEN ref_type IN ('TASK_TYPE','TASK_STATUS','TASK_CATEGORY','TASK_DIRECTION','TASK_PROTOCOL_ROLE','TASK_POINT_ROLE','SAMPLE_MODE') THEN 'BlueCrystal 任务调度与点表治理抽象'
+      WHEN ref_type IN ('TASK_STATUS','PROTOCOL_ROLE','TASK_POINT_ROLE','SAMPLE_MODE') THEN 'BlueCrystal 任务调度与点表治理抽象'
       WHEN ref_type IN ('ASSET_TYPE','ASSET_LIFECYCLE_STATUS','WORK_TEAM_TYPE','ORG_NATURE','POWER_PLANT_TYPE') THEN '风光储电场资产台账与组织管理工程约定'
       ELSE 'BlueCrystal 数据治理参考数据'
     END || '。用途：被字段 ref_type=' || ref_type || '、code=' || code || ' 引用，用于约束 DDL 外键、DML 样例、视图展示和驱动参数解释。影响：误用会导致资产分类、协议驱动调用、任务调度、点值解析或权限展示口径错误。',
     description_en = 'Meaning: ' || name_en || '. Source: ' ||
     CASE
       WHEN ref_type IN ('PROTOCOL','MODBUS_FUNCTION_CODE','IEC101_TYPE_ID','IEC104_TYPE_ID','IEC61850_FC','IEC61850_CDC','HTTP_METHOD','BYTE_ORDER','WORD_ORDER') THEN 'protocol standards or protocol driver conventions'
-      WHEN ref_type IN ('TASK_TYPE','TASK_STATUS','TASK_CATEGORY','TASK_DIRECTION','TASK_PROTOCOL_ROLE','TASK_POINT_ROLE','SAMPLE_MODE') THEN 'BlueCrystal task scheduling and point-governance abstraction'
+      WHEN ref_type IN ('TASK_STATUS','PROTOCOL_ROLE','TASK_POINT_ROLE','SAMPLE_MODE') THEN 'BlueCrystal task scheduling and point-governance abstraction'
       WHEN ref_type IN ('ASSET_TYPE','ASSET_LIFECYCLE_STATUS','WORK_TEAM_TYPE','ORG_NATURE','POWER_PLANT_TYPE') THEN 'hybrid power plant asset and organization engineering convention'
       ELSE 'BlueCrystal reference data'
     END || '. Usage: referenced by ref_type=' || ref_type || ', code=' || code || ' to constrain foreign keys, sample data, views, and driver parameter interpretation. Impact: misuse may break asset classification, protocol driver dispatch, task scheduling, point decoding, or permission display.'
@@ -389,10 +499,6 @@ UPDATE ref_code SET description_zh = '含义：Modbus 读线圈功能码 FC01，
 UPDATE ref_code SET description_zh = '含义：Modbus 读离散输入功能码 FC02，用于读取只读遥信输入。来源：Modbus Application Protocol。用途：cfg_modbus_point_item.function_code_ref_id，驱动 facade 据此调用 pymodbus.read_discrete_inputs。影响：误配会导致遥信读取错误。', description_en = 'Meaning: Modbus FC02 Read Discrete Inputs. Source: Modbus Application Protocol. Usage: cfg_modbus_point_item.function_code_ref_id; the driver facade dispatches to pymodbus.read_discrete_inputs. Impact: wrong mapping breaks digital input reads.' WHERE ref_type='MODBUS_FUNCTION_CODE' AND code='READ_DISCRETE_INPUTS';
 UPDATE ref_code SET description_zh = '含义：Modbus 读保持寄存器功能码 FC03，用于读取可读写寄存器、设点或参数。来源：Modbus Application Protocol。用途：cfg_modbus_point_item.function_code_ref_id，驱动 facade 据此调用 pymodbus.read_holding_registers。影响：误配会导致遥测或设点解析错误。', description_en = 'Meaning: Modbus FC03 Read Holding Registers. Source: Modbus Application Protocol. Usage: cfg_modbus_point_item.function_code_ref_id; the driver facade dispatches to pymodbus.read_holding_registers. Impact: wrong mapping breaks telemetry or setpoint decoding.' WHERE ref_type='MODBUS_FUNCTION_CODE' AND code='READ_HOLDING_REGISTERS';
 UPDATE ref_code SET description_zh = '含义：Modbus 读输入寄存器功能码 FC04，用于读取只读模拟量。来源：Modbus Application Protocol。用途：cfg_modbus_point_item.function_code_ref_id，驱动 facade 据此调用 pymodbus.read_input_registers。影响：误配会导致模拟量读取错误。', description_en = 'Meaning: Modbus FC04 Read Input Registers. Source: Modbus Application Protocol. Usage: cfg_modbus_point_item.function_code_ref_id; the driver facade dispatches to pymodbus.read_input_registers. Impact: wrong mapping breaks analog input reads.' WHERE ref_type='MODBUS_FUNCTION_CODE' AND code='READ_INPUT_REGISTERS';
-UPDATE ref_code SET description_zh = '含义：平台任务类型，单次调用协议驱动 read API。来源：BlueCrystal task loop 抽象。用途：cfg_protocol_task_type_mapping.task_type_ref_id、task 视图。影响：决定任务是否按一次性读取执行。', description_en = 'Meaning: platform task type for one-shot read API calls. Source: BlueCrystal task-loop abstraction. Usage: cfg_protocol_task_type_mapping.task_type_ref_id and task views. Impact: controls one-shot read execution.' WHERE ref_type='TASK_TYPE' AND code='READ_ONCE';
-UPDATE ref_code SET description_zh = '含义：平台任务类型，按调度周期循环调用协议驱动 read API。来源：BlueCrystal task loop 抽象。用途：周期采集任务。影响：决定任务调度周期、读取合并和运行负载。', description_en = 'Meaning: platform task type for periodic read API calls. Source: BlueCrystal task-loop abstraction. Usage: periodic acquisition tasks. Impact: controls schedule, read grouping, and runtime load.' WHERE ref_type='TASK_TYPE' AND code='POLL_READ';
-UPDATE ref_code SET description_zh = '含义：平台任务类型，注册协议订阅或回调并接收变化数据。来源：BlueCrystal task loop 抽象。用途：OPC UA monitored item、ADS notification、MQTT subscribe、GOOSE/SV subscribe 等。影响：决定是否创建订阅和回调处理。', description_en = 'Meaning: platform task type for protocol subscriptions and callbacks. Source: BlueCrystal task-loop abstraction. Usage: OPC UA monitored items, ADS notification, MQTT subscribe, GOOSE/SV subscribe. Impact: controls subscription and callback handling.' WHERE ref_type='TASK_TYPE' AND code='SUBSCRIBE';
-UPDATE ref_code SET description_zh = '含义：平台任务类型，本系统作为子站、服务端或发布源向外上送报告。来源：远动与报告类通信抽象。用途：IEC101/IEC104 周期或突发上送、IEC61850 report 服务端场景。影响：不等同于写入，不计入写变量。', description_en = 'Meaning: platform task type for serving reports as a substation/server/source. Source: telecontrol/report abstraction. Usage: IEC101/IEC104 cyclic or spontaneous transmission and IEC61850 report serving. Impact: not a write operation.' WHERE ref_type='TASK_TYPE' AND code='SERVE_REPORT';
 
 -- 2. Standard measurement semantics and required semantic reference codes
 -- 4. cfg_measurement_semantic: 396 records with meaningful engineering names and matched units
@@ -808,8 +914,9 @@ INSERT INTO cfg_measurement_semantic(measurement_identifier, standard_source, lo
 -- 1.1 extra reference codes required by v1_4_0
 INSERT INTO ref_code(ref_type, code, name_zh, name_en, abbr_en, description_zh, description_en, sort_order, enabled) VALUES
 ('TASK_STATUS','SCHEDULED','安排运行','Scheduled',NULL,'任务已安排运行。','Task is scheduled to run.',1,true),
-('TASK_STATUS','STOPPED','停止','Stopped',NULL,'任务已停止。','Task is stopped.',2,true),
-('TASK_STATUS','DELETED','删除','Deleted',NULL,'任务已逻辑删除。','Task is logically deleted.',3,true),
+('TASK_STATUS','STOPPED','停止','Stopped',NULL,'任务已正常停止。','Task stopped normally.',2,true),
+('TASK_STATUS','FAILED','失败退出','Failed',NULL,'任务因不可恢复错误而退出。','Task exited because of an unrecoverable error.',3,true),
+('TASK_STATUS','DELETED','删除','Deleted',NULL,'任务已逻辑删除。','Task is logically deleted.',4,true),
 ('TASK_POINT_ROLE','READ_SOURCE','读取源点','Read source',NULL,'任务读取的数据源点。','Point used as read source.',1,true),
 ('TASK_POINT_ROLE','WRITE_TARGET','写入目标','Write target',NULL,'任务写入的目标点。','Point used as write target.',2,true),
 ('TASK_POINT_ROLE','CONTROL_TARGET','控制目标','Control target',NULL,'任务控制的目标点。','Point used as control target.',3,true),
@@ -841,6 +948,7 @@ INSERT INTO cfg_protocol_table_registry(protocol_ref_id, table_role_ref_id, tabl
 (ref_code_id('PROTOCOL','IEC104'), ref_code_id('PROTOCOL_TABLE_ROLE','CONN'), 'whale', 'cfg_iec104_conn', 'IEC104 CONN 物理表。', 'IEC104 CONN table.'),
 (ref_code_id('PROTOCOL','IEC104'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_TABLE'), 'whale', 'cfg_iec104_point_table', 'IEC104 POINT_TABLE 物理表。', 'IEC104 POINT_TABLE table.'),
 (ref_code_id('PROTOCOL','IEC104'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM'), 'whale', 'cfg_iec104_point_item', 'IEC104 POINT_ITEM 物理表。', 'IEC104 POINT_ITEM table.'),
+(ref_code_id('PROTOCOL','IEC104'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec104_point_item', 'IEC104 统一点位执行视图。', 'IEC104 unified point-item execution view.'),
 (ref_code_id('PROTOCOL','IEC61850_MMS'), ref_code_id('PROTOCOL_TABLE_ROLE','CONN'), 'whale', 'cfg_iec61850_mms_conn', 'IEC61850_MMS CONN 物理表。', 'IEC61850_MMS CONN table.'),
 (ref_code_id('PROTOCOL','IEC61850_MMS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_TABLE'), 'whale', 'cfg_iec61850_mms_point_table', 'IEC61850_MMS POINT_TABLE 物理表。', 'IEC61850_MMS POINT_TABLE table.'),
 (ref_code_id('PROTOCOL','IEC61850_MMS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM'), 'whale', 'cfg_iec61850_mms_point_item', 'IEC61850_MMS POINT_ITEM 物理表。', 'IEC61850_MMS POINT_ITEM table.'),
@@ -864,7 +972,6 @@ INSERT INTO cfg_protocol_table_registry(protocol_ref_id, table_role_ref_id, tabl
 (ref_code_id('PROTOCOL','HTTP_REST'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM'), 'whale', 'cfg_http_rest_point_item', 'HTTP_REST POINT_ITEM 物理表。', 'HTTP_REST POINT_ITEM table.'),
 (ref_code_id('PROTOCOL','MODBUS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_modbus_point_item', 'MODBUS 点位执行视图。', 'MODBUS point-item execution view.'),
 (ref_code_id('PROTOCOL','IEC101'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec101_point_item', 'IEC101 点位执行视图。', 'IEC101 point-item execution view.'),
-(ref_code_id('PROTOCOL','IEC104'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec104_point_item', 'IEC104 点位执行视图。', 'IEC104 point-item execution view.'),
 (ref_code_id('PROTOCOL','IEC61850_MMS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec61850_mms_point_item', 'IEC61850_MMS 点位执行视图。', 'IEC61850_MMS point-item execution view.'),
 (ref_code_id('PROTOCOL','IEC61850_GOOSE'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec61850_goose_point_item', 'IEC61850_GOOSE 点位执行视图。', 'IEC61850_GOOSE point-item execution view.'),
 (ref_code_id('PROTOCOL','IEC61850_SV'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_iec61850_sv_point_item', 'IEC61850_SV 点位执行视图。', 'IEC61850_SV point-item execution view.'),
@@ -872,6 +979,69 @@ INSERT INTO cfg_protocol_table_registry(protocol_ref_id, table_role_ref_id, tabl
 (ref_code_id('PROTOCOL','MQTT'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_mqtt_point_item', 'MQTT 点位执行视图。', 'MQTT point-item execution view.'),
 (ref_code_id('PROTOCOL','ADS'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_ads_point_item', 'ADS 点位执行视图。', 'ADS point-item execution view.'),
 (ref_code_id('PROTOCOL','HTTP_REST'), ref_code_id('PROTOCOL_TABLE_ROLE','POINT_ITEM_VIEW'), 'whale', 'vw_http_rest_point_item', 'HTTP_REST 点位执行视图。', 'HTTP_REST point-item execution view.');
+
+-- 4.1 iec104-python c104.Type complete metadata (55 visible Type IDs)
+INSERT INTO cfg_iec104_type_def(
+    type_id_ref_id,type_id_value,type_category_ref_id,information_value_type_ref_id,time_tag_type_ref_id,
+    point_registration_supported,general_interrogation_supported,counter_interrogation_supported,
+    periodic_transmission_supported,spontaneous_transmission_supported,command_mode_supported,related_io_supported,
+    sort_order,enabled
+) VALUES
+(ref_code_id('IEC104_TYPE_ID','M_SP_NA_1'), 1, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SINGLE_POINT'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, true, false, true, true, false, false, 1, true),
+(ref_code_id('IEC104_TYPE_ID','M_SP_TA_1'), 2, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SINGLE_POINT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, true, false, true, true, false, false, 2, true),
+(ref_code_id('IEC104_TYPE_ID','M_DP_NA_1'), 3, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','DOUBLE_POINT'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, true, false, true, true, false, false, 3, true),
+(ref_code_id('IEC104_TYPE_ID','M_DP_TA_1'), 4, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','DOUBLE_POINT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, true, false, true, true, false, false, 4, true),
+(ref_code_id('IEC104_TYPE_ID','M_ST_NA_1'), 5, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','STEP_POSITION'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, true, false, true, true, false, false, 5, true),
+(ref_code_id('IEC104_TYPE_ID','M_ST_TA_1'), 6, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','STEP_POSITION'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, true, false, true, true, false, false, 6, true),
+(ref_code_id('IEC104_TYPE_ID','M_BO_NA_1'), 7, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BITSTRING32'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, true, false, true, true, false, false, 7, true),
+(ref_code_id('IEC104_TYPE_ID','M_BO_TA_1'), 8, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BITSTRING32'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, true, false, true, true, false, false, 8, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_NA_1'), 9, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','NORMALIZED_VALUE'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, true, false, true, true, false, false, 9, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_TA_1'), 10, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','NORMALIZED_VALUE'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, true, false, true, true, false, false, 10, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_NB_1'), 11, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SCALED_VALUE'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, true, false, true, true, false, false, 11, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_TB_1'), 12, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SCALED_VALUE'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, true, false, true, true, false, false, 12, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_NC_1'), 13, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SHORT_FLOAT'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, true, false, true, true, false, false, 13, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_TC_1'), 14, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SHORT_FLOAT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, false, false, true, true, false, false, 14, true),
+(ref_code_id('IEC104_TYPE_ID','M_IT_NA_1'), 15, ref_code_id('IEC104_TYPE_CATEGORY','COUNTER_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BINARY_COUNTER'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, true, true, true, false, false, 15, true),
+(ref_code_id('IEC104_TYPE_ID','M_IT_TA_1'), 16, ref_code_id('IEC104_TYPE_CATEGORY','COUNTER_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BINARY_COUNTER'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, false, true, true, true, false, false, 16, true),
+(ref_code_id('IEC104_TYPE_ID','M_EP_TA_1'), 17, ref_code_id('IEC104_TYPE_CATEGORY','PROTECTION_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','PROTECTION_EVENT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, false, false, true, true, false, false, 17, true),
+(ref_code_id('IEC104_TYPE_ID','M_EP_TB_1'), 18, ref_code_id('IEC104_TYPE_CATEGORY','PROTECTION_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','PROTECTION_START'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, false, false, true, true, false, false, 18, true),
+(ref_code_id('IEC104_TYPE_ID','M_EP_TC_1'), 19, ref_code_id('IEC104_TYPE_CATEGORY','PROTECTION_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','PROTECTION_OUTPUT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP24TIME2A'), true, false, false, true, true, false, false, 19, true),
+(ref_code_id('IEC104_TYPE_ID','M_PS_NA_1'), 20, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','PACKED_SINGLE_POINT'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, true, true, false, false, 20, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_ND_1'), 21, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','NORMALIZED_VALUE'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, true, true, false, false, 21, true),
+(ref_code_id('IEC104_TYPE_ID','M_SP_TB_1'), 30, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SINGLE_POINT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, true, false, true, true, false, false, 30, true),
+(ref_code_id('IEC104_TYPE_ID','M_DP_TB_1'), 31, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','DOUBLE_POINT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, true, false, true, true, false, false, 31, true),
+(ref_code_id('IEC104_TYPE_ID','M_ST_TB_1'), 32, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','STEP_POSITION'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, true, false, true, true, false, false, 32, true),
+(ref_code_id('IEC104_TYPE_ID','M_BO_TB_1'), 33, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BITSTRING32'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, true, false, true, true, false, false, 33, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_TD_1'), 34, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','NORMALIZED_VALUE'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, true, false, true, true, false, false, 34, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_TE_1'), 35, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SCALED_VALUE'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, true, false, true, true, false, false, 35, true),
+(ref_code_id('IEC104_TYPE_ID','M_ME_TF_1'), 36, ref_code_id('IEC104_TYPE_CATEGORY','PROCESS_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SHORT_FLOAT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, true, false, true, true, false, false, 36, true),
+(ref_code_id('IEC104_TYPE_ID','M_IT_TB_1'), 37, ref_code_id('IEC104_TYPE_CATEGORY','COUNTER_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BINARY_COUNTER'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, true, true, true, false, false, 37, true),
+(ref_code_id('IEC104_TYPE_ID','M_EP_TD_1'), 38, ref_code_id('IEC104_TYPE_CATEGORY','PROTECTION_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','PROTECTION_EVENT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, true, true, false, false, 38, true),
+(ref_code_id('IEC104_TYPE_ID','M_EP_TE_1'), 39, ref_code_id('IEC104_TYPE_CATEGORY','PROTECTION_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','PROTECTION_START'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, true, true, false, false, 39, true),
+(ref_code_id('IEC104_TYPE_ID','M_EP_TF_1'), 40, ref_code_id('IEC104_TYPE_CATEGORY','PROTECTION_MONITOR'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','PROTECTION_OUTPUT'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, true, true, false, false, 40, true),
+(ref_code_id('IEC104_TYPE_ID','C_SC_NA_1'), 45, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SINGLE_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, false, false, true, true, 45, true),
+(ref_code_id('IEC104_TYPE_ID','C_DC_NA_1'), 46, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','DOUBLE_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, false, false, true, true, 46, true),
+(ref_code_id('IEC104_TYPE_ID','C_RC_NA_1'), 47, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','REGULATING_STEP_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, false, false, true, true, 47, true),
+(ref_code_id('IEC104_TYPE_ID','C_SE_NA_1'), 48, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','NORMALIZED_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, false, false, true, true, 48, true),
+(ref_code_id('IEC104_TYPE_ID','C_SE_NB_1'), 49, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SCALED_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, false, false, true, true, 49, true),
+(ref_code_id('IEC104_TYPE_ID','C_SE_NC_1'), 50, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SHORT_FLOAT_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, false, false, true, true, 50, true),
+(ref_code_id('IEC104_TYPE_ID','C_BO_NA_1'), 51, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BITSTRING32_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), true, false, false, false, false, true, true, 51, true),
+(ref_code_id('IEC104_TYPE_ID','C_SC_TA_1'), 58, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SINGLE_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, false, false, true, true, 58, true),
+(ref_code_id('IEC104_TYPE_ID','C_DC_TA_1'), 59, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','DOUBLE_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, false, false, true, true, 59, true),
+(ref_code_id('IEC104_TYPE_ID','C_RC_TA_1'), 60, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','REGULATING_STEP_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, false, false, true, true, 60, true),
+(ref_code_id('IEC104_TYPE_ID','C_SE_TA_1'), 61, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','NORMALIZED_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, false, false, true, true, 61, true),
+(ref_code_id('IEC104_TYPE_ID','C_SE_TB_1'), 62, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SCALED_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, false, false, true, true, 62, true),
+(ref_code_id('IEC104_TYPE_ID','C_SE_TC_1'), 63, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','SHORT_FLOAT_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, false, false, true, true, 63, true),
+(ref_code_id('IEC104_TYPE_ID','C_BO_TA_1'), 64, ref_code_id('IEC104_TYPE_CATEGORY','CONTROL_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','BITSTRING32_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), true, false, false, false, false, true, true, 64, true),
+(ref_code_id('IEC104_TYPE_ID','M_EI_NA_1'), 70, ref_code_id('IEC104_TYPE_CATEGORY','INITIALIZATION'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','NONE'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), false, false, false, false, false, false, false, 70, true),
+(ref_code_id('IEC104_TYPE_ID','C_IC_NA_1'), 100, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','INTERROGATION_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), false, false, false, false, false, false, false, 100, true),
+(ref_code_id('IEC104_TYPE_ID','C_CI_NA_1'), 101, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','COUNTER_INTERROGATION_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), false, false, false, false, false, false, false, 101, true),
+(ref_code_id('IEC104_TYPE_ID','C_RD_NA_1'), 102, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','READ_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), false, false, false, false, false, false, false, 102, true),
+(ref_code_id('IEC104_TYPE_ID','C_CS_NA_1'), 103, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','CLOCK_SYNC_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), false, false, false, false, false, false, false, 103, true),
+(ref_code_id('IEC104_TYPE_ID','C_TS_NA_1'), 104, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','TEST_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), false, false, false, false, false, false, false, 104, true),
+(ref_code_id('IEC104_TYPE_ID','C_RP_NA_1'), 105, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','RESET_PROCESS_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','NONE'), false, false, false, false, false, false, false, 105, true),
+(ref_code_id('IEC104_TYPE_ID','C_CD_NA_1'), 106, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','DELAY_ACQUISITION_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP16TIME2A'), false, false, false, false, false, false, false, 106, true),
+(ref_code_id('IEC104_TYPE_ID','C_TS_TA_1'), 107, ref_code_id('IEC104_TYPE_CATEGORY','SYSTEM_COMMAND'), ref_code_id('IEC104_INFORMATION_VALUE_TYPE','TEST_COMMAND'), ref_code_id('IEC104_TIME_TAG_TYPE','CP56TIME2A'), false, false, false, false, false, false, false, 107, true);
 
 -- 5. Standard permissions, standard roles, and role-permission templates
 -- 9. security permissions, roles, employees
@@ -942,8 +1112,8 @@ FROM sec_role r
 JOIN sec_permission p ON p.permission_identifier LIKE '%VIEW'
 WHERE r.role_identifier = 'READ_ONLY_VIEWER';
 
--- 6. Protocol operation definitions and task-type mappings
--- 10. protocol operation definitions and task mappings
+-- 6. Protocol operation definitions and operation-role combinations
+-- 10. protocol operation definitions and role combinations
 INSERT INTO cfg_protocol_operation_def(protocol_ref_id, operation_identifier, name_zh, name_en, native_operation_code, native_operation_name, operation_semantic_ref_id, operation_direction_ref_id, request_response_mode_ref_id, standard_ref, description_zh, description_en) VALUES
 (ref_code_id('PROTOCOL','MODBUS'), 'MODBUS_MODBUS_READ', 'Read coils/registers', 'MODBUS_READ', 'MODBUS_READ', 'Read coils/registers', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','READ'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'MODBUS engineering practice', 'Read coils/registers。', 'Read coils/registers.'),
 (ref_code_id('PROTOCOL','MODBUS'), 'MODBUS_MODBUS_POLL_READ', 'Poll coils/registers', 'MODBUS_POLL_READ', 'MODBUS_POLL_READ', 'Poll coils/registers', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','READ'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'MODBUS engineering practice', 'Poll coils/registers。', 'Poll coils/registers.'),
@@ -966,12 +1136,20 @@ INSERT INTO cfg_protocol_operation_def(protocol_ref_id, operation_identifier, na
 (ref_code_id('PROTOCOL','IEC101'), 'IEC101_IEC101_SERVE_REPORT', 'Spontaneous/cyclic transmission', 'IEC101_SERVE_REPORT', 'IEC101_SERVE_REPORT', 'Spontaneous/cyclic transmission', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','REPORT'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REPORTING'), 'IEC101 engineering practice', 'Spontaneous/cyclic transmission。', 'Spontaneous/cyclic transmission.'),
 (ref_code_id('PROTOCOL','IEC101'), 'IEC101_IEC101_CLOCK_SYNC_ACCEPT', 'Accept clock sync', 'IEC101_CLOCK_SYNC_ACCEPT', 'IEC101_CLOCK_SYNC_ACCEPT', 'Accept clock sync', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','TIME_SYNC'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC101 engineering practice', 'Accept clock sync。', 'Accept clock sync.'),
 (ref_code_id('PROTOCOL','IEC101'), 'IEC101_IEC101_ACCEPT_CONTROL', 'Accept command', 'IEC101_ACCEPT_CONTROL', 'IEC101_ACCEPT_CONTROL', 'Accept command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','ACCEPT_CONTROL'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC101 engineering practice', 'Accept command。', 'Accept command.'),
-(ref_code_id('PROTOCOL','IEC104'), 'IEC104_IEC104_INTERROGATION_MASTER', 'General interrogation as master', 'IEC104_INTERROGATION_MASTER', 'IEC104_INTERROGATION_MASTER', 'General interrogation as master', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','INTERROGATION'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC104 engineering practice', 'General interrogation as master。', 'General interrogation as master.'),
-(ref_code_id('PROTOCOL','IEC104'), 'IEC104_IEC104_PERIODIC_READ', 'Cyclic polling as master', 'IEC104_PERIODIC_READ', 'IEC104_PERIODIC_READ', 'Cyclic polling as master', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','READ'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC104 engineering practice', 'Cyclic polling as master。', 'Cyclic polling as master.'),
-(ref_code_id('PROTOCOL','IEC104'), 'IEC104_IEC104_RESPOND_INTERROGATION', 'Respond general interrogation', 'IEC104_RESPOND_INTERROGATION', 'IEC104_RESPOND_INTERROGATION', 'Respond general interrogation', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','INTERROGATION'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC104 engineering practice', 'Respond general interrogation。', 'Respond general interrogation.'),
-(ref_code_id('PROTOCOL','IEC104'), 'IEC104_IEC104_SERVE_REPORT', 'Cyclic/spontaneous transmission', 'IEC104_SERVE_REPORT', 'IEC104_SERVE_REPORT', 'Cyclic/spontaneous transmission', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','REPORT'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REPORTING'), 'IEC104 engineering practice', 'Cyclic/spontaneous transmission。', 'Cyclic/spontaneous transmission.'),
-(ref_code_id('PROTOCOL','IEC104'), 'IEC104_IEC104_ACCEPT_WRITE', 'Accept setpoint/clock', 'IEC104_ACCEPT_WRITE', 'IEC104_ACCEPT_WRITE', 'Accept setpoint/clock', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','WRITE'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC104 engineering practice', 'Accept setpoint/clock。', 'Accept setpoint/clock.'),
-(ref_code_id('PROTOCOL','IEC104'), 'IEC104_IEC104_ACCEPT_CONTROL', 'Accept control command', 'IEC104_ACCEPT_CONTROL', 'IEC104_ACCEPT_CONTROL', 'Accept control command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','ACCEPT_CONTROL'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC104 engineering practice', 'Accept control command。', 'Accept control command.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_GENERAL_INTERROGATION', '发送站总召', 'Send general interrogation', 'C_IC_NA_1/QOI20', 'Send station interrogation', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','INTERROGATION'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '控制站发送 QOI=20 的站总召命令。', 'Controlling station sends a station interrogation with QOI=20.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_RECEIVE_MONITOR_DATA', '接收监视数据', 'Receive monitor data', 'I-format monitor ASDU', 'Receive monitor data', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','SUBSCRIBE'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REPORTING'), 'IEC 60870-5-104', '控制站统一接收周期、自发、背景及召唤响应监视数据。', 'Controlling station receives cyclic, spontaneous, background, and interrogation-response monitor data.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_RESPOND_GENERAL_INTERROGATION', '响应站总召', 'Respond general interrogation', 'C_IC_NA_1/QOI20', 'Respond station interrogation', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','INTERROGATION'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '被控站响应 QOI=20，发送激活确认、当前值及激活终止。', 'Controlled station responds to QOI=20 with activation confirmation, current values, and activation termination.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_CYCLIC_DATA', '周期上送', 'Send cyclic data', 'COT=CYCLIC', 'Cyclic transmission', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','REPORT'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REPORTING'), 'IEC 60870-5-104', '被控站按固定周期主动上送监视数据。', 'Controlled station actively sends monitor data at a fixed cycle.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_SPONTANEOUS_DATA', '变化上送', 'Send spontaneous data', 'COT=SPONTANEOUS', 'Spontaneous transmission', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','REPORT'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REPORTING'), 'IEC 60870-5-104', '被控站在状态变化或模拟量越过死区时主动上送。', 'Controlled station sends data when a state changes or an analog deadband is crossed.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_BACKGROUND_DATA', '背景上送', 'Send background data', 'COT=BACKGROUND', 'Background transmission', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','REPORT'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REPORTING'), 'IEC 60870-5-104', '被控站按低优先级背景刷新周期上送当前值。', 'Controlled station sends low-priority background refreshes.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_SETPOINT_COMMAND', '发送设点命令', 'Send setpoint command', 'C_SE_NA/NB/NC_1', 'Send setpoint command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','WRITE'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '控制站发送归一化、标度化或短浮点设点命令。', 'Controlling station sends normalized, scaled, or short-float setpoint commands.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_SINGLE_COMMAND', '发送单点遥控', 'Send single command', 'C_SC_NA_1', 'Send single command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','CONTROL'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '控制站发送单点遥控命令。', 'Controlling station sends a single command.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_DOUBLE_COMMAND', '发送双点遥控', 'Send double command', 'C_DC_NA_1', 'Send double command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','CONTROL'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '控制站发送双点遥控命令。', 'Controlling station sends a double command.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_ACCEPT_SETPOINT_COMMAND', '接收设点命令', 'Accept setpoint command', 'C_SE_NA/NB/NC_1', 'Accept setpoint command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','WRITE'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '被控站接收并处理设点命令。', 'Controlled station accepts and processes setpoint commands.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_ACCEPT_SINGLE_COMMAND', '接收单点遥控', 'Accept single command', 'C_SC_NA_1', 'Accept single command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','ACCEPT_CONTROL'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '被控站接收并处理单点遥控。', 'Controlled station accepts and processes a single command.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_ACCEPT_DOUBLE_COMMAND', '接收双点遥控', 'Accept double command', 'C_DC_NA_1', 'Accept double command', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','ACCEPT_CONTROL'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '被控站接收并处理双点遥控。', 'Controlled station accepts and processes a double command.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_SEND_CLOCK_SYNCHRONIZATION', '发送时钟同步', 'Send clock synchronization', 'C_CS_NA_1', 'Send clock synchronization', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','TIME_SYNC'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '控制站发送 CP56Time2a 时钟同步命令。', 'Controlling station sends a CP56Time2a clock synchronization command.'),
+(ref_code_id('PROTOCOL','IEC104'), 'IEC104_ACCEPT_CLOCK_SYNCHRONIZATION', '接收时钟同步', 'Accept clock synchronization', 'C_CS_NA_1', 'Accept clock synchronization', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','TIME_SYNC'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','REMOTE_TO_LOCAL'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC 60870-5-104', '被控站接收并处理时钟同步命令。', 'Controlled station accepts and processes a clock synchronization command.'),
 (ref_code_id('PROTOCOL','IEC61850_MMS'), 'IEC61850_MMS_MMS_READ', 'MMS read', 'MMS_READ', 'MMS_READ', 'MMS read', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','READ'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC61850_MMS engineering practice', 'MMS read。', 'MMS read.'),
 (ref_code_id('PROTOCOL','IEC61850_MMS'), 'IEC61850_MMS_MMS_POLL_READ', 'MMS poll read', 'MMS_POLL_READ', 'MMS_POLL_READ', 'MMS poll read', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','READ'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'IEC61850_MMS engineering practice', 'MMS poll read。', 'MMS poll read.'),
 (ref_code_id('PROTOCOL','IEC61850_MMS'), 'IEC61850_MMS_MMS_REPORT', 'MMS report control', 'MMS_REPORT', 'MMS_REPORT', 'MMS report control', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','REPORT'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REPORTING'), 'IEC61850_MMS engineering practice', 'MMS report control。', 'MMS report control.'),
@@ -988,49 +1166,296 @@ INSERT INTO cfg_protocol_operation_def(protocol_ref_id, operation_identifier, na
 (ref_code_id('PROTOCOL','HTTP_REST'), 'HTTP_REST_HTTP_POST', 'HTTP POST', 'HTTP_POST', 'HTTP_POST', 'HTTP POST', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','WRITE'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'HTTP_REST engineering practice', 'HTTP POST。', 'HTTP POST.'),
 (ref_code_id('PROTOCOL','HTTP_REST'), 'HTTP_REST_HTTP_CONTROL', 'HTTP control API', 'HTTP_CONTROL', 'HTTP_CONTROL', 'HTTP control API', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','CONTROL'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_TO_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'HTTP_REST engineering practice', 'HTTP control API。', 'HTTP control API.'),
 (ref_code_id('PROTOCOL','HTTP_REST'), 'HTTP_REST_HTTP_PUBLISH', 'HTTP callback/publish', 'HTTP_PUBLISH', 'HTTP_PUBLISH', 'HTTP callback/publish', ref_code_id('PROTOCOL_OPERATION_SEMANTIC','PUBLISH'), ref_code_id('PROTOCOL_OPERATION_DIRECTION','LOCAL_REPORT_REMOTE'), ref_code_id('REQUEST_RESPONSE_MODE','REQUEST_RESPONSE'), 'HTTP_REST engineering practice', 'HTTP callback/publish。', 'HTTP callback/publish.');
-INSERT INTO cfg_protocol_task_type_mapping(protocol_ref_id, protocol_operation_def_id, task_type_ref_id, task_category_ref_id, task_direction_ref_id, task_protocol_role_ref_id, point_table_usage_ref_id, requires_write_value, requires_response_mapping, requires_confirm, description_zh, description_en) VALUES
-(ref_code_id('PROTOCOL','MODBUS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_READ'), ref_code_id('TASK_TYPE','READ_ONCE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','MASTER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'MODBUS READ_ONCE 映射。', 'MODBUS READ_ONCE mapping.'),
-(ref_code_id('PROTOCOL','MODBUS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_POLL_READ'), ref_code_id('TASK_TYPE','POLL_READ'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','MASTER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'MODBUS POLL_READ 映射。', 'MODBUS POLL_READ mapping.'),
-(ref_code_id('PROTOCOL','MODBUS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_WRITE'), ref_code_id('TASK_TYPE','WRITE_ONCE'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','MASTER'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, false, true, 'MODBUS WRITE_ONCE 映射。', 'MODBUS WRITE_ONCE mapping.'),
-(ref_code_id('PROTOCOL','MODBUS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_CONTROL'), ref_code_id('TASK_TYPE','CONTROL'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','MASTER'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, true, 'MODBUS CONTROL 映射。', 'MODBUS CONTROL mapping.'),
-(ref_code_id('PROTOCOL','OPCUA'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_READ'), ref_code_id('TASK_TYPE','READ_ONCE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'OPCUA READ_ONCE 映射。', 'OPCUA READ_ONCE mapping.'),
-(ref_code_id('PROTOCOL','OPCUA'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_POLL_READ'), ref_code_id('TASK_TYPE','POLL_READ'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'OPCUA POLL_READ 映射。', 'OPCUA POLL_READ mapping.'),
-(ref_code_id('PROTOCOL','OPCUA'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_SUBSCRIBE'), ref_code_id('TASK_TYPE','SUBSCRIBE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, true, false, 'OPCUA SUBSCRIBE 映射。', 'OPCUA SUBSCRIBE mapping.'),
-(ref_code_id('PROTOCOL','OPCUA'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_WRITE'), ref_code_id('TASK_TYPE','WRITE_ONCE'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, false, true, 'OPCUA WRITE_ONCE 映射。', 'OPCUA WRITE_ONCE mapping.'),
-(ref_code_id('PROTOCOL','OPCUA'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_CONTROL'), ref_code_id('TASK_TYPE','CONTROL'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, true, 'OPCUA CONTROL 映射。', 'OPCUA CONTROL mapping.'),
-(ref_code_id('PROTOCOL','OPCUA'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_CALL_METHOD'), ref_code_id('TASK_TYPE','CALL_METHOD'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, false, 'OPCUA CALL_METHOD 映射。', 'OPCUA CALL_METHOD mapping.'),
-(ref_code_id('PROTOCOL','ADS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_READ'), ref_code_id('TASK_TYPE','READ_ONCE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'ADS READ_ONCE 映射。', 'ADS READ_ONCE mapping.'),
-(ref_code_id('PROTOCOL','ADS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_POLL_READ'), ref_code_id('TASK_TYPE','POLL_READ'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'ADS POLL_READ 映射。', 'ADS POLL_READ mapping.'),
-(ref_code_id('PROTOCOL','ADS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_NOTIFICATION'), ref_code_id('TASK_TYPE','SUBSCRIBE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, true, false, 'ADS SUBSCRIBE 映射。', 'ADS SUBSCRIBE mapping.'),
-(ref_code_id('PROTOCOL','ADS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_WRITE'), ref_code_id('TASK_TYPE','WRITE_ONCE'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, false, true, 'ADS WRITE_ONCE 映射。', 'ADS WRITE_ONCE mapping.'),
-(ref_code_id('PROTOCOL','ADS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_CONTROL'), ref_code_id('TASK_TYPE','CONTROL'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, true, 'ADS CONTROL 映射。', 'ADS CONTROL mapping.'),
-(ref_code_id('PROTOCOL','IEC101'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_INTERROGATION_MASTER'), ref_code_id('TASK_TYPE','READ_ONCE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','MASTER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'IEC101 READ_ONCE 映射。', 'IEC101 READ_ONCE mapping.'),
-(ref_code_id('PROTOCOL','IEC101'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_PERIODIC_READ'), ref_code_id('TASK_TYPE','POLL_READ'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','MASTER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'IEC101 POLL_READ 映射。', 'IEC101 POLL_READ mapping.'),
-(ref_code_id('PROTOCOL','IEC101'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_RESPOND_INTERROGATION'), ref_code_id('TASK_TYPE','RESPOND_READ'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SLAVE'), ref_code_id('POINT_TABLE_USAGE','SERVE_RESPONSE_SET'), false, true, false, 'IEC101 RESPOND_READ 映射。', 'IEC101 RESPOND_READ mapping.'),
-(ref_code_id('PROTOCOL','IEC101'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_SERVE_REPORT'), ref_code_id('TASK_TYPE','SERVE_REPORT'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SLAVE'), ref_code_id('POINT_TABLE_USAGE','REPORT_DATASET'), false, true, false, 'IEC101 SERVE_REPORT 映射。', 'IEC101 SERVE_REPORT mapping.'),
-(ref_code_id('PROTOCOL','IEC101'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_CLOCK_SYNC_ACCEPT'), ref_code_id('TASK_TYPE','WRITE_ONCE'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SLAVE'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, false, true, 'IEC101 WRITE_ONCE 服务端写入处理映射。', 'IEC101 WRITE_ONCE server-side write handler mapping.'),
-(ref_code_id('PROTOCOL','IEC101'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_ACCEPT_CONTROL'), ref_code_id('TASK_TYPE','CONTROL'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SLAVE'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, true, 'IEC101 CONTROL 服务端控制处理映射。', 'IEC101 CONTROL server-side control handler mapping.'),
-(ref_code_id('PROTOCOL','IEC104'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_IEC104_INTERROGATION_MASTER'), ref_code_id('TASK_TYPE','READ_ONCE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'IEC104 READ_ONCE 映射。', 'IEC104 READ_ONCE mapping.'),
-(ref_code_id('PROTOCOL','IEC104'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_IEC104_PERIODIC_READ'), ref_code_id('TASK_TYPE','POLL_READ'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'IEC104 POLL_READ 映射。', 'IEC104 POLL_READ mapping.'),
-(ref_code_id('PROTOCOL','IEC104'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_IEC104_RESPOND_INTERROGATION'), ref_code_id('TASK_TYPE','RESPOND_READ'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SERVER'), ref_code_id('POINT_TABLE_USAGE','SERVE_RESPONSE_SET'), false, true, false, 'IEC104 RESPOND_READ 映射。', 'IEC104 RESPOND_READ mapping.'),
-(ref_code_id('PROTOCOL','IEC104'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_IEC104_SERVE_REPORT'), ref_code_id('TASK_TYPE','SERVE_REPORT'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SERVER'), ref_code_id('POINT_TABLE_USAGE','REPORT_DATASET'), false, true, false, 'IEC104 SERVE_REPORT 映射。', 'IEC104 SERVE_REPORT mapping.'),
-(ref_code_id('PROTOCOL','IEC104'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_IEC104_ACCEPT_WRITE'), ref_code_id('TASK_TYPE','WRITE_ONCE'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SERVER'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, false, true, 'IEC104 WRITE_ONCE 服务端写入处理映射。', 'IEC104 WRITE_ONCE server-side write handler mapping.'),
-(ref_code_id('PROTOCOL','IEC104'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_IEC104_ACCEPT_CONTROL'), ref_code_id('TASK_TYPE','CONTROL'), ref_code_id('TASK_CATEGORY','SERVE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SERVER'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, true, 'IEC104 CONTROL 服务端控制处理映射。', 'IEC104 CONTROL server-side control handler mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_MMS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_READ'), ref_code_id('TASK_TYPE','READ_ONCE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'IEC61850_MMS READ_ONCE 映射。', 'IEC61850_MMS READ_ONCE mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_MMS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_POLL_READ'), ref_code_id('TASK_TYPE','POLL_READ'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'IEC61850_MMS POLL_READ 映射。', 'IEC61850_MMS POLL_READ mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_MMS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_REPORT'), ref_code_id('TASK_TYPE','SUBSCRIBE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, true, false, 'IEC61850_MMS SUBSCRIBE 映射。', 'IEC61850_MMS SUBSCRIBE mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_MMS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_WRITE'), ref_code_id('TASK_TYPE','WRITE_ONCE'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, false, true, 'IEC61850_MMS WRITE_ONCE 映射。', 'IEC61850_MMS WRITE_ONCE mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_MMS'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_CONTROL'), ref_code_id('TASK_TYPE','CONTROL'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, true, 'IEC61850_MMS CONTROL 映射。', 'IEC61850_MMS CONTROL mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_GOOSE'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_GOOSE') AND operation_identifier='IEC61850_GOOSE_GOOSE_SUBSCRIBE'), ref_code_id('TASK_TYPE','SUBSCRIBE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SUBSCRIBER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, true, false, 'IEC61850_GOOSE SUBSCRIBE 映射。', 'IEC61850_GOOSE SUBSCRIBE mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_GOOSE'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_GOOSE') AND operation_identifier='IEC61850_GOOSE_GOOSE_PUBLISH'), ref_code_id('TASK_TYPE','PUBLISH'), ref_code_id('TASK_CATEGORY','PUBLISH'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','PUBLISHER'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), false, false, false, 'IEC61850_GOOSE PUBLISH 映射。', 'IEC61850_GOOSE PUBLISH mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_SV'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_SV') AND operation_identifier='IEC61850_SV_SV_SUBSCRIBE'), ref_code_id('TASK_TYPE','SUBSCRIBE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SUBSCRIBER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, true, false, 'IEC61850_SV SUBSCRIBE 映射。', 'IEC61850_SV SUBSCRIBE mapping.'),
-(ref_code_id('PROTOCOL','IEC61850_SV'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_SV') AND operation_identifier='IEC61850_SV_SV_PUBLISH'), ref_code_id('TASK_TYPE','PUBLISH'), ref_code_id('TASK_CATEGORY','PUBLISH'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','PUBLISHER'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), false, false, false, 'IEC61850_SV PUBLISH 映射。', 'IEC61850_SV PUBLISH mapping.'),
-(ref_code_id('PROTOCOL','MQTT'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MQTT') AND operation_identifier='MQTT_MQTT_SUBSCRIBE'), ref_code_id('TASK_TYPE','SUBSCRIBE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','SUBSCRIBER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, true, false, 'MQTT SUBSCRIBE 映射。', 'MQTT SUBSCRIBE mapping.'),
-(ref_code_id('PROTOCOL','MQTT'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MQTT') AND operation_identifier='MQTT_MQTT_PUBLISH'), ref_code_id('TASK_TYPE','PUBLISH'), ref_code_id('TASK_CATEGORY','PUBLISH'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','PUBLISHER'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), false, false, false, 'MQTT PUBLISH 映射。', 'MQTT PUBLISH mapping.'),
-(ref_code_id('PROTOCOL','HTTP_REST'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_GET'), ref_code_id('TASK_TYPE','READ_ONCE'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'HTTP_REST READ_ONCE 映射。', 'HTTP_REST READ_ONCE mapping.'),
-(ref_code_id('PROTOCOL','HTTP_REST'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_POLL_GET'), ref_code_id('TASK_TYPE','POLL_READ'), ref_code_id('TASK_CATEGORY','ACQUIRE'), ref_code_id('TASK_DIRECTION','INBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), false, false, false, 'HTTP_REST POLL_READ 映射。', 'HTTP_REST POLL_READ mapping.'),
-(ref_code_id('PROTOCOL','HTTP_REST'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_POST'), ref_code_id('TASK_TYPE','WRITE_ONCE'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, false, true, 'HTTP_REST WRITE_ONCE 映射。', 'HTTP_REST WRITE_ONCE mapping.'),
-(ref_code_id('PROTOCOL','HTTP_REST'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_CONTROL'), ref_code_id('TASK_TYPE','CONTROL'), ref_code_id('TASK_CATEGORY','COMMAND'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, false, true, 'HTTP_REST CONTROL 映射。', 'HTTP_REST CONTROL mapping.'),
-(ref_code_id('PROTOCOL','HTTP_REST'), (SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_PUBLISH'), ref_code_id('TASK_TYPE','PUBLISH'), ref_code_id('TASK_CATEGORY','PUBLISH'), ref_code_id('TASK_DIRECTION','OUTBOUND'), ref_code_id('TASK_PROTOCOL_ROLE','CLIENT'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), false, false, false, 'HTTP_REST PUBLISH 映射。', 'HTTP_REST PUBLISH mapping.');
+INSERT INTO cfg_protocol_operation_role(protocol_operation_def_id, protocol_role_ref_id, point_table_usage_ref_id, requires_point_table, requires_write_value, requires_response_mapping, requires_confirm, description_zh, description_en) VALUES
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_READ'), ref_code_id('PROTOCOL_ROLE','MODBUS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'MODBUS READ_ONCE 组合。', 'MODBUS READ_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_POLL_READ'), ref_code_id('PROTOCOL_ROLE','MODBUS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'MODBUS POLL_READ 组合。', 'MODBUS POLL_READ combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_WRITE'), ref_code_id('PROTOCOL_ROLE','MODBUS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'MODBUS WRITE_ONCE 组合。', 'MODBUS WRITE_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MODBUS') AND operation_identifier='MODBUS_MODBUS_CONTROL'), ref_code_id('PROTOCOL_ROLE','MODBUS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'MODBUS CONTROL 组合。', 'MODBUS CONTROL combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_READ'), ref_code_id('PROTOCOL_ROLE','OPCUA_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'OPCUA READ_ONCE 组合。', 'OPCUA READ_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_POLL_READ'), ref_code_id('PROTOCOL_ROLE','OPCUA_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'OPCUA POLL_READ 组合。', 'OPCUA POLL_READ combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_SUBSCRIBE'), ref_code_id('PROTOCOL_ROLE','OPCUA_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, true, false, 'OPCUA SUBSCRIBE 组合。', 'OPCUA SUBSCRIBE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_WRITE'), ref_code_id('PROTOCOL_ROLE','OPCUA_CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'OPCUA WRITE_ONCE 组合。', 'OPCUA WRITE_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_CONTROL'), ref_code_id('PROTOCOL_ROLE','OPCUA_CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'OPCUA CONTROL 组合。', 'OPCUA CONTROL combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','OPCUA') AND operation_identifier='OPCUA_OPCUA_CALL_METHOD'), ref_code_id('PROTOCOL_ROLE','OPCUA_CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, false, 'OPCUA CALL_METHOD 组合。', 'OPCUA CALL_METHOD combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_READ'), ref_code_id('PROTOCOL_ROLE','ADS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'ADS READ_ONCE 组合。', 'ADS READ_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_POLL_READ'), ref_code_id('PROTOCOL_ROLE','ADS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'ADS POLL_READ 组合。', 'ADS POLL_READ combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_NOTIFICATION'), ref_code_id('PROTOCOL_ROLE','ADS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, true, false, 'ADS SUBSCRIBE 组合。', 'ADS SUBSCRIBE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_WRITE'), ref_code_id('PROTOCOL_ROLE','ADS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'ADS WRITE_ONCE 组合。', 'ADS WRITE_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','ADS') AND operation_identifier='ADS_ADS_CONTROL'), ref_code_id('PROTOCOL_ROLE','ADS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'ADS CONTROL 组合。', 'ADS CONTROL combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_INTERROGATION_MASTER'), ref_code_id('PROTOCOL_ROLE','IEC101_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'IEC101 READ_ONCE 组合。', 'IEC101 READ_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_PERIODIC_READ'), ref_code_id('PROTOCOL_ROLE','IEC101_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'IEC101 POLL_READ 组合。', 'IEC101 POLL_READ combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_RESPOND_INTERROGATION'), ref_code_id('PROTOCOL_ROLE','IEC101_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','SERVE_RESPONSE_SET'), true, false, true, false, 'IEC101 RESPOND_READ 组合。', 'IEC101 RESPOND_READ combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_SERVE_REPORT'), ref_code_id('PROTOCOL_ROLE','IEC101_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','REPORT_DATASET'), true, false, true, false, 'IEC101 SERVE_REPORT 组合。', 'IEC101 SERVE_REPORT combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_CLOCK_SYNC_ACCEPT'), ref_code_id('PROTOCOL_ROLE','IEC101_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'IEC101 WRITE_ONCE 服务端写入处理组合。', 'IEC101 WRITE_ONCE server-side write handler combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC101') AND operation_identifier='IEC101_IEC101_ACCEPT_CONTROL'), ref_code_id('PROTOCOL_ROLE','IEC101_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'IEC101 CONTROL 服务端控制处理组合。', 'IEC101 CONTROL server-side control handler combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_GENERAL_INTERROGATION'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'IEC104 发送站总召组合。', 'IEC104 send-general-interrogation combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_RECEIVE_MONITOR_DATA'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, true, false, 'IEC104 接收监视数据组合。', 'IEC104 receive-monitor-data combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_SETPOINT_COMMAND'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'IEC104 发送设点命令组合。', 'IEC104 send-setpoint-command combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_SINGLE_COMMAND'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'IEC104 发送单点遥控组合。', 'IEC104 send-single-command combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_DOUBLE_COMMAND'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'IEC104 发送双点遥控组合。', 'IEC104 send-double-command combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_CLOCK_SYNCHRONIZATION'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLING_STATION'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), false, false, false, true, 'IEC104 发送时钟同步组合。', 'IEC104 send-clock-synchronization combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_RESPOND_GENERAL_INTERROGATION'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','SERVE_RESPONSE_SET'), true, false, true, false, 'IEC104 响应站总召组合。', 'IEC104 respond-general-interrogation combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_CYCLIC_DATA'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','REPORT_DATASET'), true, false, true, false, 'IEC104 周期上送组合。', 'IEC104 cyclic-data combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_SPONTANEOUS_DATA'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','REPORT_DATASET'), true, false, true, false, 'IEC104 变化上送组合。', 'IEC104 spontaneous-data combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_SEND_BACKGROUND_DATA'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','REPORT_DATASET'), true, false, true, false, 'IEC104 背景上送组合。', 'IEC104 background-data combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_ACCEPT_SETPOINT_COMMAND'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'IEC104 接收设点命令组合。', 'IEC104 accept-setpoint-command combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_ACCEPT_SINGLE_COMMAND'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'IEC104 接收单点遥控组合。', 'IEC104 accept-single-command combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_ACCEPT_DOUBLE_COMMAND'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'IEC104 接收双点遥控组合。', 'IEC104 accept-double-command combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC104') AND operation_identifier='IEC104_ACCEPT_CLOCK_SYNCHRONIZATION'), ref_code_id('PROTOCOL_ROLE','IEC104_CONTROLLED_STATION'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), false, false, false, true, 'IEC104 接收时钟同步组合。', 'IEC104 accept-clock-synchronization combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_READ'), ref_code_id('PROTOCOL_ROLE','IEC61850_MMS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'IEC61850_MMS READ_ONCE 组合。', 'IEC61850_MMS READ_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_POLL_READ'), ref_code_id('PROTOCOL_ROLE','IEC61850_MMS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'IEC61850_MMS POLL_READ 组合。', 'IEC61850_MMS POLL_READ combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_REPORT'), ref_code_id('PROTOCOL_ROLE','IEC61850_MMS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, true, false, 'IEC61850_MMS SUBSCRIBE 组合。', 'IEC61850_MMS SUBSCRIBE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_WRITE'), ref_code_id('PROTOCOL_ROLE','IEC61850_MMS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'IEC61850_MMS WRITE_ONCE 组合。', 'IEC61850_MMS WRITE_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_MMS') AND operation_identifier='IEC61850_MMS_MMS_CONTROL'), ref_code_id('PROTOCOL_ROLE','IEC61850_MMS_CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'IEC61850_MMS CONTROL 组合。', 'IEC61850_MMS CONTROL combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_GOOSE') AND operation_identifier='IEC61850_GOOSE_GOOSE_SUBSCRIBE'), ref_code_id('PROTOCOL_ROLE','IEC61850_GOOSE_SUBSCRIBER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, true, false, 'IEC61850_GOOSE SUBSCRIBE 组合。', 'IEC61850_GOOSE SUBSCRIBE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_GOOSE') AND operation_identifier='IEC61850_GOOSE_GOOSE_PUBLISH'), ref_code_id('PROTOCOL_ROLE','IEC61850_GOOSE_PUBLISHER'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), true, false, false, false, 'IEC61850_GOOSE PUBLISH 组合。', 'IEC61850_GOOSE PUBLISH combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_SV') AND operation_identifier='IEC61850_SV_SV_SUBSCRIBE'), ref_code_id('PROTOCOL_ROLE','IEC61850_SV_SUBSCRIBER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, true, false, 'IEC61850_SV SUBSCRIBE 组合。', 'IEC61850_SV SUBSCRIBE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','IEC61850_SV') AND operation_identifier='IEC61850_SV_SV_PUBLISH'), ref_code_id('PROTOCOL_ROLE','IEC61850_SV_PUBLISHER'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), true, false, false, false, 'IEC61850_SV PUBLISH 组合。', 'IEC61850_SV PUBLISH combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MQTT') AND operation_identifier='MQTT_MQTT_SUBSCRIBE'), ref_code_id('PROTOCOL_ROLE','MQTT_SUBSCRIBER'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, true, false, 'MQTT SUBSCRIBE 组合。', 'MQTT SUBSCRIBE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','MQTT') AND operation_identifier='MQTT_MQTT_PUBLISH'), ref_code_id('PROTOCOL_ROLE','MQTT_PUBLISHER'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), true, false, false, false, 'MQTT PUBLISH 组合。', 'MQTT PUBLISH combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_GET'), ref_code_id('PROTOCOL_ROLE','HTTP_REST_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'HTTP_REST READ_ONCE 组合。', 'HTTP_REST READ_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_POLL_GET'), ref_code_id('PROTOCOL_ROLE','HTTP_REST_CLIENT'), ref_code_id('POINT_TABLE_USAGE','ACQUIRE_POINT_SET'), true, false, false, false, 'HTTP_REST POLL_READ 组合。', 'HTTP_REST POLL_READ combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_POST'), ref_code_id('PROTOCOL_ROLE','HTTP_REST_CLIENT'), ref_code_id('POINT_TABLE_USAGE','COMMAND_TARGET_SET'), true, true, false, true, 'HTTP_REST WRITE_ONCE 组合。', 'HTTP_REST WRITE_ONCE combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_CONTROL'), ref_code_id('PROTOCOL_ROLE','HTTP_REST_CLIENT'), ref_code_id('POINT_TABLE_USAGE','CONTROL_TARGET_SET'), true, true, false, true, 'HTTP_REST CONTROL 组合。', 'HTTP_REST CONTROL combination.'),
+((SELECT cfg_protocol_operation_def_id FROM cfg_protocol_operation_def WHERE protocol_ref_id=ref_code_id('PROTOCOL','HTTP_REST') AND operation_identifier='HTTP_REST_HTTP_PUBLISH'), ref_code_id('PROTOCOL_ROLE','HTTP_REST_CLIENT'), ref_code_id('POINT_TABLE_USAGE','PUBLISH_PAYLOAD_SET'), true, false, false, false, 'HTTP_REST PUBLISH 组合。', 'HTTP_REST PUBLISH combination.');
+
+-- 11. Centralized value domains
+INSERT INTO cfg_value_domain(domain_identifier,name_zh,name_en,data_type_ref_id,ref_code_type,description_zh,description_en) VALUES
+('TRIGGER_EVENT_ONLY','仅事件触发','Event only',ref_code_id('DATA_TYPE','STRING'),'TRIGGER_MODE','只允许 EVENT。','Allows EVENT only.'),
+('TRIGGER_SCHEDULED_ONLY','仅调度触发','Scheduled only',ref_code_id('DATA_TYPE','STRING'),'TRIGGER_MODE','只允许 SCHEDULED。','Allows SCHEDULED only.'),
+('TRIGGER_MANUAL_EVENT','手动或事件触发','Manual or event',ref_code_id('DATA_TYPE','STRING'),'TRIGGER_MODE','允许 MANUAL 或 EVENT。','Allows MANUAL or EVENT.'),
+('TRIGGER_ALL','全部任务触发方式','All task triggers',ref_code_id('DATA_TYPE','STRING'),'TRIGGER_MODE','允许 MANUAL、EVENT、SCHEDULED。','Allows MANUAL, EVENT, and SCHEDULED.'),
+('POINT_ROLE_READ','读取源点角色','Read-source role',ref_code_id('DATA_TYPE','STRING'),'TASK_POINT_ROLE','只允许 READ_SOURCE。','Allows READ_SOURCE only.'),
+('POINT_ROLE_WRITE','写入目标角色','Write-target role',ref_code_id('DATA_TYPE','STRING'),'TASK_POINT_ROLE','只允许 WRITE_TARGET。','Allows WRITE_TARGET only.'),
+('POINT_ROLE_CONTROL','控制目标角色','Control-target role',ref_code_id('DATA_TYPE','STRING'),'TASK_POINT_ROLE','只允许 CONTROL_TARGET。','Allows CONTROL_TARGET only.'),
+('POINT_ROLE_PUBLISH','发布字段角色','Publish-field role',ref_code_id('DATA_TYPE','STRING'),'TASK_POINT_ROLE','只允许 PUBLISH_FIELD。','Allows PUBLISH_FIELD only.'),
+('POINT_ROLE_REPORT','报告字段角色','Report-field role',ref_code_id('DATA_TYPE','STRING'),'TASK_POINT_ROLE','只允许 REPORT_FIELD。','Allows REPORT_FIELD only.'),
+('SAMPLE_EVENT_ONLY','仅事件采样','Event sample only',ref_code_id('DATA_TYPE','STRING'),'SAMPLE_MODE','只允许 EVENT。','Allows EVENT only.'),
+('SAMPLE_CYCLIC_ONLY','仅周期采样','Cyclic sample only',ref_code_id('DATA_TYPE','STRING'),'SAMPLE_MODE','只允许 CYCLIC。','Allows CYCLIC only.'),
+('SAMPLE_MANUAL_EVENT','手动或事件采样','Manual or event sample',ref_code_id('DATA_TYPE','STRING'),'SAMPLE_MODE','允许 MANUAL 或 EVENT。','Allows MANUAL or EVENT.'),
+('SAMPLE_ALL','全部采样方式','All sample modes',ref_code_id('DATA_TYPE','STRING'),'SAMPLE_MODE','允许 MANUAL、EVENT、CYCLIC。','Allows MANUAL, EVENT, and CYCLIC.'),
+('IEC104_MONITOR_TYPE_ID','IEC104监视类型','IEC104 monitor Type IDs',ref_code_id('DATA_TYPE','STRING'),'IEC104_TYPE_ID','允许任务使用的 IEC104 M_* 监视类型。','IEC104 M_* monitor Type IDs allowed in tasks.'),
+('IEC104_SETPOINT_TYPE_ID','IEC104设点类型','IEC104 setpoint Type IDs',ref_code_id('DATA_TYPE','STRING'),'IEC104_TYPE_ID','允许 C_SE_NA/NB/NC_1。','Allows C_SE_NA/NB/NC_1.'),
+('IEC104_SINGLE_COMMAND_TYPE_ID','IEC104单点命令类型','IEC104 single-command Type ID',ref_code_id('DATA_TYPE','STRING'),'IEC104_TYPE_ID','只允许 C_SC_NA_1。','Allows C_SC_NA_1 only.'),
+('IEC104_DOUBLE_COMMAND_TYPE_ID','IEC104双点命令类型','IEC104 double-command Type ID',ref_code_id('DATA_TYPE','STRING'),'IEC104_TYPE_ID','只允许 C_DC_NA_1。','Allows C_DC_NA_1 only.'),
+('ASDU_SEQUENCE_MODE','ASDU顺序地址模式','ASDU sequence mode',ref_code_id('DATA_TYPE','STRING'),NULL,'AUTO、SQ0、SQ1。','AUTO, SQ0, and SQ1.'),
+('QUALITY_HANDLING_MODE','质量处理方式','Quality handling mode',ref_code_id('DATA_TYPE','STRING'),NULL,'接收质量位处理方式。','Quality handling modes for received data.');
+
+INSERT INTO cfg_value_domain_item(cfg_value_domain_id,value_code,ref_code_id,name_zh,name_en,sort_order,description_zh,description_en)
+SELECT d.cfg_value_domain_id,r.code,r.ref_code_id,r.name_zh,r.name_en,r.sort_order,r.description_zh,r.description_en
+FROM cfg_value_domain d JOIN ref_code r ON
+ (d.domain_identifier='TRIGGER_EVENT_ONLY' AND r.ref_type='TRIGGER_MODE' AND r.code='EVENT') OR
+ (d.domain_identifier='TRIGGER_SCHEDULED_ONLY' AND r.ref_type='TRIGGER_MODE' AND r.code='SCHEDULED') OR
+ (d.domain_identifier='TRIGGER_MANUAL_EVENT' AND r.ref_type='TRIGGER_MODE' AND r.code IN ('MANUAL','EVENT')) OR
+ (d.domain_identifier='TRIGGER_ALL' AND r.ref_type='TRIGGER_MODE') OR
+ (d.domain_identifier='POINT_ROLE_READ' AND r.ref_type='TASK_POINT_ROLE' AND r.code='READ_SOURCE') OR
+ (d.domain_identifier='POINT_ROLE_WRITE' AND r.ref_type='TASK_POINT_ROLE' AND r.code='WRITE_TARGET') OR
+ (d.domain_identifier='POINT_ROLE_CONTROL' AND r.ref_type='TASK_POINT_ROLE' AND r.code='CONTROL_TARGET') OR
+ (d.domain_identifier='POINT_ROLE_PUBLISH' AND r.ref_type='TASK_POINT_ROLE' AND r.code='PUBLISH_FIELD') OR
+ (d.domain_identifier='POINT_ROLE_REPORT' AND r.ref_type='TASK_POINT_ROLE' AND r.code='REPORT_FIELD') OR
+ (d.domain_identifier='SAMPLE_EVENT_ONLY' AND r.ref_type='SAMPLE_MODE' AND r.code='EVENT') OR
+ (d.domain_identifier='SAMPLE_CYCLIC_ONLY' AND r.ref_type='SAMPLE_MODE' AND r.code='CYCLIC') OR
+ (d.domain_identifier='SAMPLE_MANUAL_EVENT' AND r.ref_type='SAMPLE_MODE' AND r.code IN ('MANUAL','EVENT')) OR
+ (d.domain_identifier='SAMPLE_ALL' AND r.ref_type='SAMPLE_MODE') OR
+ (d.domain_identifier='IEC104_MONITOR_TYPE_ID' AND r.ref_type='IEC104_TYPE_ID' AND EXISTS (SELECT 1 FROM cfg_iec104_type_def td JOIN ref_code tc ON tc.ref_code_id=td.type_category_ref_id WHERE td.type_id_ref_id=r.ref_code_id AND tc.code IN ('PROCESS_MONITOR','COUNTER_MONITOR','PROTECTION_MONITOR') AND td.point_registration_supported)) OR
+ (d.domain_identifier='IEC104_SETPOINT_TYPE_ID' AND r.ref_type='IEC104_TYPE_ID' AND r.code IN ('C_SE_NA_1','C_SE_NB_1','C_SE_NC_1')) OR
+ (d.domain_identifier='IEC104_SINGLE_COMMAND_TYPE_ID' AND r.ref_type='IEC104_TYPE_ID' AND r.code='C_SC_NA_1') OR
+ (d.domain_identifier='IEC104_DOUBLE_COMMAND_TYPE_ID' AND r.ref_type='IEC104_TYPE_ID' AND r.code='C_DC_NA_1');
+
+INSERT INTO cfg_value_domain_item(cfg_value_domain_id,value_code,name_zh,name_en,sort_order,description_zh,description_en)
+SELECT d.cfg_value_domain_id,v.value_code,v.name_zh,v.name_en,v.sort_order,v.description_zh,v.description_en
+FROM cfg_value_domain d JOIN (VALUES
+ ('ASDU_SEQUENCE_MODE','AUTO','自动','Auto',1,'驱动自动选择 SQ=0 或 SQ=1。','Driver selects SQ=0 or SQ=1.'),
+ ('ASDU_SEQUENCE_MODE','SQ0','显式地址','Explicit addresses',2,'每个信息对象携带 IOA。','Each information object carries an IOA.'),
+ ('ASDU_SEQUENCE_MODE','SQ1','顺序地址','Sequential addresses',3,'仅首个对象携带 IOA，后续地址连续递增。','Only the first object carries an IOA; later addresses are sequential.'),
+ ('QUALITY_HANDLING_MODE','ACCEPT_ALL','接受全部','Accept all',1,'接受全部质量状态并透传。','Accept and propagate all quality states.'),
+ ('QUALITY_HANDLING_MODE','REJECT_INVALID','拒绝无效质量','Reject invalid',2,'拒绝 invalid 数据。','Reject invalid data.'),
+ ('QUALITY_HANDLING_MODE','MARK_INVALID','标记无效质量','Mark invalid',3,'保留数据并标记为无效。','Keep data and mark it invalid.')
+) v(domain_identifier,value_code,name_zh,name_en,sort_order,description_zh,description_en)
+ON d.domain_identifier=v.domain_identifier;
+
+-- 12. Core field constraints for every mapping
+INSERT INTO cfg_task_field_constraint(cfg_protocol_operation_role_id,constrained_field_ref_id,cfg_value_domain_id,default_value_code,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,
+       ref_code_id('TASK_CONSTRAINT_FIELD','TRIGGER_MODE'),
+       d.cfg_value_domain_id,
+       CASE
+         WHEN op.operation_identifier='IEC104_SEND_BACKGROUND_DATA' THEN 'SCHEDULED'
+         WHEN op.operation_identifier IN (
+              'IEC104_RESPOND_GENERAL_INTERROGATION','IEC104_RECEIVE_MONITOR_DATA',
+              'IEC104_SEND_CYCLIC_DATA','IEC104_SEND_SPONTANEOUS_DATA',
+              'IEC104_ACCEPT_SETPOINT_COMMAND','IEC104_ACCEPT_SINGLE_COMMAND',
+              'IEC104_ACCEPT_DOUBLE_COMMAND','IEC104_ACCEPT_CLOCK_SYNCHRONIZATION'
+         ) THEN 'EVENT'
+         WHEN op.operation_identifier IN (
+              'IEC104_SEND_SETPOINT_COMMAND','IEC104_SEND_SINGLE_COMMAND','IEC104_SEND_DOUBLE_COMMAND'
+         ) THEN 'MANUAL'
+         WHEN op.operation_identifier IN (
+              'IEC104_SEND_GENERAL_INTERROGATION','IEC104_SEND_CLOCK_SYNCHRONIZATION'
+         ) THEN 'EVENT'
+         WHEN op.operation_identifier LIKE '%POLL%'
+           OR op.operation_identifier LIKE '%PUBLISH%' THEN 'SCHEDULED'
+         WHEN op.operation_identifier LIKE '%SUBSCRIBE%'
+           OR op.operation_identifier LIKE '%REPORT%'
+           OR op.operation_identifier LIKE '%NOTIFICATION%'
+           OR op.operation_identifier LIKE '%RESPOND%'
+           OR op.operation_identifier LIKE '%RECEIVE%'
+           OR op.operation_identifier LIKE '%ACCEPT%' THEN 'EVENT'
+         ELSE 'MANUAL'
+       END,
+       '该协议原生操作—协议角色组合允许的触发方式。',
+       'Allowed trigger mode for this protocol-operation and protocol-role combination.'
+FROM cfg_protocol_operation_role m
+JOIN cfg_protocol_operation_def op
+  ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+JOIN cfg_value_domain d
+  ON d.domain_identifier=CASE
+       WHEN op.operation_identifier='IEC104_SEND_BACKGROUND_DATA' THEN 'TRIGGER_SCHEDULED_ONLY'
+       WHEN op.operation_identifier IN (
+            'IEC104_RESPOND_GENERAL_INTERROGATION','IEC104_RECEIVE_MONITOR_DATA',
+            'IEC104_SEND_CYCLIC_DATA','IEC104_SEND_SPONTANEOUS_DATA',
+            'IEC104_ACCEPT_SETPOINT_COMMAND','IEC104_ACCEPT_SINGLE_COMMAND',
+            'IEC104_ACCEPT_DOUBLE_COMMAND','IEC104_ACCEPT_CLOCK_SYNCHRONIZATION'
+       ) THEN 'TRIGGER_EVENT_ONLY'
+       WHEN op.operation_identifier IN (
+            'IEC104_SEND_SETPOINT_COMMAND','IEC104_SEND_SINGLE_COMMAND','IEC104_SEND_DOUBLE_COMMAND'
+       ) THEN 'TRIGGER_MANUAL_EVENT'
+       WHEN op.operation_identifier IN (
+            'IEC104_SEND_GENERAL_INTERROGATION','IEC104_SEND_CLOCK_SYNCHRONIZATION'
+       ) THEN 'TRIGGER_ALL'
+       WHEN op.operation_identifier LIKE '%POLL%'
+         OR op.operation_identifier LIKE '%PUBLISH%' THEN 'TRIGGER_SCHEDULED_ONLY'
+       WHEN op.operation_identifier LIKE '%SUBSCRIBE%'
+         OR op.operation_identifier LIKE '%REPORT%'
+         OR op.operation_identifier LIKE '%NOTIFICATION%'
+         OR op.operation_identifier LIKE '%RESPOND%'
+         OR op.operation_identifier LIKE '%RECEIVE%'
+         OR op.operation_identifier LIKE '%ACCEPT%' THEN 'TRIGGER_EVENT_ONLY'
+       WHEN op.operation_identifier LIKE '%WRITE%'
+         OR op.operation_identifier LIKE '%CONTROL%'
+         OR op.operation_identifier LIKE '%COMMAND%'
+         OR op.operation_identifier LIKE '%METHOD%' THEN 'TRIGGER_MANUAL_EVENT'
+       ELSE 'TRIGGER_ALL'
+     END;
+
+INSERT INTO cfg_task_field_constraint(cfg_protocol_operation_role_id,constrained_field_ref_id,cfg_value_domain_id,default_value_code,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,ref_code_id('TASK_CONSTRAINT_FIELD','POINT_ROLE'),d.cfg_value_domain_id,
+       CASE u.code WHEN 'ACQUIRE_POINT_SET' THEN 'READ_SOURCE' WHEN 'COMMAND_TARGET_SET' THEN 'WRITE_TARGET' WHEN 'CONTROL_TARGET_SET' THEN 'CONTROL_TARGET' WHEN 'PUBLISH_PAYLOAD_SET' THEN 'PUBLISH_FIELD' ELSE 'REPORT_FIELD' END,
+       '该协议操作映射允许的任务点角色。','Allowed task-point roles for this protocol-operation mapping.'
+FROM cfg_protocol_operation_role m JOIN ref_code u ON u.ref_code_id=m.point_table_usage_ref_id
+JOIN cfg_value_domain d ON d.domain_identifier=CASE u.code WHEN 'ACQUIRE_POINT_SET' THEN 'POINT_ROLE_READ' WHEN 'COMMAND_TARGET_SET' THEN 'POINT_ROLE_WRITE' WHEN 'CONTROL_TARGET_SET' THEN 'POINT_ROLE_CONTROL' WHEN 'PUBLISH_PAYLOAD_SET' THEN 'POINT_ROLE_PUBLISH' ELSE 'POINT_ROLE_REPORT' END;
+
+INSERT INTO cfg_task_field_constraint(cfg_protocol_operation_role_id,constrained_field_ref_id,cfg_value_domain_id,default_value_code,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,ref_code_id('TASK_CONSTRAINT_FIELD','SAMPLE_MODE'),d.cfg_value_domain_id,
+       CASE td.domain_identifier WHEN 'TRIGGER_SCHEDULED_ONLY' THEN 'CYCLIC' WHEN 'TRIGGER_EVENT_ONLY' THEN 'EVENT' WHEN 'TRIGGER_MANUAL_EVENT' THEN 'MANUAL' ELSE 'MANUAL' END,
+       '该协议操作映射允许的任务点采样方式。','Allowed task-point sample modes for this protocol-operation mapping.'
+FROM cfg_protocol_operation_role m
+JOIN cfg_task_field_constraint tc ON tc.cfg_protocol_operation_role_id=m.cfg_protocol_operation_role_id
+JOIN ref_code f ON f.ref_code_id=tc.constrained_field_ref_id AND f.code='TRIGGER_MODE'
+JOIN cfg_value_domain td ON td.cfg_value_domain_id=tc.cfg_value_domain_id
+JOIN cfg_value_domain d ON d.domain_identifier=CASE td.domain_identifier WHEN 'TRIGGER_SCHEDULED_ONLY' THEN 'SAMPLE_CYCLIC_ONLY' WHEN 'TRIGGER_EVENT_ONLY' THEN 'SAMPLE_EVENT_ONLY' WHEN 'TRIGGER_MANUAL_EVENT' THEN 'SAMPLE_MANUAL_EVENT' ELSE 'SAMPLE_ALL' END;
+
+INSERT INTO cfg_task_field_constraint(cfg_protocol_operation_role_id,constrained_field_ref_id,cfg_value_domain_id,default_value_code,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,ref_code_id('TASK_CONSTRAINT_FIELD','PROTOCOL_TYPE_ID'),d.cfg_value_domain_id,
+       (SELECT value_code FROM cfg_value_domain_item WHERE cfg_value_domain_id=d.cfg_value_domain_id ORDER BY sort_order,value_code LIMIT 1),
+       'IEC104 操作允许的 Type ID。','IEC104 Type IDs allowed by the operation.'
+FROM cfg_protocol_operation_role m JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+JOIN cfg_value_domain d ON d.domain_identifier=CASE
+ WHEN op.operation_identifier IN ('IEC104_SEND_SETPOINT_COMMAND','IEC104_ACCEPT_SETPOINT_COMMAND') THEN 'IEC104_SETPOINT_TYPE_ID'
+ WHEN op.operation_identifier IN ('IEC104_SEND_SINGLE_COMMAND','IEC104_ACCEPT_SINGLE_COMMAND') THEN 'IEC104_SINGLE_COMMAND_TYPE_ID'
+ WHEN op.operation_identifier IN ('IEC104_SEND_DOUBLE_COMMAND','IEC104_ACCEPT_DOUBLE_COMMAND') THEN 'IEC104_DOUBLE_COMMAND_TYPE_ID'
+ ELSE 'IEC104_MONITOR_TYPE_ID' END
+WHERE op.protocol_ref_id=ref_code_id('PROTOCOL','IEC104')
+  AND op.operation_identifier NOT IN ('IEC104_SEND_CLOCK_SYNCHRONIZATION','IEC104_ACCEPT_CLOCK_SYNCHRONIZATION');
+
+-- 13. Task parameter definitions
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,cfg_value_domain_id,required,default_value,numeric_min,numeric_max,text_pattern,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,'schedule_expression','调度表达式','Schedule expression',ref_code_id('DATA_TYPE','STRING'),NULL,NULL,false,NULL,NULL,NULL,'^(rate[(][1-9][0-9]*(ms|s|m|h)[)]|cron[(].+[)])$','仅 SCHEDULED 任务必填；支持 rate(5s) 或 cron(...)。','Required only for SCHEDULED tasks; supports rate(5s) or cron(...).'
+FROM cfg_protocol_operation_role m
+JOIN cfg_task_field_constraint fc ON fc.cfg_protocol_operation_role_id=m.cfg_protocol_operation_role_id
+JOIN ref_code f ON f.ref_code_id=fc.constrained_field_ref_id AND f.code='TRIGGER_MODE'
+WHERE m.enabled
+  AND EXISTS (
+      SELECT 1 FROM cfg_value_domain_item di
+      WHERE di.cfg_value_domain_id=fc.cfg_value_domain_id
+        AND di.value_code='SCHEDULED'
+        AND di.enabled=TRUE AND di.valid_to IS NULL
+  );
+
+INSERT INTO cfg_task_param_dependency_rule(target_task_param_def_id,condition_field_ref_id,condition_operator_ref_id,condition_value_code,rule_action_ref_id,description_zh,description_en)
+SELECT d.task_param_def_id,ref_code_id('TASK_CONSTRAINT_FIELD','TRIGGER_MODE'),ref_code_id('VALIDATION_OPERATOR','EQUALS'),'SCHEDULED',ref_code_id('PARAM_RULE_ACTION','REQUIRED'),'调度任务必须配置 schedule_expression。','Scheduled tasks require schedule_expression.'
+FROM task_param_def d WHERE d.param_identifier='schedule_expression';
+
+-- IEC104 common ASDU batching parameters for server responses and active transmissions
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,cfg_value_domain_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,v.param_identifier,v.name_zh,v.name_en,v.data_type_ref_id,v.unit_id,v.domain_id,v.required,v.default_value,v.numeric_min,v.numeric_max,v.description_zh,v.description_en
+FROM cfg_protocol_operation_role m JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+CROSS JOIN LATERAL (VALUES
+ ('max_objects_per_asdu','每ASDU最大对象数','Maximum objects per ASDU',ref_code_id('DATA_TYPE','INT32'),NULL::BIGINT,NULL::BIGINT,false,'40',1::NUMERIC,127::NUMERIC,'单个 ASDU 最大信息对象数。','Maximum information objects in one ASDU.'),
+ ('sequence_mode','顺序地址模式','Sequence address mode',ref_code_id('DATA_TYPE','STRING'),NULL,(SELECT cfg_value_domain_id FROM cfg_value_domain WHERE domain_identifier='ASDU_SEQUENCE_MODE'),false,'AUTO',NULL,NULL,'AUTO、SQ0 或 SQ1。','AUTO, SQ0, or SQ1.')
+) v(param_identifier,name_zh,name_en,data_type_ref_id,unit_id,domain_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+WHERE op.operation_identifier IN ('IEC104_RESPOND_GENERAL_INTERROGATION','IEC104_SEND_CYCLIC_DATA','IEC104_SEND_SPONTANEOUS_DATA','IEC104_SEND_BACKGROUND_DATA');
+
+-- Station interrogation parameters
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,cfg_value_domain_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,v.* FROM cfg_protocol_operation_role m JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+CROSS JOIN (VALUES
+ ('startdt_required','执行前要求STARTDT','Require STARTDT',ref_code_id('DATA_TYPE','BOOL'),NULL::BIGINT,NULL::BIGINT,false,'true',NULL::NUMERIC,NULL::NUMERIC,'执行召唤前要求数据传输已启动。','Require STARTDT before interrogation.'),
+ ('wait_activation_confirmation','等待激活确认','Wait activation confirmation',ref_code_id('DATA_TYPE','BOOL'),NULL,NULL,false,'true',NULL,NULL,'等待 activation confirmation。','Wait for activation confirmation.'),
+ ('wait_activation_termination','等待激活终止','Wait activation termination',ref_code_id('DATA_TYPE','BOOL'),NULL,NULL,false,'true',NULL,NULL,'等待 activation termination；总流程超时使用 task.timeout_ms。','Wait for activation termination; the overall timeout is task.timeout_ms.')
+) v(param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,cfg_value_domain_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+WHERE op.operation_identifier IN ('IEC104_SEND_GENERAL_INTERROGATION');
+
+
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,required,default_value,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,v.* FROM cfg_protocol_operation_role m JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+CROSS JOIN (VALUES
+ ('send_activation_confirmation','发送激活确认','Send activation confirmation',ref_code_id('DATA_TYPE','BOOL'),false,'true','数据发送前返回激活确认。','Send activation confirmation before data.'),
+ ('send_activation_termination','发送激活终止','Send activation termination',ref_code_id('DATA_TYPE','BOOL'),false,'true','响应结束后返回激活终止。','Send activation termination after data.')
+) v(param_identifier,name_zh,name_en,data_type_ref_id,required,default_value,description_zh,description_en)
+WHERE op.operation_identifier IN ('IEC104_RESPOND_GENERAL_INTERROGATION');
+
+-- Controlled-station monitor-data tasks
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,'period_ms','背景刷新间隔','Background transmission period',ref_code_id('DATA_TYPE','INT32'),ref_code_id('UNIT','MS'),true,'60000',1,NULL,'背景上送间隔。','Background transmission interval.'
+FROM cfg_protocol_operation_role m JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id WHERE op.operation_identifier='IEC104_SEND_BACKGROUND_DATA';
+
+-- Controlling-station receive parameters
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,cfg_value_domain_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,v.* FROM cfg_protocol_operation_role m JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+CROSS JOIN (VALUES
+ ('accept_cyclic','接收周期数据','Accept cyclic data',ref_code_id('DATA_TYPE','BOOL'),NULL::BIGINT,NULL::BIGINT,false,'true',NULL::NUMERIC,NULL::NUMERIC,'是否接收 COT=CYCLIC 的监视数据。','Whether to accept monitor data with COT=CYCLIC.'),
+ ('accept_spontaneous','接收变化数据','Accept spontaneous data',ref_code_id('DATA_TYPE','BOOL'),NULL,NULL,false,'true',NULL,NULL,'是否接收 COT=SPONTANEOUS 的监视数据。','Whether to accept monitor data with COT=SPONTANEOUS.'),
+ ('accept_background','接收背景数据','Accept background data',ref_code_id('DATA_TYPE','BOOL'),NULL,NULL,false,'true',NULL,NULL,'是否接收 COT=BACKGROUND 的监视数据。','Whether to accept monitor data with COT=BACKGROUND.'),
+ ('accept_interrogated','接收召唤响应数据','Accept interrogation-response data',ref_code_id('DATA_TYPE','BOOL'),NULL,NULL,false,'true',NULL,NULL,'是否接收站总召和组召响应监视数据。','Whether to accept station/group interrogation-response monitor data.'),
+ ('deduplicate','去重','Deduplicate',ref_code_id('DATA_TYPE','BOOL'),NULL,NULL,false,'true',NULL,NULL,'按 CA、IOA、Type ID、时标和值去重。','Deduplicate by CA, IOA, Type ID, timestamp, and value.'),
+ ('stale_timeout_ms','数据陈旧超时','Stale timeout',ref_code_id('DATA_TYPE','INT32'),ref_code_id('UNIT','MS'),NULL,false,'60000',1,NULL,'未刷新超过此时间标记陈旧。','Mark data stale after this interval.'),
+ ('quality_handling','质量处理策略','Quality handling',ref_code_id('DATA_TYPE','STRING'),NULL,(SELECT cfg_value_domain_id FROM cfg_value_domain WHERE domain_identifier='QUALITY_HANDLING_MODE'),false,'MARK_INVALID',NULL,NULL,'质量描述符处理策略。','Quality-descriptor handling policy.')
+) v(param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,cfg_value_domain_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+WHERE op.operation_identifier='IEC104_RECEIVE_MONITOR_DATA';
+
+-- Command parameters: controlling-station send and controlled-station accept semantics are defined separately.
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,v.*
+FROM cfg_protocol_operation_role m
+JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+CROSS JOIN (VALUES
+ ('select_before_operate','选择后执行','Select before operate',ref_code_id('DATA_TYPE','BOOL'),NULL::BIGINT,false,'false',NULL::NUMERIC,NULL::NUMERIC,'是否采用选择后执行；命令总超时使用 task.timeout_ms。','Whether to use select-before-operate; command timeout is task.timeout_ms.'),
+ ('wait_activation_confirmation','等待激活确认','Wait activation confirmation',ref_code_id('DATA_TYPE','BOOL'),NULL,false,'true',NULL,NULL,'是否等待对端激活确认。','Whether to wait for peer activation confirmation.'),
+ ('wait_activation_termination','等待激活终止','Wait activation termination',ref_code_id('DATA_TYPE','BOOL'),NULL,false,'true',NULL,NULL,'是否等待对端激活终止。','Whether to wait for peer activation termination.'),
+ ('readback_verify','回读校验','Readback verification',ref_code_id('DATA_TYPE','BOOL'),NULL,false,'false',NULL,NULL,'是否执行显式反馈点回读；默认关闭。','Whether to verify an explicitly mapped feedback point; disabled by default.')
+) v(param_identifier,name_zh,name_en,data_type_ref_id,engineering_unit_ref_id,required,default_value,numeric_min,numeric_max,description_zh,description_en)
+WHERE op.operation_identifier IN ('IEC104_SEND_SETPOINT_COMMAND','IEC104_SEND_SINGLE_COMMAND','IEC104_SEND_DOUBLE_COMMAND');
+
+INSERT INTO task_param_def(cfg_protocol_operation_role_id,param_identifier,name_zh,name_en,data_type_ref_id,required,default_value,description_zh,description_en)
+SELECT m.cfg_protocol_operation_role_id,v.*
+FROM cfg_protocol_operation_role m
+JOIN cfg_protocol_operation_def op ON op.cfg_protocol_operation_def_id=m.protocol_operation_def_id
+CROSS JOIN (VALUES
+ ('require_select_before_operate','要求选择后执行','Require select before operate',ref_code_id('DATA_TYPE','BOOL'),false,'false','是否拒绝未经过选择阶段的执行命令。','Whether to reject execute commands without a preceding select phase.'),
+ ('send_activation_confirmation','发送激活确认','Send activation confirmation',ref_code_id('DATA_TYPE','BOOL'),false,'true','是否向控制站返回激活确认。','Whether to send activation confirmation to the controlling station.'),
+ ('send_activation_termination','发送激活终止','Send activation termination',ref_code_id('DATA_TYPE','BOOL'),false,'true','是否在命令处理完成后返回激活终止。','Whether to send activation termination after command processing.')
+) v(param_identifier,name_zh,name_en,data_type_ref_id,required,default_value,description_zh,description_en)
+WHERE op.operation_identifier IN ('IEC104_ACCEPT_SETPOINT_COMMAND','IEC104_ACCEPT_SINGLE_COMMAND','IEC104_ACCEPT_DOUBLE_COMMAND');
 
 COMMIT;
