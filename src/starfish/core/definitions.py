@@ -38,7 +38,7 @@ class PointItemDefinition:
 
 @dataclass(frozen=True)
 class TaskDefinition:
-    """一个 connection 下的 Starfish 启动相关 task 定义。"""
+    """一个 connection 下的协议原生 task 定义。"""
 
     task_id: int
     task_identifier: str
@@ -46,6 +46,9 @@ class TaskDefinition:
     task_status: str
     params: dict[str, Any] = field(default_factory=dict)
     point_item_ids: tuple[int, ...] = ()
+    task_role: str = ""
+    task_point_table_id: int | None = None
+    point_roles: dict[int, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -75,6 +78,7 @@ class ServerDefinition:
     point_items: tuple[PointItemDefinition, ...] = ()
     capabilities: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
+    station_role: str = ""
 
 
 @dataclass(frozen=True)

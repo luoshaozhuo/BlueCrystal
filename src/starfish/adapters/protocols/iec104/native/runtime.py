@@ -44,9 +44,7 @@ def native_runner_env(binary_path: Path) -> dict[str, str]:
 
     if lib_dirs:
         existing = env.get("LD_LIBRARY_PATH", "")
-        env["LD_LIBRARY_PATH"] = ":".join(
-            lib_dirs + ([existing] if existing else [])
-        )
+        env["LD_LIBRARY_PATH"] = ":".join(lib_dirs + ([existing] if existing else []))
 
     return env
 
@@ -84,16 +82,18 @@ def probe_native_binary(
         )
         merged_output = f"{result.stdout}\n{result.stderr}"
         if "not found" in merged_output:
-            missing = sorted({
-                line.strip().split("=>", 1)[0].strip()
-                for line in merged_output.splitlines()
-                if "not found" in line
-            })
-            return False, (
-                f"{display_name} binary 缺少动态库依赖: {', '.join(missing)}"
+            missing = sorted(
+                {
+                    line.strip().split("=>", 1)[0].strip()
+                    for line in merged_output.splitlines()
+                    if "not found" in line
+                }
             )
+            return False, (f"{display_name} binary 缺少动态库依赖: {', '.join(missing)}")
 
     return True, f"{display_name} binary 可用: {binary_path} ({st.st_size} bytes)"
+
+
 __all__ = [
     "native_runner_env",
     "probe_native_binary",

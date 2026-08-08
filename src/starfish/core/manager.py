@@ -118,8 +118,7 @@ class StarfishServerManager:
             server = self._servers[int(connection_id)]
             return {int(connection_id): _status_dict(server)}
         return {
-            connection_id: _status_dict(server)
-            for connection_id, server in self._servers.items()
+            connection_id: _status_dict(server) for connection_id, server in self._servers.items()
         }
 
     def health(self, connection_id: int | None = None) -> dict[str, Any]:

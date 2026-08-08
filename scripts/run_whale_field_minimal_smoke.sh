@@ -13,7 +13,7 @@
 # 如 TDengine/Pulsar/HDFS 镜像不可稳定运行，输出 environment-pending 预检信息。
 #
 # 测试阶段：跨模块联调期验证（含配置检查）
-# 环境依赖: Python 3.11+, Kafka broker (可选)
+# 环境依赖: CPython 3.13, Kafka broker (可选)
 # =============================================================================
 
 set -euo pipefail
@@ -126,10 +126,11 @@ check_port() {
     else
         if $DRY_RUN; then
             log_pending "$label ($host:$port) 不可连接 (dry-run 模式)"
+            return 0
         else
             log_fail "$label ($host:$port) 不可连接"
+            return 1
         fi
-        return 1
     fi
 }
 
@@ -163,10 +164,10 @@ main() {
 
     # Python 版本检查
     python_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    if [[ "$(python3 -c 'import sys; print(sys.version_info >= (3, 11))')" == "True" ]]; then
-        log_pass "Python 版本 $python_version >= 3.11"
+    if [[ "$(python3 -c 'import sys; print(sys.implementation.name == "cpython" and sys.version_info[:2] == (3, 13))')" == "True" ]]; then
+        log_pass "Python 版本 $python_version = CPython 3.13"
     else
-        log_fail "Python 版本 $python_version < 3.11，需要 >= 3.11"
+        log_fail "Python 版本 $python_version 不符合项目基线，需要 CPython 3.13"
     fi
 
     # Python 核心依赖

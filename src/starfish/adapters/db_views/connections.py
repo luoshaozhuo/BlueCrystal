@@ -26,15 +26,11 @@ class ConnectionDbViewLoader:
     def list_connection_ids(self) -> list[int]:
         """按 connection_id 排序返回执行视图中的全部 connection。"""
         with self._engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    """
+            rows = conn.execute(text("""
                     SELECT connection_id
                     FROM whale.vw_connection_object_full
                     ORDER BY connection_id
-                    """
-                )
-            ).mappings()
+                    """)).mappings()
             return [int(row["connection_id"]) for row in rows]
 
     def load_protocols(self, connection_ids: Sequence[int]) -> dict[int, str]:
@@ -43,30 +39,23 @@ class ConnectionDbViewLoader:
         if not normalized_ids:
             raise DbViewLoadError("connection_ids 不能为空")
 
-        stmt = text(
-            """
+        stmt = text("""
             SELECT connection_id, protocol
             FROM whale.vw_connection_object_full
             WHERE connection_id IN :connection_ids
             ORDER BY connection_id
-            """
-        ).bindparams(bindparam("connection_ids", expanding=True))
+            """).bindparams(bindparam("connection_ids", expanding=True))
         with self._engine.connect() as conn:
-            rows = list(
-                conn.execute(stmt, {"connection_ids": normalized_ids}).mappings()
-            )
+            rows = list(conn.execute(stmt, {"connection_ids": normalized_ids}).mappings())
 
         protocols = {
-            int(row["connection_id"]): _normalize_protocol(row.get("protocol"))
-            for row in rows
+            int(row["connection_id"]): _normalize_protocol(row.get("protocol")) for row in rows
         }
         missing = sorted(set(normalized_ids) - protocols.keys())
         if missing:
             raise DbViewLoadError(f"未找到 connection_id: {missing}")
         empty_protocol = sorted(
-            connection_id
-            for connection_id, protocol in protocols.items()
-            if not protocol
+            connection_id for connection_id, protocol in protocols.items() if not protocol
         )
         if empty_protocol:
             raise DbViewLoadError(f"connection protocol 为空: {empty_protocol}")

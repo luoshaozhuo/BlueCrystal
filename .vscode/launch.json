@@ -1,0 +1,43 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Starfish",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "starfish",
+            "args": [
+                "run",
+                "-id",
+                "1001"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal", // Use the integrated terminal for input/output
+            "justMyCode": false, // Debug all code, not just user code
+            "env": {
+                "WHALE_DB_URL": "${env:WHALE_DB_URL}"
+            }
+        },
+        {
+            "name": "Debug Current Python File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Debug Current Pytest File",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["${file}", "-v"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ]
+}

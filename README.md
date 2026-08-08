@@ -28,6 +28,19 @@ mypy src/
 pytest
 ```
 
+项目 Python 运行基线为 CPython 3.13（`>=3.13,<3.14`）。启用 Starfish
+IEC104 runtime 时安装可选依赖：
+
+```bash
+pip install -e ".[dev,iec104]"
+```
+
+`iec104` extra 包含 GPLv3 许可的 `c104==2.2.1`；分发包含该二进制扩展的
+制品前需单独完成 GPLv3 合规审查。
+
+Starfish IEC104 的当前验证基线为 BlueCrystal（CPython 3.13.14）及
+`c104==2.2.1` 的 CPython 3.13 native wheel。
+
 ## 编码规范
 - PEP 8标准
 - Black格式化（行宽100）

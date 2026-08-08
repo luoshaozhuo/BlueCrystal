@@ -6,9 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "bluecrystal"
 version = "0.1.0"
 description = "智慧能源平台"
-authors = [{ name = "Bors" }]
+authors = [{ name = "LuoSZ" }]
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "APScheduler>=3.11,<4.0",
     "alembic>=1.18,<2.0",
@@ -41,6 +41,11 @@ dev = [
     "testcontainers[kafka]>=4.13,<5.0",
     "types-PyYAML>=6.0,<7.0",
 ]
+# IEC104 runtime 使用 GPLv3 的 c104 二进制扩展，仅在明确启用 Starfish
+# IEC104 功能的环境安装，避免将许可与二进制依赖扩散到全部部署。
+iec104 = [
+    "c104==2.2.1",
+]
 s3 = [
     "boto3>=1.35,<2.0",
 ]
@@ -66,14 +71,14 @@ where = ["src"]
 
 [tool.black]
 line-length = 100
-target-version = ["py311"]
+target-version = ["py313"]
 
 [tool.isort]
 profile = "black"
 line_length = 100
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 mypy_path = "src"
 # 排除 src/whale/：该子包已在 __init__.py 显式声明为 skeleton，
 # 依赖尚未实现的 whale.models（见 src/whale/processing/__init__.py 、

@@ -67,9 +67,7 @@ def build_server_manager_from_db(
             )
         definitions.extend(loader_factory(db_url).load(protocol_connection_ids))
 
-    definitions_by_id = {
-        definition.connection_id: definition for definition in definitions
-    }
+    definitions_by_id = {definition.connection_id: definition for definition in definitions}
     missing_definitions = sorted(set(normalized_ids) - definitions_by_id.keys())
     if missing_definitions:
         raise DbViewLoadError(

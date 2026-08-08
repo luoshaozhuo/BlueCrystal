@@ -21,7 +21,7 @@ ingest -> Kafka -> speed_layer -> S3/TDengine/Redis
 | --- | --- | --- |
 | Docker | 24.0+ | 用于运行外部依赖容器 |
 | Docker Compose | v2 | `docker compose` 子命令或 `docker-compose` |
-| Python | 3.11+ | 运行 Whale 所有模块 |
+| Python | CPython 3.13 | 项目运行基线；当前不支持 3.14 |
 | pip | 23.0+ | 依赖安装 |
 
 ## 快速启动
@@ -54,10 +54,31 @@ docker compose -f deploy/whale/message_pipeline/docker-compose.whale-l5.yaml ps
 ### 4. 安装 Python 驱动
 
 ```bash
-pip install -e ".[dev,s3,redis]"
+pip install -e ".[dev,s3]"
 # 如果使用 TDengine 原生驱动（可选，默认使用 REST API）
 # pip install taos-ws-py
 ```
+
+Starfish IEC104 runtime 需要单独启用：
+
+```bash
+pip install -e ".[dev,iec104]"
+```
+
+`iec104` extra 固定使用 `c104==2.2.1`。该扩展及其 lib60870-C 依赖采用
+GPLv3；构建或分发包含该 extra 的镜像/安装包前，必须完成相应许可合规审查。
+
+### Whale ingest 镜像状态
+
+当前 ingest Dockerfile 已使用 Python 3.13。真实构建已通过，镜像中未发现
+CPython 3.14 字节码，因此 Python 3.13 构建基线本身已验证。
+
+但镜像默认入口 `python -m whale.ingest.runtime.entrypoint` 目前仍不能完成
+运行启动。Git 历史中的 `9bbc3dc` 删除了原有分模块 runtime ORM 文件，而当前
+`src/` 中仍有 20 多个路径引用这些旧 ORM 模块或导出，入口在导入阶段失败。
+这是本轮 Python/Starfish 变更之前已经存在的 Whale ORM 迁移阻塞，不能通过
+简单补环境变量或 `export` 修复；因此只能记录“镜像构建通过”，不得记录
+“Whale ingest 镜像运行闭环通过”。
 
 ### 5. 一键预检验证
 

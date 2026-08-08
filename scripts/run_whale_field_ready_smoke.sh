@@ -13,7 +13,7 @@
 #   bash scripts/run_whale_field_ready_smoke.sh --json              # JSON 输出
 #   bash scripts/run_whale_field_ready_smoke.sh --skip-tests        # 跳过测试，仅环境检查
 #
-# 环境依赖: Docker (for compose ps), Python 3.11+, pytest
+# 环境依赖: Docker (for compose ps), CPython 3.13, pytest
 # 测试阶段：准生产依赖验证期（E2E/field） + 跨模块联调期验证
 #
 # 已知 env-pending: Pulsar (6650) / Flink (8081) / HDFS (9870)

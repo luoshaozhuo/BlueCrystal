@@ -80,3 +80,6 @@ logs/
 # local cache
 /.mypy_cache/
 /.ruff_cache/
+
+# test files
+/tests/

@@ -1,10 +1,18 @@
 """starfish CLI 入口 —— 通过 Whale DB view 启动 Starfish simulator。
 
+安装：
+
+```bash
+conda activate <bluecrystal_env>
+cd <bluecrystal_project_root>
+pip install -e . ".[iec104]"
+```
+
 使用方式：
 
 ```text
-python -m starfish run -id 1001
-python -m starfish run -a --duration 30
+starfish run -id 1001
+starfish run -a --duration 30
 ```
 
 模块职责：
@@ -21,8 +29,8 @@ python -m starfish run -a --duration 30
 
 不负责：
 - 替代 pytest。
-- 生产数据写入、落库或生产链路编排；server 数据更新由 Seahorse 负责。
-- IEC104 frame 编解码实现（由 native runner 负责）。
+- 持久化模拟值、生产数据写入、落库或生产链路编排。
+- IEC104 frame 编解码实现（由延迟加载的 c104 runtime 负责）。
 """
 
 from __future__ import annotations
@@ -34,7 +42,6 @@ from typing import Annotated
 
 import typer
 import typer.main
-from click.exceptions import Exit as ClickExit
 from click.exceptions import UsageError as ClickUsageError
 from typer._click.exceptions import UsageError as TyperUsageError
 
@@ -45,13 +52,12 @@ from starfish.composition import (
 )
 from starfish.core import StarfishServerManager
 
-
 _PROG_NAME = "starfish"
 
 app = typer.Typer(
     name=_PROG_NAME,
     help="Starfish 多协议 simulator 运行 CLI",
-    no_args_is_help=False,
+    no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
@@ -109,10 +115,6 @@ def main(argv: list[str]) -> int:
             prog_name=_PROG_NAME,
             standalone_mode=False,
         )
-    except ClickExit as exc:
-        if exc.exit_code == 0:
-            return 0
-        raise SystemExit(exc.exit_code) from None
     except (ClickUsageError, TyperUsageError) as exc:
         print(exc.format_message(), file=sys.stderr)
         raise SystemExit(exc.exit_code) from None
@@ -122,17 +124,7 @@ def main(argv: list[str]) -> int:
 
 @app.callback()
 def cli(ctx: typer.Context) -> None:
-    """保持 `python -m starfish` 的显式子命令解析边界。
-
-    Args:
-        ctx: Typer/Click 当前解析上下文。
-
-    Raises:
-        typer.Exit: 未提供子命令时以解析错误退出，避免误触发 manager 加载。
-    """
-    if ctx.invoked_subcommand is None:
-        print(ctx.get_help(), file=sys.stderr)
-        raise typer.Exit(2)
+    """Starfish CLI 根命令组。"""
 
 
 def _selected_manager_count(manager: StarfishServerManager) -> int:
@@ -206,4 +198,6 @@ def run_command(
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    # 支持通过 `python -m starfish ...` 启动 CLI。
+    # `starfish run ...` 由 pyproject.toml 注册的 console script 直接调用 app。
+    sys.exit(main(sys.argv[1:])) 

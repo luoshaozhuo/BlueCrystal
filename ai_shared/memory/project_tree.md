@@ -7,7 +7,7 @@
 
 ## 1. 扫描口径
 
-本次扫描当前磁盘中的 4784 个文件，纳入文件级导航 1043 个，省略 3741 个。纳入范围包括未提交和未跟踪文件，因此目录树反映当前工作区，而不是仅反映 Git HEAD。
+本次扫描当前磁盘中的 4788 个文件，纳入文件级导航 1047 个，省略 3741 个。纳入范围包括未提交和未跟踪文件，因此目录树反映当前工作区，而不是仅反映 Git HEAD。
 
 ### 1.1 纳入文件分布
 
@@ -15,6 +15,7 @@
 |---|---:|
 | `.claude` | 5 |
 | `.codex` | 5 |
+| `.dockerignore` | 1 |
 | `.gitignore` | 1 |
 | `.mcp.json` | 1 |
 | `.vscode` | 1 |
@@ -30,20 +31,20 @@
 | `pyproject.toml` | 1 |
 | `scripts` | 29 |
 | `src` | 660 |
-| `tests` | 230 |
+| `tests` | 233 |
 
 主要文件类型：
 
 | 类型 | 文件数 |
 |---|---:|
-| `.py` | 642 |
+| `.py` | 645 |
 | `.ts` | 131 |
 | `.md` | 90 |
 | `.vue` | 73 |
 | `.yaml` | 36 |
 | `.sh` | 25 |
 | `.json` | 9 |
-| `[无扩展名]` | 6 |
+| `[无扩展名]` | 7 |
 | `.toml` | 5 |
 | `.sql` | 4 |
 | `.example` | 3 |
@@ -94,6 +95,7 @@ BlueCrystal/
 │   │   └── test-validator.toml  # 配置：test-validator.toml
 │   ├── config.toml  # 配置：config.toml
 │   └── hooks.json  # 配置：hooks.json
+├── .dockerignore  # Docker 构建上下文缓存与字节码忽略规则
 ├── .vscode/  # VS Code 工作区配置
 │   └── settings.json  # 配置：settings.json
 ├── ai_shared/  # 共享规则、技能、记忆、报告与模板
@@ -761,7 +763,7 @@ BlueCrystal/
 │   │   │   ├── db_views/
 │   │   │   │   ├── iec104/
 │   │   │   │   │   ├── __init__.py  # IEC104 DB view adapter
-│   │   │   │   │   └── loader.py  # IEC104 simulator 的 Whale DB view loader
+│   │   │   │   │   └── loader.py  # IEC104 connection/task/member/point view loader
 │   │   │   │   ├── __init__.py  # DB view outbound adapters
 │   │   │   │   ├── connections.py  # Whale connection 执行视图的通用索引 loader
 │   │   │   │   └── errors.py  # DB view adapter 错误边界
@@ -772,9 +774,9 @@ BlueCrystal/
 │   │   │   │   │   │   │   └── iec104_simulator_server.c  # C 源码：iec104 simulator server
 │   │   │   │   │   │   ├── __init__.py  # IEC104 native runner 资源与启动辅助
 │   │   │   │   │   │   └── runtime.py  # starfish native runner 启动辅助
-│   │   │   │   │   ├── __init__.py  # IEC104 protocol server adapter
-│   │   │   │   │   ├── backend.py  # Starfish IEC 60870-5-104 协议 backend —— 依赖 lib60870 C runner
-│   │   │   │   │   └── server.py  # IEC104 Starfish server worker
+│   │   │   │   │   ├── __init__.py  # IEC104 c104 adapter 对外入口
+│   │   │   │   │   ├── backend.py  # iec104-python 双角色 runtime 与 point/task API
+│   │   │   │   │   └── server.py  # IEC104 connection worker 与稳定委托接口
 │   │   │   │   ├── __init__.py  # Protocol server outbound adapters
 │   │   │   │   └── factory.py  # Protocol server factory adapter
 │   │   │   └── __init__.py  # Starfish adapters 层入口
@@ -1166,6 +1168,8 @@ BlueCrystal/
 │   │   └── test_whale_l5_storage_e2e.py  # Whale L5 端到端验证测试 — 存储层（S3/MinIO + TDengine + Redis）
 │   ├── integration/
 │   │   ├── __init__.py  # Whale 主平台 integration 测试包
+│   │   ├── starfish/
+│   │   │   └── test_iec104_c104_runtime.py  # 真实 View 与 c104 双角色网络闭环测试
 │   │   ├── test_framework_db_init.py  # Integration tests for framework database initialization
 │   │   ├── test_http_rest_acquisition_chain.py  # HTTP REST 全链路采集集成测试
 │   │   ├── test_iec101_acquisition_chain.py  # IEC 101 全链路采集集成测试
@@ -1300,8 +1304,10 @@ BlueCrystal/
 │   │   │   ├── __init__.py  # starfish unit 测试包
 │   │   │   ├── conftest.py  # Starfish unit 测试子树的通用 marker 约束
 │   │   │   ├── test_connection_db_view_loader.py  # 通用 connection view loader 与 composition protocol 分派测试
-│   │   │   ├── test_iec104_db_view_loader.py  # IEC104 DB view loader 单元测试
-│   │   │   ├── test_iec104_server.py  # IEC104 server worker 与 protocol factory 测试
+│   │   │   ├── test_iec104_backend.py  # Starfish c104 双角色 backend 行为测试
+│   │   │   ├── test_iec104_db_view_loader.py  # IEC104 当前四类 view 契约测试
+│   │   │   ├── test_iec104_server.py  # IEC104 worker API 与 protocol factory 测试
+│   │   │   ├── test_import_boundary.py  # Starfish 与其他业务 Python 包的 AST 隔离门禁
 │   │   │   ├── test_runtime_api.py  # Starfish manager 与 IEC104 worker 生命周期测试
 │   │   │   └── test_starfish_cli.py  # Starfish CLI 的 DB selector 与生命周期测试
 │   │   ├── __init__.py  # Whale 主平台 unit 测试包
