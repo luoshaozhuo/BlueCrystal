@@ -52,6 +52,7 @@ skill result:
 - docs files:
 - config/schema files:
 - risk:
+- tier_hint: light|standard|full
 ```
 
 ## 5. 判定规则
@@ -59,3 +60,25 @@ skill result:
 1. 出现 untracked 文件时必须列出。
 2. 出现删除、移动、重命名或职责变化时，project-steward 必须判断 project-tree-update。
 3. 如果工作区存在与本轮无关的既有变更，必须标注，避免误改。
+
+## 6. tier_hint 判定
+
+`tier_hint` 是基于 changed files 路径模式给出的建议任务等级，主会话据其判断 `task_tier`。判定优先级自上而下，首条命中即返回：
+
+```text
+1. 命中白名单路径（任一即返回 full）：
+   - public interface / API / CLI / handler：src/.../api/、src/.../cli/、src/.../handlers/、*handler*.py、*endpoint*.py
+   - schema / migration / 配置 / 环境变量：migrations/、alembic/、*.sql、.env*、config/*.yaml、config/*.toml
+   - 消息格式 / 协议 / 文件格式：src/.../protocols/、src/.../codec/、src/.../schemas/、*schema*.py、*.proto、*.avsc
+   - adapter / repository / external client / gateway：src/.../adapters/、src/.../repository/、src/.../gateway/、src/.../clients/
+   - runtime / scheduler / worker / lease / fencing：src/.../runtime/、src/.../scheduler/、src/.../workers/、*lease*.py、*fencing*.py
+   - 安全 / 权限 / 审计 / 凭据：src/.../auth/、src/.../security/、*permission*.py、*audit*.py、*credentials*.py
+   - deploy/ / docker / compose / helm / terraform：deploy/、Dockerfile*、docker-compose*、charts/、*.tf、*.tfvars
+2. handoff 显式引用 heavy-regression skill → full
+3. 跨 ≥3 个 module（按 src/<module>/ 一级目录计数）→ full
+4. 命中 src/ 或 tests/（未命中白名单）→ standard
+5. 命中 ai_shared/、docs/、*.md（非规则改造）→ light
+6. 其他 → light
+```
+
+说明：tier_hint 是建议值，最终 task_tier 由主会话在收到 code-implementer 的 `require_full_validation` 声明后确认。

@@ -15,11 +15,9 @@
                 "1001"
             ],
             "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env.local",
             "console": "integratedTerminal", // Use the integrated terminal for input/output
-            "justMyCode": false, // Debug all code, not just user code
-            "env": {
-                "WHALE_DB_URL": "${env:WHALE_DB_URL}"
-            }
+            "justMyCode": false // Debug all code, not just user code
         },
         {
             "name": "Debug Current Python File",

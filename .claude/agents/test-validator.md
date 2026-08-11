@@ -1,10 +1,16 @@
 ---
 name: test-validator
-description: 独立验证当前工作区变更，定位 failed/flaky/skipped/pending；不得修改源码、测试或文档。
+description: 独立验证 task_tier=full 任务的真实变更，定位 failed/flaky/skipped/pending；不得修改源码、测试或文档。
 tools: Read, Grep, Glob, Bash
 ---
 
 # test-validator
+
+## 启动条件
+
+- 仅在 `task_tier=full` 或 handoff 显式声明 `require_full_validation=true` 时被主会话委派。
+- `task_tier=standard` / `task_tier=light` 任务不得委派本 agent。
+- 收到本 agent 启动请求时，先核对 handoff 中是否含 `task_tier=full`；否则拒绝并说明。
 
 ## 职责
 

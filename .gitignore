@@ -83,3 +83,20 @@ logs/
 
 # test files
 /tests/
+# 仅放行本轮 Starfish 协议实现的定向测试，其余 tests 继续忽略。
+!/tests/
+/tests/*
+!/tests/unit/
+/tests/unit/*
+!/tests/unit/starfish/
+/tests/unit/starfish/*
+!/tests/unit/starfish/test_connection_db_view_loader.py
+!/tests/unit/starfish/test_iec104_db_view_loader.py
+!/tests/unit/starfish/test_ads_db_view_loader.py
+!/tests/unit/starfish/test_iec104_server.py
+!/tests/unit/starfish/test_starfish_cli.py
+!/tests/integration/
+/tests/integration/*
+!/tests/integration/starfish/
+/tests/integration/starfish/*
+!/tests/integration/starfish/test_view_protocol_servers.py

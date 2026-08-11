@@ -45,12 +45,9 @@ import typer.main
 from click.exceptions import UsageError as ClickUsageError
 from typer._click.exceptions import UsageError as TyperUsageError
 
-from starfish.adapters.db_views import DbViewLoadError
-from starfish.composition import (
-    build_server_manager_from_db,
-    list_connection_ids_from_db,
-)
+from starfish.composition import build_server_manager_from_db
 from starfish.core import StarfishServerManager
+from starfish.adapters.errors import DbViewLoadError
 
 _PROG_NAME = "starfish"
 
@@ -64,7 +61,7 @@ app = typer.Typer(
 
 def _open_manager_or_print_error(
     *,
-    connection_id: int | None,
+    connection_ids:str | None,
     load_all: bool,
 ) -> StarfishServerManager | None:
     """从 DB view 创建 simulator manager，并将加载错误转为 CLI 输出。"""
@@ -73,16 +70,10 @@ def _open_manager_or_print_error(
         print("错误：缺少环境变量 WHALE_DB_URL", file=sys.stderr)
         return None
     try:
-        connection_ids = (
-            list_connection_ids_from_db(db_url)
-            if load_all
-            else ([connection_id] if connection_id is not None else [])
-        )
-        if not connection_ids:
-            raise DbViewLoadError("vw_connection_object_full 中没有可启动的 connection")
         return build_server_manager_from_db(
-            db_url,
-            connection_ids,
+            None
+            if load_all
+            else ([int(cid) for cid in connection_ids.split(",")] if connection_ids is not None else []),
         )
     except DbViewLoadError as exc:
         print(f"错误：{exc}", file=sys.stderr)
@@ -90,22 +81,6 @@ def _open_manager_or_print_error(
     except Exception as exc:
         print(f"错误：加载 simulator 配置失败: {exc}", file=sys.stderr)
         return None
-
-
-def _print_manager_summary(manager: StarfishServerManager) -> None:
-    """打印 manager 当前装配的 server 摘要。"""
-    description = manager.describe()
-    print(f"servers: {description['server_count']}")
-    print("Server 装配结果:")
-    for server in description["servers"]:
-        print(f"  connection_id: {server['connection_id']}")
-        print(f"    name:        {server['name']}")
-        print(f"    protocol:    {server['protocol']}")
-        print(f"    bind:        {server['bind_host']}:{server['bind_port']}")
-        print(f"    points:      {server['point_count']}")
-        print(f"    tasks:       {server['task_count']}")
-        print(f"    caps:        {server['capabilities']}")
-
 
 def main(argv: list[str]) -> int:
     """Starfish CLI 统一入口。"""
@@ -127,20 +102,14 @@ def cli(ctx: typer.Context) -> None:
     """Starfish CLI 根命令组。"""
 
 
-def _selected_manager_count(manager: StarfishServerManager) -> int:
-    """返回当前 manager 持有的 server 数量。"""
-    return manager.server_count
-
-
 @app.command("run")
 def run_command(
-    connection_id: Annotated[
+    connection_ids: Annotated[
         int | None,
         typer.Option(
             "-id",
             "--connection-id",
-            min=1,
-            help="按 vw_connection_object_full.connection_id 启动单个simulator",
+            help="connection_id，多个 ID 使用逗号分隔，例如：-id 1001,1002,1003",
         ),
     ] = None,
     load_all: Annotated[
@@ -162,18 +131,16 @@ def run_command(
     Returns:
         Typer 使用的进程退出码。
     """
-    if (connection_id is None) == (not load_all):
+    if (connection_ids is None) == (not load_all):
         print("错误：必须且只能提供 -id <connection_id> 或 -a", file=sys.stderr)
         return 1
 
     manager = _open_manager_or_print_error(
-        connection_id=connection_id,
+        connection_ids=connection_ids,
         load_all=load_all,
     )
     if manager is None:
         return 1
-
-    _print_manager_summary(manager)
 
     try:
         manager.start()
@@ -181,9 +148,12 @@ def run_command(
         print(f"错误：启动 simulator 失败: {exc}", file=sys.stderr)
         return 1
 
-    started_count = _selected_manager_count(manager)
-    print(f"\n已启动 {started_count} 个 simulator endpoint。")
-    print("按 Ctrl+C 停止。" if duration is None else f"将运行 {duration:.2f} 秒后自动停止。")
+    print(manager.status())
+    print(
+        "按 Ctrl+C 停止。"
+        if duration is None
+        else f"将运行 {duration:.2f} 秒后自动停止。"
+    )
 
     stop_event = threading.Event()
     try:
@@ -200,4 +170,4 @@ def run_command(
 if __name__ == "__main__":
     # 支持通过 `python -m starfish ...` 启动 CLI。
     # `starfish run ...` 由 pyproject.toml 注册的 console script 直接调用 app。
-    sys.exit(main(sys.argv[1:])) 
+    sys.exit(main(sys.argv[1:]))

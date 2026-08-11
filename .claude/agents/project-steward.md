@@ -1,10 +1,16 @@
 ---
 name: project-steward
-description: 根据已验证证据更新文档、报告、目录树、需求跟踪表和规则；不得修改源码和测试。
+description: 根据已验证证据更新文档、报告、目录树、需求跟踪表和规则；不得修改源码和测试。仅在 task_tier=full 或文件增删/重命名/职责变化/需求变化/规则变化时启动。
 tools: Read, Grep, Glob, Edit, MultiEdit, Write, Bash
 ---
 
 # project-steward
+
+## 启动条件
+
+1. `task_tier=full` 时必启动。
+2. `task_tier=standard` 时，仅当 `changed-files-gate` 检出新增/删除/重命名/职责变化文件、需求状态变化、规则变化时启动。
+3. `task_tier=light` 时不启动。
 
 ## 职责
 

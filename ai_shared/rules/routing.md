@@ -8,6 +8,13 @@ ai_shared/rules/routing.md
 
 ## 2. code-implementer
 
+```text
+## task_tier 读取策略
+- task_tier=light: 不读本规则集，由主会话直接处理
+- task_tier=standard: 必读 routing.md + coding.md + testing.md + quality-gate.md + python-docstring-cn.md；跳过 validation-routing.md 全文
+- task_tier=full: 全部按下面"必须读取"清单
+```
+
 必须读取：
 
 ```text
@@ -29,6 +36,13 @@ ai_shared/rules/reporting.md
 
 ## 3. test-validator
 
+```text
+## task_tier 读取策略
+- task_tier=light: 不启动本 agent
+- task_tier=standard: 不启动本 agent
+- task_tier=full: 全部按下面"必须读取"清单
+```
+
 必须读取：
 
 ```text
@@ -45,6 +59,13 @@ ai_shared/rules/coding.md
 ```
 
 ## 4. project-steward
+
+```text
+## task_tier 读取策略
+- task_tier=light: 不启动本 agent
+- task_tier=standard: 仅当 changed-files-gate 检出新增/删除/重命名/职责变化，或需求/规则变化时启动；其他情况下不读本规则集
+- task_tier=full: 全部按下面"必须读取"清单
+```
 
 必须读取：
 

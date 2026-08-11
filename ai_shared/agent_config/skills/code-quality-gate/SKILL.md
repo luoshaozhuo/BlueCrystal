@@ -40,6 +40,13 @@ ai_shared/rules/python-docstring-cn.md
 
 ## 5. 必须判断
 
+```text
+## task_tier 行为
+- light: 不调用本 skill
+- standard: 只输出 §5.1 syntax / §5.5 受影响 unit / §5.4 测试最小集
+- full: 走完整 §5 全部 8 项
+```
+
 1. 是否需要补充或修正文档注释。
 2. 是否需要补充普通注释说明原因、边界、假设或风险。
 3. 是否需要类型、schema、签名或契约修正。

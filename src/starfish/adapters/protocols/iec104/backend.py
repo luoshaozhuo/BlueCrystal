@@ -2,7 +2,7 @@
 
 第三方扩展通过延迟 import 加载，避免在不支持当前 Python 版本的平台上阻断
 Starfish 其他模块导入。受控站使用包内建总召、单点读和一般累计量召唤处理器；
-控制站通过稳定的 ``execute_task`` 接口发起读取、召唤、控制和时钟同步。
+测试和外部调用方使用真实 c104 client 发起读取、召唤、控制和时钟同步。
 
 背景传输由本 adapter 的可停止线程调度；周期传输交给 ``report_ms``；自发传输
 由 ``update_point`` 的变化检测触发。运行状态保存在 adapter 中，不向 pybind11
@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import importlib
 import math
-import re
 import threading
 import time
 from collections import defaultdict
@@ -24,41 +23,11 @@ from decimal import Decimal
 from types import ModuleType
 from typing import Any
 
-from starfish.core.definitions import (
-    PointItemDefinition,
-    ServerDefinition,
-    TaskDefinition,
-)
+from starfish.core.definitions import PointItemDefinition, ServerDefinition
 
 _SERVER_ROLE = "CONTROLLED_STATION"
 _CLIENT_ROLE = "CONTROLLING_STATION"
 _BACKGROUND_STOP_TIMEOUT_S = 2.0
-_RETRY_BACKOFF_BASE_S = 0.1
-_RATE_EXPRESSION_RE = re.compile(r"^rate\(\s*(\d+)\s*(ms|s|m|h)\s*\)$", re.IGNORECASE)
-_SUPPORTED_TASKS_BY_ROLE = {
-    _SERVER_ROLE: {
-        "IEC104_RESPOND_GENERAL_INTERROGATION",
-        "IEC104_RESPOND_COUNTER_INTERROGATION",
-        "IEC104_RESPOND_READ_COMMAND",
-        "IEC104_SEND_CYCLIC_DATA",
-        "IEC104_SEND_SPONTANEOUS_DATA",
-        "IEC104_SEND_BACKGROUND_DATA",
-        "IEC104_ACCEPT_SINGLE_COMMAND",
-        "IEC104_ACCEPT_DOUBLE_COMMAND",
-        "IEC104_ACCEPT_SETPOINT_COMMAND",
-        "IEC104_ACCEPT_CLOCK_SYNCHRONIZATION",
-    },
-    _CLIENT_ROLE: {
-        "IEC104_RECEIVE_MONITOR_DATA",
-        "IEC104_SEND_GENERAL_INTERROGATION",
-        "IEC104_SEND_COUNTER_INTERROGATION",
-        "IEC104_SEND_READ_COMMAND",
-        "IEC104_SEND_SINGLE_COMMAND",
-        "IEC104_SEND_DOUBLE_COMMAND",
-        "IEC104_SEND_SETPOINT_COMMAND",
-        "IEC104_SEND_CLOCK_SYNCHRONIZATION",
-    },
-}
 
 
 class Iec104DependencyError(RuntimeError):
@@ -66,11 +35,7 @@ class Iec104DependencyError(RuntimeError):
 
 
 class Iec104OperationError(RuntimeError):
-    """IEC104 task 执行失败、超时或返回否定结果。"""
-
-
-class _RetryableTransmissionError(Iec104OperationError):
-    """安全主动请求返回 False，可在 deadline 内有限重试。"""
+    """IEC104 runtime 装配、传输或资源生命周期失败。"""
 
 
 @dataclass
@@ -144,7 +109,9 @@ class Iec104Backend:
             raise Iec104OperationError("IEC104 runtime 已装配，不能重新加载 definition")
         _validate_definition(definition)
         self._definition = definition
-        self._point_defs = {point.point_item_id: point for point in definition.point_items}
+        self._point_defs = {
+            point.point_item_id: point for point in definition.point_items
+        }
         now = datetime.now(timezone.utc)
         self._point_states = {
             point.point_item_id: _PointState(
@@ -167,22 +134,22 @@ class Iec104Backend:
         elif definition.station_role == _CLIENT_ROLE:
             self._build_client(c104, definition)
         else:
-            raise Iec104OperationError(f"不支持的 IEC104 station_role: {definition.station_role}")
+            raise Iec104OperationError(
+                f"不支持的 IEC104 station_role: {definition.station_role}"
+            )
 
     def start(self) -> None:
-        """启动 c104 socket/连接和配置为 SCHEDULED 的背景任务。"""
+        """启动 c104 socket/连接和 Point 元数据声明的背景传输。"""
         if self._started:
             return
         self.connect()
         definition = self._require_definition()
-        if definition.station_role == _SERVER_ROLE:
-            for task in definition.tasks:
-                if task.task_type == "IEC104_SEND_BACKGROUND_DATA":
-                    _background_period_ms(task)
         try:
             self._runtime.start()
         except Exception as exc:
-            raise Iec104OperationError(f"启动 IEC104 {self._role_label()} 失败: {exc}") from exc
+            raise Iec104OperationError(
+                f"启动 IEC104 {self._role_label()} 失败: {exc}"
+            ) from exc
         self._stop_event.clear()
         self._started = True
         self._started_at = datetime.now(timezone.utc)
@@ -199,7 +166,7 @@ class Iec104Backend:
                 self.stop()
                 raise
         else:
-            self._start_background_tasks()
+            self._start_background_transmission()
 
     def stop(self) -> None:
         """停止调度和 c104 runtime；未回收线程会保留并明确报告。"""
@@ -262,7 +229,9 @@ class Iec104Backend:
             state = self._point_states[point_id]
             value_changed = _value_changed(state.value, value, 0)
             spontaneous_reference = (
-                state.last_sent_value if state.last_sent_at is not None else point_def.initial_value
+                state.last_sent_value
+                if state.last_sent_at is not None
+                else point_def.initial_value
             )
             spontaneous_changed = _value_changed(
                 spontaneous_reference,
@@ -314,57 +283,22 @@ class Iec104Backend:
                 "recorded_at": state.recorded_at,
             }
 
-    def execute_task(
-        self,
-        task: int | str,
-        *,
-        values: Mapping[int | str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """同步执行可主动调用的 IEC104 task。
-
-        c104 的命令等待使用 Client 构造时的 ``command_timeout_ms``；本方法在
-        返回 ``success=False`` 时抛出稳定异常，不把否定确认伪装成成功。仅站
-        总召、一般累计量召唤和读命令的 False 结果可有限退避重试；第三方异常
-        默认不可安全分类，因此不重试。控制与时钟命令始终不自动重试。
-        """
-        task_def = self._resolve_task(task)
-        operation = task_def.task_type
-        if self._require_definition().station_role == _SERVER_ROLE:
-            send_causes = {
-                "IEC104_SEND_BACKGROUND_DATA": self._c104.Cot.BACKGROUND_SCAN,
-                "IEC104_SEND_CYCLIC_DATA": self._c104.Cot.PERIODIC,
-                "IEC104_SEND_SPONTANEOUS_DATA": self._c104.Cot.SPONTANEOUS,
-            }
-            if operation in send_causes:
-                sent = self._transmit_points(
-                    task_def.point_item_ids,
-                    send_causes[operation],
-                    max_objects=int(task_def.params.get("max_objects_per_asdu", 40)),
-                )
-                return _task_result(task_def, sent)
-            if operation in {
-                "IEC104_RESPOND_GENERAL_INTERROGATION",
-                "IEC104_RESPOND_COUNTER_INTERROGATION",
-                "IEC104_RESPOND_READ_COMMAND",
-                "IEC104_ACCEPT_SINGLE_COMMAND",
-                "IEC104_ACCEPT_DOUBLE_COMMAND",
-                "IEC104_ACCEPT_SETPOINT_COMMAND",
-                "IEC104_ACCEPT_CLOCK_SYNCHRONIZATION",
-            }:
-                return _task_result(task_def, True, automatic=True)
-            raise Iec104OperationError(f"受控站 task 不可主动执行: {operation}")
-
-        return self._execute_client_task(task_def, values or {})
-
     def health(self) -> dict[str, Any]:
         """返回生命周期、角色、连接和 Point 状态摘要。"""
         self._prune_background_threads()
         definition = self._definition
         runtime_running = bool(
-            self._runtime is not None and getattr(self._runtime, "is_running", self._started)
+            self._runtime is not None
+            and getattr(self._runtime, "is_running", self._started)
         )
-        if definition and definition.station_role == _CLIENT_ROLE and self._runtime is not None:
-            running = bool(getattr(self._runtime, "has_open_connections", runtime_running))
+        if (
+            definition
+            and definition.station_role == _CLIENT_ROLE
+            and self._runtime is not None
+        ):
+            running = bool(
+                getattr(self._runtime, "has_open_connections", runtime_running)
+            )
         else:
             running = runtime_running
         shutdown_incomplete = bool(self._background_threads and not self._started)
@@ -379,7 +313,6 @@ class Iec104Backend:
             "definition_loaded": definition is not None,
             "station_role": definition.station_role if definition else None,
             "point_count": len(self._point_defs),
-            "task_count": len(definition.tasks) if definition else 0,
             "started_at": self._started_at.isoformat() if self._started_at else None,
             "background_thread_count": len(self._background_threads),
             "shutdown_incomplete": shutdown_incomplete,
@@ -400,8 +333,7 @@ class Iec104Backend:
         self._register_points(c104, self._runtime, server_side=True)
 
         def on_clock_sync(server: Any, ip: str, date_time: datetime) -> Any:
-            accepted = self._has_enabled_task("IEC104_ACCEPT_CLOCK_SYNCHRONIZATION")
-            return c104.ResponseState.SUCCESS if accepted else c104.ResponseState.FAILURE
+            return c104.ResponseState.SUCCESS
 
         on_clock_sync.__annotations__ = {
             "server": getattr(c104, "Server", Any),
@@ -432,13 +364,17 @@ class Iec104Backend:
         stations: dict[int, Any] = {}
         for point_def in self._point_defs.values():
             if not bool(point_def.metadata.get("point_registration_supported", True)):
-                raise Iec104OperationError(f"view 声明 Point 不可注册: {point_def.type_id}")
+                raise Iec104OperationError(
+                    f"view 声明 Point 不可注册: {point_def.type_id}"
+                )
             common_address = int(point_def.metadata.get("common_address") or 0)
             station = stations.get(common_address)
             if station is None:
                 station = parent.add_station(common_address=common_address)
                 if station is None:
-                    raise Iec104OperationError(f"无法创建 IEC104 Station CA={common_address}")
+                    raise Iec104OperationError(
+                        f"无法创建 IEC104 Station CA={common_address}"
+                    )
                 stations[common_address] = station
             command_mode_name = str(point_def.metadata.get("command_mode") or "DIRECT")
             kwargs = {
@@ -447,7 +383,8 @@ class Iec104Backend:
                 "report_ms": self._effective_report_ms(point_def) if server_side else 0,
                 "related_io_address": (
                     int(point_def.metadata["related_io_address"])
-                    if server_side and point_def.metadata.get("related_io_address") is not None
+                    if server_side
+                    and point_def.metadata.get("related_io_address") is not None
                     else None
                 ),
                 "related_io_autoreturn": bool(
@@ -583,150 +520,6 @@ class Iec104Backend:
             state.quality = getattr(runtime_point, "quality", None)
             state.recorded_at = getattr(runtime_point, "recorded_at", None)
 
-    def _execute_client_task(
-        self,
-        task: TaskDefinition,
-        values: Mapping[int | str, Any],
-    ) -> dict[str, Any]:
-        if self._connection is None:
-            raise Iec104OperationError("IEC104 client connection 尚未装配")
-        timeout_ms = max(int(task.params.get("timeout_ms", 10000)), 1)
-        operation = task.task_type
-        safe_retry_operations = {
-            "IEC104_SEND_GENERAL_INTERROGATION",
-            "IEC104_SEND_COUNTER_INTERROGATION",
-            "IEC104_SEND_READ_COMMAND",
-        }
-        configured_retries = max(int(task.params.get("retry_count", 0)), 0)
-        retries = configured_retries if operation in safe_retry_operations else 0
-        last_error: Iec104OperationError | None = None
-        deadline = time.monotonic() + timeout_ms / 1000
-        for attempt in range(1, retries + 2):
-            if self._stop_event.is_set():
-                raise Iec104OperationError(f"执行 {operation} 已被 stop 中断")
-            try:
-                remaining_ms = math.ceil((deadline - time.monotonic()) * 1000)
-                if remaining_ms <= 0:
-                    raise Iec104OperationError(
-                        f"执行 {operation} 超过 task timeout_ms={timeout_ms}"
-                    )
-                self._wait_connection_open(remaining_ms)
-                result = self._execute_client_task_once(task, values)
-                if time.monotonic() > deadline:
-                    raise Iec104OperationError(
-                        f"执行 {operation} 超过 task timeout_ms={timeout_ms}；"
-                        "c104 同步调用内部不可由 adapter 取消，仅能在返回后判定超时"
-                    )
-                result["attempts"] = attempt
-                if configured_retries and not retries:
-                    result["retry_suppressed"] = (
-                        "控制/时钟命令不自动重试，避免不确定确认导致重复执行"
-                    )
-                return result
-            except _RetryableTransmissionError as exc:
-                last_error = exc
-                if attempt > retries or time.monotonic() >= deadline:
-                    break
-                self._wait_retry_backoff(operation, attempt, deadline)
-            except Iec104OperationError:
-                # 配置、输入、Type/Key 等错误默认不可重试；第三方异常也不猜测。
-                raise
-        suffix = (
-            "；控制/时钟命令不自动重试，避免不确定确认导致重复执行"
-            if configured_retries and not retries
-            else ""
-        )
-        raise Iec104OperationError(f"{last_error}{suffix}") from last_error
-
-    def _wait_retry_backoff(
-        self,
-        operation: str,
-        failed_attempt: int,
-        deadline: float,
-    ) -> None:
-        """递增退避，等待可被 stop 中断且不能跨过 task deadline。"""
-        backoff_s = _RETRY_BACKOFF_BASE_S * failed_attempt
-        remaining_s = deadline - time.monotonic()
-        if remaining_s <= backoff_s:
-            raise Iec104OperationError(
-                f"执行 {operation} 重试预算不足：剩余 deadline "
-                f"{max(remaining_s, 0) * 1000:.0f}ms，小于 backoff "
-                f"{backoff_s * 1000:.0f}ms"
-            )
-        if self._stop_event.wait(backoff_s):
-            raise Iec104OperationError(f"执行 {operation} 的 retry backoff 被 stop 中断")
-
-    def _execute_client_task_once(
-        self,
-        task: TaskDefinition,
-        values: Mapping[int | str, Any],
-    ) -> dict[str, Any]:
-        """执行一次控制站 task；重试策略由外层统一约束。"""
-        operation = task.task_type
-        wait = bool(task.params.get("wait_activation_confirmation", True))
-        common_addresses = _task_common_addresses(task, self._point_defs)
-        results: list[bool] = []
-        try:
-            if operation == "IEC104_SEND_GENERAL_INTERROGATION":
-                results = [
-                    bool(
-                        self._connection.interrogation(
-                            common_address=ca,
-                            cause=self._c104.Cot.ACTIVATION,
-                            qualifier=self._c104.Qoi.STATION,
-                            wait_for_response=wait,
-                        )
-                    )
-                    for ca in common_addresses
-                ]
-            elif operation == "IEC104_SEND_COUNTER_INTERROGATION":
-                results = [
-                    bool(
-                        self._connection.counter_interrogation(
-                            common_address=ca,
-                            cause=self._c104.Cot.ACTIVATION,
-                            qualifier=self._c104.Rqt.GENERAL,
-                            freeze=self._c104.Frz.READ,
-                            wait_for_response=wait,
-                        )
-                    )
-                    for ca in common_addresses
-                ]
-            elif operation == "IEC104_SEND_CLOCK_SYNCHRONIZATION":
-                default_ca = int(self._require_definition().connection_params["common_address"])
-                results = [
-                    bool(
-                        self._connection.clock_sync(
-                            common_address=default_ca,
-                            wait_for_response=True,
-                        )
-                    )
-                ]
-            elif operation == "IEC104_SEND_READ_COMMAND":
-                results = [bool(self._points[point_id].read()) for point_id in task.point_item_ids]
-            elif operation in {
-                "IEC104_SEND_SINGLE_COMMAND",
-                "IEC104_SEND_DOUBLE_COMMAND",
-                "IEC104_SEND_SETPOINT_COMMAND",
-            }:
-                results = [
-                    self._transmit_command(
-                        point_id, _lookup_value(values, point_id, self._point_defs)
-                    )
-                    for point_id in task.point_item_ids
-                ]
-            elif operation == "IEC104_RECEIVE_MONITOR_DATA":
-                return _task_result(task, True, automatic=True)
-            else:
-                raise Iec104OperationError(f"控制站不支持主动执行 task: {operation}")
-        except Iec104OperationError:
-            raise
-        except Exception as exc:
-            raise Iec104OperationError(f"执行 {operation} 失败: {exc}") from exc
-        if not results or not all(results):
-            raise _RetryableTransmissionError(f"执行 {operation} 收到失败或超时结果: {results}")
-        return _task_result(task, True, operation_count=len(results))
-
     def _wait_connection_open(self, timeout_ms: int) -> None:
         """等待 c104 异步连接进入 OPEN，deadline 到期或 stop 时稳定失败。"""
         if self._connection is None:
@@ -741,12 +534,6 @@ class Iec104Backend:
                     f"等待 IEC104 connection OPEN 超时 timeout_ms={timeout_ms}"
                 )
             self._stop_event.wait(min(remaining, 0.01))
-
-    def _transmit_command(self, point_id: int, value: Any) -> bool:
-        point_def = self._point_defs[point_id]
-        point = self._points[point_id]
-        point.value = _c104_value(self._c104, point_def.type_id, value)
-        return bool(point.transmit(cause=self._c104.Cot.ACTIVATION))
 
     def _transmit_points(
         self,
@@ -780,14 +567,6 @@ class Iec104Backend:
         return success
 
     def _spontaneous_due(self, point_id: int, now: datetime) -> bool:
-        task_ids = {
-            point
-            for task in self._require_definition().tasks
-            if task.task_type == "IEC104_SEND_SPONTANEOUS_DATA" and _task_is_enabled(task)
-            for point in task.point_item_ids
-        }
-        if point_id not in task_ids:
-            return False
         if not bool(
             self._point_defs[point_id].metadata.get(
                 "spontaneous_transmission_supported",
@@ -799,7 +578,11 @@ class Iec104Backend:
             self._point_defs[point_id].metadata.get("spontaneous_min_interval_ms") or 0
         )
         last = self._point_states[point_id].last_sent_at
-        return last is None or minimum_ms <= 0 or (now - last).total_seconds() * 1000 >= minimum_ms
+        return (
+            last is None
+            or minimum_ms <= 0
+            or (now - last).total_seconds() * 1000 >= minimum_ms
+        )
 
     def _mark_sent(self, point_id: int) -> None:
         with self._lock:
@@ -807,26 +590,32 @@ class Iec104Backend:
             state.last_sent_at = datetime.now(timezone.utc)
             state.last_sent_value = state.value
 
-    def _start_background_tasks(self) -> None:
-        for task in self._require_definition().tasks:
-            if task.task_type != "IEC104_SEND_BACKGROUND_DATA" or not _task_is_enabled(task):
-                continue
-            period_ms = _background_period_ms(task)
+    def _start_background_transmission(self) -> None:
+        groups: dict[int, list[int]] = defaultdict(list)
+        for point in self._point_defs.values():
+            if bool(point.metadata.get("background_transmission_supported")):
+                period_ms = max(
+                    int(point.metadata.get("value_update_interval_ms") or 1000),
+                    1,
+                )
+                groups[period_ms].append(point.point_item_id)
+        for period_ms, point_ids in groups.items():
             thread = threading.Thread(
                 target=self._background_loop,
-                args=(task, period_ms),
-                name=f"starfish-iec104-background-{task.task_id}",
+                args=(tuple(point_ids), period_ms),
+                name=f"starfish-iec104-background-{period_ms}ms",
                 daemon=True,
             )
             self._background_threads.append(thread)
             thread.start()
 
-    def _background_loop(self, task: TaskDefinition, period_ms: int) -> None:
+    def _background_loop(self, point_ids: tuple[int, ...], period_ms: int) -> None:
+        """按 point 元数据声明的周期发送背景扫描批次。"""
         while not self._stop_event.wait(max(period_ms, 1) / 1000):
             if self._stop_event.is_set():
                 return
             try:
-                self.execute_task(task.task_id)
+                self._transmit_points(point_ids, self._c104.Cot.BACKGROUND_SCAN)
             except Iec104OperationError:
                 # health/status 保持 runtime 存活；下一周期仍可恢复发送。
                 if self._stop_event.is_set():
@@ -858,50 +647,19 @@ class Iec104Backend:
             raise Iec104OperationError(f"IEC104 Point 不存在: {point}")
         return point_id
 
-    def _resolve_task(self, task: int | str) -> TaskDefinition:
-        tasks = self._require_definition().tasks
-        matches = [
-            item
-            for item in tasks
-            if item.task_id == task or item.task_identifier == task or item.task_type == task
-        ]
-        if len(matches) != 1:
-            raise Iec104OperationError(f"无法唯一定位 IEC104 task: {task}")
-        task_def = matches[0]
-        if not _task_is_enabled(task_def):
-            raise Iec104OperationError(f"IEC104 task 未启用: {task_def.task_identifier}")
-        return task_def
-
     def _effective_report_ms(self, point_def: PointItemDefinition) -> int:
-        """返回同时被周期 task 和 Point 能力允许的 c104 report 周期。"""
+        """直接按 Point 周期能力返回 c104 report 周期。"""
         if not bool(point_def.metadata.get("periodic_transmission_supported", True)):
-            return 0
-        if not self._task_contains_point(
-            "IEC104_SEND_CYCLIC_DATA",
-            point_def.point_item_id,
-        ):
             return 0
         return max(int(point_def.metadata.get("report_ms") or 0), 0)
 
     def _command_is_enabled(self, point_id: int, type_id: str) -> bool:
-        """按命令 Type 与启用 task 成员关系判断受控站是否接受命令。"""
-        operation = _command_accept_operation(type_id)
-        return bool(operation and self._task_contains_point(operation, point_id))
-
-    def _has_enabled_task(self, operation: str) -> bool:
-        """返回 definition 是否声明了指定启用 operation。"""
-        return any(
-            task.task_type == operation and _task_is_enabled(task)
-            for task in self._require_definition().tasks
-        )
-
-    def _task_contains_point(self, operation: str, point_id: int) -> bool:
-        """返回指定 Point 是否属于启用 operation task。"""
-        return any(
-            task.task_type == operation
-            and _task_is_enabled(task)
-            and point_id in task.point_item_ids
-            for task in self._require_definition().tasks
+        """按注册命令 Point 自身元数据判断受控站是否接受命令。"""
+        return bool(
+            _is_command_type(type_id)
+            and self._point_defs[point_id].metadata.get(
+                "command_accept_supported", True
+            )
         )
 
     def _require_definition(self) -> ServerDefinition:
@@ -926,22 +684,21 @@ def _enum_member(enum_type: Any, name: str) -> Any:
 
 
 def _validate_definition(definition: ServerDefinition) -> None:
-    """拒绝当前 c104 adapter 未声明支持的角色、task 和 CP24 Point。"""
-    supported_tasks = _SUPPORTED_TASKS_BY_ROLE.get(definition.station_role)
-    if supported_tasks is None:
-        raise Iec104OperationError(f"不支持的 IEC104 station_role: {definition.station_role}")
-    unsupported_tasks = sorted(
-        {task.task_type for task in definition.tasks if task.task_type not in supported_tasks}
-    )
-    if unsupported_tasks:
-        raise Iec104OperationError("当前 c104 adapter 不支持 IEC104 task: " f"{unsupported_tasks}")
+    """拒绝当前 c104 adapter 未声明支持的角色和 CP24 Point。"""
+    if definition.station_role not in {_SERVER_ROLE, _CLIENT_ROLE}:
+        raise Iec104OperationError(
+            f"不支持的 IEC104 station_role: {definition.station_role}"
+        )
     cp24_points = sorted(
         point.point_identifier
         for point in definition.point_items
-        if str(point.metadata.get("time_tag_type") or "").strip().upper() == "CP24TIME2A"
+        if str(point.metadata.get("time_tag_type") or "").strip().upper()
+        == "CP24TIME2A"
     )
     if cp24_points:
-        raise Iec104OperationError(f"c104 2.2.1 不支持注册 CP24Time2a Point: {cp24_points}")
+        raise Iec104OperationError(
+            f"c104 2.2.1 不支持注册 CP24Time2a Point: {cp24_points}"
+        )
 
 
 def _c104_value(c104: Any, type_id: str, value: Any) -> Any:
@@ -1014,7 +771,9 @@ def _related_monitor_value(
         return numeric_mapping[raw]
     if command_type_id.startswith("C_SE_"):
         return float(_plain_value(command_value))
-    raise Iec104OperationError(f"不支持 {command_type_id} 关联到模拟量 {target_type_id}")
+    raise Iec104OperationError(
+        f"不支持 {command_type_id} 关联到模拟量 {target_type_id}"
+    )
 
 
 def _assign_point_information(
@@ -1029,12 +788,16 @@ def _assign_point_information(
     """按 Point Type 写值，并在需要时构造带质量/CP56 时标的 Information。"""
     converted = _c104_value(c104, point_def.type_id, value)
     converted_quality = (
-        _quality_value(c104, point_def.type_id, quality) if quality is not None else None
+        _quality_value(c104, point_def.type_id, quality)
+        if quality is not None
+        else None
     )
     if recorded_at is not None:
         time_tag_type = str(point_def.metadata.get("time_tag_type") or "NONE")
         if time_tag_type != "CP56TIME2A":
-            raise Iec104OperationError(f"{point_def.type_id} 不支持 recorded_at={time_tag_type}")
+            raise Iec104OperationError(
+                f"{point_def.type_id} 不支持 recorded_at={time_tag_type}"
+            )
         runtime_point.info = _monitor_information(
             c104,
             point_def.type_id,
@@ -1052,7 +815,9 @@ def _quality_value(c104: Any, type_id: str, quality: Any) -> Any:
     """把 quality 成员名转换为对应 c104 质量枚举。"""
     if not isinstance(quality, str):
         return quality
-    enum_type = c104.BinaryCounterQuality if type_id.startswith("M_IT_") else c104.Quality
+    enum_type = (
+        c104.BinaryCounterQuality if type_id.startswith("M_IT_") else c104.Quality
+    )
     return _enum_member(enum_type, quality)
 
 
@@ -1099,27 +864,6 @@ def _is_command_type(type_id: str) -> bool:
     }
 
 
-def _command_accept_operation(type_id: str) -> str | None:
-    """将 c104 支持的当前命令 Type 映射到 View 接收 operation。"""
-    if type_id.startswith("C_SC_"):
-        return "IEC104_ACCEPT_SINGLE_COMMAND"
-    if type_id.startswith("C_DC_"):
-        return "IEC104_ACCEPT_DOUBLE_COMMAND"
-    if type_id.startswith("C_SE_"):
-        return "IEC104_ACCEPT_SETPOINT_COMMAND"
-    return None
-
-
-def _task_is_enabled(task: TaskDefinition) -> bool:
-    """按 View task_status 判断 task 是否参与运行装配。"""
-    return task.task_status.strip().upper() not in {
-        "DISABLED",
-        "INACTIVE",
-        "STOPPED",
-        "DELETED",
-    }
-
-
 def _value_changed(previous: Any, current: Any, deadband: float) -> bool:
     if isinstance(previous, (int, float)) and isinstance(current, (int, float)):
         return abs(float(current) - float(previous)) > deadband
@@ -1127,31 +871,18 @@ def _value_changed(previous: Any, current: Any, deadband: float) -> bool:
 
 
 def _select_timeout_ms(definition: ServerDefinition) -> int:
-    """选择仅适用于 SELECT_AND_EXECUTE 控制任务的 server 超时。"""
-    operations = {
-        "IEC104_ACCEPT_SINGLE_COMMAND",
-        "IEC104_ACCEPT_DOUBLE_COMMAND",
-        "IEC104_ACCEPT_SETPOINT_COMMAND",
-    }
-    values = [
-        int(task.params.get("timeout_ms", 10000))
-        for task in definition.tasks
-        if task.task_type in operations
-    ]
-    return max(values, default=int(definition.connection_params.get("timeout_ms", 10000)))
+    """从 connection 参数选择 SELECT_AND_EXECUTE server 超时。"""
+    return max(int(definition.connection_params.get("timeout_ms", 10000)), 1)
 
 
 def _client_command_timeout_ms(definition: ServerDefinition) -> int:
-    """选择最大主动 task timeout，避免 c104 全局值提前截断长任务。"""
-    active = [
-        int(task.params.get("timeout_ms", 10000))
-        for task in definition.tasks
-        if task.task_type.startswith("IEC104_SEND_")
-    ]
-    return max(max(active, default=10000), 1)
+    """从 connection 参数选择 c104 client 全局命令超时。"""
+    return max(int(definition.connection_params.get("timeout_ms", 10000)), 1)
 
 
-def _apply_protocol_parameters(protocol_parameters: Any, params: Mapping[str, Any]) -> None:
+def _apply_protocol_parameters(
+    protocol_parameters: Any, params: Mapping[str, Any]
+) -> None:
     """把 View 中毫秒制链路参数映射到 c104 秒制属性及 k/w 窗口。"""
     timeout_fields = {
         "t0_ms": "connection_timeout",
@@ -1177,55 +908,6 @@ def _connection_is_open(c104: Any, connection: Any) -> bool:
     state = connection.state
     expected = c104.ConnectionState.OPEN
     return bool(state == expected or getattr(state, "name", None) == "OPEN")
-
-
-def _background_period_ms(task: TaskDefinition) -> int:
-    """将 view 的简单 ``rate(...)`` 调度表达式转换为可停止线程周期。"""
-    if "period_ms" in task.params:
-        return max(int(task.params["period_ms"]), 1)
-    expression = str(task.params.get("schedule_expression") or "rate(60s)").strip()
-    match = _RATE_EXPRESSION_RE.fullmatch(expression)
-    if match is None:
-        raise Iec104OperationError(f"IEC104 背景任务仅支持 rate(Nms|Ns|Nm|Nh): {expression}")
-    amount = int(match.group(1))
-    multiplier = {"ms": 1, "s": 1000, "m": 60000, "h": 3600000}[match.group(2).lower()]
-    return max(amount * multiplier, 1)
-
-
-def _task_common_addresses(
-    task: TaskDefinition,
-    point_defs: Mapping[int, PointItemDefinition],
-) -> list[int]:
-    addresses = sorted(
-        {
-            int(point_defs[point_id].metadata.get("common_address") or 0)
-            for point_id in task.point_item_ids
-        }
-    )
-    return addresses or [1]
-
-
-def _lookup_value(
-    values: Mapping[int | str, Any],
-    point_id: int,
-    point_defs: Mapping[int, PointItemDefinition],
-) -> Any:
-    point_def = point_defs[point_id]
-    if point_id in values:
-        return values[point_id]
-    if point_def.point_identifier in values:
-        return values[point_def.point_identifier]
-    raise Iec104OperationError(f"命令 task 缺少 Point 值: {point_def.point_identifier}")
-
-
-def _task_result(task: TaskDefinition, success: bool, **detail: Any) -> dict[str, Any]:
-    return {
-        "task_id": task.task_id,
-        "task_identifier": task.task_identifier,
-        "operation_identifier": task.task_type,
-        "success": success,
-        **detail,
-    }
 
 
 __all__ = [

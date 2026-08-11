@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from starfish.core.ports.protocol_server import StarfishServerPort
 from starfish.core.ports.server_factory import ServerFactoryPort
-from starfish.core.ports.server_loader import ServerDefinitionLoaderPort
+from starfish.core.ports.dbview_loader import DBViewLoaderPort
 
 __all__ = [
-    "ServerDefinitionLoaderPort",
+    "DBViewLoaderPort",
     "ServerFactoryPort",
     "StarfishServerPort",
 ]

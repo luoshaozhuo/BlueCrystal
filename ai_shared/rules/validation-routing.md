@@ -9,6 +9,7 @@
 1. 每次编码后只执行与本次风险匹配的最小必要验证。
 2. 不把高成本验证默认提升为日常编码后的必跑项。
 3. 具体命令以仓库工具链、测试索引、任务 handoff 和真实环境为准。
+4. `task_tier` 决定 `must-run` 集合的上界：`light` 不进入验证阶段；`standard` 只跑受影响 unit；`full` 才走完整路由表（含 integration、smoke、regression 等 `should-run`/`manual-or-expensive` 判定）。命中白名单的 standard 任务自动升级到 full。
 
 ## 2. 执行优先级
 

@@ -158,7 +158,12 @@ BlueCrystal/
 │   │   ├── seahorse_round7c_repo_import_closure.md  # Seahorse Round 7C 仓库范围 broken import 收口
 │   │   ├── starfish_architecture_doc_finalize.md  # Starfish Clean Architecture v3.3 文档封板收尾
 │   │   ├── starfish_clean_boundary_refactor.md  # Starfish Clean Boundary Refactor
+│   │   ├── starfish_engine_lifecycle_2026_08_09.md  # Starfish Engine 生命周期定向验证
+│   │   ├── starfish_db_loader_simplification_2026_08_10.md  # Starfish SQL 下推与最小 loader 校验归档
+│   │   ├── starfish_pandas_view_mapping_2026_08_09.md  # Starfish pandas-first 公共配置契约定向验证
 │   │   ├── starfish_strict_di_refactor.md  # Starfish Strict DI 收敛重构报告
+│   │   ├── starfish_task_definition_cleanup_2026_08_09.md  # Starfish IEC104 独立任务模型清理验证
+│   │   ├── starfish_view_protocol_simulator_2026_08_08.md  # Starfish IEC104/ADS view-driven simulator 定向验证
 │   │   ├── tools_sqlalchemy_session_extraction.md  # session.py 迁出至 tools.sqlalchemy_session：横切工具下沉
 │   │   └── whale_session_url_minimalization.md  # session.py 极简化：多 env 收敛到单一 WHALE_DB_URL
 │   ├── rules/
@@ -761,13 +766,21 @@ BlueCrystal/
 │   ├── starfish/
 │   │   ├── adapters/
 │   │   │   ├── db_views/
+│   │   │   │   ├── ads/
+│   │   │   │   │   ├── __init__.py  # ADS DB view adapter
+│   │   │   │   │   └── loader.py  # ADS SQL 结果映射与请求 ID 缺失检查
 │   │   │   │   ├── iec104/
 │   │   │   │   │   ├── __init__.py  # IEC104 DB view adapter
-│   │   │   │   │   └── loader.py  # IEC104 connection/task/member/point view loader
+│   │   │   │   │   └── loader.py  # IEC104 SQL 结果映射与请求 ID 缺失检查
 │   │   │   │   ├── __init__.py  # DB view outbound adapters
-│   │   │   │   ├── connections.py  # Whale connection 执行视图的通用索引 loader
+│   │   │   │   ├── connections.py  # connection SQL 结果映射与请求 ID 缺失检查
+│   │   │   │   ├── dataframes.py  # 参数化 view SQL、稳定排序与 PointTable JOIN
 │   │   │   │   └── errors.py  # DB view adapter 错误边界
 │   │   │   ├── protocols/
+│   │   │   │   ├── ads/
+│   │   │   │   │   ├── __init__.py  # ADS AMS/TCP adapter 对外入口
+│   │   │   │   │   ├── backend.py  # ADS Source 读与 notification runtime
+│   │   │   │   │   └── server.py  # ADS 配置帧到 runtime definition 边界
 │   │   │   │   ├── iec104/
 │   │   │   │   │   ├── native/
 │   │   │   │   │   │   ├── lib60870/
@@ -775,24 +788,25 @@ BlueCrystal/
 │   │   │   │   │   │   ├── __init__.py  # IEC104 native runner 资源与启动辅助
 │   │   │   │   │   │   └── runtime.py  # starfish native runner 启动辅助
 │   │   │   │   │   ├── __init__.py  # IEC104 c104 adapter 对外入口
-│   │   │   │   │   ├── backend.py  # iec104-python 双角色 runtime 与 point/task API
-│   │   │   │   │   └── server.py  # IEC104 connection worker 与稳定委托接口
+│   │   │   │   │   ├── backend.py  # c104 handler 与 Point 元数据驱动 runtime
+│   │   │   │   │   └── server.py  # IEC104 配置帧到 runtime definition 边界
 │   │   │   │   ├── __init__.py  # Protocol server outbound adapters
-│   │   │   │   └── factory.py  # Protocol server factory adapter
+│   │   │   │   └── factory.py  # 单 connection 配置帧协议分派 factory
 │   │   │   └── __init__.py  # Starfish adapters 层入口
 │   │   ├── core/
 │   │   │   ├── ports/
 │   │   │   │   ├── __init__.py  # Starfish core ports
 │   │   │   │   ├── protocol_server.py  # Protocol server worker port
-│   │   │   │   ├── server_factory.py  # Server factory port
-│   │   │   │   └── server_loader.py  # Server definition loader port
+│   │   │   │   ├── server_factory.py  # DataFrame server factory port
+│   │   │   │   └── server_loader.py  # DataFrame 配置 loader port
 │   │   │   ├── __init__.py  # Starfish 核心运行时模型
-│   │   │   ├── definitions.py  # Starfish core 使用的 simulator definition
-│   │   │   └── manager.py  # Starfish core server manager
+│   │   │   ├── config_frames.py  # 58 列 pandas 公共配置帧契约
+│   │   │   ├── definitions.py  # Starfish server/point runtime definitions
+│   │   │   └── manager.py  # 配置帧分组、深拷贝与 worker 管理
 │   │   ├── __init__.py  # starfish 对外包入口
 │   │   ├── __main__.py  # starfish CLI 入口 —— 通过 Whale DB view 启动 Starfish simulator
 │   │   ├── ARCHITECTURE.md  # Starfish 架构说明
-│   │   ├── composition.py  # Starfish 依赖装配与协议分派入口
+│   │   ├── composition.py  # Engine 所有权、配置帧校验与协议装配
 │   │   └── README.md  # Starfish
 │   ├── tools/
 │   │   ├── __init__.py  # 跨模块通用工具集
@@ -1169,7 +1183,8 @@ BlueCrystal/
 │   ├── integration/
 │   │   ├── __init__.py  # Whale 主平台 integration 测试包
 │   │   ├── starfish/
-│   │   │   └── test_iec104_c104_runtime.py  # 真实 View 与 c104 双角色网络闭环测试
+│   │   │   ├── test_iec104_c104_runtime.py  # 真实 View 与 c104 双角色网络闭环测试
+│   │   │   └── test_view_protocol_servers.py  # 当前 Whale views 到真实 IEC104/ADS client 闭环
 │   │   ├── test_framework_db_init.py  # Integration tests for framework database initialization
 │   │   ├── test_http_rest_acquisition_chain.py  # HTTP REST 全链路采集集成测试
 │   │   ├── test_iec101_acquisition_chain.py  # IEC 101 全链路采集集成测试
@@ -1303,13 +1318,14 @@ BlueCrystal/
 │   │   ├── starfish/
 │   │   │   ├── __init__.py  # starfish unit 测试包
 │   │   │   ├── conftest.py  # Starfish unit 测试子树的通用 marker 约束
-│   │   │   ├── test_connection_db_view_loader.py  # 通用 connection view loader 与 composition protocol 分派测试
-│   │   │   ├── test_iec104_backend.py  # Starfish c104 双角色 backend 行为测试
-│   │   │   ├── test_iec104_db_view_loader.py  # IEC104 当前四类 view 契约测试
-│   │   │   ├── test_iec104_server.py  # IEC104 worker API 与 protocol factory 测试
-│   │   │   ├── test_import_boundary.py  # Starfish 与其他业务 Python 包的 AST 隔离门禁
-│   │   │   ├── test_runtime_api.py  # Starfish manager 与 IEC104 worker 生命周期测试
-│   │   │   └── test_starfish_cli.py  # Starfish CLI 的 DB selector 与生命周期测试
+│   │   │   ├── test_ads_db_view_loader.py  # ADS SQL 下推、映射与 backend 角色边界测试
+│   │   │   ├── test_connection_db_view_loader.py  # connection SQL 过滤与 Engine 所有权测试
+│   │   │   ├── test_iec104_backend.py  # c104 handler 与 Point 元数据行为测试
+│   │   │   ├── test_iec104_db_view_loader.py  # IEC104 SQL 下推、映射与 backend 角色边界测试
+│   │   │   ├── test_iec104_server.py  # IEC104 Point worker 与 protocol factory 测试
+│   │   │   ├── test_import_boundary.py  # pandas runtime 与业务包 AST 边界门禁
+│   │   │   ├── test_runtime_api.py  # manager 配置帧与 worker 生命周期测试
+│   │   │   └── test_starfish_cli.py  # Starfish CLI DB selector、同 build 装配与生命周期测试
 │   │   ├── __init__.py  # Whale 主平台 unit 测试包
 │   │   ├── test_acquisition_job_handler.py  # AcquisitionJobHandler 单元测试
 │   │   ├── test_config.py  # Unit tests for ingest configuration resolution
@@ -1420,7 +1436,7 @@ BlueCrystal/
 - `pyproject.toml`：Python 包、依赖和 Ruff / Black / mypy / pytest 配置入口。
 - `src/whale/`：能源数据平台的采集、消息管道、速度层、共享持久化与存储实现。
 - `src/seahorse/`：按 Clean Architecture 组织的样例场站、场景和时序数据生成组件。
-- `src/starfish/`：按 Hexagonal Architecture 组织的 IEC104 simulator 生命周期管理；`composition.py` 是装配根，`core/` 是内核，`adapters/` 是 DB view 与协议适配器。
+- `src/starfish/`：按 Hexagonal Architecture 组织的 IEC104/ADS simulator 生命周期管理；`composition.py` 是装配根，`core/` 是内核，`adapters/` 是 DB view 与协议适配器。
 - `src/platform_shared/`：不归属具体业务域的公共契约、内核和横切能力。
 - `src/turtle/`：安全、合规、审计和治理基础能力。
 - `src/octopus/`：部署、监控、告警、诊断和自动化运维基础能力。

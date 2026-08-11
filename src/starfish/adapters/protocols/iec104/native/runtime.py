@@ -65,7 +65,10 @@ def probe_native_binary(
         return False, f"{display_name} binary 不存在: {binary_path}"
 
     if st.st_size < min_size:
-        return False, f"{display_name} binary 文件过小 ({st.st_size} bytes): {binary_path}"
+        return (
+            False,
+            f"{display_name} binary 文件过小 ({st.st_size} bytes): {binary_path}",
+        )
 
     if not os.access(binary_path, os.X_OK):
         return False, f"{display_name} binary 无执行权限: {binary_path}"
@@ -89,7 +92,9 @@ def probe_native_binary(
                     if "not found" in line
                 }
             )
-            return False, (f"{display_name} binary 缺少动态库依赖: {', '.join(missing)}")
+            return False, (
+                f"{display_name} binary 缺少动态库依赖: {', '.join(missing)}"
+            )
 
     return True, f"{display_name} binary 可用: {binary_path} ({st.st_size} bytes)"
 

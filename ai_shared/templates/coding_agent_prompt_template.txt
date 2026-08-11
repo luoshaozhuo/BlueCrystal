@@ -18,9 +18,15 @@
 
 ## 2. 固定 agent 流程
 
+按 `task_tier` 分级：
+
 ```text
-@agent-code-implementer -> @agent-test-validator -> @agent-project-steward -> 主会话收口
+- light: 主会话直接处理；不委派任何 subagent
+- standard: @agent-code-implementer → 主会话收口
+- full: @agent-code-implementer → @agent-test-validator → @agent-project-steward → 主会话收口
 ```
+
+`tier_hint` 由 `changed-files-gate` 给出；主会话可在白名单命中时强制覆盖到 `full`。
 
 ## 3. 可用 skills
 
@@ -68,6 +74,8 @@ ai_shared/reports/<上一轮报告>.md
 ---
 
 # 第{ROUND_NO}轮_共{TOTAL_ROUNDS}轮：{TASK_TITLE}
+
+> task_tier: {TASK_TIER}（light / standard / full）
 
 ## 0. 本轮唯一目标
 
@@ -117,6 +125,7 @@ ai_shared/rules/routing.md
 
 ```text
 Agent handoff:
+- task_tier: {TASK_TIER}
 - task:
   - {IMPLEMENT_TASK}
 - allowed paths:
@@ -132,19 +141,25 @@ Agent handoff:
   - {IMPLEMENT_EVIDENCE_1}
 - rules to read:
   - routing 指定的 coding / testing / validation / quality / comment-doc 规则
+  - task_tier=standard: 跳过 validation-routing.md 全文
+  - task_tier=full: 全读
 - skills to use:
   - changed-files-gate
   - code-quality-gate
 - commands to run:
   - {IMPLEMENT_COMMAND_1}
 - expected output:
-  - Agent result
+  - task_tier=standard: 4 字段 Agent result（reporting.md §2.2）
+  - task_tier=full: 12 字段 Agent result（reporting.md §2.1）
 ```
+
+> 本节仅在 `task_tier` 为 `standard` 或 `full` 时生效；`light` 任务不委派 `code-implementer`。
 
 ## 6. @agent-test-validator handoff
 
 ```text
 Agent handoff:
+- task_tier: full
 - task:
   - 独立验证 code-implementer 的真实变更
 - allowed paths:
@@ -172,13 +187,16 @@ Agent handoff:
 - commands to run:
   - {TEST_COMMAND_1}
 - expected output:
-  - Agent result
+  - 12 字段 Agent result
 ```
+
+> 本节仅在 `task_tier=full` 时生效；`standard` / `light` 任务不委派 `test-validator`。
 
 ## 7. @agent-project-steward handoff
 
 ```text
 Agent handoff:
+- task_tier: full
 - task:
   - 根据已验证结果更新文档、目录树、需求跟踪和报告
 - allowed paths:
@@ -211,8 +229,10 @@ Agent handoff:
 - report target:
   - ai_shared/reports/{REPORT_FILE_NAME}.md
 - expected output:
-  - Agent result
+  - 12 字段 Agent result
 ```
+
+> 本节仅在 `task_tier=full` 时生效；`standard` 仅在文件增删/重命名/职责变化、需求状态变化、规则变化时启动；`light` 不启动 `project-steward`。
 
 ## 8. 验收标准
 

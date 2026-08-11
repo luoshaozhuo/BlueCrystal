@@ -1,83 +1,55 @@
-"""Starfish 依赖装配与协议分派入口。
+"""Starfish pandas-first 依赖装配与协议分派入口。
 
-本模块先通过通用 connection view 获取 protocol，再按 protocol registry 调用
-对应 definition loader。core 不依赖数据库、registry 或具体协议 adapter。
+本模块以 connection DataFrame 分组调用协议 loader，再以 concat/merge/cardinality
+检查组合一行一个 point 的公共配置帧。Engine 在配置物化后确定性释放；协议原生
+对象只由 factory/worker 边界创建。
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Callable, Sequence
+from typing import Sequence
 
-from starfish.adapters.db_views import ConnectionDbViewLoader, DbViewLoadError
-from starfish.adapters.db_views.iec104 import Iec104DbViewLoader
-from starfish.adapters.protocols import ProtocolServerFactory
+from starfish.adapters import PGViewLoader
+from starfish.adapters import DbViewLoadError
+from starfish.adapters import ProtocolServerFactory
+from starfish.core import BaseConnection
+from starfish.core import IEC104Connection, IEC104SrcPointItem, IEC104SinkPointItem
+from starfish.core import ADSConnection, ADSSrcPointItem, ADSSinkPointItem
 from starfish.core import StarfishServerManager
-from starfish.core.definitions import ServerDefinition
-from starfish.core.ports.server_loader import ServerDefinitionLoaderPort
+from starfish.core import ServerDefinition
 
-ProtocolLoaderFactory = Callable[[str], ServerDefinitionLoaderPort]
+VIEW_SELECTOR = {
+    'IEC104': (IEC104Connection, IEC104SrcPointItem, IEC104SinkPointItem),
+    'ADS': (ADSConnection, ADSSrcPointItem, ADSSinkPointItem),
+}
 
-
-def list_connection_ids_from_db(db_url: str) -> list[int]:
-    """列出 `vw_connection_object_full` 中的全部 connection IDs。"""
-    return ConnectionDbViewLoader(db_url).list_connection_ids()
-
-
-def build_server_manager_from_db(
-    db_url: str,
-    connection_ids: Sequence[int],
-    *,
-    loader_factories: dict[str, ProtocolLoaderFactory] | None = None,
-) -> StarfishServerManager:
-    """按 connection IDs 的实际 protocol 装配 server manager。
+def build_server_manager_from_db(connection_ids: Sequence[int] | None = None) -> StarfishServerManager:
+    """以 pandas 配置主链路装配 server manager。
 
     Args:
-        db_url: `WHALE_DB_URL` 提供的 SQLAlchemy 数据库 URL。
-        connection_ids: CLI 或其他调用方选定的 connection IDs。
-        loader_factories: protocol 到 loader factory 的可选注册表，主要用于测试
-            或后续协议扩展；默认当前只注册 IEC104。
+        connection_ids: 选定 IDs；``None`` 表示从同一 Engine 枚举全部 connection。
 
     Returns:
-        已持有协议 server workers、尚未启动的 manager。
+        持有规范化配置帧和协议 workers、尚未启动且不再依赖数据库的 manager。
 
     Raises:
-        DbViewLoadError: ID 为空、connection 不存在或 protocol 尚未注册。
+        DbViewLoadError: ID 为空、配置缺失/重复或 protocol 尚未注册。
     """
-    # 去重并确保 connection IDs 为整数列表。
-    normalized_ids = list(dict.fromkeys(int(value) for value in connection_ids))
-    if not normalized_ids:
+    if connection_ids is not None and len(connection_ids) == 0:
         raise DbViewLoadError("connection_ids 不能为空")
 
-    protocols = ConnectionDbViewLoader(db_url).load_protocols(normalized_ids)
-    grouped_ids: dict[str, list[int]] = defaultdict(list)
-    for connection_id in normalized_ids:
-        grouped_ids[protocols[connection_id]].append(connection_id)
+    conn_df = PGViewLoader().load(BaseConnection, _in={"connection_id": connection_ids} if connection_ids is not None else None)
+    if conn_df.empty:
+        raise DbViewLoadError("connection_ids 不存在或未注册协议")
+    
+    servers = []
+    for row in conn_df.iterrows():
+        view_cls = VIEW_SELECTOR[row['protocol']]
+        _conn_sr = PGViewLoader().load(view_cls[0], _equ={"connection_id": row['connection_id']}).squeeze()
+        _src_point_item_df = PGViewLoader().load(view_cls[1], _equ={"point_table_id": _conn_sr['src_point_table_id']})
+        _sink_point_item_df = PGViewLoader().load(view_cls[2], _equ={"point_table_id": _conn_sr['sink_point_table_id']})
+        servers.append(ProtocolServerFactory.create(ServerDefinition(_conn_sr, _src_point_item_df, _sink_point_item_df)))
 
-    factories = loader_factories or {
-        "IEC104": lambda url: Iec104DbViewLoader(url),
-    }
-    definitions: list[ServerDefinition] = []
-    for protocol, protocol_connection_ids in grouped_ids.items():
-        loader_factory = factories.get(protocol)
-        if loader_factory is None:
-            raise DbViewLoadError(
-                f"未注册 protocol={protocol} 的 Starfish server loader，"
-                f"connection_ids={protocol_connection_ids}"
-            )
-        definitions.extend(loader_factory(db_url).load(protocol_connection_ids))
+    return StarfishServerManager(servers)
 
-    definitions_by_id = {definition.connection_id: definition for definition in definitions}
-    missing_definitions = sorted(set(normalized_ids) - definitions_by_id.keys())
-    if missing_definitions:
-        raise DbViewLoadError(
-            f"protocol loader 未返回 connection definitions: {missing_definitions}"
-        )
-    ordered_definitions = [definitions_by_id[value] for value in normalized_ids]
-    return StarfishServerManager.from_definitions(
-        ordered_definitions,
-        ProtocolServerFactory(),
-    )
-
-
-__all__ = ["build_server_manager_from_db", "list_connection_ids_from_db"]
+__all__ = ["build_server_manager_from_db"]

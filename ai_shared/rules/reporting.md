@@ -8,7 +8,7 @@
 
 ## 2. Agent result 格式
 
-所有 subagent 使用统一格式：
+### 2.1 full 12 字段（task_tier=full 必填）
 
 ```text
 Agent result:
@@ -20,7 +20,8 @@ Agent result:
 - commands run:
 - passed:
 - failed:
-- not-run:
+- skipped:
+- pending:
 - evidence:
 - risk:
 - next handoff suggestion:
@@ -30,13 +31,43 @@ Agent result:
 
 1. `passed` 记录已执行且通过的检查或测试。
 2. `failed` 记录已执行且失败的检查或测试。
-3. `not-run` 记录未执行项，并说明原因。
-4. 不使用未定状态字段。
-5. 测试框架 skip 不单独作为结果字段；未执行时归入 `not-run`。
+3. `skipped` 记录被主动跳过且已说明原因的检查或测试。
+4. `pending` 记录等待环境、条件或后续输入后才能执行的项。
+5. `evidence` 记录每条结论对应的真实证据（命令、文件路径、字段名、行号或状态值）。
+6. `risk` 记录本轮残留风险、未覆盖范围、潜在回退点或升级触发条件。
+7. `next handoff suggestion` 可按任务需要使用简短标签，例如 coding、test、validation、fix、cleanup、documentation、requirement、architecture、security、performance、deployment、operation、regression。标签不是封闭枚举；重点是说明后续动作、触发条件和风险。
+8. 不使用未定状态字段。
+9. 测试框架 skip 不单独作为结果字段；未执行时归入 `pending` 或在 `skipped` 中说明。
 
-`next handoff suggestion` 可按任务需要使用简短标签，例如 coding、test、validation、fix、cleanup、documentation、requirement、architecture、security、performance、deployment、operation、regression。标签不是封闭枚举；重点是说明后续动作、触发条件和风险。
+### 2.2 standard 4 字段（task_tier=standard 必填）
+
+```text
+Agent result:
+- files changed: <列表>
+- passed: <受影响的 syntax + lint + unit 简表>
+- failed: <0 / 列表>
+- not-run: <未跑项 + 原因码>
+```
+
+字段要求：
+
+1. `files changed` 给出本轮实际修改/新增/删除的文件清单。
+2. `passed` 用一行或简短列表列出受影响的语法、lint 与 unit 检查结果。
+3. `failed` 默认 `0`；存在失败时列出命令与失败项。
+4. `not-run` 列出本轮未跑项与原因码（按需，例如 `NOT_RUN: heavy-regression`, `NOT_RUN: 跨模块联调`）。
+5. 不要求 12 字段完整版；只在该任务由 standard 自动升级到 full 时，按 §2.1 输出。
 
 ## 3. 主会话反馈
+
+### 3.0 light 反馈（task_tier=light）
+
+```text
+已完成：<一句话说明本轮做了什么>
+```
+
+说明：light 任务由主会话直接处理，不启动任何 subagent；不写报告文件，不引用 Agent result。
+
+### 3.1 full 反馈（task_tier=full）
 
 未生成报告文件时，主会话反馈使用以下结构：
 
@@ -60,7 +91,8 @@ Agent 使用:
 检查与测试:
 - passed:
 - failed:
-- not-run:
+- skipped:
+- pending:
 
 project_tree:
 - 已更新 / 无需更新 / 未更新原因:
@@ -98,6 +130,21 @@ project_tree:
 ```
 
 窗口反馈不得与报告结论不一致，不应重复报告全文。
+
+### 3.2 standard 反馈（task_tier=standard）
+
+```text
+修改文件: <列表>
+检查与测试:
+- passed:
+- failed:
+- not-run:
+是否收口: 是/否
+剩余风险: <一行>
+下一步: <一行>
+```
+
+说明：standard 任务默认不启动 test-validator / project-steward，不写报告文件；若主会话或 code-implementer 触发自动升级到 full，则按 §3.1 输出。
 
 ## 4. 报告输出位置
 
