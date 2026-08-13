@@ -1,11 +1,12 @@
 
 
 from enum import StrEnum, auto
-
 import pandas as pd
+from dataclasses import dataclass
 
 
 class ServerStatus(StrEnum):
+    NOT_CREATED = auto()       # 未创建
     CREATED = auto()       # 已创建，尚未初始化
     INITIALIZED = auto()   # 初始化完成
     STARTING = auto()      # 正在启动
@@ -15,15 +16,16 @@ class ServerStatus(StrEnum):
     FAILED = auto()        # 运行失败
         
 
+@dataclass(slots=True, kw_only=True, eq=False)
 class ServerDefinition:
-    """服务器定义类。"""
+    """所有协议 Server 的公共定义。"""
 
-    def __init__(
-            self, 
-            conn: pd.Series, 
-            src_point_items_df: pd.DataFrame=None,
-            sink_point_items_df: pd.DataFrame=None,
-            ):
-        self.conn = conn
-        self.src_point_items_df = src_point_items_df
-        self.sink_point_items_df = sink_point_items_df
+    conn: pd.Series
+    src_point_items_df: pd.DataFrame
+    sink_point_items_df: pd.DataFrame
+
+    def __post_init__(self) -> None:
+        if self.src_point_items_df.empty and self.sink_point_items_df.empty:
+            raise ValueError(
+                f"connection_id={self.conn['connection_id']} 未定义任何点位"
+            )

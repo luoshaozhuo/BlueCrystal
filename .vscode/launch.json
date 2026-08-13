@@ -26,16 +26,7 @@
             "program": "${file}",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": false
         },
-        {
-            "name": "Debug Current Pytest File",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "args": ["${file}", "-v"],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal"
-        }
     ]
 }

@@ -1,20 +1,9 @@
-"""Protocol server worker port。"""
-
-from __future__ import annotations
-
-from typing import Protocol
-
-from starfish.core.definitions import ServerDefinition, ServerStatus
 
 
-class StarfishServerPort(Protocol):
-    """core manager 可管理的 simulator server worker 契约。"""
-    def __init__(self, definition: ServerDefinition) -> None:
-        """初始化 server worker。
+from starfish.core import ServerDefinition, ServerStatus
 
-        Args:
-            definition: 该 worker 持有的 server definition。
-        """
+
+class IEC104Server():
 
     @property
     def definition(self) -> ServerDefinition:
@@ -31,6 +20,3 @@ class StarfishServerPort(Protocol):
 
     def status(self) -> ServerStatus:
         """返回 server 当前运行状态。"""
-
-
-__all__ = ["StarfishServerPort"]

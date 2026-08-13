@@ -47,7 +47,7 @@ from typer._click.exceptions import UsageError as TyperUsageError
 
 from starfish.composition import build_server_manager_from_db
 from starfish.core import StarfishServerManager
-from starfish.adapters.errors import DbViewLoadError
+from starfish.errors import DbViewLoadError
 
 _PROG_NAME = "starfish"
 

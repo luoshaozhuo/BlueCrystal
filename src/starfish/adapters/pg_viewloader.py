@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 
-from pydantic.dataclasses import field
+from dataclasses import fields
 
 from starfish.core.entities import EntityBase
 
@@ -32,8 +32,8 @@ class PGViewLoader():
         Returns:
             pd.DataFrame: 包含视图数据的 DataFrame。
         """
-        fields = {field(entity)} - {"view_name"}
-        query = f"SELECT {', '.join(fields)} FROM {entity.view_name}"
+        var_names = {i.name for i in fields(entity)} - {"view_name"}
+        query = f"SELECT {', '.join(var_names)} FROM {entity.view_name}"
         if _equ:
             conditions = " AND ".join(f"{k} = '{v}'" for k, v in _equ.items())
             query += f" WHERE {conditions}"

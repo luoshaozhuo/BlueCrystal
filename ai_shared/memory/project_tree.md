@@ -157,6 +157,7 @@ BlueCrystal/
 │   │   ├── seahorse_round7b_legacy_no_compat_cleanup.md  # Seahorse Round 7B 旧顶层目录硬清理 — 无兼容尾巴
 │   │   ├── seahorse_round7c_repo_import_closure.md  # Seahorse Round 7C 仓库范围 broken import 收口
 │   │   ├── starfish_architecture_doc_finalize.md  # Starfish Clean Architecture v3.3 文档封板收尾
+│   │   ├── starfish_ads_init_2026_08_12.md  # Starfish ADS init 实现与验证边界
 │   │   ├── starfish_clean_boundary_refactor.md  # Starfish Clean Boundary Refactor
 │   │   ├── starfish_engine_lifecycle_2026_08_09.md  # Starfish Engine 生命周期定向验证
 │   │   ├── starfish_db_loader_simplification_2026_08_10.md  # Starfish SQL 下推与最小 loader 校验归档
