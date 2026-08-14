@@ -48,6 +48,7 @@ commit-message
 2. report-archive 不再作为 skill；报告归档由 project-steward 按 reporting.md 直接写入 ai_shared/reports/。
 3. feedback-archive 不再作为 skill；用户反馈归档归入 reporting.md。
 4. 只在 handoff 中引用需要的 skill，不复制 skill 细则。
+5. `project-tree-update` 和 `project-tree-reset` 仅在用户明确要求时列入，handoff 必须转述该请求，不根据文件变化自动检查或触发。
 ```
 
 ## 4. 可用 memory / 文档入口
@@ -198,7 +199,7 @@ Agent handoff:
 Agent handoff:
 - task_tier: full
 - task:
-  - 根据已验证结果更新文档、目录树、需求跟踪和报告
+  - 根据已验证结果更新文档、需求跟踪和报告；目录树仅按明确指令维护
 - allowed paths:
   - ai_shared/
 - forbidden:
@@ -209,7 +210,6 @@ Agent handoff:
 - required files:
   - ai_shared/rules/documentation.md
   - ai_shared/rules/reporting.md
-  - ai_shared/memory/project_tree.md
   - {DOC_REQUIRED_FILE_1}
 - changed files:
   - 使用 changed-files-gate 获取真实变更文件
@@ -221,7 +221,6 @@ Agent handoff:
   - reporting
 - skills to use:
   - changed-files-gate
-  - project-tree-update if needed
   - requirement-trace if needed
   - rule-update if needed
 - commands to run:
@@ -232,7 +231,7 @@ Agent handoff:
   - 12 字段 Agent result
 ```
 
-> 本节仅在 `task_tier=full` 时生效；`standard` 仅在文件增删/重命名/职责变化、需求状态变化、规则变化时启动；`light` 不启动 `project-steward`。
+> 本节仅在 `task_tier=full` 时生效；`standard` 仅在需求状态变化或规则变化时启动；`light` 不启动 `project-steward`。如用户明确要求目录树操作，再将该请求、对应 skill 和 `project_tree.md` 加入 handoff。
 
 ## 8. 验收标准
 
@@ -240,7 +239,7 @@ Agent handoff:
 1. 本轮引入 failed = 0，或明确 environment-pending。
 2. 改动已按语言和影响范围执行最小必要验证：语法/编译、lint、type-check、受影响测试与必要边界验证。
 3. 行为变化有测试证据。
-4. 新增、删除、移动、重命名、职责变化文件已触发 project-tree-update 判断。
+4. 未经用户明确要求时，未检查或执行 project-tree-update / project-tree-reset。
 5. 需求状态没有高估。
 6. 报告和最终反馈能追溯到 Agent result。
 7. 未默认扩大到回归、长测、性能、完整部署验证；若执行高成本验证，必须说明触发原因。

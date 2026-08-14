@@ -11,10 +11,11 @@ description: Use when the user explicitly requests a full rebuild of ai_shared/m
 
 ## 2. 触发条件
 
-必须用户明确要求，或 handoff 明确指定。
+必须用户明确要求；如由子 agent 执行，handoff 必须转述该用户请求。不做例行一致性检查，不由任何自动流程推断触发。
 
 禁止使用：
-- 普通新增、删除、移动、重命名文件；这些使用 project-tree-update。
+- 普通新增、删除、移动、重命名或职责变化文件。
+- 仅为检查目录树是否与仓库一致。
 - 仅为了格式化 project_tree。
 
 ## 3. 操作步骤

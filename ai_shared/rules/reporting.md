@@ -95,7 +95,7 @@ Agent 使用:
 - pending:
 
 project_tree:
-- 已更新 / 无需更新 / 未更新原因:
+- 已按明确指令更新 / 未手动请求（未检查）:
 
 报告:
 - 无 / 路径:
@@ -212,7 +212,7 @@ new.md
 
 ## 6. project_tree / 规则
 
-- project_tree:
+- project_tree: 已按明确指令更新 / 未手动请求（未检查）
 - rules:
 
 ## 7. 剩余风险

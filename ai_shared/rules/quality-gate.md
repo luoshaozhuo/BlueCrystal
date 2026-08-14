@@ -33,7 +33,7 @@ SQL/migration: migration dry-run, schema compatibility tests
 
 ## 4. 文档门禁
 
-新增、删除、移动、重命名文件，或文件职责变化时，必须触发目录树或索引更新判断。
+`project-tree-update` 和 `project-tree-reset` 不属于例行质量门禁；仅在用户明确要求时手动执行，handoff 必须转述该请求，不因文件变化自动检查。
 
 ## 5. 结果分类
 

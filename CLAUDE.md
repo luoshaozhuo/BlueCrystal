@@ -78,7 +78,7 @@ handoff 指定文件
 2. `code-implementer` 跑受影响 unit + syntax + lint 最小集，按 reporting.md §2.2 输出 4 字段 `Agent result`。
 3. `code-implementer` 在白名单命中时声明 `require_full_validation=true`，主会话据此追加 `test-validator` 和 `project-steward`，并向用户事后告知。
 4. 不委派 `test-validator`（除非自动升级触发）。
-5. `project-steward` 仅在文件增删/重命名/职责变化、需求状态变化、规则变化时启动。
+5. `project-steward` 仅在需求状态变化、规则变化时启动；普通文件变化不再自动触发目录树检查或更新。
 
 handoff 必须包含 `task_tier: standard` 字段；code-implementer 必须按 routing.md §2 的 `task_tier=standard` 读取策略跳过 `validation-routing.md` 全文。
 
@@ -141,7 +141,7 @@ handoff 必须包含 `task_tier: full` 字段；三个 subagent 都按 routing.m
 
 1. 使用 `changed-files-gate` 获取当前真实变更范围。
 2. 读取 `ai_shared/rules/documentation.md` 和 `reporting.md`。
-3. 新增、删除、移动、重命名文件，或文件职责变化时，使用 `project-tree-update`。
+3. 仅当用户明确要求时，才手动使用 `project-tree-update` 或 `project-tree-reset`；handoff 必须转述该用户请求，不因文件变化自动检查、执行或提示。
 4. 需求状态变化时，使用 `requirement-trace`。
 5. 需要归档报告时，直接按 `reporting.md` 写入 `ai_shared/reports/`，不再使用 report-archive skill。
 6. 规则体系变化时，使用 `rule-update`。
@@ -216,6 +216,7 @@ Agent result:
 
 ```text
 project-tree-reset
+project-tree-update
 heavy-regression
 commit-message
 rule-update
@@ -224,7 +225,7 @@ commit / push / reset / clean
 其他会修改 Git 历史、工作区状态或远端仓库状态的 Git/GitHub 写操作
 ```
 
-如果流程中需要判断是否执行 `requirement-trace`、`project-tree-update`，由 `project-steward` 按规则判断；真正创建或修改规则文件时，必须有 handoff 或用户 prompt 支持。
+如果流程中需要判断是否执行 `requirement-trace`，由 `project-steward` 按规则判断；`project-tree-update` 和 `project-tree-reset` 仅在用户明确要求时手动执行，handoff 必须转述该请求，不做例行检查。真正创建或修改规则文件时，必须有 handoff 或用户 prompt 支持。
 
 ## 8. 禁止事项
 

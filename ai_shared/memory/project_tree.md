@@ -3,7 +3,7 @@
 > 全量重建日期: 2026-07-13
 > 数据来源: 当前工作区真实文件扫描
 > 用途: 文件定位与职责导航；不能替代读取真实源码、测试、配置和 schema
-> 维护方式: 普通文件变化使用 `project-tree-update`；用户明确要求全量重建时使用 `project-tree-reset`
+> 维护方式: 仅在用户明确要求时，手动执行 `project-tree-update` 或 `project-tree-reset`；如由子 agent 执行，handoff 必须转述该请求；普通文件变化不自动检查或触发
 
 ## 1. 扫描口径
 

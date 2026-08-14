@@ -63,7 +63,7 @@ ai_shared/rules/coding.md
 ```text
 ## task_tier 读取策略
 - task_tier=light: 不启动本 agent
-- task_tier=standard: 仅当 changed-files-gate 检出新增/删除/重命名/职责变化，或需求/规则变化时启动；其他情况下不读本规则集
+- task_tier=standard: 仅当需求/规则变化时启动；普通文件变化不触发，其他情况下不读本规则集
 - task_tier=full: 全部按下面"必须读取"清单
 ```
 
@@ -84,7 +84,7 @@ ai_shared/rules/validation-routing.md
 ```
 
 如涉及需求状态，必须结合 `requirement-trace` skill。
-如涉及 project_tree 更新，必须结合 `project-tree-update` skill。
+仅当用户明确要求 project_tree 更新或重建时，才结合 `project-tree-update` 或 `project-tree-reset` skill；handoff 必须转述该请求，不做例行检查。
 如涉及规则体系变化，必须结合 `rule-update` skill。
 
 说明：

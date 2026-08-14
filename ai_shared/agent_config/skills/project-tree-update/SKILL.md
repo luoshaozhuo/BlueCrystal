@@ -1,24 +1,22 @@
 ---
 name: project-tree-update
-description: Use when files are added, removed, moved, renamed, or change responsibility and ai_shared/memory/project_tree.md needs an incremental update based on real file changes.
+description: Use only when the user explicitly requests an incremental update of ai_shared/memory/project_tree.md from real repository changes.
 ---
 
 # project-tree-update
 
 ## 1. 目的
 
-文件新增、删除、移动、重命名或职责变化后，增量更新 `ai_shared/memory/project_tree.md`。
+用户明确要求时，根据文件新增、删除、移动、重命名或职责变化，增量更新 `ai_shared/memory/project_tree.md`。
 
 ## 2. 触发条件
 
 必须使用：
-- 新增文件。
-- 删除文件。
-- 移动或重命名文件。
-- 文件职责变化。
-- 目录树与真实文件不一致。
+- 用户明确要求增量更新 project_tree。
+- handoff 明确转述用户对增量更新 project_tree 的请求。
 
 禁止使用：
+- 仅因文件新增、删除、移动、重命名、职责变化或目录树不一致而自动检查或触发。
 - 单纯读取 project_tree。
 - 无变更时重写整棵树。
 

@@ -54,7 +54,7 @@ ai_shared/rules/python-docstring-cn.md
 5. 应执行哪些语法/编译、lint、type-check、pytest 或其他语言验证命令。
 6. 是否涉及生产路径与工具/实验路径隔离。
 7. 是否涉及安全、审计、权限、lease、fencing、事务、重试、回滚、子进程、socket 或外部系统调用。
-8. 是否需要 project-tree-update / requirement-trace / rule-update，由 project-steward 后续处理。
+8. 是否需要 requirement-trace / rule-update，由 project-steward 后续处理；不自动检查 project-tree-update / project-tree-reset。
 
 ## 6. 输出格式
 

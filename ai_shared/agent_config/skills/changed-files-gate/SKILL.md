@@ -58,7 +58,7 @@ skill result:
 ## 5. 判定规则
 
 1. 出现 untracked 文件时必须列出。
-2. 出现删除、移动、重命名或职责变化时，project-steward 必须判断 project-tree-update。
+2. 不根据文件变化自动判断或触发 `project-tree-update` / `project-tree-reset`；两者仅响应用户的明确要求，handoff 必须转述该请求。
 3. 如果工作区存在与本轮无关的既有变更，必须标注，避免误改。
 
 ## 6. tier_hint 判定

@@ -24,3 +24,4 @@ ai_shared/rules/routing.md
 8. 不把工具/实验模块引入生产路径。
 9. 不自动执行 commit、push、reset、clean；其他会修改 Git 历史、工作区状态或远端仓库状态的命令也默认禁止自动执行。
 10. 不默认运行重回归或长测。
+11. `project-tree-update` 和 `project-tree-reset` 仅在用户明确要求时手动执行；handoff 必须转述该用户请求，不得例行检查或自动触发。
