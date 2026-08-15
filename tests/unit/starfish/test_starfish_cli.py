@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-import starfish.__main__ as starfish_cli
-from starfish.__main__ import main
+import pacific.starfish.__main__ as starfish_cli
+from pacific.starfish.__main__ import main
 from starfish.adapters.db_views import DbViewLoadError
 
 

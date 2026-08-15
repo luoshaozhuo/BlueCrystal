@@ -8,10 +8,10 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from starfish.adapters.protocols import ProtocolServerFactory
-from starfish.adapters.protocols.ads import AdsServer
-from starfish.adapters.protocols.iec104 import Iec104Server
-from starfish.core.definitions import PointItemDefinition, ServerDefinition
+from pacific.starfish.adapters.protocols import ProtocolServerFactory
+from pacific.starfish.adapters.protocols.ads import AdsServer
+from pacific.starfish.adapters.protocols.iec104 import Iec104Server
+from pacific.starfish.core.definitions import PointItemDefinition, ServerDefinition
 from starfish.core.config_frames import normalize_server_config_frame
 
 

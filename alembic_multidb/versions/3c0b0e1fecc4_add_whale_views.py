@@ -9,7 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 
-from whale.shared.persistence.views.registry import ALL_VIEW_DEFINITIONS
+from pacific.whale.shared.persistence.views.registry import ALL_VIEW_DEFINITIONS
 
 # revision identifiers, used by Alembic.
 revision: str = '3c0b0e1fecc4'

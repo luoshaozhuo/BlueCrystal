@@ -21,8 +21,8 @@ from starfish.adapters.db_views.iec104 import (
     Iec104DbViewLoadError,
     Iec104DbViewLoader,
 )
-from starfish.adapters.protocols.ads import AdsServer
-from starfish.adapters.protocols.iec104 import Iec104Server
+from pacific.starfish.adapters.protocols.ads import AdsServer
+from pacific.starfish.adapters.protocols.iec104 import Iec104Server
 
 pytestmark = [pytest.mark.integration, pytest.mark.external, pytest.mark.starfish]
 

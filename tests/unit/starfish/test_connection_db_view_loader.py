@@ -14,14 +14,14 @@ import pandas as pd
 import pytest
 from sqlalchemy.engine import Engine
 
-import starfish.composition as composition
+import pacific.starfish.composition as composition
 from starfish.adapters.db_views import ConnectionDbViewLoader, DbViewLoadError
 from starfish.core.config_frames import (
     CONNECTION_FRAME_COLUMNS,
     empty_server_config_frame,
     normalize_server_config_frame,
 )
-from starfish.core.definitions import ServerDefinition, ServerStatus
+from pacific.starfish.core.definitions import ServerDefinition, ServerStatus
 
 
 class _FakeResult:
