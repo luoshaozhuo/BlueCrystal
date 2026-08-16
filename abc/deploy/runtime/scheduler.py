@@ -26,7 +26,7 @@ class ScheduledTask:
     paused: bool
 
 
-class RuntimeScheduler:
+class TaskScheduler:
     """Ingest 运行时调度器."""
 
     JOB_ID_PREFIX = "task:"
@@ -57,11 +57,13 @@ class RuntimeScheduler:
         """启动调度器."""
         if not self._scheduler.running:
             self._scheduler.start()
+        print("scheduler start")
 
     def stop(self) -> None:
         """停止调度器."""
         if self._scheduler.running:
             self._scheduler.shutdown(wait=False)
+        print("scheduler stop")
 
     def schedule_interval(
         self,
@@ -120,7 +122,7 @@ class RuntimeScheduler:
         return self.get(task_id)
 
     def run_now(self, task_id: int) -> None:
-        """立即执行一次任务，不改变原有调度计划."""
+        """立即执行一次任务"""
         self._scheduler.add_job(
             self._runner,
             args=(task_id,),

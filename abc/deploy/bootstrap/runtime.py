@@ -1,4 +1,4 @@
-"""Ingest 应用装配入口."""
+"""应用装配入口."""
 
 from __future__ import annotations
 import asyncio
@@ -7,12 +7,11 @@ from enum import StrEnum
 
 import uvicorn
 
-from deploy.runtime.api import create_api
-from deploy.runtime.scheduler import RuntimeScheduler
-
+from deploy.runtime.scheduler import TaskScheduler
+from deploy.runtime.web.app import create_api
 
 class RuntimeMode(StrEnum):
-    """Ingest 运行模式."""
+    """应用运行模式."""
 
     STANDALONE = "standalone"
     ACTIVE_STANDBY = "active_standby"
@@ -28,8 +27,8 @@ async def execute_task(task_id: int) -> None:
     print(f"execute ingest task: {task_id}")
 
 
-class StandaloneApplication:
-    """Standalone Ingest 应用."""
+class StandaloneRuntime:
+    """Standalone 应用."""
 
     def __init__(
         self,
@@ -37,7 +36,7 @@ class StandaloneApplication:
         port: int = 8000,
     ) -> None:
         """初始化."""
-        self._scheduler = RuntimeScheduler(execute_task)
+        self._scheduler = TaskScheduler(execute_task)
         self._api = create_api(self._scheduler)
 
         self._server = uvicorn.Server(
@@ -59,12 +58,12 @@ class StandaloneApplication:
             self._scheduler.stop()
 
 
-def app_factory(mode: RuntimeMode) -> StandaloneApplication:
+def runtime_factory(mode: RuntimeMode, slave:bool =False) -> StandaloneRuntime:
     """创建指定运行模式的 Application."""
     if mode == RuntimeMode.STANDALONE:
-        return StandaloneApplication()
+        return StandaloneRuntime()
 
     raise ValueError(f"Unsupported runtime mode: {mode}")
 
 if __name__ == "__main__":
-    asyncio.run(app_factory(RuntimeMode.STANDALONE).run())
+    asyncio.run(runtime_factory(RuntimeMode.STANDALONE).run())

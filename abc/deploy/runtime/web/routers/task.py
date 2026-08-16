@@ -1,17 +1,13 @@
-"""Ingest 运行时管理 API."""
+"""定义了任务相关的路由接口"""
 
 from __future__ import annotations
 
-from datetime import datetime
-
-from fastapi import FastAPI, HTTPException, Response, status
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
+from datetime import datetime
+from fastapi import HTTPException, Response, status
 
-from deploy.runtime.scheduler import (
-    RuntimeScheduler,
-    ScheduledTask,
-    ScheduledTaskNotFoundError,
-)
+from deploy.runtime.scheduler import TaskScheduler, ScheduledTask, ScheduledTaskNotFoundError
 
 
 class ScheduleIntervalRequest(BaseModel):
@@ -28,45 +24,42 @@ class ScheduledTaskResponse(BaseModel):
     paused: bool
 
 
-class RuntimeStatusResponse(BaseModel):
-    """运行时状态响应."""
-
-    scheduler_running: bool
-    scheduled_task_count: int
-
-
-def create_api(scheduler: RuntimeScheduler) -> FastAPI:
-    """创建 Ingest Management API."""
-
-    app = FastAPI(
-        title="BlueCrystal Ingest Management API",
-        version="0.1.0",
+def _to_response(task: ScheduledTask) -> ScheduledTaskResponse:
+    """转换为 API 响应模型."""
+    return ScheduledTaskResponse(
+        task_id=task.task_id,
+        next_run_time=task.next_run_time,
+        paused=task.paused,
     )
 
-    @app.get(
-        "/health",
-        response_model=RuntimeStatusResponse,
-    )
-    async def health() -> RuntimeStatusResponse:
-        """查询运行状态."""
-        tasks = scheduler.list()
 
-        return RuntimeStatusResponse(
-            scheduler_running=scheduler.running,
-            scheduled_task_count=len(tasks),
-        )
+def create_task_router(
+    scheduler: TaskScheduler,
+) -> APIRouter:
+    """创建绑定指定调度器的任务管理路由.
 
-    @app.get(
-        "/runtime/tasks",
+    Args:
+        scheduler: 承担任务查询、调度和状态切换的运行时调度器.
+
+    Returns:
+        路径前缀为 ``/task`` 的 FastAPI 路由器.
+    """
+
+    router = APIRouter(prefix="/tasks", tags=["task"])
+
+    @router.get(
+        "/",
         response_model=list[ScheduledTaskResponse],
+        summary="查询所有运行时任务",
     )
     async def list_tasks() -> list[ScheduledTaskResponse]:
         """查询所有运行时任务."""
         return [_to_response(task) for task in scheduler.list()]
 
-    @app.get(
-        "/runtime/tasks/{task_id}",
+    @router.get(
+        "/{task_id}",
         response_model=ScheduledTaskResponse,
+        summary="查询指定运行时任务",
     )
     async def get_task(task_id: int) -> ScheduledTaskResponse:
         """查询指定运行时任务."""
@@ -80,9 +73,10 @@ def create_api(scheduler: RuntimeScheduler) -> FastAPI:
 
         return _to_response(task)
 
-    @app.put(
-        "/runtime/tasks/{task_id}",
+    @router.put(
+        "/{task_id}",
         response_model=ScheduledTaskResponse,
+        summary="创建或更新周期运行任务",
     )
     async def schedule_task(
         task_id: int,
@@ -96,9 +90,10 @@ def create_api(scheduler: RuntimeScheduler) -> FastAPI:
 
         return _to_response(task)
 
-    @app.delete(
-        "/runtime/tasks/{task_id}",
+    @router.delete(
+        "/{task_id}",
         status_code=status.HTTP_204_NO_CONTENT,
+        summary="停止并移除运行时任务",
     )
     async def remove_task(task_id: int) -> Response:
         """停止并移除运行时任务."""
@@ -112,9 +107,10 @@ def create_api(scheduler: RuntimeScheduler) -> FastAPI:
 
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    @app.post(
-        "/runtime/tasks/{task_id}/pause",
+    @router.post(
+        "/{task_id}/pause",
         response_model=ScheduledTaskResponse,
+        summary="暂停运行时任务",
     )
     async def pause_task(task_id: int) -> ScheduledTaskResponse:
         """暂停运行时任务."""
@@ -128,9 +124,10 @@ def create_api(scheduler: RuntimeScheduler) -> FastAPI:
 
         return _to_response(task)
 
-    @app.post(
-        "/runtime/tasks/{task_id}/resume",
+    @router.post(
+        "/{task_id}/resume",
         response_model=ScheduledTaskResponse,
+        summary="恢复运行时任务",
     )
     async def resume_task(task_id: int) -> ScheduledTaskResponse:
         """恢复运行时任务."""
@@ -144,9 +141,10 @@ def create_api(scheduler: RuntimeScheduler) -> FastAPI:
 
         return _to_response(task)
 
-    @app.post(
-        "/runtime/tasks/{task_id}/run",
+    @router.post(
+        "/{task_id}/run",
         status_code=status.HTTP_202_ACCEPTED,
+        summary="立即执行一次任务",
     )
     async def run_task(task_id: int) -> dict[str, int]:
         """立即执行一次任务."""
@@ -154,13 +152,4 @@ def create_api(scheduler: RuntimeScheduler) -> FastAPI:
 
         return {"task_id": task_id}
 
-    return app
-
-
-def _to_response(task: ScheduledTask) -> ScheduledTaskResponse:
-    """转换为 API 响应模型."""
-    return ScheduledTaskResponse(
-        task_id=task.task_id,
-        next_run_time=task.next_run_time,
-        paused=task.paused,
-    )
+    return router
