@@ -11,8 +11,8 @@ from deploy.runtime.web.routers.health import create_health_router
 from deploy.runtime.scheduler import TaskScheduler
 
 
-def create_api(scheduler: TaskScheduler) -> fastapi.FastAPI:
-    """创建 Ingest Management API."""
+def create_web_api(scheduler: TaskScheduler) -> fastapi.FastAPI:
+    """创建运行时部署模式的 Web API."""
 
     app = fastapi.FastAPI(
         title="BlueCrystal",

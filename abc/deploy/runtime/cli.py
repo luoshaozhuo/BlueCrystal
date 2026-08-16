@@ -9,9 +9,10 @@ main = Typer()
 
 @main.command('run')
 def run(
+    host: Annotated[str, Option('--host', help="主机地址")] = "0.0.0.0",
+    port: Annotated[int, Option('--port', help="端口号")] = 8000,
     mode: Annotated[RuntimeMode, Option('--mode', help="运行模式")] = RuntimeMode.STANDALONE,
-    slave: Annotated[bool, Option('--slave', help="只在主从模式下使用，默认是master")] = False,
 ) -> None:
     """运行时部署模式的入口命令."""
-    runtime = runtime_factory(mode, slave=slave)
+    runtime = runtime_factory(host, port, mode)
     asyncio.run(runtime.run())

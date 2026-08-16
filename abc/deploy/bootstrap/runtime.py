@@ -8,7 +8,7 @@ from enum import StrEnum
 import uvicorn
 
 from deploy.runtime.scheduler import TaskScheduler
-from deploy.runtime.web.app import create_api
+from deploy.runtime.web.app import create_web_api
 
 class RuntimeMode(StrEnum):
     """应用运行模式."""
@@ -37,7 +37,7 @@ class StandaloneRuntime:
     ) -> None:
         """初始化."""
         self._scheduler = TaskScheduler(execute_task)
-        self._api = create_api(self._scheduler)
+        self._api = create_web_api(self._scheduler)
 
         self._server = uvicorn.Server(
             uvicorn.Config(
@@ -58,10 +58,10 @@ class StandaloneRuntime:
             self._scheduler.stop()
 
 
-def runtime_factory(mode: RuntimeMode, slave:bool =False) -> StandaloneRuntime:
+def runtime_factory(host:str, port:int, mode: RuntimeMode) -> StandaloneRuntime:
     """创建指定运行模式的 Application."""
     if mode == RuntimeMode.STANDALONE:
-        return StandaloneRuntime()
+        return StandaloneRuntime(host=host, port=port)
 
     raise ValueError(f"Unsupported runtime mode: {mode}")
 
