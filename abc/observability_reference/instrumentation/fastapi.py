@@ -6,7 +6,7 @@ from time import perf_counter
 
 from fastapi import FastAPI, Request
 
-from deploy.observability.shared import bind_observation_context, new_request_id
+from abc.observability_reference.shared import bind_observation_context, new_request_id
 
 from .hooks import InstrumentationHooks, safe_observe
 

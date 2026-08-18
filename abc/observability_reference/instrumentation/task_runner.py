@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from time import perf_counter
 
-from deploy.observability.shared import bind_observation_context
+from abc.observability_reference.shared import bind_observation_context
 
 from .hooks import InstrumentationHooks, safe_observe
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from deploy.observability.shared import bind_observation_context
+from abc.observability_reference.shared import bind_observation_context
 
 from .service import LogService
 

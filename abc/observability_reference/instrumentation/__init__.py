@@ -7,6 +7,7 @@ from .apscheduler import (
     install_apscheduler_instrumentation,
     uninstall_apscheduler_instrumentation,
 )
+from .composite import CompositeInstrumentationHooks
 from .fastapi import install_fastapi_instrumentation
 from .hooks import InstrumentationHooks, NullInstrumentationHooks, safe_observe
 from .task_runner import ObservedTaskRunner, TaskRunner, instrument_task_runner
@@ -14,6 +15,7 @@ from .task_runner import ObservedTaskRunner, TaskRunner, instrument_task_runner
 __all__ = [
     "APSCHEDULER_OBSERVABILITY_EVENT_MASK",
     "APSchedulerListener",
+    "CompositeInstrumentationHooks",
     "InstrumentationHooks",
     "NullInstrumentationHooks",
     "ObservedTaskRunner",

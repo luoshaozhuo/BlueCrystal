@@ -87,6 +87,7 @@ Thumbs.db
 /tests/*
 !/tests/unit/
 /tests/unit/*
+!/tests/unit/test_deploy_observability_reference_imports.py
 !/tests/unit/test_deploy_runtime_web_app.py
 !/tests/unit/starfish/
 /tests/unit/starfish/*
