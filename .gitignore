@@ -38,7 +38,6 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
 
 # Root-level local check outputs (must stay in tmp/)
 /all_test_output.txt
