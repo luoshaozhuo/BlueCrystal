@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from types import MappingProxyType
 from uuid import uuid4
 
-from deploy.observability.shared import get_observation_context
+from observability_reference.shared import get_observation_context
 
 from .models import AuditQuery, AuditRecord, AuditResult
 from .ports import AuditStore

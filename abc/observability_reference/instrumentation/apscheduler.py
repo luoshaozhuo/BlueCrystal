@@ -1,9 +1,8 @@
-"""APScheduler 3.x 事件监听适配."""
+"""APScheduler 3.x 技术事件监听适配."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
 
 from apscheduler.events import (
     EVENT_JOB_MAX_INSTANCES,
@@ -15,6 +14,8 @@ from apscheduler.events import (
     SchedulerEvent,
 )
 from apscheduler.schedulers.base import BaseScheduler
+
+from observability_reference.shared import bind_scheduler_event_context
 
 from .hooks import InstrumentationHooks, safe_observe
 
@@ -35,20 +36,17 @@ def create_apscheduler_listener(
     *,
     task_job_id_prefix: str = DEFAULT_TASK_JOB_ID_PREFIX,
 ) -> APSchedulerListener:
-    """创建 APScheduler -> BlueCrystal Observability 的事件监听器.
-
-    Task success/failure/duration 不在这里重复记录，而由 ``ObservedTaskRunner``
-    负责。这里仅记录 Scheduler 自己才能可靠判断的事实，例如 misfire 和
-    max_instances。
-    """
+    """创建 APScheduler -> Observability Listener."""
 
     def listener(event: SchedulerEvent) -> None:
         if event.code == EVENT_SCHEDULER_STARTED:
-            safe_observe(hooks.scheduler_started)
+            with bind_scheduler_event_context():
+                safe_observe(hooks.scheduler_started)
             return
 
         if event.code == EVENT_SCHEDULER_SHUTDOWN:
-            safe_observe(hooks.scheduler_stopped)
+            with bind_scheduler_event_context():
+                safe_observe(hooks.scheduler_stopped)
             return
 
         if event.code == EVENT_JOB_MISSED:
@@ -57,11 +55,12 @@ def create_apscheduler_listener(
             task_id = _parse_task_id(event.job_id, task_job_id_prefix)
             if task_id is None:
                 return
-            safe_observe(
-                hooks.scheduler_job_missed,
-                task_id=task_id,
-                scheduled_run_time=event.scheduled_run_time,
-            )
+
+            with bind_scheduler_event_context(task_id):
+                safe_observe(
+                    hooks.scheduler_job_missed,
+                    scheduled_run_time=event.scheduled_run_time,
+                )
             return
 
         if event.code == EVENT_JOB_MAX_INSTANCES:
@@ -70,11 +69,12 @@ def create_apscheduler_listener(
             task_id = _parse_task_id(event.job_id, task_job_id_prefix)
             if task_id is None:
                 return
-            safe_observe(
-                hooks.scheduler_job_max_instances,
-                task_id=task_id,
-                scheduled_run_times=tuple(event.scheduled_run_times),
-            )
+
+            with bind_scheduler_event_context(task_id):
+                safe_observe(
+                    hooks.scheduler_job_max_instances,
+                    scheduled_run_times=tuple(event.scheduled_run_times),
+                )
 
     return listener
 
@@ -85,10 +85,6 @@ def install_apscheduler_instrumentation(
     *,
     task_job_id_prefix: str = DEFAULT_TASK_JOB_ID_PREFIX,
 ) -> APSchedulerListener:
-    """把 Observability Listener 安装到 APScheduler 3.x 实例.
-
-    返回 listener 便于测试或关闭阶段调用 ``remove_listener()``。
-    """
     listener = create_apscheduler_listener(
         hooks,
         task_job_id_prefix=task_job_id_prefix,
@@ -101,17 +97,14 @@ def uninstall_apscheduler_instrumentation(
     scheduler: BaseScheduler,
     listener: APSchedulerListener,
 ) -> None:
-    """移除之前安装的 APScheduler Listener."""
     scheduler.remove_listener(listener)
 
 
 def _parse_task_id(job_id: str, prefix: str) -> int | None:
-    """从 BlueCrystal 周期 Job ID 中解析 task_id."""
     if not job_id.startswith(prefix):
         return None
 
-    raw = job_id.removeprefix(prefix)
     try:
-        return int(raw)
+        return int(job_id.removeprefix(prefix))
     except ValueError:
         return None

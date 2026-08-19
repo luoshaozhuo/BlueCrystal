@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 
-from abc.observability_reference.shared import get_observation_context
+from observability_reference.shared import get_observation_context
 
 from .models import (
     DiagnosticError,

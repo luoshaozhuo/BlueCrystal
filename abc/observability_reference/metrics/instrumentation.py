@@ -1,4 +1,4 @@
-"""Instrumentation 技术事实到 Metrics 的映射."""
+"""Instrumentation 事实 -> Metrics."""
 
 from __future__ import annotations
 
@@ -8,68 +8,48 @@ from .service import MetricService
 
 
 class MetricInstrumentationHooks:
-    """把 InstrumentationHooks 的事实映射为聚合指标.
-
-    不把 request_id/task_id/connection_id/raw path 作为 label，避免高基数。
-    """
+    """Metrics 只接收低基数字段；ID 从 Context 读取也不作为 label."""
 
     def __init__(self, metrics: MetricService) -> None:
         self._metrics = metrics
 
-    def http_request_started(self, *, method: str, path: str) -> None:
-        self._metrics.add_gauge(
-            "http_requests_in_flight",
-            1.0,
-            labels={"method": method.upper()},
-        )
+    def http_request_started(self) -> None:
+        self._metrics.add_gauge("http_requests_in_flight", 1.0)
 
     def http_request_finished(
         self,
         *,
-        method: str,
-        path: str,
         status_code: int,
         duration_seconds: float,
     ) -> None:
-        labels = {
-            "method": method.upper(),
-            "status_class": f"{status_code // 100}xx",
-        }
-        self._metrics.add_gauge(
-            "http_requests_in_flight",
-            -1.0,
-            labels={"method": method.upper()},
+        self._metrics.add_gauge("http_requests_in_flight", -1.0)
+        self._metrics.increment(
+            "http_requests_total",
+            labels={
+                "result": "success" if status_code < 500 else "server_error",
+                "status_class": f"{status_code // 100}xx",
+            },
         )
-        self._metrics.increment("http_requests_total", labels=labels)
         self._metrics.observe(
             "http_request_duration_seconds",
             duration_seconds,
-            labels=labels,
         )
 
     def http_request_failed(
         self,
         *,
-        method: str,
-        path: str,
         duration_seconds: float,
         exception: Exception,
     ) -> None:
-        labels = {"method": method.upper(), "status_class": "exception"}
-        self._metrics.add_gauge(
-            "http_requests_in_flight",
-            -1.0,
-            labels={"method": method.upper()},
-        )
-        self._metrics.increment("http_requests_total", labels=labels)
+        self._metrics.add_gauge("http_requests_in_flight", -1.0)
         self._metrics.increment(
-            "http_request_failures_total",
-            labels={"method": method.upper()},
+            "http_requests_total",
+            labels={"result": "exception"},
         )
         self._metrics.observe(
             "http_request_duration_seconds",
             duration_seconds,
-            labels=labels,
+            labels={"result": "exception"},
         )
 
     def scheduler_started(self) -> None:
@@ -81,68 +61,96 @@ class MetricInstrumentationHooks:
     def scheduler_job_missed(
         self,
         *,
-        task_id: int,
         scheduled_run_time: datetime,
     ) -> None:
-        self._metrics.increment("task_misfires_total")
+        self._metrics.increment("scheduler_job_missed_total")
 
     def scheduler_job_max_instances(
         self,
         *,
-        task_id: int,
         scheduled_run_times: tuple[datetime, ...],
     ) -> None:
         self._metrics.increment(
-            "task_max_instances_skips_total",
+            "scheduler_job_max_instances_total",
             amount=float(max(1, len(scheduled_run_times))),
         )
 
-    def task_execution_started(self, *, task_id: int) -> None:
+    def task_execution_started(self) -> None:
         self._metrics.add_gauge("task_executions_in_flight", 1.0)
 
     def task_execution_succeeded(
         self,
         *,
-        task_id: int,
         duration_seconds: float,
     ) -> None:
-        self._finish_task_execution("success", duration_seconds)
+        self._finish_execution(
+            result="success",
+            duration_seconds=duration_seconds,
+        )
 
     def task_execution_failed(
         self,
         *,
-        task_id: int,
         duration_seconds: float,
         exception: Exception,
     ) -> None:
-        self._finish_task_execution("failure", duration_seconds)
-        self._metrics.increment("task_execution_failures_total")
+        self._finish_execution(
+            result="failure",
+            duration_seconds=duration_seconds,
+        )
 
     def task_execution_cancelled(
         self,
         *,
-        task_id: int,
         duration_seconds: float,
     ) -> None:
-        self._finish_task_execution("cancelled", duration_seconds)
-        self._metrics.increment("task_execution_cancellations_total")
+        self._finish_execution(
+            result="cancelled",
+            duration_seconds=duration_seconds,
+        )
 
-    def task_scheduled(self, *, task_id: int) -> None:
-        self._scheduler_operation("schedule")
+    def task_scheduled(self) -> None:
+        self._task_operation("scheduled")
 
-    def task_removed(self, *, task_id: int) -> None:
-        self._scheduler_operation("remove")
+    def task_removed(self) -> None:
+        self._task_operation("removed")
 
-    def task_paused(self, *, task_id: int) -> None:
-        self._scheduler_operation("pause")
+    def task_paused(self) -> None:
+        self._task_operation("paused")
 
-    def task_resumed(self, *, task_id: int) -> None:
-        self._scheduler_operation("resume")
+    def task_resumed(self) -> None:
+        self._task_operation("resumed")
 
-    def task_run_requested(self, *, task_id: int) -> None:
-        self._scheduler_operation("run_now")
+    def task_run_requested(self) -> None:
+        self._task_operation("run_requested")
 
-    def _finish_task_execution(self, result: str, duration_seconds: float) -> None:
+    def audit_operation_succeeded(
+        self,
+        *,
+        status_code: int | None = None,
+    ) -> None:
+        self._metrics.increment(
+            "audit_operations_total",
+            labels={"result": "success"},
+        )
+
+    def audit_operation_failed(
+        self,
+        *,
+        status_code: int | None = None,
+        exception: BaseException | None = None,
+    ) -> None:
+        self._metrics.increment(
+            "audit_operations_total",
+            labels={"result": "failure"},
+        )
+
+    def _finish_execution(
+        self,
+        *,
+        result: str,
+        duration_seconds: float,
+    ) -> None:
         self._metrics.add_gauge("task_executions_in_flight", -1.0)
         self._metrics.increment(
             "task_executions_total",
@@ -154,8 +162,8 @@ class MetricInstrumentationHooks:
             labels={"result": result},
         )
 
-    def _scheduler_operation(self, operation: str) -> None:
+    def _task_operation(self, operation: str) -> None:
         self._metrics.increment(
-            "scheduler_task_operations_total",
+            "task_operations_total",
             labels={"operation": operation},
         )

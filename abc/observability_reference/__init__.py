@@ -1,5 +1,5 @@
-"""可观测性能力的部署参考实现。
+"""BlueCrystal Observability Reference Implementation.
 
-本包用于展示日志、指标、诊断、审计及框架埋点的分层装配方式，不作为
-``src`` 下独立生产 observability 包的兼容入口。
+用于解释 Observability 内部机制；生产实现可以替换为第三方 telemetry 库，
+但应保留这里定义的语义边界与 Context / Hook contract。
 """

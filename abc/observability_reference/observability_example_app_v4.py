@@ -1,52 +1,60 @@
-"""FastAPI + APScheduler + Observability 最小完整示例（声明式 Audit）."""
+"""FastAPI + APScheduler + Observability Reference v0_8.
+
+关键规则：
+1. Context 只在 Middleware / Wrapper / Route Adapter / semantic helper 边界注入；
+2. Hook 不再重复传 request_id/task_id/method/path/actor 等 Context 数据；
+3. Audit 进入统一 CompositeInstrumentationHooks。
+"""
 
 from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 import uvicorn
-from apscheduler.jobstores.base import JobLookupError
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 
-from deploy.observability.audit import (
+from observability_reference.audit import (
+    AuditInstrumentationHooks,
     AuditQuery,
     AuditService,
     audit_action,
     install_fastapi_audit,
 )
-from deploy.observability.audit.adapters import SQLiteAuditStore
-from deploy.observability.diagnostics import (
+from observability_reference.audit.adapters import SQLiteAuditStore
+from observability_reference.diagnostics import (
     DiagnosticInstrumentationHooks,
     DiagnosticService,
     InMemoryDiagnosticStore,
 )
-from deploy.observability.instrumentation import (
+from observability_reference.instrumentation import (
     CompositeInstrumentationHooks,
     install_apscheduler_instrumentation,
     install_fastapi_instrumentation,
     instrument_task_runner,
-    safe_observe,
+    instrument_task_scheduler,
 )
-from deploy.observability.logs import LogInstrumentationHooks, LogService
-from deploy.observability.logs.adapters import ConsoleLogSink, RollingFileLogSink
-from deploy.observability.metrics import (
+from observability_reference.logs import LogInstrumentationHooks, LogService
+from observability_reference.logs.adapters import ConsoleLogSink, RollingFileLogSink
+from observability_reference.metrics import (
     InMemoryMetricRegistry,
     MetricInstrumentationHooks,
     MetricService,
 )
-from deploy.observability.shared import initialize_runtime_context
+from observability_reference.shared import initialize_runtime_context
+from observability_reference.task_scheduler_reference import (
+    ScheduledTaskNotFoundError,
+    TaskScheduler,
+)
 
 
 TASK_ID = 1
 RECURRING_JOB_ID = f"task:{TASK_ID}"
 
 initialize_runtime_context(
-    runtime_id="observability-demo",
+    runtime_id="observability-reference-demo",
     node_id="local",
 )
 
@@ -54,20 +62,18 @@ logs = LogService(
     [
         ConsoleLogSink(),
         RollingFileLogSink(
-            Path("data/observability-demo/app.log"),
+            Path("data/observability-reference/app.log"),
             max_bytes=5 * 1024 * 1024,
             backup_count=3,
         ),
     ]
 )
-
 metrics = MetricService(InMemoryMetricRegistry())
 diagnostics = DiagnosticService(InMemoryDiagnosticStore())
-
 audit = AuditService(
     [
         SQLiteAuditStore(
-            Path("data/observability-demo/audit.sqlite3")
+            Path("data/observability-reference/audit.sqlite3")
         )
     ],
     strict=False,
@@ -78,12 +84,14 @@ hooks = CompositeInstrumentationHooks(
         LogInstrumentationHooks(logs),
         MetricInstrumentationHooks(metrics),
         DiagnosticInstrumentationHooks(diagnostics),
+        AuditInstrumentationHooks(audit),
     ]
 )
 
 
 async def demo_task(task_id: int) -> None:
-    """示例业务任务：不依赖 Observability."""
+    """真实业务 Task 不主动操作 ObservationContext."""
+
     print(f"demo task running: task_id={task_id}")
     await asyncio.sleep(1)
 
@@ -93,10 +101,15 @@ observed_task = instrument_task_runner(
     hooks,
 )
 
-scheduler = AsyncIOScheduler()
+raw_scheduler = TaskScheduler(observed_task)
 
 install_apscheduler_instrumentation(
-    scheduler,
+    raw_scheduler.apscheduler,
+    hooks,
+)
+
+scheduler = instrument_task_scheduler(
+    raw_scheduler,
     hooks,
 )
 
@@ -105,19 +118,9 @@ install_apscheduler_instrumentation(
 async def lifespan(app: FastAPI):
     diagnostics.runtime_starting()
 
-    scheduler.add_job(
-        observed_task,
-        trigger="interval",
-        seconds=5,
-        id=RECURRING_JOB_ID,
-        args=(TASK_ID,),
-        max_instances=1,
-        coalesce=False,
-        replace_existing=True,
-    )
-    safe_observe(
-        hooks.task_scheduled,
-        task_id=TASK_ID,
+    scheduler.schedule_interval(
+        TASK_ID,
+        interval_ms=5000,
     )
 
     scheduler.start()
@@ -129,10 +132,9 @@ async def lifespan(app: FastAPI):
         diagnostics.runtime_stopping()
 
         if scheduler.running:
-            scheduler.shutdown(wait=False)
+            scheduler.stop()
 
         diagnostics.runtime_stopped()
-
         audit.flush()
         audit.close()
         logs.flush()
@@ -140,133 +142,110 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Observability Minimal Example",
+    title="Observability Reference v0_8",
     lifespan=lifespan,
 )
 
-# 先安装通用 HTTP Observability，再安装声明式 Audit。
-# 两者都必须在需要 Audit 的 Route 注册之前完成。
+# 统一 HTTP Middleware 同时建立：
+# request_id / method / path / actor / source
 install_fastapi_instrumentation(
     app,
     hooks,
 )
 
+# Audit Adapter 不再持有 AuditService，只产生统一 Hook。
 install_fastapi_audit(
     app,
-    audit,
+    hooks,
 )
 
 
 @app.get("/")
 async def root() -> dict[str, object]:
     return {
-        "name": "observability-minimal-example",
+        "name": "observability-reference-v0_8",
         "task_id": TASK_ID,
         "interval_seconds": 5,
     }
 
 
-@app.post("/tasks/1/run")
+@app.post("/tasks/{task_id}/run")
 @audit_action(
     operation="task.run",
     target_type="task",
-    target_arg=None,
+    target_arg="task_id",
 )
-async def run_task_once() -> dict[str, object]:
-    scheduler.add_job(
-        observed_task,
-        trigger="date",
-        run_date=datetime.now(timezone.utc),
-        args=(TASK_ID,),
-    )
-
-    safe_observe(
-        hooks.task_run_requested,
-        task_id=TASK_ID,
-    )
+async def run_task_once(task_id: int) -> dict[str, object]:
+    scheduler.run_now(task_id)
 
     return {
-        "task_id": TASK_ID,
+        "task_id": task_id,
         "submitted": True,
     }
 
 
-@app.post("/tasks/1/pause")
+@app.post("/tasks/{task_id}/pause")
 @audit_action(
     operation="task.pause",
     target_type="task",
-    target_arg=None,
+    target_arg="task_id",
 )
-async def pause_task() -> dict[str, object]:
+async def pause_task(task_id: int) -> dict[str, object]:
     try:
-        scheduler.pause_job(RECURRING_JOB_ID)
-    except JobLookupError as exc:
+        scheduler.pause(task_id)
+    except ScheduledTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
             detail="task not found",
         ) from exc
 
-    safe_observe(
-        hooks.task_paused,
-        task_id=TASK_ID,
-    )
 
     return {
-        "task_id": TASK_ID,
+        "task_id": task_id,
         "paused": True,
     }
 
 
-@app.post("/tasks/1/resume")
+@app.post("/tasks/{task_id}/resume")
 @audit_action(
     operation="task.resume",
     target_type="task",
-    target_arg=None,
+    target_arg="task_id",
 )
-async def resume_task() -> dict[str, object]:
+async def resume_task(task_id: int) -> dict[str, object]:
     try:
-        scheduler.resume_job(RECURRING_JOB_ID)
-    except JobLookupError as exc:
+        scheduler.resume(task_id)
+    except ScheduledTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
             detail="task not found",
         ) from exc
 
-    safe_observe(
-        hooks.task_resumed,
-        task_id=TASK_ID,
-    )
 
     return {
-        "task_id": TASK_ID,
+        "task_id": task_id,
         "paused": False,
     }
 
 
 @app.get("/metrics")
 async def get_metrics():
-    return jsonable_encoder(
-        metrics.snapshot()
-    )
+    return jsonable_encoder(metrics.snapshot())
 
 
 @app.get("/diagnostics/runtime")
 async def get_runtime_diagnostic():
-    return jsonable_encoder(
-        diagnostics.runtime()
-    )
+    return jsonable_encoder(diagnostics.runtime())
 
 
 @app.get("/diagnostics/scheduler")
 async def get_scheduler_diagnostic():
-    return jsonable_encoder(
-        diagnostics.scheduler()
-    )
+    return jsonable_encoder(diagnostics.scheduler())
 
 
-@app.get("/diagnostics/tasks/1")
-async def get_task_diagnostic():
-    diagnostic = diagnostics.task(TASK_ID)
+@app.get("/diagnostics/tasks/{task_id}")
+async def get_task_diagnostic(task_id: int):
+    diagnostic = diagnostics.task(task_id)
 
     if diagnostic is None:
         raise HTTPException(

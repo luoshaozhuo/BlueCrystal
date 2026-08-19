@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from types import MappingProxyType
 
-from abc.observability_reference.shared import get_observation_context
+from observability_reference.shared import get_observation_context
 
 from .models import ExceptionInfo, LogEvent, LogLevel
 from .ports import LogSink

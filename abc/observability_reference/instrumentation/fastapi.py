@@ -1,18 +1,30 @@
-"""FastAPI HTTP 请求的低侵入观测 Middleware."""
+"""FastAPI HTTP 统一 Context 与技术事实 Middleware."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from time import perf_counter
 
 from fastapi import FastAPI, Request
 
-from abc.observability_reference.shared import bind_observation_context, new_request_id
+from observability_reference.shared import bind_request_context, new_request_id
 
 from .hooks import InstrumentationHooks, safe_observe
 
 
 DEFAULT_REQUEST_ID_HEADER = "X-Request-ID"
 MAX_REQUEST_ID_LENGTH = 128
+ActorResolver = Callable[[Request], str | None]
+
+
+def default_actor_resolver(
+    request: Request,
+    *,
+    header_name: str = "X-Actor",
+) -> str | None:
+    """Reference 默认从 X-Actor 读取；生产环境应读取认证结果."""
+
+    return request.headers.get(header_name)
 
 
 def install_fastapi_instrumentation(
@@ -20,52 +32,53 @@ def install_fastapi_instrumentation(
     hooks: InstrumentationHooks,
     *,
     request_id_header: str = DEFAULT_REQUEST_ID_HEADER,
+    actor_resolver: ActorResolver | None = None,
+    source: str = "http",
 ) -> None:
-    """为 FastAPI 安装统一 Request Context 和 HTTP 观测 Middleware."""
+    """安装一个统一的 HTTP Observability Middleware.
+
+    Middleware 只在入口绑定一次 request/method/path/actor/source。
+    后续 Hook 不重复传递这些 Context 字段。
+    """
+
+    resolver = actor_resolver or default_actor_resolver
 
     @app.middleware("http")
     async def observability_middleware(request: Request, call_next):
-        method = request.method
-        path = request.url.path
         request_id = _request_id_from_header(
             request.headers.get(request_id_header)
         )
 
-        with bind_observation_context(request_id=request_id):
+        with bind_request_context(
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            actor=resolver(request),
+            source=source,
+        ):
             started_at = perf_counter()
-            safe_observe(
-                hooks.http_request_started,
-                method=method,
-                path=path,
-            )
+            safe_observe(hooks.http_request_started)
 
             try:
                 response = await call_next(request)
             except Exception as exc:
-                duration = perf_counter() - started_at
                 safe_observe(
                     hooks.http_request_failed,
-                    method=method,
-                    path=path,
-                    duration_seconds=duration,
+                    duration_seconds=perf_counter() - started_at,
                     exception=exc,
                 )
                 raise
 
-            duration = perf_counter() - started_at
             safe_observe(
                 hooks.http_request_finished,
-                method=method,
-                path=path,
                 status_code=response.status_code,
-                duration_seconds=duration,
+                duration_seconds=perf_counter() - started_at,
             )
             response.headers[request_id_header] = request_id
             return response
 
 
 def _request_id_from_header(value: str | None) -> str:
-    """接收安全的外部 request_id，否则生成新的 ID."""
     if value is None:
         return new_request_id()
 

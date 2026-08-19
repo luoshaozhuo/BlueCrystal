@@ -1,6 +1,6 @@
 <h1 class="title">Ingest 可观测性设计</h1>
 
-<p class="subtitle">v0_6 · 20260818</p>
+<p class="subtitle">v0_8 · 20260819</p>
 
 <style>
 body { font-family: "Microsoft YaHei"; font-size: 16px; line-height: 1.75; color: #24292f; }
@@ -261,43 +261,70 @@ Audit       -> SQLite Local Store
 
 ## 4.2 `ObservationContext`
 
-`ObservationContext` 只保存需要沿调用链传播的关联标识，不保存 timestamp。
+v0_8 将 `ObservationContext` 从“只存 ID”提升为**统一执行上下文**。原则是：
 
-<p class="table-caption">表 4-1 ObservationContext 字段</p>
+> **Context 保存“当前是谁 / 当前处于什么执行边界”；Hook 参数保存“本次事件发生了什么”。**
 
-| 字段 | 产生位置 | 语义 |
-|---|---|---|
-| `runtime_id` | Runtime 启动 | 当前 Runtime 实例 |
-| `node_id` | 多节点环境 | 当前节点 |
-| `request_id` | HTTP 入口 | 一次 Management 请求 |
-| `task_id` | Task 执行/操作 | Whale Task |
-| `connection_id` | Connection 交互 | 数据源连接 |
+因此下列信息进入 Context：
 
-每条 Log、Audit、Metric、Diagnostic 在自身创建时生成 timestamp。
+| 类别 | 字段 |
+|---|---|
+| Runtime | `runtime_id`、`node_id` |
+| HTTP Request | `request_id`、`http_method`、`http_path` |
+| Identity | `actor`、`source` |
+| Execution Subject | `task_id`、`connection_id` |
+| Management Operation | `operation`、`target_type`、`target_id` |
+
+而以下信息**不进入 Context**：
+
+```text
+status_code
+duration_seconds
+exception
+scheduled_run_time
+scheduled_run_times
+```
+
+它们属于某一次事件的事件载荷，继续作为 Hook 参数。
 
 ### 4.2.1 `ContextVar` 机制
 
-同一个 `_CONTEXT` 在不同 asyncio Context 中可以映射到不同 `ObservationContext`：
+同一个 `_CONTEXT` 在不同 asyncio Context 中可以映射到不同的不可变 `ObservationContext`：
 
 ```text
-Context A: _CONTEXT -> ObservationContext(task_id=100)
-Context B: _CONTEXT -> ObservationContext(task_id=200)
+Context A -> request_id=R1, actor=user-a
+Context B -> task_id=100
+Context C -> task_id=200
 ```
 
-`default=_EMPTY_CONTEXT` 只是当前 Context 没有显式值时的 fallback。`set()` 返回 Token，`reset(token)` 恢复进入作用域前的值。
+`set()` 返回 Token，`reset(token)` 在退出边界时恢复进入前的 Context，因此 Middleware、Wrapper、Listener 和 Route Adapter 可以安全嵌套。
 
-### 4.2.2 Scope 语义
+### 4.2.2 语义化 Context 边界
 
-<p class="table-caption">表 4-2 Context Scope 规则</p>
+v0_8 不鼓励业务代码直接使用通用 `bind_observation_context()`，而由基础设施使用语义化绑定器：
 
-| Scope | 设置字段 | 主动清空 |
+```text
+bind_request_context()
+bind_task_execution_context()
+bind_task_operation_context()
+bind_scheduler_event_context()
+bind_connection_context()
+bind_operation_context()
+```
+
+边界规则：
+
+| Boundary | 设置 | 主动清理 |
 |---|---|---|
-| Runtime | `runtime_id`、`node_id` | `request_id/task_id/connection_id` |
-| HTTP Request | `request_id` | `task_id/connection_id` |
-| Task Execution | `task_id` | `request_id/connection_id` |
-| Connection | `connection_id` | 通常保留上层 `task_id` |
+| Runtime | `runtime_id/node_id` | 其余为空 |
+| HTTP Request | `request_id/method/path/actor/source` | Task/Connection/Operation |
+| Task Execution | `task_id/source=scheduler` | HTTP/Actor/Connection/Operation |
+| Task Operation | `task_id` | 保留当前 Request/Actor |
+| Scheduler Event | `task_id/source=scheduler` | HTTP/Actor/Connection/Operation |
+| Connection | `connection_id` | 保留上层 Task |
+| Audit Operation | `operation/target_*` | 保留当前 Request/Actor |
 
-后续可在通用 `bind_observation_context()` 上封装 `bind_request_context()`、`bind_task_context()`、`bind_connection_context()`。
+这样 `ObservedTaskRunner` 与 HTTP Middleware 都会调用 Context Binder，但它们分别建立**不同的执行边界**，不是重复绑定同一职责。
 
 ## 4.3 Logs 核心对象
 
@@ -413,7 +440,7 @@ ConnectionDiagnostic（P1）
 
 ## 4.6 Audit 核心模型
 
-Audit 仍以 `AuditRecord` 作为最终持久化记录，但在 v0_6 中增加两个关键对象：
+Audit 仍以 `AuditRecord` 作为最终持久化记录，但在 v0_8 中增加两个关键对象：
 
 ```text
 AuditContext
@@ -547,77 +574,82 @@ InMemoryDiagnosticStore
 
 ## 5.5 Audit
 
-v0_6 将 Audit 从“业务函数显式调用 `audit.success()/audit.failure()`”调整为“业务语义声明 + 基础设施自动记录”。
+v0_8 将 Audit 正式并入统一 `InstrumentationHooks` 管线。
 
-逻辑链为：
+Audit 的 HTTP Adapter 不再直接依赖 `AuditService`：
 
 ```text
-HTTP Request
+HTTP Middleware
     ↓
-Audit Context Middleware
-    ├── actor
-    └── source
+bind_request_context()
+    request_id/method/path/actor/source
     ↓
 AuditedAPIRoute
     ↓
-读取 endpoint 上的 AuditSpec
+bind_operation_context()
+    operation/target_type/target_id
     ↓
-调用原 Route Handler
-    ├── 正常返回 / 2xx、3xx -> SUCCESS
-    └── 异常或 >= 400       -> FAILURE
+audit_operation_succeeded()
+或
+audit_operation_failed()
+    ↓
+CompositeInstrumentationHooks
+    ↓
+AuditInstrumentationHooks
     ↓
 AuditService
     ↓
 AuditStore
-    ↓
-SQLiteAuditStore
 ```
 
-业务代码只需要声明：
+因此 `audit/` 与其它 capability 一样拥有：
+
+```text
+audit/instrumentation.py
+```
+
+`AuditInstrumentationHooks` 从 `ObservationContext` 取得 actor/source/request_id/operation/target，再把事件转换为 `AuditRecord`。
+
+业务 endpoint 仍只需要：
 
 ```python
-@app.post("/tasks/{task_id}/pause")
 @audit_action(
     operation="task.pause",
     target_type="task",
     target_arg="task_id",
 )
-async def pause_task(task_id: int):
-    ...
 ```
 
-不再出现：
-
-```python
-try:
-    ...
-except Exception as exc:
-    audit.failure(...)
-    raise
-else:
-    audit.success(...)
-```
-
-这里必须区分两个概念：
-
-> **Audit 的业务语义必须由业务边界声明，但 Audit 的控制流和持久化不应侵入业务函数。**
-
-`AuditService.success()/failure()` 可以继续作为底层 API 或非 Web 场景的兼容接口，但 FastAPI Router 默认不直接调用它们。
+Router 不显式调用 `audit.success()/audit.failure()`。
 
 ## 5.6 Composite Instrumentation
 
-Logs、Metrics、Diagnostics 可以共享一次 Instrumentation 事实：
+v0_8 的 Composite 是统一 Producer-facing Hook Contract：
 
 ```text
-Instrumentation Fact
-    ├── LogInstrumentationHooks
-    ├── MetricInstrumentationHooks
-    └── DiagnosticInstrumentationHooks
+Instrumentation Producer
+        ↓
+CompositeInstrumentationHooks
+        ├── LogInstrumentationHooks
+        ├── MetricInstrumentationHooks
+        ├── DiagnosticInstrumentationHooks
+        └── AuditInstrumentationHooks
 ```
 
-每个 capability 的失败均被隔离。
+一个关键调整是：
 
----
+> capability consumer 可以只实现自己关心的 Hook，不再机械实现整个 `InstrumentationHooks`。
+
+`CompositeInstrumentationHooks` 使用 `getattr()` 做可选分发。例如 Audit 只需要实现：
+
+```text
+audit_operation_succeeded
+audit_operation_failed
+```
+
+而无需实现 HTTP、Scheduler、TaskRunner 的所有 no-op 方法。
+
+这使 `InstrumentationHooks` 可以继续作为统一 Producer Contract，而 capability 侧保持低耦合。
 
 # 6. 实现策略与业务代码侵入控制
 
@@ -627,21 +659,96 @@ Instrumentation Fact
 
 低侵入不等于“业务代码一行 Observability 都不能出现”。只有业务层知道的事实，显式一行 Semantic Hook 比从框架事件猜测更可靠。
 
-## 6.2 FastAPI Middleware
+## 6.2 Observability 插入点总览
 
-FastAPI 可以定义多个 `@app.middleware("http")`，多个 Middleware 按洋葱结构嵌套。Observability Middleware 只负责自己的横切职责：
+从收到 Management HTTP Request，到 TaskScheduler 管理，再到 APScheduler 调度和真实 Task 执行，采用下表所示的扩展机制：
+
+| 链路位置 | 插入方式 | 主要负责 |
+|---|---|---|
+| HTTP 请求 | FastAPI Middleware | Request Context；HTTP started / finished / failed |
+| Audit 管理操作 | `@audit_action` + 自定义 `APIRoute` | operation / target；Audit success / failure |
+| TaskScheduler 管理动作 | `ObservedTaskScheduler` Wrapper | scheduled / removed / paused / resumed / run_requested |
+| APScheduler | Listener | scheduler started / stopped；misfire；max_instances |
+| Task 执行 | `ObservedTaskRunner` Wrapper | execution started / succeeded / failed / cancelled |
+
+其中前三条技术执行链可简化理解为：
+
+| 链路位置 | 插入方式 | 主要负责 |
+|---|---|---|
+| HTTP 请求 | FastAPI Middleware | request context、HTTP started/finished/failed |
+| APScheduler | Listener | scheduler started/stopped、misfire、max_instances |
+| Task 执行 | Wrapper / `ObservedTaskRunner` | execution started/succeeded/failed/cancelled |
+
+<p class="figure-caption">图 6-1 Observability 全链路插入位置</p>
+
+```mermaid
+%%{init: {"flowchart": {"useMaxWidth": true}}}%%
+flowchart LR
+    REQ["HTTP Request"]
+    MW["FastAPI Middleware"]
+    AR["AuditedAPIRoute<br/>@audit_action"]
+    API["Management API"]
+    TS["ObservedTaskScheduler<br/>Wrapper"]
+    APS["APScheduler"]
+    LIS["Listener"]
+    RUN["ObservedTaskRunner<br/>Wrapper"]
+    TASK["真实 Task"]
+    H["CompositeInstrumentationHooks"]
+
+    REQ --> MW --> AR --> API --> TS --> APS --> RUN --> TASK
+    APS -. "scheduler events" .-> LIS
+
+    MW -->|"HTTP hooks"| H
+    AR -->|"Audit hooks"| H
+    TS -->|"Semantic hooks"| H
+    LIS -->|"Scheduler hooks"| H
+    RUN -->|"Execution hooks"| H
+```
+
+这里应区分：
+
+- **TaskScheduler**：BlueCrystal 的管理语义层，知道 `schedule/remove/pause/resume/run_now`；
+- **APScheduler**：底层调度框架，只产生自身技术事件；
+- **ObservedTaskRunner**：真正 Task 函数的执行边界；
+- **AuditedAPIRoute**：管理操作的审计边界。
+
+## 6.3 FastAPI Middleware
+
+v0_8 使用一个统一 HTTP Observability Middleware 建立 HTTP Context：
+
+```python
+with bind_request_context(
+    request_id=request_id,
+    method=request.method,
+    path=request.url.path,
+    actor=actor_resolver(request),
+    source="http",
+):
+    ...
+```
+
+因此后续 Hook 不再重复传递：
 
 ```text
 request_id
-HTTP duration
-HTTP status
-HTTP exception
-HTTP metrics
+method
+path
+actor
+source
 ```
 
-认证、CORS、压缩等职责继续使用独立 Middleware。
+例如：
 
-## 6.3 APScheduler Listener
+```python
+hooks.http_request_finished(
+    status_code=response.status_code,
+    duration_seconds=duration,
+)
+```
+
+其中 `status_code/duration_seconds` 是事件载荷，保留为参数。
+
+## 6.4 APScheduler Listener
 
 当前 `APSCHEDULER_OBSERVABILITY_EVENT_MASK` 只包含：
 
@@ -670,37 +777,93 @@ Diagnostic 重复更新
 
 后续可考虑更名为 `APSCHEDULER_TECHNICAL_EVENT_MASK` 或 `APSCHEDULER_LISTENER_EVENT_MASK`。
 
-## 6.4 TaskRunner Wrapper
+## 6.5 TaskRunner Wrapper
 
-`ObservedTaskRunner` 负责：
+`ObservedTaskRunner` 是真正的 Task Execution Context 边界：
 
-```text
-task_execution_started
-task_execution_succeeded
-task_execution_failed
-task_execution_cancelled
-duration
+```python
+with bind_task_execution_context(task_id):
+    hooks.task_execution_started()
+    ...
 ```
 
-Wrapper 最接近真实 Worker，可以绑定 `task_id`、捕获异常对象、测量真实执行时间，同时不修改真实业务函数。
-
-## 6.5 TaskScheduler Semantic Hook
-
-Scheduler 管理动作应在动作真正成功后显式产生：
+进入该边界时：
 
 ```text
-task_scheduled
-task_removed
-task_paused
-task_resumed
-task_run_requested
+保留：runtime_id / node_id
+设置：task_id / source=scheduler
+清空：request_id / method / path / actor / connection_id / operation
 ```
 
-这些属于 BlueCrystal 语义，不依赖 APScheduler 通用 `JOB_*` 技术事件推断。
+因此即使 Task 由 HTTP `run_now` 触发，真正的异步 Task 生命周期也不会错误继承 HTTP request_id。
 
-## 6.6 Instrumentation 权威事实源
+Hook 从：
 
-<p class="figure-caption">图 6-1 Instrumentation 责任划分</p>
+```python
+hooks.task_execution_succeeded(
+    task_id=task_id,
+    duration_seconds=duration,
+)
+```
+
+简化为：
+
+```python
+hooks.task_execution_succeeded(
+    duration_seconds=duration,
+)
+```
+
+`task_id` 由 capability instrumentation 自己从 `ObservationContext` 读取。
+
+## 6.6 TaskScheduler Semantic Wrapper
+
+v0_8 不再让 Router 显式调用 `observe_task_paused()` 等 helper。
+
+Composition Root 只包装一次：
+
+```python
+scheduler = instrument_task_scheduler(
+    raw_scheduler,
+    hooks,
+)
+```
+
+业务 Router 之后只调用原始业务接口：
+
+```python
+scheduler.pause(task_id)
+scheduler.resume(task_id)
+scheduler.run_now(task_id)
+```
+
+`ObservedTaskScheduler` 在真实动作成功后自动产生 Semantic Hook：
+
+```python
+def pause(self, task_id: int):
+    result = self._scheduler.pause(task_id)
+
+    with bind_task_operation_context(task_id):
+        safe_observe(self._hooks.task_paused)
+
+    return result
+```
+
+因此：
+
+```text
+真实动作成功
+    ↓
+建立 Task Operation Context
+    ↓
+Semantic Hook
+```
+
+真实动作失败则不会错误产生成功语义 Hook。Semantic Fact 仍是显式定义，但不再侵入 Router。
+
+## 6.7 Instrumentation 权威事实源
+
+<p class="figure-caption">图 6-1 v0_8 Instrumentation 责任划分</p>
 
 ```mermaid
 %%{init: {"flowchart": {"useMaxWidth": true}}}%%
@@ -708,78 +871,81 @@ flowchart LR
     HTTP["FastAPI Middleware"]
     APS["APScheduler Listener"]
     RUN["ObservedTaskRunner"]
-    SCH["TaskScheduler Semantic Hook"]
-    MGMT["Management Boundary"]
+    SEM["Task Semantic Adapter"]
+    AUDR["AuditedAPIRoute"]
 
-    HTTP -->|"HTTP 技术事实"| OBS["Logs / Metrics / Diagnostics"]
-    APS -->|"Scheduler 技术事实"| OBS
-    RUN -->|"Task 执行事实"| OBS
-    SCH -->|"Task 管理语义"| OBS
-    MGMT -->|"Actor / Operation / Result"| AUD["Audit"]
+    CTX["ObservationContext"]
+    HOOK["CompositeInstrumentationHooks"]
+
+    HTTP -->|"bind request context"| CTX
+    APS -->|"bind scheduler event context"| CTX
+    RUN -->|"bind task execution context"| CTX
+    SEM -->|"bind task operation context"| CTX
+    AUDR -->|"bind operation context"| CTX
+
+    HTTP -->|"HTTP facts"| HOOK
+    APS -->|"Scheduler facts"| HOOK
+    RUN -->|"Task execution facts"| HOOK
+    SEM -->|"Task semantic facts"| HOOK
+    AUDR -->|"Audit operation facts"| HOOK
+
+    HOOK --> LOG["Logs"]
+    HOOK --> MET["Metrics"]
+    HOOK --> DIA["Diagnostics"]
+    HOOK --> AUD["Audit"]
 ```
 
-同一事实只能有一个权威来源。
+同一事实只有一个权威 Producer；所有 consumer 从同一个 Context 读取关联信息。
 
-## 6.7 Context Scope
+## 6.8 Context Scope
 
-建议将通用 `bind_observation_context()` 进一步封装成：
+Context 的边界建立统一交给 Middleware、Wrapper、Listener、Route Adapter 或 semantic helper，业务函数不直接操作 `_CONTEXT`。
+
+判断标准：
+
+| 信息 | 归属 |
+|---|---|
+| 当前 request/task/connection/actor/operation | `ObservationContext` |
+| status/duration/exception/scheduled time | Hook 参数 |
+
+因此不存在“所有 Hook 参数都放进 Context”的设计。Context 是执行环境，Hook 参数是事件载荷。
+
+## 6.9 Audit 的声明式接入
+
+Audit 现在与 Logs/Metrics/Diagnostics 使用同一条 Hook 总线。
+
+`AuditedAPIRoute`：
 
 ```text
-bind_request_context()
-bind_task_context()
-bind_connection_context()
+读取 @audit_action -> AuditSpec
+绑定 operation/target 到 ObservationContext
+执行 endpoint
+成功 -> hooks.audit_operation_succeeded(...)
+失败 -> hooks.audit_operation_failed(...)
 ```
 
-以统一哪些字段继承、哪些字段主动清空。
-
-## 6.8 Audit 的声明式接入
-
-Audit 仍然不进入通用 `CompositeInstrumentationHooks`，因为 `task_paused(task_id=123)` 无法表达 actor、source 和业务操作名称。
-
-但这不意味着 Router 必须显式调用 `AuditService`。
-
-v0_6 将职责拆为三层：
+`AuditInstrumentationHooks`：
 
 ```text
-AuditContext Middleware
-    -> 谁在调用：actor / source
-
-@audit_action
-    -> 这是什么业务操作：operation / target
-
-AuditedAPIRoute
-    -> 调用结果是什么：success / failure / exception
+get_observation_context()
+    ↓
+actor/source/request_id/operation/target
+    ↓
+AuditService.success()/failure()
 ```
 
-因此业务 endpoint 只声明元数据：
-
-```python
-@app.post("/tasks/{task_id}/pause")
-@audit_action(
-    operation="task.pause",
-    target_type="task",
-    target_arg="task_id",
-)
-async def pause_task(task_id: int):
-    scheduler.pause_job(f"task:{task_id}")
-    return {"task_id": task_id, "paused": True}
-```
-
-`@audit_action` 本身不执行业务前后逻辑，只附加 `AuditSpec`。真正的 try/except、结果判断、`AuditService.record()` 和持久化都位于 `AuditedAPIRoute`。
-
-对于 actor，示例可从 `X-Actor` Header 获取；生产环境应优先读取认证 Middleware 已经解析出的用户身份，而不是让每个 Router 自己解析 `Authorization`。
-
-这使 Audit 达到：
+因此：
 
 ```text
-业务语义显式
-审计控制流自动
-身份上下文自动
-关联上下文自动
-持久化自动
+业务语义声明显式
+Context 注入自动
+Audit 事实产生自动
+Audit 持久化消费自动
 ```
 
-## 6.9 `safe_observe`
+并且 Audit 不再需要独立 `AuditContext`。
+
+## 6.10 `safe_observe`
 
 自动 Instrumentation 必须保证：
 
@@ -917,397 +1083,123 @@ flowchart TD
 
 # 8. 可运行的最小应用示例
 
-本章构造一个独立的：
+v0_8 将 Task Semantic Hook 从 Router 中移出，统一由 `ObservedTaskScheduler` Wrapper 产生。
 
-```text
-FastAPI + APScheduler + Observability
+## 8.1 五类插入机制
+
+| 链路位置 | 插入机制 |
+|---|---|
+| HTTP | Middleware |
+| Audit | Decorator Metadata + APIRoute Wrapper |
+| TaskScheduler Semantic | Wrapper |
+| APScheduler | Listener |
+| Task Execution | Wrapper |
+
+因此 Router 只表达业务动作：
+
+```python
+scheduler.pause(task_id)
+scheduler.resume(task_id)
+scheduler.run_now(task_id)
 ```
 
-最小应用。它不依赖 Whale、Ingest `TaskScheduler`、Worker、数据库模型或其它业务模块，只用于验证 Observability 的真实接入方式。
+## 8.2 Pause 请求完整链路
 
-与 v0_5 相比，本版最重要的变化是：
-
-> **Audit 从 Router 中显式调用 `success()/failure()` 改为声明式 `@audit_action` + `AuditedAPIRoute` 自动记录。**
-
-## 8.1 示例功能
-
-示例只有一个业务 Task：
-
-```text
-Task 1
-每 5 秒执行一次
-执行内容：sleep 1 秒并打印 task_id
-```
-
-HTTP API：
-
-```text
-GET  /
-POST /tasks/1/run
-POST /tasks/1/pause
-POST /tasks/1/resume
-
-GET  /metrics
-GET  /diagnostics/runtime
-GET  /diagnostics/scheduler
-GET  /diagnostics/tasks/1
-GET  /audit
-```
-
-## 8.2 Observability 接入结构
-
-<p class="figure-caption">图 8-1 最小示例的 Observability 接入结构</p>
+<p class="figure-caption">图 8-1 Pause 请求完整 Observability 链路</p>
 
 ```mermaid
-%%{init: {"flowchart": {"useMaxWidth": true}}}%%
-flowchart LR
-    C["HTTP Client"]
+%%{init: {"sequence": {"useMaxWidth": true}}}%%
+sequenceDiagram
+    participant C as Client
+    participant M as HTTP Middleware
+    participant A as AuditedAPIRoute
+    participant R as Router
+    participant S as ObservedTaskScheduler
+    participant P as APScheduler
+    participant H as CompositeHooks
+    participant U as Audit
 
-    subgraph APP["Minimal FastAPI + APScheduler App"]
-        API["FastAPI"]
-        SCH["APScheduler"]
-        RUN["ObservedTaskRunner"]
-        JOB["demo_task()"]
-
-        HTTP["HTTP Observability Middleware"]
-        ACTX["Audit Context Middleware"]
-        AR["AuditedAPIRoute"]
-
-        HOOK["CompositeInstrumentationHooks"]
-        LOG["Logs"]
-        MET["Metrics"]
-        DIA["Diagnostics"]
-        AUD["AuditService"]
-    end
-
-    C --> API
-    API --> HTTP
-    HTTP --> ACTX
-    ACTX --> AR
-    AR --> SCH
-    SCH --> RUN
-    RUN --> JOB
-
-    HTTP --> HOOK
-    SCH -->|"Listener"| HOOK
-    RUN -->|"Wrapper"| HOOK
-    AR --> AUD
-
-    HOOK --> LOG
-    HOOK --> MET
-    HOOK --> DIA
+    C->>M: POST /tasks/1/pause
+    M->>M: bind_request_context()
+    M->>H: http_request_started()
+    M->>A: route request
+    A->>A: read @audit_action
+    A->>A: bind_operation_context()
+    A->>R: pause_task(1)
+    R->>S: pause(1)
+    S->>P: pause_job(task:1)
+    P-->>S: success
+    S->>S: bind_task_operation_context(1)
+    S->>H: task_paused()
+    S-->>R: ScheduledTask
+    R-->>A: HTTP 200
+    A->>H: audit_operation_succeeded(status=200)
+    H->>U: persist AuditRecord
+    A-->>M: response
+    M->>H: http_request_finished(status=200, duration)
+    M-->>C: HTTP 200
 ```
 
-## 8.3 初始化 Observability
+## 8.3 完整 `observability_example_app_v4.py`
 
 ```python
-logs = LogService(
-    [
-        ConsoleLogSink(),
-        RollingFileLogSink(
-            Path("data/observability-demo/app.log"),
-            max_bytes=5 * 1024 * 1024,
-            backup_count=3,
-        ),
-    ]
-)
+"""FastAPI + APScheduler + Observability Reference v0_8.
 
-metrics = MetricService(InMemoryMetricRegistry())
-diagnostics = DiagnosticService(InMemoryDiagnosticStore())
-
-audit = AuditService(
-    [
-        SQLiteAuditStore(
-            Path("data/observability-demo/audit.sqlite3")
-        )
-    ],
-    strict=False,
-)
-
-hooks = CompositeInstrumentationHooks(
-    [
-        LogInstrumentationHooks(logs),
-        MetricInstrumentationHooks(metrics),
-        DiagnosticInstrumentationHooks(diagnostics),
-    ]
-)
-```
-
-Audit 不加入 Composite Hooks。
-
-## 8.4 Runtime Context
-
-```python
-initialize_runtime_context(
-    runtime_id="observability-demo",
-    node_id="local",
-)
-```
-
-FastAPI HTTP Instrumentation 在请求作用域绑定 `request_id`，TaskRunner Wrapper 在 Task 作用域绑定 `task_id`。
-
-## 8.5 最小业务 Task
-
-```python
-async def demo_task(task_id: int) -> None:
-    print(f"demo task running: task_id={task_id}")
-    await asyncio.sleep(1)
-```
-
-业务 Task 完全不知道 Observability。
-
-包装：
-
-```python
-observed_task = instrument_task_runner(
-    demo_task,
-    hooks,
-)
-```
-
-## 8.6 APScheduler 接入
-
-```python
-scheduler = AsyncIOScheduler()
-
-install_apscheduler_instrumentation(
-    scheduler,
-    hooks,
-)
-```
-
-周期 Job：
-
-```python
-scheduler.add_job(
-    observed_task,
-    trigger="interval",
-    seconds=5,
-    id="task:1",
-    args=(1,),
-    max_instances=1,
-    coalesce=False,
-    replace_existing=True,
-)
-
-safe_observe(
-    hooks.task_scheduled,
-    task_id=1,
-)
-```
-
-APScheduler Listener 负责 Scheduler 技术事实；Wrapper 负责实际执行事实。
-
-## 8.7 FastAPI 与声明式 Audit 接入
-
-必须在需要审计的 Route 注册之前完成：
-
-```python
-app = FastAPI(
-    title="Observability Minimal Example",
-    lifespan=lifespan,
-)
-
-install_fastapi_instrumentation(
-    app,
-    hooks,
-)
-
-install_fastapi_audit(
-    app,
-    audit,
-)
-```
-
-`install_fastapi_audit()` 完成两件事：
-
-```text
-Audit Context Middleware
-    -> 建立 actor/source
-
-AuditedAPIRoute
-    -> 读取 AuditSpec
-    -> 自动调用原 Handler
-    -> 自动判断 success/failure
-    -> 自动调用 AuditService
-```
-
-默认示例从 `X-Actor` Header 取得 actor。生产环境应传入自定义 `actor_resolver`，读取认证模块已经解析出的身份。
-
-## 8.8 Router 不再显式调用 Audit
-
-Pause API：
-
-```python
-@app.post("/tasks/1/pause")
-@audit_action(
-    operation="task.pause",
-    target_type="task",
-)
-async def pause_task() -> dict[str, object]:
-    try:
-        scheduler.pause_job("task:1")
-    except JobLookupError as exc:
-        raise HTTPException(
-            status_code=404,
-            detail="task not found",
-        ) from exc
-
-    safe_observe(
-        hooks.task_paused,
-        task_id=1,
-    )
-
-    return {
-        "task_id": 1,
-        "paused": True,
-    }
-```
-
-这里没有：
-
-```text
-audit.success()
-audit.failure()
-AuditRecord()
-actor 解析
-request_id 传递
-为 Audit 编写的 try/except
-```
-
-代码中的 try/except 只是在把 `JobLookupError` 转换为 HTTP 404，属于 API 自身错误映射，不是 Audit 控制逻辑。
-
-`@audit_action` 只声明：
-
-```text
-operation = task.pause
-target_type = task
-```
-
-执行结果由 `AuditedAPIRoute` 自动判断。
-
-## 8.9 动态 target_id
-
-若 URL 使用动态 Task ID：
-
-```python
-@app.post("/tasks/{task_id}/pause")
-@audit_action(
-    operation="task.pause",
-    target_type="task",
-    target_arg="task_id",
-)
-async def pause_task(task_id: int):
-    ...
-```
-
-`AuditedAPIRoute` 会从 `request.path_params["task_id"]` 自动提取：
-
-```text
-target_id = task_id
-```
-
-业务函数仍不需要把 target_id 传给 Audit。
-
-## 8.10 查询接口
-
-```python
-@app.get("/metrics")
-async def get_metrics():
-    return jsonable_encoder(
-        metrics.snapshot()
-    )
-
-
-@app.get("/diagnostics/tasks/1")
-async def get_task_diagnostic():
-    return jsonable_encoder(
-        diagnostics.task(1)
-    )
-
-
-@app.get("/audit")
-async def get_audit():
-    return jsonable_encoder(
-        audit.query(
-            AuditQuery(limit=100)
-        )
-    )
-```
-
-## 8.11 生命周期
-
-FastAPI `lifespan` 负责 Scheduler 与可观测资源生命周期：
-
-```text
-启动：
-    RuntimeDiagnostic -> STARTING
-    注册 Job
-    Scheduler.start()
-    RuntimeDiagnostic -> RUNNING
-
-关闭：
-    RuntimeDiagnostic -> STOPPING
-    Scheduler.shutdown()
-    RuntimeDiagnostic -> STOPPED
-    Audit flush/close
-    Logs flush/close
-```
-
-## 8.12 完整 `app.py`
-
-以下代码为完整示例。Audit 使用上一节设计的 `AuditSpec + @audit_action + AuditContext + AuditedAPIRoute`。
-
-```python
-"""FastAPI + APScheduler + Observability 最小完整示例（声明式 Audit）."""
+关键规则：
+1. Context 只在 Middleware / Wrapper / Route Adapter / semantic helper 边界注入；
+2. Hook 不再重复传 request_id/task_id/method/path/actor 等 Context 数据；
+3. Audit 进入统一 CompositeInstrumentationHooks。
+"""
 
 from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 import uvicorn
-from apscheduler.jobstores.base import JobLookupError
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 
-from deploy.observability.audit import (
+from observability_reference.audit import (
+    AuditInstrumentationHooks,
     AuditQuery,
     AuditService,
     audit_action,
     install_fastapi_audit,
 )
-from deploy.observability.audit.adapters import SQLiteAuditStore
-from deploy.observability.diagnostics import (
+from observability_reference.audit.adapters import SQLiteAuditStore
+from observability_reference.diagnostics import (
     DiagnosticInstrumentationHooks,
     DiagnosticService,
     InMemoryDiagnosticStore,
 )
-from deploy.observability.instrumentation import (
+from observability_reference.instrumentation import (
     CompositeInstrumentationHooks,
     install_apscheduler_instrumentation,
     install_fastapi_instrumentation,
     instrument_task_runner,
-    safe_observe,
+    instrument_task_scheduler,
 )
-from deploy.observability.logs import LogInstrumentationHooks, LogService
-from deploy.observability.logs.adapters import ConsoleLogSink, RollingFileLogSink
-from deploy.observability.metrics import (
+from observability_reference.logs import LogInstrumentationHooks, LogService
+from observability_reference.logs.adapters import ConsoleLogSink, RollingFileLogSink
+from observability_reference.metrics import (
     InMemoryMetricRegistry,
     MetricInstrumentationHooks,
     MetricService,
 )
-from deploy.observability.shared import initialize_runtime_context
+from observability_reference.shared import initialize_runtime_context
+from observability_reference.task_scheduler_reference import (
+    ScheduledTaskNotFoundError,
+    TaskScheduler,
+)
 
 
 TASK_ID = 1
 RECURRING_JOB_ID = f"task:{TASK_ID}"
 
 initialize_runtime_context(
-    runtime_id="observability-demo",
+    runtime_id="observability-reference-demo",
     node_id="local",
 )
 
@@ -1315,20 +1207,18 @@ logs = LogService(
     [
         ConsoleLogSink(),
         RollingFileLogSink(
-            Path("data/observability-demo/app.log"),
+            Path("data/observability-reference/app.log"),
             max_bytes=5 * 1024 * 1024,
             backup_count=3,
         ),
     ]
 )
-
 metrics = MetricService(InMemoryMetricRegistry())
 diagnostics = DiagnosticService(InMemoryDiagnosticStore())
-
 audit = AuditService(
     [
         SQLiteAuditStore(
-            Path("data/observability-demo/audit.sqlite3")
+            Path("data/observability-reference/audit.sqlite3")
         )
     ],
     strict=False,
@@ -1339,12 +1229,14 @@ hooks = CompositeInstrumentationHooks(
         LogInstrumentationHooks(logs),
         MetricInstrumentationHooks(metrics),
         DiagnosticInstrumentationHooks(diagnostics),
+        AuditInstrumentationHooks(audit),
     ]
 )
 
 
 async def demo_task(task_id: int) -> None:
-    """示例业务任务：不依赖 Observability."""
+    """真实业务 Task 不主动操作 ObservationContext."""
+
     print(f"demo task running: task_id={task_id}")
     await asyncio.sleep(1)
 
@@ -1354,10 +1246,15 @@ observed_task = instrument_task_runner(
     hooks,
 )
 
-scheduler = AsyncIOScheduler()
+raw_scheduler = TaskScheduler(observed_task)
 
 install_apscheduler_instrumentation(
-    scheduler,
+    raw_scheduler.apscheduler,
+    hooks,
+)
+
+scheduler = instrument_task_scheduler(
+    raw_scheduler,
     hooks,
 )
 
@@ -1366,19 +1263,9 @@ install_apscheduler_instrumentation(
 async def lifespan(app: FastAPI):
     diagnostics.runtime_starting()
 
-    scheduler.add_job(
-        observed_task,
-        trigger="interval",
-        seconds=5,
-        id=RECURRING_JOB_ID,
-        args=(TASK_ID,),
-        max_instances=1,
-        coalesce=False,
-        replace_existing=True,
-    )
-    safe_observe(
-        hooks.task_scheduled,
-        task_id=TASK_ID,
+    scheduler.schedule_interval(
+        TASK_ID,
+        interval_ms=5000,
     )
 
     scheduler.start()
@@ -1390,10 +1277,9 @@ async def lifespan(app: FastAPI):
         diagnostics.runtime_stopping()
 
         if scheduler.running:
-            scheduler.shutdown(wait=False)
+            scheduler.stop()
 
         diagnostics.runtime_stopped()
-
         audit.flush()
         audit.close()
         logs.flush()
@@ -1401,133 +1287,110 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Observability Minimal Example",
+    title="Observability Reference v0_8",
     lifespan=lifespan,
 )
 
-# 先安装通用 HTTP Observability，再安装声明式 Audit。
-# 两者都必须在需要 Audit 的 Route 注册之前完成。
+# 统一 HTTP Middleware 同时建立：
+# request_id / method / path / actor / source
 install_fastapi_instrumentation(
     app,
     hooks,
 )
 
+# Audit Adapter 不再持有 AuditService，只产生统一 Hook。
 install_fastapi_audit(
     app,
-    audit,
+    hooks,
 )
 
 
 @app.get("/")
 async def root() -> dict[str, object]:
     return {
-        "name": "observability-minimal-example",
+        "name": "observability-reference-v0_8",
         "task_id": TASK_ID,
         "interval_seconds": 5,
     }
 
 
-@app.post("/tasks/1/run")
+@app.post("/tasks/{task_id}/run")
 @audit_action(
     operation="task.run",
     target_type="task",
-    target_arg=None,
+    target_arg="task_id",
 )
-async def run_task_once() -> dict[str, object]:
-    scheduler.add_job(
-        observed_task,
-        trigger="date",
-        run_date=datetime.now(timezone.utc),
-        args=(TASK_ID,),
-    )
-
-    safe_observe(
-        hooks.task_run_requested,
-        task_id=TASK_ID,
-    )
+async def run_task_once(task_id: int) -> dict[str, object]:
+    scheduler.run_now(task_id)
 
     return {
-        "task_id": TASK_ID,
+        "task_id": task_id,
         "submitted": True,
     }
 
 
-@app.post("/tasks/1/pause")
+@app.post("/tasks/{task_id}/pause")
 @audit_action(
     operation="task.pause",
     target_type="task",
-    target_arg=None,
+    target_arg="task_id",
 )
-async def pause_task() -> dict[str, object]:
+async def pause_task(task_id: int) -> dict[str, object]:
     try:
-        scheduler.pause_job(RECURRING_JOB_ID)
-    except JobLookupError as exc:
+        scheduler.pause(task_id)
+    except ScheduledTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
             detail="task not found",
         ) from exc
 
-    safe_observe(
-        hooks.task_paused,
-        task_id=TASK_ID,
-    )
 
     return {
-        "task_id": TASK_ID,
+        "task_id": task_id,
         "paused": True,
     }
 
 
-@app.post("/tasks/1/resume")
+@app.post("/tasks/{task_id}/resume")
 @audit_action(
     operation="task.resume",
     target_type="task",
-    target_arg=None,
+    target_arg="task_id",
 )
-async def resume_task() -> dict[str, object]:
+async def resume_task(task_id: int) -> dict[str, object]:
     try:
-        scheduler.resume_job(RECURRING_JOB_ID)
-    except JobLookupError as exc:
+        scheduler.resume(task_id)
+    except ScheduledTaskNotFoundError as exc:
         raise HTTPException(
             status_code=404,
             detail="task not found",
         ) from exc
 
-    safe_observe(
-        hooks.task_resumed,
-        task_id=TASK_ID,
-    )
 
     return {
-        "task_id": TASK_ID,
+        "task_id": task_id,
         "paused": False,
     }
 
 
 @app.get("/metrics")
 async def get_metrics():
-    return jsonable_encoder(
-        metrics.snapshot()
-    )
+    return jsonable_encoder(metrics.snapshot())
 
 
 @app.get("/diagnostics/runtime")
 async def get_runtime_diagnostic():
-    return jsonable_encoder(
-        diagnostics.runtime()
-    )
+    return jsonable_encoder(diagnostics.runtime())
 
 
 @app.get("/diagnostics/scheduler")
 async def get_scheduler_diagnostic():
-    return jsonable_encoder(
-        diagnostics.scheduler()
-    )
+    return jsonable_encoder(diagnostics.scheduler())
 
 
-@app.get("/diagnostics/tasks/1")
-async def get_task_diagnostic():
-    diagnostic = diagnostics.task(TASK_ID)
+@app.get("/diagnostics/tasks/{task_id}")
+async def get_task_diagnostic(task_id: int):
+    diagnostic = diagnostics.task(task_id)
 
     if diagnostic is None:
         raise HTTPException(
@@ -1555,96 +1418,10 @@ if __name__ == "__main__":
     )
 ```
 
-## 8.13 启动
+## 8.4 启动
 
 ```bash
-python observability_example_app_v2.py
-```
-
-默认：
-
-```text
-http://127.0.0.1:8000
-```
-
-## 8.14 验证声明式 Audit
-
-暂停：
-
-```bash
-curl -X POST \
-  -H "X-Actor: demo-user" \
-  http://127.0.0.1:8000/tasks/1/pause
-```
-
-恢复：
-
-```bash
-curl -X POST \
-  -H "X-Actor: demo-user" \
-  http://127.0.0.1:8000/tasks/1/resume
-```
-
-查询：
-
-```bash
-curl http://127.0.0.1:8000/audit
-```
-
-业务 Router 从未显式调用 Audit，但应得到包含以下字段的记录：
-
-```text
-actor = demo-user
-source = http
-operation = task.pause
-target_type = task
-result = success / failure
-request_id = 当前请求关联 ID
-```
-
-## 8.15 Pause 的完整链路
-
-<p class="figure-caption">图 8-2 声明式 Audit 下的 Pause API 时序</p>
-
-```mermaid
-%%{init: {"flowchart": {"useMaxWidth": true}}}%%
-sequenceDiagram
-    participant C as Client
-    participant HM as HTTP Observability Middleware
-    participant AM as Audit Context Middleware
-    participant AR as AuditedAPIRoute
-    participant API as pause_task
-    participant S as APScheduler
-    participant H as Composite Hooks
-    participant A as AuditService
-
-    C->>AM: POST /tasks/1/pause
-    AM->>AM: bind actor/source
-    AM->>HM: call_next
-    HM->>HM: bind request_id
-    HM->>H: http_request_started
-    HM->>AR: route
-    AR->>AR: read AuditSpec
-    AR->>API: call handler
-    API->>S: pause_job
-    S-->>API: success
-    API->>H: task_paused
-    API-->>AR: response
-    AR->>A: record(SUCCESS)
-    AR-->>HM: response
-    HM->>H: http_request_finished
-    HM-->>AM: response
-    AM-->>C: 200
-```
-
-本例由此同时展示：
-
-```text
-Middleware        -> HTTP 横切观测与 AuditContext
-Listener          -> Scheduler 技术事件
-Wrapper           -> Task 执行边界
-Semantic Hook     -> 应用业务语义
-Declarative Audit -> 业务元数据声明 + Route 自动记录
+python -m observability_reference.observability_example_app_v4
 ```
 
 ---
@@ -1666,29 +1443,50 @@ abc/deploy/observability/
 
 ## 9.2 Reference Implementation
 
-建议保留完整自研版本为独立 sibling package：
-
-```text
-abc/deploy/
-├── observability/
-└── observability_reference/
-```
-
-Reference 结构：
+v0_8 Reference Implementation 目录：
 
 ```text
 observability_reference/
 ├── shared/
+│   └── context.py
 ├── instrumentation/
+│   ├── hooks.py
+│   ├── composite.py
+│   ├── fastapi.py
+│   ├── apscheduler.py
+│   ├── task_runner.py
+│   └── task_scheduler.py
 ├── logs/
+│   ├── instrumentation.py
+│   ├── models.py
+│   ├── ports.py
+│   ├── service.py
+│   └── adapters/
 ├── metrics/
+│   ├── instrumentation.py
+│   ├── models.py
+│   ├── ports.py
+│   ├── service.py
+│   └── adapters/
 ├── diagnostics/
-└── audit/
+│   ├── instrumentation.py
+│   ├── models.py
+│   ├── ports.py
+│   ├── service.py
+│   └── adapters/
+├── audit/
+│   ├── instrumentation.py
+│   ├── decorators.py
+│   ├── fastapi.py
+│   ├── models.py
+│   ├── ports.py
+│   ├── service.py
+│   └── adapters/
+├── task_scheduler_reference.py
+└── observability_example_app_v4.py
 ```
 
-其定位是：
-
-> 用 Python 基础机制完整实现可观测性核心能力，用于学习、语义验证和第三方库对照，不作为 Production Runtime 的长期基础设施依赖。
+Audit 的独立 `context.py` 已删除，actor/source 与 management operation 合并进入统一 `ObservationContext`。
 
 ## 9.3 Production Implementation
 
@@ -1938,7 +1736,12 @@ Production Runtime 禁止依赖 Reference。
 13. 当前实现状态和目标设计状态必须明确区分；
 14. FastAPI Audit 采用声明式元数据，业务 Router 不显式编排 `audit.success()/failure()`；
 15. actor/source 由请求上下文统一建立，业务函数不重复解析身份；
-16. Audit 的业务语义必须显式声明，但 Audit 控制流必须由基础设施自动完成。
+16. Audit 的业务语义必须显式声明，但 Audit 控制流必须由基础设施自动完成；
+17. Hook 不重复传递 Context 已有字段；
+18. Context 只允许保存执行环境，不保存 duration/status/exception 等事件载荷；
+19. Context 由 Middleware/Wrapper/Listener/Route Adapter 等边界统一建立；
+20. Audit 必须进入统一 CompositeInstrumentationHooks；
+21. Semantic Hook 不得散落在 Router，应由 TaskScheduler Wrapper/Adapter 在真实动作成功后产生。
 
 ## 12.5 推荐后续实现顺序
 
