@@ -32,13 +32,13 @@ class StatusService:
         self._tasks: dict[int, TaskStatus] = {}
 
     def runtime_started(self) -> None:
-        context = get_observation_context()
+        observation = get_observation_context()
         now = _utc_now()
         with self._lock:
             self._runtime = replace(
                 self._runtime,
-                runtime_id=context.runtime_id,
-                node_id=context.node_id,
+                runtime_id=observation.runtime_id,
+                node_id=observation.node_id,
                 state=RuntimeState.RUNNING,
                 started_at=now,
                 stopped_at=None,

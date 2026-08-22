@@ -39,13 +39,13 @@ class BlueCrystalSampler(Sampler):
         if not self._policy.enabled:
             return SamplingResult(Decision.DROP)
 
-        context = get_observation_context()
+        observation = get_observation_context()
         should_force_trace = (
-            context.force_trace
-            or context.task_id in self._policy.traced_task_ids
+            observation.force_trace
+            or observation.task_id in self._policy.traced_task_ids
             or (
-                context.connection_id is not None
-                and context.connection_id
+                observation.connection_id is not None
+                and observation.connection_id
                 in self._policy.traced_connection_ids
             )
         )

@@ -80,15 +80,15 @@ class AuditService:
         detail: Mapping[str, object] | None,
         exception: BaseException | None,
     ) -> AuditRecord:
-        context = get_observation_context()
+        observation = get_observation_context()
         record = AuditRecord(
             audit_id=uuid4().hex,
             timestamp=datetime.now(timezone.utc),
-            runtime_id=context.runtime_id,
-            node_id=context.node_id,
-            request_id=context.request_id,
-            actor=context.actor,
-            source=context.source or "unknown",
+            runtime_id=observation.runtime_id,
+            node_id=observation.node_id,
+            request_id=observation.request_id,
+            actor=observation.actor,
+            source=observation.source or "unknown",
             operation=operation,
             target_type=target_type,
             target_id=target_id,

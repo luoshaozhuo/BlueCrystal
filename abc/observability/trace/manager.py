@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 
 from opentelemetry import trace
@@ -31,7 +31,7 @@ class TraceManager:
         name: str,
         *,
         attributes: Mapping[str, object] | None = None,
-    ) -> Iterator[Span]:
+    ) -> Generator[Span, None, None]:
         """创建并进入一个 Span 上下文。"""
         with self._tracer.start_as_current_span(
             name,

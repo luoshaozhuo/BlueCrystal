@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
@@ -28,7 +28,7 @@ class ObservationContext:
 
 
 _EMPTY_CONTEXT: Final = ObservationContext()
-_CONTEXT: ContextVar[ObservationContext] = ContextVar(
+_OBSERVATION_VAR: ContextVar[ObservationContext] = ContextVar(
     "bluecrystal_observation_context",
     default=_EMPTY_CONTEXT,
 )
@@ -46,7 +46,7 @@ def new_request_id() -> str:
 
 def get_observation_context() -> ObservationContext:
     """获取当前执行上下文中的关联上下文。"""
-    return _CONTEXT.get()
+    return _OBSERVATION_VAR.get()
 
 
 def initialize_runtime_context(
@@ -63,18 +63,18 @@ def initialize_runtime_context(
     Returns:
         初始化后的关联上下文。
     """
-    context = ObservationContext(
+    observation = ObservationContext(
         runtime_id=runtime_id or new_runtime_id(),
         node_id=node_id,
     )
-    _CONTEXT.set(context)
-    return context
+    _OBSERVATION_VAR.set(observation)
+    return observation
 
 
 @contextmanager
 def bind_observation_context(
     **changes: object,
-) -> Iterator[ObservationContext]:
+) -> Generator[ObservationContext, None, None]:
     """临时覆盖当前关联上下文字段。
 
     Args:
@@ -95,8 +95,8 @@ def bind_observation_context(
         )
 
     updated = replace(current, **changes)
-    token = _CONTEXT.set(updated)
+    token = _OBSERVATION_VAR.set(updated)
     try:
         yield updated
     finally:
-        _CONTEXT.reset(token)
+        _OBSERVATION_VAR.reset(token)

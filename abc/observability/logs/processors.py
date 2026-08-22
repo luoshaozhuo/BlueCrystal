@@ -47,9 +47,9 @@ def add_observation_context(
     event_dict: dict[str, object],
 ) -> dict[str, object]:
     """将当前关联上下文字段注入日志事件。"""
-    context = get_observation_context()
+    observation = get_observation_context()
     for name in _CONTEXT_FIELDS:
-        value = getattr(context, name)
+        value = getattr(observation, name)
         if value is not None:
             event_dict.setdefault(name, value)
     return event_dict
