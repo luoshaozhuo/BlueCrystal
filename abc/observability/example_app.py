@@ -1,74 +1,51 @@
-"""Observability 最小组合示例。"""
+"""FastAPI + Worker 的最小组合示例，不在模块导入时创建资源。"""
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 
-from .audit import AuditService, SQLiteAuditStore, audit_action
-from .audit.fastapi import install_audit_routes
-from .instrumentation import install_http_observability, wrap_task_runner
-from .logs import configure_logging
-from .context import initialize_runtime_context
-from .status import StatusService
-from .trace import TraceManager, TracePolicy, configure_trace
+from .manager import create_observability
 
 
-async def business_runner(task_id: int) -> None:
-    """模拟业务任务执行。
-
-    Args:
-        task_id: 任务标识。
-
-    Raises:
-        RuntimeError: 当 `task_id` 为 13 时模拟任务失败。
-    """
+async def business_runner(task_id: int) -> int:
+    """模拟业务 Worker，并保持业务自行记录日志的边界。"""
     await asyncio.sleep(0.01)
-    if task_id == 13:
-        raise RuntimeError("simulated task failure")
+    return task_id
 
 
-def create_app() -> FastAPI:
-    """创建可观测性组合示例应用。
+def create_app(config_path: str | Path) -> FastAPI:
+    """从 YAML 创建只组合 FastAPI 和 Worker 的示例应用。"""
+    runtime = create_observability(config_path)
 
-    Returns:
-        已安装日志、审计、指标和 Trace 能力的 FastAPI 应用。
-    """
-    configure_logging(level="INFO", log_file="./logs/bluecrystal.jsonl")
-    initialize_runtime_context(node_id="node-01")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        """在应用结构安装完成后启动资源，并在退出时逆序关闭。"""
+        await runtime.start()
+        try:
+            yield
+        finally:
+            await runtime.close()
 
-    policy = TracePolicy(normal_sample_rate=0.001)
-    configure_trace(service_name="bluecrystal-ingest", policy=policy)
-
-    trace = TraceManager(policy)
-    status = StatusService()
-    audit = AuditService(SQLiteAuditStore("./audit.db"))
-    runner = wrap_task_runner(business_runner, status=status, trace=trace)
-
-    app = FastAPI(title="BlueCrystal Observability Third Party")
-    install_audit_routes(
-        app,
-        audit,
-        actor_resolver=lambda request: request.headers.get("x-actor"),
+    runner = runtime.instrument_worker(
+        "task.execute",
+        business_runner,
+        resolver=lambda task_id: {
+            "job_id": str(task_id),
+            "attributes": {"example.task.id": task_id},
+        },
     )
-    install_http_observability(app, trace_policy=policy)
-
-    @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    app = FastAPI(title="Observability Example", lifespan=lifespan)
+    runtime.instrument_fastapi(app)
+    app.state.observability = runtime
 
     @app.post("/tasks/{task_id}/run")
-    @audit_action(operation="task.run", target_type="task", target_arg="task_id")
     async def run_task(task_id: int) -> dict[str, int]:
-        await runner(task_id)
-        return {"task_id": task_id}
-
-    @app.get("/status/tasks/{task_id}")
-    async def task_status(task_id: int):
-        return status.task(task_id)
+        """触发示例 Worker 并返回其业务结果。"""
+        return {"task_id": await runner(task_id)}
 
     return app
-
-
-app = create_app()

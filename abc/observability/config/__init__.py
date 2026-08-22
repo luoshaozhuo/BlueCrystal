@@ -1,28 +1,23 @@
-"""Observability unified configuration models."""
+"""YAML 驱动的可观测性配置公共接口。"""
 
-from dataclasses import dataclass, field
+from .loader import load_observability_config
+from .models import (
+    AuditConfig,
+    InstrumentationConfig,
+    LoggingConfig,
+    MetricsConfig,
+    ObservabilityConfig,
+    ServiceConfig,
+    TracingConfig,
+)
 
-
-@dataclass(frozen=True, slots=True)
-class LoggingConfig:
-    level: str = "INFO"
-
-
-@dataclass(frozen=True, slots=True)
-class MetricsConfig:
-    namespace: str = "bluecrystal"
-    subsystem: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class TraceConfig:
-    enabled: bool = True
-    service_name: str = "bluecrystal"
-    normal_sample_rate: float = 0.001
-
-
-@dataclass(frozen=True, slots=True)
-class ObservabilityConfig:
-    logging: LoggingConfig = field(default_factory=LoggingConfig)
-    metrics: MetricsConfig = field(default_factory=MetricsConfig)
-    trace: TraceConfig = field(default_factory=TraceConfig)
+__all__ = [
+    "AuditConfig",
+    "InstrumentationConfig",
+    "LoggingConfig",
+    "MetricsConfig",
+    "ObservabilityConfig",
+    "ServiceConfig",
+    "TracingConfig",
+    "load_observability_config",
+]

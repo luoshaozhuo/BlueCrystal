@@ -1,115 +1,150 @@
-"""APScheduler 3.x 技术事件可观测性适配。
+"""APScheduler 3.x 技术事件 listener adapter。
 
-负责将 Scheduler 生命周期和任务调度异常事件转换为状态、指标和日志。
-该模块不承担任务调度策略。
+第三方包没有 ``py.typed``，因此本模块用最小 Protocol 隔离动态边界；只观察
+scheduler 已发生的事实，不承担调度策略或业务 Worker 日志。
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import importlib
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Protocol, cast
 
-import structlog
-from apscheduler.events import (
-    EVENT_JOB_MAX_INSTANCES,
-    EVENT_JOB_MISSED,
-    EVENT_SCHEDULER_SHUTDOWN,
-    EVENT_SCHEDULER_STARTED,
-    JobExecutionEvent,
-    JobSubmissionEvent,
-    SchedulerEvent,
-)
-from apscheduler.schedulers.base import BaseScheduler
+from ..context import bind_observation_context
+from ..logs import get_logger
 
-from ..metrics import (
-    SCHEDULER_RUNNING,
-    TASK_MAX_INSTANCE_SKIPS,
-    TASK_MISFIRES,
-)
-from ..status import StatusService
+if TYPE_CHECKING:
+    from ..manager import ObservabilityRuntime
 
 
-DEFAULT_TASK_JOB_ID_PREFIX = "task:"
+class SchedulerEvent(Protocol):
+    """listener 实际使用的 APScheduler event 最小契约。"""
+
+    code: int
+
+
+class JobEvent(SchedulerEvent, Protocol):
+    """带 Job ID 的 APScheduler event 最小契约。"""
+
+    job_id: str
+
+
+class SchedulerTarget(Protocol):
+    """支持 listener 注册与移除的 scheduler 最小契约。"""
+
+    def add_listener(self, callback: Callable[[SchedulerEvent], None], mask: int) -> None:
+        """注册 listener。"""
+        ...
+
+    def remove_listener(self, callback: Callable[[SchedulerEvent], None]) -> None:
+        """移除 listener。"""
+        ...
+
+
+_events = importlib.import_module("apscheduler.events")
+EVENT_SCHEDULER_STARTED = cast(int, _events.EVENT_SCHEDULER_STARTED)
+EVENT_SCHEDULER_SHUTDOWN = cast(int, _events.EVENT_SCHEDULER_SHUTDOWN)
+EVENT_JOB_SUBMITTED = cast(int, _events.EVENT_JOB_SUBMITTED)
+EVENT_JOB_EXECUTED = cast(int, _events.EVENT_JOB_EXECUTED)
+EVENT_JOB_ERROR = cast(int, _events.EVENT_JOB_ERROR)
+EVENT_JOB_MISSED = cast(int, _events.EVENT_JOB_MISSED)
+EVENT_JOB_MAX_INSTANCES = cast(int, _events.EVENT_JOB_MAX_INSTANCES)
 EVENT_MASK = (
     EVENT_SCHEDULER_STARTED
     | EVENT_SCHEDULER_SHUTDOWN
+    | EVENT_JOB_SUBMITTED
+    | EVENT_JOB_EXECUTED
+    | EVENT_JOB_ERROR
     | EVENT_JOB_MISSED
     | EVENT_JOB_MAX_INSTANCES
 )
-APSchedulerListener = Callable[[SchedulerEvent], None]
-
-logger = structlog.get_logger(__name__)
+JobIdentityResolver = Callable[[JobEvent], Mapping[str, object]]
 
 
-def install_scheduler_observability(
-    scheduler: BaseScheduler,
-    *,
-    status: StatusService,
-    task_job_id_prefix: str = DEFAULT_TASK_JOB_ID_PREFIX,
-) -> APSchedulerListener:
-    """安装 APScheduler 技术事件 Listener。
+class APSchedulerInstrumentation:
+    """将 APScheduler 生命周期与执行结果连接到 Runtime backend。"""
 
-    Args:
-        scheduler: APScheduler 调度器实例。
-        status: 当前状态服务。
-        task_job_id_prefix: 用于从 Job ID 解析任务 ID 的前缀。
+    name = "apscheduler"
 
-    Returns:
-        已安装的 Listener，可用于外部保存或移除。
-    """
-
-    def listener(event: SchedulerEvent) -> None:
-        if event.code == EVENT_SCHEDULER_STARTED:
-            SCHEDULER_RUNNING.set(1)
-            status.scheduler_started()
-            logger.info("scheduler_started")
-            return
-
-        if event.code == EVENT_SCHEDULER_SHUTDOWN:
-            SCHEDULER_RUNNING.set(0)
-            status.scheduler_stopped()
-            logger.info("scheduler_stopped")
-            return
-
-        if event.code == EVENT_JOB_MISSED and isinstance(event, JobExecutionEvent):
-            task_id = _parse_task_id(event.job_id, task_job_id_prefix)
-            if task_id is not None:
-                TASK_MISFIRES.inc()
-                status.scheduler_job_missed(task_id)
-                logger.warning(
-                    "scheduler_job_missed",
-                    task_id=task_id,
-                    scheduled_run_time=event.scheduled_run_time,
-                )
-            return
-
-        if event.code == EVENT_JOB_MAX_INSTANCES and isinstance(
-            event, JobSubmissionEvent
+    def __init__(
+        self,
+        scheduler: object,
+        *,
+        enabled: bool = True,
+        identity_resolver: JobIdentityResolver | None = None,
+        event_mask: int = EVENT_MASK,
+    ) -> None:
+        """保存 scheduler 目标；listener 仅在 Runtime 启动时注册。"""
+        if not hasattr(scheduler, "add_listener") or not hasattr(
+            scheduler, "remove_listener"
         ):
-            task_id = _parse_task_id(event.job_id, task_job_id_prefix)
-            if task_id is not None:
-                skipped = max(1, len(event.scheduled_run_times))
-                TASK_MAX_INSTANCE_SKIPS.inc(skipped)
-                status.scheduler_job_max_instances(task_id, skipped)
-                logger.warning(
-                    "scheduler_job_max_instances",
-                    task_id=task_id,
-                    skipped=skipped,
+            raise TypeError("apscheduler target must support listener lifecycle")
+        self._scheduler = cast(SchedulerTarget, scheduler)
+        self._enabled = enabled
+        self._identity_resolver = identity_resolver
+        self._event_mask = event_mask
+        self._listener: Callable[[SchedulerEvent], None] | None = None
+
+    def install(self, runtime: ObservabilityRuntime) -> None:
+        """注册 listener；重复安装不会重复订阅。"""
+        if self._listener is not None or not self._enabled:
+            return
+        logger = get_logger(__name__)
+
+        def listener(event: SchedulerEvent) -> None:
+            """将单个第三方 event 转换为低基数指标和关联日志。"""
+            event_name = _event_name(event.code)
+            if runtime.metrics is not None:
+                runtime.metrics.scheduler_events.labels(event=event_name).inc()
+                if event.code == EVENT_SCHEDULER_STARTED:
+                    runtime.metrics.scheduler_running.set(1)
+                elif event.code == EVENT_SCHEDULER_SHUTDOWN:
+                    runtime.metrics.scheduler_running.set(0)
+            if hasattr(event, "job_id"):
+                job_event = cast(JobEvent, event)
+                resolved = (
+                    self._identity_resolver(job_event)
+                    if self._identity_resolver
+                    else {}
                 )
+                attributes = resolved.get("attributes", {})
+                if not isinstance(attributes, Mapping):
+                    raise TypeError("APScheduler identity attributes must be a mapping")
+                with bind_observation_context(
+                    job_id=str(resolved.get("job_id", job_event.job_id)),
+                    source="scheduler",
+                    attributes=attributes,
+                ):
+                    logger.info("scheduler_event", scheduler_event=event_name)
+            else:
+                logger.info("scheduler_event", scheduler_event=event_name)
 
-    scheduler.add_listener(listener, EVENT_MASK)
-    return listener
+        self._scheduler.add_listener(listener, self._event_mask)
+        self._listener = listener
+
+    def uninstall(self) -> None:
+        """移除已注册 listener；未安装时为空操作。"""
+        if self._listener is None:
+            return
+        self._scheduler.remove_listener(self._listener)
+        self._listener = None
+
+    def start(self) -> None:
+        """Listener 不拥有 scheduler 生命周期，无需启动资源。"""
+
+    def stop(self) -> None:
+        """Listener 不拥有 scheduler 生命周期，无需停止资源。"""
 
 
-def _parse_task_id(job_id: str, prefix: str) -> int | None:
-    if not job_id.startswith(prefix):
-        return None
-
-    try:
-        return int(job_id.removeprefix(prefix))
-    except ValueError:
-        return None
-
-
-# Design note:
-# Scheduler instrumentation observes scheduling events only.
-# TaskRunner owns business execution exception handling.
+def _event_name(code: int) -> str:
+    """把 APScheduler 位事件码映射为低基数标签。"""
+    names = {
+        EVENT_SCHEDULER_STARTED: "scheduler_started",
+        EVENT_SCHEDULER_SHUTDOWN: "scheduler_shutdown",
+        EVENT_JOB_SUBMITTED: "job_submitted",
+        EVENT_JOB_EXECUTED: "job_executed",
+        EVENT_JOB_ERROR: "job_error",
+        EVENT_JOB_MISSED: "job_missed",
+        EVENT_JOB_MAX_INSTANCES: "job_max_instances",
+    }
+    return names.get(code, "unknown")

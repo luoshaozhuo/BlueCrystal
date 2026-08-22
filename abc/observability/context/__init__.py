@@ -1,17 +1,28 @@
-from .models import (
-    ObservationContext, RuntimeContext, RequestContext,
-    ExecutionContext, TraceContext,
-)
+"""关联上下文公共 API。"""
+
+from uuid import uuid4
+
 from .manager import (
-    get_observation_context, initialize_runtime_context,
-    bind_observation_context, capture_observation_context,
+    bind_execution_context,
+    bind_observation_context,
+    bind_request_context,
+    get_observation_context,
+    initialize_runtime_context,
 )
+from .models import ObservationContext
+
+
+def new_request_id() -> str:
+    """生成不包含业务语义的请求关联 ID。"""
+    return uuid4().hex
+
 
 __all__ = [
-    "ObservationContext", "RuntimeContext", "RequestContext",
-    "ExecutionContext", "TraceContext",
-    "get_observation_context", "initialize_runtime_context",
-    "bind_observation_context", "capture_observation_context",
+    "ObservationContext",
+    "bind_execution_context",
+    "bind_observation_context",
+    "bind_request_context",
+    "get_observation_context",
+    "initialize_runtime_context",
+    "new_request_id",
 ]
-
-from .propagation_manager import PropagationManager

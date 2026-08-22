@@ -84,8 +84,8 @@ class AuditService:
         record = AuditRecord(
             audit_id=uuid4().hex,
             timestamp=datetime.now(timezone.utc),
-            runtime_id=observation.runtime_id,
-            node_id=observation.node_id,
+            service_name=observation.service_name,
+            service_instance_id=observation.service_instance_id,
             request_id=observation.request_id,
             actor=observation.actor,
             source=observation.source or "unknown",

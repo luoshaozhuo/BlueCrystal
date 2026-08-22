@@ -15,7 +15,11 @@ class SQLiteAuditStore:
     """将审计记录持久化到本地 SQLite 数据库。"""
 
     def __init__(self, path: str | Path) -> None:
-        self._path = str(path)
+        """创建 SQLite store，并确保父目录及表结构存在。"""
+        resolved = Path(path)
+        if resolved != Path(":memory:"):
+            resolved.parent.mkdir(parents=True, exist_ok=True)
+        self._path = str(resolved)
         self._initialize()
 
     def append(self, record: AuditRecord) -> None:
@@ -27,8 +31,8 @@ class SQLiteAuditStore:
         values = (
             record.audit_id,
             record.timestamp.isoformat(),
-            record.runtime_id,
-            record.node_id,
+            record.service_name,
+            record.service_instance_id,
             record.request_id,
             record.actor,
             record.source,
@@ -93,8 +97,8 @@ class SQLiteAuditStore:
                 CREATE TABLE IF NOT EXISTS audit_record (
                     audit_id TEXT PRIMARY KEY,
                     timestamp TEXT NOT NULL,
-                    runtime_id TEXT,
-                    node_id TEXT,
+                    service_name TEXT,
+                    service_instance_id TEXT,
                     request_id TEXT,
                     actor TEXT,
                     source TEXT NOT NULL,
@@ -115,8 +119,8 @@ class SQLiteAuditStore:
         return AuditRecord(
             audit_id=str(row[0]),
             timestamp=datetime.fromisoformat(str(row[1])),
-            runtime_id=None if row[2] is None else str(row[2]),
-            node_id=None if row[3] is None else str(row[3]),
+            service_name=None if row[2] is None else str(row[2]),
+            service_instance_id=None if row[3] is None else str(row[3]),
             request_id=None if row[4] is None else str(row[4]),
             actor=None if row[5] is None else str(row[5]),
             source=str(row[6]),

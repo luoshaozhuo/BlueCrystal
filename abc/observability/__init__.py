@@ -1,17 +1,31 @@
-"""Observability public API."""
+"""Opinionated observability integration runtime 的最小公共 API。
 
-from .context.models import ObservationContext
-from .context.manager import (
+根包不导入 FastAPI 或 APScheduler，未使用的框架依赖可以缺席。
+"""
+
+from .audit import audit_action
+from .config import ObservabilityConfig, load_observability_config
+from .context import (
+    ObservationContext,
     bind_observation_context,
     get_observation_context,
-    initialize_runtime_context,
 )
-from .manager import ObservabilityManager
+from .logs import get_logger
+from .manager import (
+    ObservabilityRuntime,
+    create_observability,
+    install_observability,
+)
 
 __all__ = [
     "ObservationContext",
-    "ObservabilityManager",
+    "ObservabilityConfig",
+    "ObservabilityRuntime",
+    "audit_action",
     "bind_observation_context",
+    "create_observability",
     "get_observation_context",
-    "initialize_runtime_context",
+    "get_logger",
+    "install_observability",
+    "load_observability_config",
 ]

@@ -1,5 +1,5 @@
-"""Prometheus metrics public API."""
+"""Prometheus Metrics backend 公共接口。"""
 
-from .registry import MetricsConfig, MetricsRegistry
+from .registry import MetricsBackend
 
-__all__ = ["MetricsConfig", "MetricsRegistry"]
+__all__ = ["MetricsBackend"]

@@ -1,94 +1,159 @@
-"""FastAPI HTTP 日志、指标与 Trace 自动埋点。"""
+"""FastAPI 第三方 instrumentation 的薄装配 adapter。
+
+OTel 与 Prometheus HTTP 数据由成熟第三方库产生；本模块只补 request ID、
+actor 和 correlation context，不重复实现 HTTP span、耗时或状态码指标。
+"""
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from time import perf_counter
+from typing import TYPE_CHECKING, Any, cast
 
-import structlog
 from fastapi import FastAPI, Request, Response
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from ..context import bind_observation_context, new_request_id
-from ..trace import TracePolicy
 
+if TYPE_CHECKING:
+    from ..manager import ObservabilityRuntime
 
-logger = structlog.get_logger(__name__)
+ActorResolver = Callable[[Request], str | None]
 CallNext = Callable[[Request], Awaitable[Response]]
 
 
-def install_http_observability(
-    app: FastAPI,
-    *,
-    trace_policy: TracePolicy,
-    excluded_trace_urls: str = "health,metrics",
-    expose_metrics: bool = True,
-) -> None:
-    """为 FastAPI 应用安装 HTTP 可观测性能力。
+class FastAPIInstrumentation:
+    """组合 OTel FastAPI、Prometheus instrumentator 和关联中间件。"""
 
-    Args:
-        app: FastAPI 应用。
-        trace_policy: Trace 策略。
-        excluded_trace_urls: OpenTelemetry 排除 URL 规则。
-        expose_metrics: 是否暴露 `/metrics` 端点。
-    """
+    name = "fastapi"
 
-    @app.middleware("http")
-    async def observation_context_middleware(
-        request: Request,
-        call_next: CallNext,
-    ) -> Response:
-        # 使用单调时钟计算耗时，避免系统时间调整影响持续时间。
-        started = perf_counter()
-        request_id = request.headers.get("x-request-id") or new_request_id()
+    def __init__(
+        self,
+        app: object,
+        *,
+        enabled: bool = True,
+        excluded_urls: str = "health,metrics",
+        expose_metrics: bool = True,
+        metrics_endpoint: str = "/metrics",
+        request_id_header: str = "x-request-id",
+        actor_resolver: ActorResolver | None = None,
+        otel_options: dict[str, object] | None = None,
+        metrics_options: dict[str, object] | None = None,
+    ) -> None:
+        """保存安装目标和透传参数，不在构造阶段修改应用。"""
+        if not isinstance(app, FastAPI):
+            raise TypeError("fastapi instrumentation target must be FastAPI")
+        self._app = app
+        self._enabled = enabled
+        self._excluded_urls = excluded_urls
+        self._expose_metrics = expose_metrics
+        self._metrics_endpoint = metrics_endpoint
+        self._request_id_header = request_id_header
+        self._actor_resolver = actor_resolver
+        self._otel_options = dict(otel_options or {})
+        self._metrics_options = dict(metrics_options or {})
+        self._instrumentator: Instrumentator | None = None
+        self._otel_installed = False
+        self._installed = False
+        self._owned_routes: list[object] = []
+        self._owned_middleware: list[object] = []
 
-        with bind_observation_context(
-            request_id=request_id,
-            task_id=None,
-            connection_id=None,
-            actor=None,
-            source="http",
-            operation=None,
-            target_type=None,
-            target_id=None,
-        ):
-            logger.info(
-                "http_request_started",
-                method=request.method,
-                path=request.url.path,
+    def install(self, runtime: ObservabilityRuntime) -> None:
+        """按已启用 backend 安装第三方 instrumentation 和薄上下文层。"""
+        if self._installed or not self._enabled:
+            return
+        controlled_otel = {"tracer_provider", "excluded_urls"}
+        conflict = controlled_otel.intersection(self._otel_options)
+        if conflict:
+            raise ValueError(
+                "instrumentation.fastapi.options.otel_options conflicts with: "
+                + ", ".join(sorted(conflict))
             )
-            try:
-                response = await call_next(request)
-            except Exception:
-                logger.exception(
-                    "http_request_failed",
-                    method=request.method,
-                    path=request.url.path,
-                    duration_seconds=perf_counter() - started,
+        controlled_metrics = {"registry"}
+        conflict = controlled_metrics.intersection(self._metrics_options)
+        if conflict:
+            raise ValueError(
+                "instrumentation.fastapi.options.metrics_options conflicts with: "
+                + ", ".join(sorted(conflict))
+            )
+
+        existing_routes = {id(route) for route in self._app.routes}
+        existing_middleware = {id(item) for item in self._app.user_middleware}
+
+        try:
+            @self._app.middleware("http")
+            async def correlation_middleware(
+                request: Request, call_next: CallNext
+            ) -> Response:
+                """补充请求关联字段，不重复第三方 HTTP telemetry。"""
+                request_id = request.headers.get(self._request_id_header) or new_request_id()
+                correlation_id = request.headers.get("x-correlation-id") or request_id
+                actor = self._actor_resolver(request) if self._actor_resolver else None
+                with bind_observation_context(
+                    request_id=request_id,
+                    correlation_id=correlation_id,
+                    actor=actor,
+                    source="http",
+                ):
+                    response = await call_next(request)
+                response.headers[self._request_id_header] = request_id
+                return response
+
+            if runtime.metrics is not None:
+                instrumentator_factory = cast(Any, Instrumentator)
+                self._instrumentator = instrumentator_factory(
+                    registry=runtime.metrics.registry,
+                    **self._metrics_options,
+                ).instrument(self._app)
+                if self._expose_metrics:
+                    self._instrumentator.expose(
+                        self._app,
+                        endpoint=self._metrics_endpoint,
+                        include_in_schema=False,
+                    )
+            if runtime.tracing is not None:
+                instrument_app = cast(Any, FastAPIInstrumentor.instrument_app)
+                instrument_app(
+                    self._app,
+                    tracer_provider=runtime.tracing.provider,
+                    excluded_urls=self._excluded_urls,
+                    **self._otel_options,
                 )
-                raise
+                self._otel_installed = True
+            self._installed = True
+        finally:
+            # 即使第三方安装中途失败，也记录本 adapter 已产生的对象供回滚。
+            self._owned_routes = [
+                route for route in self._app.routes if id(route) not in existing_routes
+            ]
+            self._owned_middleware = [
+                item
+                for item in self._app.user_middleware
+                if id(item) not in existing_middleware
+            ]
 
-            logger.info(
-                "http_request_finished",
-                method=request.method,
-                path=request.url.path,
-                status_code=response.status_code,
-                duration_seconds=perf_counter() - started,
-            )
-            response.headers["x-request-id"] = request_id
-            return response
+    def uninstall(self) -> None:
+        """卸载 OTel，并按对象身份移除本 adapter 创建的 route/middleware。"""
+        if self._otel_installed:
+            FastAPIInstrumentor.uninstrument_app(self._app)
+            self._otel_installed = False
+        owned_route_ids = {id(route) for route in self._owned_routes}
+        owned_middleware_ids = {id(item) for item in self._owned_middleware}
+        self._app.router.routes[:] = [
+            route for route in self._app.router.routes if id(route) not in owned_route_ids
+        ]
+        self._app.user_middleware[:] = [
+            item
+            for item in self._app.user_middleware
+            if id(item) not in owned_middleware_ids
+        ]
+        self._app.middleware_stack = None
+        self._owned_routes.clear()
+        self._owned_middleware.clear()
+        self._installed = False
 
-    instrumentator = Instrumentator().instrument(app)
-    if expose_metrics:
-        instrumentator.expose(
-            app,
-            endpoint="/metrics",
-            include_in_schema=False,
-        )
+    def start(self) -> None:
+        """FastAPI adapter 无独立运行期资源，结构已在应用启动前安装。"""
 
-    if trace_policy.enabled and trace_policy.trace_http:
-        FastAPIInstrumentor.instrument_app(
-            app,
-            excluded_urls=excluded_trace_urls,
-        )
+    def stop(self) -> None:
+        """FastAPI adapter 无独立运行期资源。"""

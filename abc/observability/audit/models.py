@@ -18,12 +18,12 @@ class AuditResult(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class AuditRecord:
-    """一条不可变审计记录。"""
+    """一条不可变审计记录，保存操作主体和关联链路。"""
 
     audit_id: str
     timestamp: datetime
-    runtime_id: str | None
-    node_id: str | None
+    service_name: str | None
+    service_instance_id: str | None
     request_id: str | None
     actor: str | None
     source: str
@@ -48,6 +48,11 @@ class AuditQuery:
     actor: str | None = None
     result: AuditResult | None = None
     limit: int = 100
+
+    def __post_init__(self) -> None:
+        """限制单次读取量，避免无界审计查询占用内存。"""
+        if self.limit <= 0:
+            raise ValueError("audit query limit must be positive")
 
 
 @dataclass(frozen=True, slots=True)

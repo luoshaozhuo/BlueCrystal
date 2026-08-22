@@ -43,6 +43,7 @@ def audit_action(
         raise ValueError("operation and target_type must not be empty")
 
     def decorator(func: F) -> F:
+        """把已校验的审计定义绑定到目标函数并保留其类型。"""
         setattr(func, _ATTR, spec)
         return func
 

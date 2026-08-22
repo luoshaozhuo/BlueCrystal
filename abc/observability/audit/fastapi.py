@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
+from typing import Any, cast
 
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
@@ -13,34 +14,36 @@ from .service import AuditService
 
 
 ActorResolver = Callable[[Request], str | None]
-RouteHandler = Callable[[Request], Awaitable[Response]]
+RouteHandler = Callable[[Request], Coroutine[Any, Any, Response]]
 
 
 def create_audit_route_class(
     audit: AuditService,
     *,
-    base_route_class: type[APIRoute] = APIRoute,
     actor_resolver: ActorResolver | None = None,
 ) -> type[APIRoute]:
     """创建带审计处理的 FastAPI 路由类。
 
     Args:
         audit: 审计服务。
-        base_route_class: 需要包装的基础路由类。
         actor_resolver: 从请求解析操作主体的可选函数。
 
     Returns:
         包装后的 APIRoute 子类。
     """
 
-    class AuditedRoute(base_route_class):
+    class AuditedRoute(APIRoute):
+        """仅包装带 ``audit_action`` 声明的 FastAPI endpoint。"""
+
         def get_route_handler(self) -> RouteHandler:
+            """返回保留原响应和异常语义的审计 route handler。"""
             original = super().get_route_handler()
             spec = get_audit_spec(self.endpoint)
             if spec is None:
-                return original
+                return cast(RouteHandler, original)
 
             async def handler(request: Request) -> Response:
+                """从请求解析审计主体与目标，并记录成功或失败。"""
                 actor = actor_resolver(request) if actor_resolver else None
                 target = None
                 if spec.target_arg:
@@ -57,13 +60,16 @@ def create_audit_route_class(
                 with bind_observation_context(
                     actor=actor,
                     source="http",
-                    operation=spec.operation,
-                    target_type=spec.target_type,
-                    target_id=target,
+                    attributes={
+                        "audit.operation": spec.operation,
+                        "audit.target.type": spec.target_type,
+                        "audit.target.id": target or "",
+                    },
                 ):
                     try:
-                        response = await original(request)
+                        response = cast(Response, await original(request))
                     except Exception as exc:
+                        # 审计失败记录完成后必须重新抛出原业务异常。
                         audit.failure(
                             operation=spec.operation,
                             target_type=spec.target_type,
@@ -83,7 +89,7 @@ def create_audit_route_class(
 
             return handler
 
-    AuditedRoute.__name__ = f"Audited{base_route_class.__name__}"
+    AuditedRoute.__name__ = "AuditedAPIRoute"
     return AuditedRoute
 
 
@@ -96,6 +102,5 @@ def install_audit_routes(
     """为 FastAPI 应用安装审计路由类。"""
     app.router.route_class = create_audit_route_class(
         audit,
-        base_route_class=app.router.route_class,
         actor_resolver=actor_resolver,
     )

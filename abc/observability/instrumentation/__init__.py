@@ -1,15 +1,14 @@
-"""可观测性自动埋点公共接口。"""
+"""可选 instrumentation 的框架无关公共契约。
 
-from .apscheduler import install_scheduler_observability
-from .fastapi import install_http_observability
-from .task_runner import ObservedTaskRunner, wrap_task_runner
-from .task_scheduler import ObservedTaskScheduler, wrap_task_scheduler
+具体框架 adapter 应通过其子模块或 ``ObservabilityRuntime`` 按需加载。
+"""
+
+from .base import Instrumentation
+from .registry import InstrumentationRegistry
+from .task_scheduler import observe_scheduler_action
 
 __all__ = [
-    "install_scheduler_observability",
-    "install_http_observability",
-    "ObservedTaskRunner",
-    "wrap_task_runner",
-    "ObservedTaskScheduler",
-    "wrap_task_scheduler",
+    "Instrumentation",
+    "InstrumentationRegistry",
+    "observe_scheduler_action",
 ]

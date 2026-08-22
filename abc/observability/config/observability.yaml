@@ -1,12 +1,43 @@
 observability:
+  service:
+    name: ingest
+    instance_id: ${SERVICE_INSTANCE_ID:-local}
+    environment: ${APP_ENV:-development}
+
   logging:
+    enabled: true
     level: INFO
+    renderer: json
+    configure_stdlib: false
 
   metrics:
-    namespace: bluecrystal
+    enabled: true
+    provider: prometheus
+    namespace: ingest
     subsystem: ingest
 
-  trace:
+  tracing:
     enabled: true
-    service_name: bluecrystal
-    normal_sample_rate: 0.001
+    provider: opentelemetry
+    exporter: otlp_grpc
+    sample_rate: 0.001
+    exporter_options:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}
+      insecure: true
+
+  audit:
+    enabled: false
+    store: sqlite
+    options:
+      path: ./data/audit.sqlite3
+
+  instrumentation:
+    fastapi:
+      enabled: true
+      options:
+        excluded_urls: health,metrics
+        expose_metrics: true
+    apscheduler:
+      enabled: true
+    worker:
+      enabled: true
