@@ -13,7 +13,7 @@ from ..metrics import (
     TASK_EXECUTIONS,
     TASK_EXECUTIONS_IN_FLIGHT,
 )
-from ..shared import bind_observation_context
+from ..context import bind_observation_context
 from ..status import StatusService
 from ..trace import TraceManager
 

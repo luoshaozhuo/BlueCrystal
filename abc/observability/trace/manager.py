@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from opentelemetry import trace
 from opentelemetry.trace import Span, Status, StatusCode
 
-from ..shared import bind_observation_context
+from ..context import bind_observation_context
 from .dedup import ErrorTraceDeduplicator
 from .fingerprint import make_error_fingerprint
 from .policy import TracePolicy

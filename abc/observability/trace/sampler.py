@@ -14,7 +14,7 @@ from opentelemetry.sdk.trace.sampling import (
 )
 from opentelemetry.trace import Link, SpanKind, TraceState
 
-from ..shared import get_observation_context
+from .decision import get_trace_decision_context
 from .policy import TracePolicy
 
 
@@ -39,16 +39,8 @@ class BlueCrystalSampler(Sampler):
         if not self._policy.enabled:
             return SamplingResult(Decision.DROP)
 
-        observation = get_observation_context()
-        should_force_trace = (
-            observation.force_trace
-            or observation.task_id in self._policy.traced_task_ids
-            or (
-                observation.connection_id is not None
-                and observation.connection_id
-                in self._policy.traced_connection_ids
-            )
-        )
+        decision_context = get_trace_decision_context()
+        should_force_trace = decision_context.force_sample
         if should_force_trace:
             return SamplingResult(
                 Decision.RECORD_AND_SAMPLE,

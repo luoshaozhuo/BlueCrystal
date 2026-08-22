@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from ..shared import get_observation_context
+from ..context import get_observation_context
 
 
 _REDACTED = "***REDACTED***"
@@ -28,16 +28,10 @@ _SENSITIVE_KEYS = frozenset(
     }
 )
 _CONTEXT_FIELDS = (
-    "runtime_id",
-    "node_id",
-    "request_id",
-    "task_id",
-    "connection_id",
-    "actor",
-    "source",
-    "operation",
-    "target_type",
-    "target_id",
+    "runtime",
+    "request",
+    "execution",
+    "trace",
 )
 
 
@@ -50,8 +44,7 @@ def add_observation_context(
     observation = get_observation_context()
     for name in _CONTEXT_FIELDS:
         value = getattr(observation, name)
-        if value is not None:
-            event_dict.setdefault(name, value)
+        event_dict.setdefault(name, value)
     return event_dict
 
 

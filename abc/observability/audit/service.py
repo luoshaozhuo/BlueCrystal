@@ -8,7 +8,7 @@ from types import MappingProxyType
 from typing import Protocol
 from uuid import uuid4
 
-from ..shared import get_observation_context
+from ..context import get_observation_context
 from .models import AuditQuery, AuditRecord, AuditResult
 
 

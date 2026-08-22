@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, Response
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from ..shared import bind_observation_context, new_request_id
+from ..context import bind_observation_context, new_request_id
 from ..trace import TracePolicy
 
 

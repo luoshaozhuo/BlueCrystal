@@ -6,7 +6,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from threading import RLock
 
-from ..shared import get_observation_context
+from ..context import get_observation_context
 from .models import (
     ErrorInfo,
     RuntimeState,

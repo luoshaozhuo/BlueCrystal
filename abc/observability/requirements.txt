@@ -8,3 +8,4 @@ opentelemetry-exporter-otlp-proto-grpc
 cachetools
 fastapi
 apscheduler<4
+pyyaml

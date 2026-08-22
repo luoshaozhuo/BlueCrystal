@@ -10,7 +10,7 @@ from .audit import AuditService, SQLiteAuditStore, audit_action
 from .audit.fastapi import install_audit_routes
 from .instrumentation import install_http_observability, wrap_task_runner
 from .logs import configure_logging
-from .shared import initialize_runtime_context
+from .context import initialize_runtime_context
 from .status import StatusService
 from .trace import TraceManager, TracePolicy, configure_trace
 

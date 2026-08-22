@@ -1,0 +1,12 @@
+observability:
+  logging:
+    level: INFO
+
+  metrics:
+    namespace: bluecrystal
+    subsystem: ingest
+
+  trace:
+    enabled: true
+    service_name: bluecrystal
+    normal_sample_rate: 0.001

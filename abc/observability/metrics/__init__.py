@@ -1,23 +1,5 @@
-"""Prometheus 指标公共接口。"""
+"""Prometheus metrics public API."""
 
-from .scheduler import (
-    SCHEDULER_RUNNING,
-    SCHEDULER_TASK_OPERATIONS,
-    TASK_MAX_INSTANCE_SKIPS,
-    TASK_MISFIRES,
-)
-from .task import (
-    TASK_EXECUTION_DURATION,
-    TASK_EXECUTIONS,
-    TASK_EXECUTIONS_IN_FLIGHT,
-)
+from .registry import MetricsConfig, MetricsRegistry
 
-__all__ = [
-    "SCHEDULER_RUNNING",
-    "SCHEDULER_TASK_OPERATIONS",
-    "TASK_MAX_INSTANCE_SKIPS",
-    "TASK_MISFIRES",
-    "TASK_EXECUTION_DURATION",
-    "TASK_EXECUTIONS",
-    "TASK_EXECUTIONS_IN_FLIGHT",
-]
+__all__ = ["MetricsConfig", "MetricsRegistry"]

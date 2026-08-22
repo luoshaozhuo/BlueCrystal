@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import FastAPI, Request, Response
 from fastapi.routing import APIRoute
 
-from ..shared import bind_observation_context
+from ..context import bind_observation_context
 from .decorators import get_audit_spec
 from .service import AuditService
 

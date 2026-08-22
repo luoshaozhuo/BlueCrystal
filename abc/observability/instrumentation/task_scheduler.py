@@ -8,7 +8,7 @@ from typing import Protocol
 import structlog
 
 from ..metrics import SCHEDULER_TASK_OPERATIONS
-from ..shared import bind_observation_context
+from ..context import bind_observation_context
 from ..status import StatusService
 from ..trace import TraceManager
 

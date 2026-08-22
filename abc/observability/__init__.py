@@ -1,19 +1,17 @@
-"""BlueCrystal Observability 公共入口。"""
+"""Observability public API."""
 
-from .shared import (
-    ObservationContext,
+from .context.models import ObservationContext
+from .context.manager import (
     bind_observation_context,
     get_observation_context,
     initialize_runtime_context,
-    new_request_id,
-    new_runtime_id,
 )
+from .manager import ObservabilityManager
 
 __all__ = [
     "ObservationContext",
+    "ObservabilityManager",
     "bind_observation_context",
     "get_observation_context",
     "initialize_runtime_context",
-    "new_request_id",
-    "new_runtime_id",
 ]

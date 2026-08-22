@@ -108,3 +108,8 @@ def _parse_task_id(job_id: str, prefix: str) -> int | None:
         return int(job_id.removeprefix(prefix))
     except ValueError:
         return None
+
+
+# Design note:
+# Scheduler instrumentation observes scheduling events only.
+# TaskRunner owns business execution exception handling.
