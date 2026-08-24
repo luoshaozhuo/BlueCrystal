@@ -1,43 +1,81 @@
 observability:
   service:
-    name: ingest
+    # 观测服务的名称，用于日志、指标和链路追踪的统一标识
+    name: observability-example
+    # 当前实例 ID；如果环境变量 SERVICE_INSTANCE_ID 未设置或为空，则默认使用 local
     instance_id: ${SERVICE_INSTANCE_ID:-local}
+    # 当前运行环境；未配置时默认为 development
     environment: ${APP_ENV:-development}
 
   logging:
+    # 是否启用统一日志能力
     enabled: true
+    # 日志级别：DEBUG / INFO / WARNING / ERROR
     level: INFO
-    renderer: json
-    configure_stdlib: false
+    # 避免日志重复输出，指定 handler 名称
+    handler_name: bluecrystal
+    file:
+      path: ${OBSERVABILITY_LOG_PATH:-/tmp/observability-example.log}
+      # daily = 按天轮转，理论上一天产生 1 个轮转文件
+      # size = 按文件大小轮转，当日志文件达到 max_bytes 时触发轮转
+      rotation: daily
+      # 当 rotation 为 size 时生效，单位字节， 10485760 = 10MB
+      max_bytes: 10485760
+      # 当 rotation 为 daily 时，表示保留最近多少天的日志文件
+      # 当 rotation 为 size 时，表示保留最近多少个轮转文件
+      backup_count: 30
 
   metrics:
+    # 是否启用指标收集
     enabled: true
+    # 指标后端类型，当前仅支持 prometheus
     provider: prometheus
-    namespace: ingest
-    subsystem: ingest
+    # 子系统名；空字符串表示不额外追加子名称
+    subsystem: ""
+    
 
   tracing:
+    # 是否启用分布式链路追踪
     enabled: true
+    # 跟踪实现供应商，目前仅支持 OpenTelemetry
     provider: opentelemetry
+    # 数据导出器类型，例如 console 或 otlp_grpc
     exporter: otlp_grpc
-    sample_rate: 0.001
     exporter_options:
-      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}
-      insecure: true
+      # 下面的参数当 exporter==OTLP 类型时生效
+      # endpoint 表示 OTLP 接收器的地址，格式为 host:port
+      # max_queue_size 表示批处理队列的最大容量，超过该值的 span 会被丢弃。
+      # schedule_delay_millis 表示调度延迟，单位为毫秒。
+      # max_export_batch_size 表示每次导出的最大批量大小。
+      endpoint: ${OTLP_ENDPOINT:-localhost:64317}
+      max_queue_size: 2048
+      schedule_delay_millis: 5000
+      max_export_batch_size: 512
 
   audit:
-    enabled: false
+    # 是否开启审计日志
+    enabled: true
+    # 审计存储后端
     store: sqlite
     options:
-      path: ./data/audit.sqlite3
+      # 审计数据库位置；未配置时使用 /tmp 下的默认 SQLite 文件
+      path: ${OBSERVABILITY_AUDIT_PATH:-/tmp/observability-example-audit.sqlite3}
 
   instrumentation:
     fastapi:
+      # 是否插桩 FastAPI 请求生命周期和异常处理
       enabled: true
       options:
-        excluded_urls: health,metrics
+        # 默认 actor resolver 使用请求头 x-actor；也可切成 x-user-or-actor
+        # 或 x-forwarded-user-or-actor
+        actor_resolver: x-actor
+        # 排除不需要埋点的 URL，避免健康检查和指标接口被干扰
+        excluded_urls: health,metrics,audit
+        # 是否直接暴露指标接口
         expose_metrics: true
     apscheduler:
+      # 是否监控 APScheduler 的任务调度事件
       enabled: true
     worker:
+      # 是否开启后台 worker 的观测埋点
       enabled: true

@@ -46,13 +46,14 @@ def load_observability_config(path: str | Path) -> ObservabilityConfig:
         raise ObservabilityConfigError("observability must be a mapping")
     try:
         expanded = _expand_environment(section, path="observability")
-        return ObservabilityConfig.model_validate(expanded)
+        config = ObservabilityConfig.model_validate(expanded)
+        return _resolve_local_paths(config, config_path)
     except (ObservabilityConfigError, ValidationError) as exc:
         raise ObservabilityConfigError(f"invalid observability config: {exc}") from exc
 
 
 def _expand_environment(value: Any, *, path: str) -> Any:
-    """递归替换字符串中的 ``${NAME}`` 或 ``${NAME:-default}``。"""
+    """递归解析配置中的环境变量表达式。"""
     if isinstance(value, dict):
         return {
             key: _expand_environment(item, path=f"{path}.{key}")
@@ -77,3 +78,32 @@ def _expand_environment(value: Any, *, path: str) -> Any:
         return resolved
 
     return _ENV_PATTERN.sub(replace, value)
+
+
+def _resolve_local_paths(
+    config: ObservabilityConfig,
+    config_path: Path,
+) -> ObservabilityConfig:
+    """把内建 SQLite 相对路径稳定解析到 YAML 所在目录。
+
+    Args:
+        config: 已通过稳定字段校验的配置对象。
+        config_path: 作为相对路径基准的 YAML 文件。
+
+    Returns:
+        SQLite 路径已绝对化的不可变配置副本；无需处理时返回原对象。
+    """
+    path = config.audit.options.get("path")
+    if config.audit.store != "sqlite" or not isinstance(path, str):
+        return config
+    if path == ":memory:" or Path(path).is_absolute():
+        return config
+    resolved_options = {
+        **config.audit.options,
+        "path": str((config_path.parent / path).resolve()),
+    }
+    return config.model_copy(
+        update={
+            "audit": config.audit.model_copy(update={"options": resolved_options})
+        }
+    )

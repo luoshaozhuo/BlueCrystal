@@ -41,3 +41,45 @@ YAML 是部署入口，并严格解析为 `ObservabilityConfig`。稳定字段�
 
 每个 Runtime 独占 Prometheus registry 和 OTel `TracerProvider`，模块导入不会注册
 全局 collector、设置全局 tracer provider 或自动修改 root logger。
+
+## 运行完整示例
+
+默认示例不依赖外部 Collector：结构化业务日志和 OTel console span 写到进程
+标准输出，Prometheus 指标由 `GET /metrics` 暴露，审计记录写入仓库
+`/tmp/observability-example-audit.sqlite3`。YAML 中 SQLite 相对路径统一以 YAML
+文件所在目录为基准；可通过 `OBSERVABILITY_EXAMPLE_AUDIT_PATH` 覆盖持久化位置。
+
+示例明确把 `X-Actor` 当作演示主体，因此同一 request context 中的声明式 HTTP
+Audit 与 scheduler 管理 Audit 都能关联 actor。通用 FastAPI adapter 默认不信任
+任何主体 header；生产代码必须向 `runtime.instrument_fastapi(...,
+actor_resolver=...)` 注入从认证 session、token 或网关可信声明解析主体的 resolver，
+不能直接照搬示例 header 作为身份认证。
+
+```bash
+python -m observability.example_app
+
+# 直接运行经过 instrumentation 的业务 Worker
+curl -H 'x-request-id: demo-request' -H 'x-actor: operator' \
+  -X POST 'http://127.0.0.1:8000/tasks/7/run'
+# 观察代表性业务失败日志、失败 span 与 Audit
+curl -X POST 'http://127.0.0.1:8000/tasks/8/run?fail=true'
+
+# 创建一次性真实 APScheduler 任务，并立即触发
+curl -H 'x-actor: scheduler-operator' -X POST \
+  'http://127.0.0.1:8000/schedules/demo-job?task_id=9&delay_seconds=60'
+curl -H 'x-actor: scheduler-operator' -X POST \
+  'http://127.0.0.1:8000/schedules/demo-job/run-now'
+
+curl 'http://127.0.0.1:8000/metrics'
+curl 'http://127.0.0.1:8000/audit?operation=schedule.run_now&limit=10'
+curl 'http://127.0.0.1:8000/health'
+```
+
+部署时可用 `OBSERVABILITY_CONFIG_PATH=/path/to/observability.yaml` 替换默认 YAML；
+`OBSERVABILITY_EXAMPLE_HOST`、`OBSERVABILITY_EXAMPLE_PORT` 和
+`OBSERVABILITY_EXAMPLE_RELOAD=true` 分别控制监听地址、端口与 Uvicorn reload。
+
+APScheduler listener 只证明 scheduler 启停、提交和执行结果等技术事实，并输出
+对应 metrics/log；被调度的 Worker wrapper 负责执行 span 与指标，显式
+create/run-now/pause/resume/remove 管理操作由 `observe_scheduler_action` 负责
+trace/audit。示例不会把 listener 事件夸大为操作者审计。

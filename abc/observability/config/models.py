@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class _StrictModel(BaseModel):
@@ -18,12 +18,19 @@ class _StrictModel(BaseModel):
 
 
 class ServiceConfig(_StrictModel):
-    """标识产生遥测数据的服务实例。"""
-
     name: str = Field(min_length=1)
     instance_id: str | None = None
     environment: str | None = None
     attributes: dict[str, str] = Field(default_factory=dict)
+
+
+class FileLogConfig(_StrictModel):
+    """固定文件日志配置；``path`` 是日志基准路径，按日期轮转写入。"""
+
+    path: str = Field(min_length=1)
+    rotation: str = Field(default="daily")
+    max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    backup_count: int = Field(default=5, ge=0)
 
 
 class LoggingConfig(_StrictModel):
@@ -31,8 +38,8 @@ class LoggingConfig(_StrictModel):
 
     enabled: bool = True
     level: str = "INFO"
-    renderer: str = "json"
-    configure_stdlib: bool = False
+    handler_name: str = "bluecrystal"
+    file: FileLogConfig | None = None
     options: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -41,7 +48,6 @@ class MetricsConfig(_StrictModel):
 
     enabled: bool = True
     provider: str = "prometheus"
-    namespace: str = ""
     subsystem: str = ""
     provider_options: dict[str, Any] = Field(default_factory=dict)
 
@@ -52,17 +58,9 @@ class TracingConfig(_StrictModel):
     enabled: bool = True
     provider: str = "opentelemetry"
     exporter: str = "otlp_grpc"
-    sample_rate: float = 0.001
+    sample_rate: float = Field(default=0.001, ge=0, le=1)
     provider_options: dict[str, Any] = Field(default_factory=dict)
     exporter_options: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("sample_rate")
-    @classmethod
-    def validate_sample_rate(cls, value: float) -> float:
-        """限制概率采样率，避免第三方构造阶段才出现模糊错误。"""
-        if not 0 <= value <= 1:
-            raise ValueError("sample_rate must be in [0, 1]")
-        return value
 
 
 class AuditConfig(_StrictModel):

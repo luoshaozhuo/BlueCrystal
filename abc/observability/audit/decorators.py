@@ -7,7 +7,7 @@ from typing import TypeVar, cast
 
 from .models import AuditSpec
 
-
+# F 只能代表某种可调用对象，必须满足 Callable[..., object] 这个大类
 F = TypeVar("F", bound=Callable[..., object])
 _ATTR = "__bluecrystal_audit_spec__"
 

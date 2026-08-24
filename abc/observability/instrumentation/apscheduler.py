@@ -14,7 +14,7 @@ from ..context import bind_observation_context
 from ..logs import get_logger
 
 if TYPE_CHECKING:
-    from ..manager import ObservabilityRuntime
+    from ..runtime import ObservabilityRuntime
 
 
 class SchedulerEvent(Protocol):
@@ -111,13 +111,20 @@ class APSchedulerInstrumentation:
                 if not isinstance(attributes, Mapping):
                     raise TypeError("APScheduler identity attributes must be a mapping")
                 with bind_observation_context(
+                    service_name=runtime.config.service.name,
+                    service_instance_id=runtime.config.service.instance_id,
                     job_id=str(resolved.get("job_id", job_event.job_id)),
                     source="scheduler",
                     attributes=attributes,
                 ):
                     logger.info("scheduler_event", scheduler_event=event_name)
             else:
-                logger.info("scheduler_event", scheduler_event=event_name)
+                with bind_observation_context(
+                    service_name=runtime.config.service.name,
+                    service_instance_id=runtime.config.service.instance_id,
+                    source="scheduler",
+                ):
+                    logger.info("scheduler_event", scheduler_event=event_name)
 
         self._scheduler.add_listener(listener, self._event_mask)
         self._listener = listener

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
+import time
 from typing import Any, cast
 
 import pytest
@@ -67,38 +68,153 @@ async def test_fastapi_third_party_instrumentation_minimal_request() -> None:
         await runtime.close()
 
 
-def test_example_app_installs_structure_before_lifespan(tmp_path: Path) -> None:
-    """真实 composition root 不得在 FastAPI startup 阶段新增 middleware。"""
+def test_example_app_complete_local_observability_loop(
+    tmp_path: Path,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    """真实单机示例应闭环 HTTP、scheduler、Worker 和四类输出。
+
+    Console exporter、结构化日志、SQLite 和进程内 Prometheus registry 均为真实
+    本地实现；本测试不证明远端 collector 或 scraper 可用。
+    """
     config_path = tmp_path / "observability.yaml"
     config_path.write_text(
         """
 observability:
   service:
-    name: composition-test
+    name: example-test
+    instance_id: node-test
   logging:
-    enabled: false
+    enabled: true
+    renderer: json
   metrics:
     enabled: true
+    namespace: example_test
   tracing:
-    enabled: false
+    enabled: true
+    exporter: console
+    sample_rate: 1.0
   audit:
-    enabled: false
+    enabled: true
+    store: sqlite
+    options:
+      path: audit.sqlite3
   instrumentation:
     fastapi:
       enabled: true
       options:
         expose_metrics: true
+    apscheduler:
+      enabled: true
     worker:
       enabled: true
 """,
         encoding="utf-8",
     )
     app = create_app(config_path)
-    with TestClient(app) as client:
-        response = client.post("/tasks/7/run")
+    scheduler = app.state.scheduler
+    installed_callbacks = {callback for callback, _ in scheduler._listeners}
+    assert installed_callbacks
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/tasks/7/run",
+            headers={"x-request-id": "request-direct", "x-actor": "operator"},
+        )
         assert response.status_code == 200
         assert response.json() == {"task_id": 7}
-        assert client.get("/metrics").status_code == 200
+
+        failed = client.post("/tasks/8/run?fail=true")
+        assert failed.status_code == 500
+
+        created = client.post(
+            "/schedules/job-9?task_id=9&delay_seconds=60",
+            headers={
+                "x-request-id": "request-create",
+                "x-actor": "scheduler-operator",
+            },
+        )
+        assert created.status_code == 200
+        triggered = client.post(
+            "/schedules/job-9/run-now",
+            headers={
+                "x-request-id": "request-run-now",
+                "x-actor": "scheduler-operator",
+            },
+        )
+        assert triggered.status_code == 200
+
+        missing = client.post(
+            "/schedules/missing-job/run-now",
+            headers={
+                "x-request-id": "request-missing",
+                "x-actor": "failure-operator",
+            },
+        )
+        assert missing.status_code == 500
+
+        deadline = time.monotonic() + 2.0
+        scheduler_state: dict[str, object] = {}
+        while time.monotonic() < deadline:
+            health = client.get("/health")
+            scheduler_state = cast(
+                dict[str, object], health.json()["scheduler_executions"]
+            )
+            if scheduler_state["succeeded"] == 1:
+                break
+            time.sleep(0.02)
+        assert scheduler_state == {"succeeded": 1, "failed": 0, "last_task_id": 9}
+
+        metrics = client.get("/metrics")
+        assert metrics.status_code == 200
+        assert "http_requests_total" in metrics.text
+        assert "example_test_worker_executions_total" in metrics.text
+        assert "example_test_scheduler_events_total" in metrics.text
+        assert 'event="job_executed"' in metrics.text
+
+        management_audit = client.get(
+            "/audit?operation=schedule.run_now&target_id=job-9"
+        ).json()
+        assert len(management_audit) == 1
+        assert management_audit[0]["actor"] == "scheduler-operator"
+        assert management_audit[0]["request_id"] == "request-run-now"
+        assert management_audit[0]["operation"] == "schedule.run_now"
+        assert management_audit[0]["target_id"] == "job-9"
+        assert management_audit[0]["result"] == "success"
+
+        failed_management_audit = client.get(
+            "/audit?operation=schedule.run_now&target_id=missing-job"
+        ).json()
+        assert len(failed_management_audit) == 1
+        assert failed_management_audit[0]["actor"] == "failure-operator"
+        assert failed_management_audit[0]["request_id"] == "request-missing"
+        assert failed_management_audit[0]["operation"] == "schedule.run_now"
+        assert failed_management_audit[0]["target_id"] == "missing-job"
+        assert failed_management_audit[0]["result"] == "failure"
+        assert failed_management_audit[0]["error_type"] == "JobLookupError"
+
+        worker_audit = client.get("/audit?operation=task.run&target_id=7").json()
+        assert len(worker_audit) == 1
+        assert worker_audit[0]["actor"] == "operator"
+        assert worker_audit[0]["request_id"] == "request-direct"
+
+    assert scheduler.running is False
+    assert installed_callbacks.isdisjoint(
+        callback for callback, _ in scheduler._listeners
+    )
+    assert (tmp_path / "audit.sqlite3").exists()
+
+    output = capfd.readouterr().out
+    assert '"event": "business_task_started"' in output
+    assert '"event": "business_task_completed"' in output
+    assert '"event": "business_task_failed"' in output
+    assert '"request_id": "request-direct"' in output
+    assert '"job_id": "job-9"' in output
+    assert '"service_name": "example-test"' in output
+    assert '"trace_id":' in output
+    assert '"name": "example.task.execute"' in output
+    assert '"name": "scheduler.schedule.run_now"' in output
+    assert '"scheduler.target.id": "missing-job"' in output
 
 
 @pytest.mark.asyncio

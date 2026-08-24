@@ -7,7 +7,7 @@ from .base import Instrumentation
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..manager import ObservabilityRuntime
+    from ..runtime import ObservabilityRuntime
 
 
 class InstrumentationRegistry:

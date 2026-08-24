@@ -14,7 +14,7 @@ from opentelemetry.trace import Status, StatusCode
 from ..context import bind_observation_context
 
 if TYPE_CHECKING:
-    from ..manager import ObservabilityRuntime
+    from ..runtime import ObservabilityRuntime
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -48,6 +48,8 @@ def observe_scheduler_action(
             else nullcontext(None)
         )
         with bind_observation_context(
+            service_name=runtime.config.service.name,
+            service_instance_id=runtime.config.service.instance_id,
             source="scheduler",
             attributes=attributes,
         ):

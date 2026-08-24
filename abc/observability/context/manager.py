@@ -53,6 +53,7 @@ def bind_observation_context(
     attributes: Mapping[str, object] | object = _UNSET,
 ) -> Generator[ObservationContext, None, None]:
     """临时绑定关联字段，并在异常或取消时可靠恢复父上下文。"""
+    # _UNSET 的作用是“区分‘没传参数’和‘传了一个真实值’”。
     supplied = {
         "service_name": service_name,
         "service_instance_id": service_instance_id,
@@ -65,11 +66,21 @@ def bind_observation_context(
     }
     changes = {key: value for key, value in supplied.items() if value is not _UNSET}
     if attributes is not _UNSET:
+        # 合并父上下文的 attributes 与新传入的 attributes。
+        # 例如：
+        # >>> parent = {"tenant_id": "t1", "region": "cn"}
+        # >>> child = {"region": "us", "order_id": "O-99"}
+        # >>> merged = {**parent, **child}
+        # >>> print(merged)
+        # >>> {'tenant_id': 't1', 'region': 'us', 'order_id': 'O-99'}
         changes["attributes"] = {
             **get_observation_context().attributes,
             **dict(cast(Mapping[str, object], attributes)),
         }
     current = get_observation_context()
+
+    # 下面的 cast 不是为了业务逻辑，而是为了“让静态类型检查器接受”这个值的来源。
+    # changes.get(...) 的返回值来自字典，字典的值类型通常被推断为更宽泛的 object | None
     updated = ObservationContext(
         service_name=cast(str | None, changes.get("service_name", current.service_name)),
         service_instance_id=cast(

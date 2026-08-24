@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from typing import Any, cast
@@ -12,6 +13,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
     ConsoleSpanExporter,
+    SimpleSpanProcessor,
     SpanExporter,
 )
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
@@ -43,22 +45,27 @@ class TracingBackend:
             resource_attributes["service.instance.id"] = service.instance_id
         if service.environment:
             resource_attributes["deployment.environment.name"] = service.environment
+        
         self.provider = TracerProvider(
             resource=Resource.create(resource_attributes),
-            sampler=TraceIdRatioBased(config.sample_rate),
             **config.provider_options,
         )
-        exporter: SpanExporter | None
+
         if config.exporter == "otlp_grpc":
-            exporter = cast(Any, OTLPSpanExporter)(**config.exporter_options)
+            exporter: SpanExporter = cast(Any, OTLPSpanExporter)(**config.exporter_options)
+            processor = BatchSpanProcessor(
+                exporter,
+                max_queue_size=2048,
+                schedule_delay_millis=5000,
+                max_export_batch_size=512,
+            )
         elif config.exporter == "console":
-            exporter = cast(Any, ConsoleSpanExporter)(**config.exporter_options)
-        elif config.exporter == "none":
-            exporter = None
+            exporter: SpanExporter = cast(Any, ConsoleSpanExporter)(out=sys.stdout, **config.exporter_options)
+            processor = SimpleSpanProcessor(exporter)
         else:
             raise ValueError(f"tracing.exporter: unsupported exporter {config.exporter!r}")
-        if exporter is not None:
-            self.provider.add_span_processor(BatchSpanProcessor(exporter))
+        
+        self.provider.add_span_processor(processor)
         self.tracer: Tracer = self.provider.get_tracer("observability")
 
     def span(
@@ -77,6 +84,8 @@ class TracingBackend:
 
     def close(self) -> None:
         """刷新并关闭 span processors。"""
+        # 用了 BatchSpanProcessor（见 backend.py:53 一段），它会先入队再异步发。
+        # 因此在关闭 provider 前，需要调用 shutdown 确保所有 span 都被导出。
         self.provider.shutdown()
 
 

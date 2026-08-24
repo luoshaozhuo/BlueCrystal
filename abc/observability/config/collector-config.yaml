@@ -1,0 +1,74 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # 内存限制器配置，控制 Collector 的内存使用。
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    # 突发内存使用限制，防止短时间内内存激增导致 OOM。
+    spike_limit_mib: 128
+
+  # 先按 trace_id 聚合，避免同一 trace 分片重复决策。
+  groupbytrace:
+    wait_duration: 8s
+    num_traces: 50000
+
+  # Tail Sampling: 错误 trace 全保留；非错误 trace 按比例抽样。
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 2000
+    policies:
+      - name: keep-error-traces
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: sample-non-error-traces
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${NORMAL_TRACE_SAMPLING_PERCENTAGE:1}
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+exporters:
+  # 默认输出到 Collector 自身日志，方便本地验证采样是否生效。
+  debug:
+    verbosity: normal
+
+  file/local:
+    path: /var/lib/otelcol/traces.jsonl
+    rotation:
+      max_megabytes: 100
+      max_days: 100
+      max_backups: 100
+      localtime: true
+
+  # 如果需要转发到后端（Tempo/Jaeger/APM），启用下方 exporter 并加入 pipeline exporters。
+  otlp/upstream:
+    endpoint: ${UPSTREAM_OTLP_GRPC_ENDPOINT:tempo:4317}
+    tls:
+      insecure: true
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, groupbytrace, tail_sampling, batch]
+      # 生产环境。
+      # exporters: [otlp/upstream]
+      # exporters: [file/local]
+      # 测试环境[debug] 或者 [debug, otlp/upstream]。
+      exporters: [debug]

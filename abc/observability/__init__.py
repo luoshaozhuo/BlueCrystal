@@ -11,7 +11,7 @@ from .context import (
     get_observation_context,
 )
 from .logs import get_logger
-from .manager import (
+from .runtime import (
     ObservabilityRuntime,
     create_observability,
     install_observability,

@@ -27,15 +27,13 @@ class ObservabilityRuntime:
     def __init__(
         self,
         config: ObservabilityConfig,
-        *,
-        metrics_registry: CollectorRegistry | None = None,
     ) -> None:
         """按配置创建能力，但不隐式安装任何框架 instrumentation。"""
         self.config = config
         if config.logging.enabled:
             configure_logging(config.logging)
         self.metrics = (
-            MetricsBackend(config.metrics, metrics_registry)
+            MetricsBackend(config.service, config.metrics)
             if config.metrics.enabled
             else None
         )
@@ -78,25 +76,63 @@ class ObservabilityRuntime:
         self._instrumentations.register(instrumentation)
         return instrumentation
 
-    def instrument_fastapi(self, app: object) -> Instrumentation:
-        """按需安装 FastAPI adapter，根包不会提前导入 FastAPI。"""
-        from .instrumentation.fastapi import FastAPIInstrumentation
+    def instrument_fastapi(
+        self,
+        app: object,
+        *,
+        actor_resolver: Callable[..., str | None] | None = None,
+    ) -> None:
+        """按需安装 FastAPI adapter，并显式注入认证主体 resolver。
+
+        Args:
+            app: 待安装结构 instrumentation 的 FastAPI 对象。
+            actor_resolver: 从框架请求解析可信认证主体的 Python callable；通用
+                adapter 不会默认信任任意 HTTP header。
+
+        Raises:
+            ValueError: YAML options 试图提供运行期 callable 时抛出。
+        """
+        from .instrumentation.fastapi import (
+            FastAPIInstrumentation,
+            resolve_actor_resolver,
+        )
 
         options = self.config.instrumentation.get_options("fastapi")
-        adapter = cast(Any, FastAPIInstrumentation)(
-            app, enabled=options.enabled, **options.options
-        )
-        return self.install(adapter)
 
-    def instrument_apscheduler(self, scheduler: object) -> Instrumentation:
+        configured = options.options.get("actor_resolver")
+        if configured is not None and not isinstance(configured, str):
+            raise ValueError(
+                "instrumentation.fastapi.options.actor_resolver must be a builtin "
+                "string selector or a Python runtime callable"
+            )
+
+        resolved_actor_resolver = actor_resolver
+        if resolved_actor_resolver is None:
+            resolved_actor_resolver = resolve_actor_resolver(configured)
+
+        fastapi_options = dict(options.options)
+        fastapi_options.pop("actor_resolver", None)
+
+        adapter = cast(Any, FastAPIInstrumentation)(
+            app,
+            enabled=True,
+            actor_resolver=resolved_actor_resolver,
+            **fastapi_options,
+        )
+        self.install(adapter)
+
+    def instrument_apscheduler(self, scheduler: object) -> None:
         """按需安装 APScheduler listener adapter。"""
         from .instrumentation.apscheduler import APSchedulerInstrumentation
 
         options = self.config.instrumentation.get_options("apscheduler")
+
         adapter = cast(Any, APSchedulerInstrumentation)(
-            scheduler, enabled=options.enabled, **options.options
+            scheduler,
+            enabled=True,
+            **options.options,
         )
-        return self.install(adapter)
+        self.install(adapter)
 
     def instrument_worker(
         self,
@@ -106,13 +142,41 @@ class ObservabilityRuntime:
         resolver: Callable[..., Mapping[str, object]] | None = None,
         options: Mapping[str, object] | None = None,
     ) -> Callable[P, R]:
-        """包装同步或异步业务 Worker，同时保留其参数和返回契约。"""
+        """包装同步或异步业务 Worker，同时保留其参数和返回契约。
+
+        该方法将业务函数包装为带观测能力的 worker，保留原函数签名和返回值，
+        但额外执行上下文绑定、日志、指标、链路记录等 instrumentation 逻辑。
+
+        Args:
+            name: Worker 的业务名称，用于日志、链路和度量中区分具体 worker。
+                例子: "sync_orders", "daily_report", "ingest_event".
+            runner: 要包装的原始业务函数。函数可以是同步或异步 callable，并保留
+                其原有参数列表和返回值签名。
+            resolver: 可选 callables，用于从 worker 调用上下文中解析附加业务元数据。
+                例如可从函数参数、消息体或任务载荷中提取 tenant_id、order_id 等。
+                该 resolver 不应依赖任意 HTTP header；而应明确从已知调用上下文中读取。
+            options: 可覆盖或追加的 worker 配置项。它会和 YAML 中配置合并，options
+                优先级更高，最终以显式调用参数覆盖配置文件。
+                例子: {"timeout": 30, "retries": 2, "queue": "orders"}.
+
+        Returns:
+            包装后的 worker callable，调用方式与原 runner 保持一致。外部代码应继续
+            按原函数签名调用，而不需要知道观测逻辑的细节。
+
+        Notes:
+            - 如果 worker instrumentation 在配置中被禁用，则直接返回原 runner。
+            - wrapper 负责在执行前后绑定 observation context，并在失败时保留上下文。
+            - 该实现不改变业务函数的契约，确保可以无缝替换原调用点。
+        """
         from .instrumentation.task_runner import wrap_worker
 
         configured = self.config.instrumentation.get_options("worker")
         if not configured.enabled:
             return runner
         merged = {**configured.options, **dict(options or {})}
+        # wrap_worker 是从动态导入的模块里拿到的，不一定被静态分析器准确推断出它的签名
+        # 但代码和业务逻辑上，wrapper_factory(...) 最终确实返回一个可调用对象，且类型应当符合 Callable[P, R]
+        # 所以用 cast 明确“我知道这里的类型是这个”，避免 mypy/pyright 报错
         wrapper_factory = cast(Any, wrap_worker)
         return cast(
             Callable[P, R],
@@ -156,8 +220,6 @@ class ObservabilityRuntime:
 
 def create_observability(
     config: ObservabilityConfig | str | Path,
-    *,
-    metrics_registry: CollectorRegistry | None = None,
 ) -> ObservabilityRuntime:
     """从配置对象或 YAML 路径创建未启动的 Runtime。"""
     resolved = (
@@ -165,7 +227,7 @@ def create_observability(
         if isinstance(config, (str, Path))
         else config
     )
-    return ObservabilityRuntime(resolved, metrics_registry=metrics_registry)
+    return ObservabilityRuntime(resolved)
 
 
 def install_observability(
@@ -177,19 +239,32 @@ def install_observability(
     """创建 Runtime，并在宿主启动前安装实际存在的框架对象。
 
     Args:
-        config: 强类型配置或 YAML 路径。
-        app: 可选 FastAPI 应用对象。
-        scheduler: 可选 APScheduler 对象。
+        config: 观测配置对象或指向 YAML 文件的路径。支持两种来源：
+            1) `ObservabilityConfig` 实例；
+            2) 文件系统路径，随后由 `load_observability_config` 解析。
+        app: 可选 FastAPI 应用对象。若传入，则会自动安装 FastAPI instrumentation，
+            并将 runtime 挂到 `app.state.observability` 上，供后续请求处理访问。
+        scheduler: 可选 APScheduler 调度器对象。若传入，则会自动安装
+            APScheduler instrumentation，进入任务/触发器生命周期监控。
 
     Returns:
-        已完成结构安装但尚未启动资源的 Runtime。
+        已完成结构安装但尚未启动资源的 Runtime。调用方仍需显式执行
+        `await runtime.start()` 才会真正开启 backend 和 instrumentation。
+
+    Notes:
+        - 这是一个“安装阶段”方法，不做尾部资源启动。
+        - 适用于宿主应用在启动时提前挂载观测能力。
     """
     runtime = create_observability(config)
+
     if app is not None:
-        runtime.instrument_fastapi(app)
-        state = getattr(app, "state", None)
-        if state is not None:
-            state.observability = runtime
+        if runtime.config.instrumentation.get_options("fastapi").enabled:
+            runtime.instrument_fastapi(app)
+            state = getattr(app, "state", None)
+            setattr(state, "observability", runtime)
+
     if scheduler is not None:
-        runtime.instrument_apscheduler(scheduler)
+        if runtime.config.instrumentation.get_options("apscheduler").enabled:
+            runtime.instrument_apscheduler(scheduler)
+
     return runtime

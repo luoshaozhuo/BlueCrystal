@@ -1,0 +1,18 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.107.0
+    container_name: observability-otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    restart: unless-stopped
+    environment:
+      # 非错误 trace 抽样比例（百分比）。
+      NORMAL_TRACE_SAMPLING_PERCENTAGE: "1"
+      # 若启用 otlp/upstream exporter，请配置下方地址。
+      UPSTREAM_OTLP_GRPC_ENDPOINT: "tempo:4317"
+    ports:
+      - "64317:4317"   # OTLP/gRPC
+      - "64318:4318"   # OTLP/HTTP
+      - "13133:13133" # Collector 健康检查
+    volumes:
+      - ./collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./collector-data:/var/lib/otelcol

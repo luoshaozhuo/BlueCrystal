@@ -82,6 +82,9 @@ l5 = [
 [tool.setuptools.packages.find]
 where = ["src", "abc"]
 
+[tool.setuptools.package-data]
+observability = ["config/*.yaml"]
+
 [tool.black]
 line-length = 100
 target-version = ["py313"]

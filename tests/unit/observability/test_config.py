@@ -20,6 +20,7 @@ from observability.config.loader import (
     ObservabilityConfigError,
     load_observability_config,
 )
+from observability.manager import ObservabilityRuntime
 
 PACKAGE_ROOT = Path(__file__).parents[3] / "abc" / "observability"
 REMOVED_MODULE_PATHS = frozenset(
@@ -173,6 +174,7 @@ def test_built_wheel_excludes_removed_modules(tmp_path: Path) -> None:
         members = frozenset(archive.namelist())
     assert "observability/manager.py" in members
     assert "observability/trace/backend.py" in members
+    assert "observability/config/observability.yaml" in members
     assert all(
         not any(member == removed or member.startswith(removed) for member in members)
         for removed in REMOVED_MODULE_PATHS
@@ -242,3 +244,115 @@ def test_yaml_requires_declared_environment_variable(tmp_path: Path) -> None:
     )
     with pytest.raises(ObservabilityConfigError, match="observability.service.name"):
         load_observability_config(path)
+
+
+def test_yaml_resolves_sqlite_path_relative_to_config(tmp_path: Path) -> None:
+    """SQLite 相对路径应以 YAML 目录为基准，避免依赖启动工作目录。"""
+    config_dir = tmp_path / "deployment"
+    config_dir.mkdir()
+    path = config_dir / "observability.yaml"
+    path.write_text(
+        """
+observability:
+  service:
+    name: relative-audit
+  logging:
+    enabled: false
+  metrics:
+    enabled: false
+  tracing:
+    enabled: false
+  audit:
+    enabled: true
+    store: sqlite
+    options:
+      path: ../state/audit.sqlite3
+""",
+        encoding="utf-8",
+    )
+    config = load_observability_config(path)
+    assert config.audit.options["path"] == str(
+        (tmp_path / "state" / "audit.sqlite3").resolve()
+    )
+
+
+def test_console_exporter_rejects_runtime_controlled_output() -> None:
+    """Console exporter 的当前进程输出流不得被 YAML options 覆盖。"""
+    config = observability.ObservabilityConfig.model_validate(
+        {
+            "service": {"name": "console-conflict"},
+            "logging": {"enabled": False},
+            "metrics": {"enabled": False},
+            "tracing": {
+                "exporter": "console",
+                "exporter_options": {"out": "not-a-stream"},
+            },
+        }
+    )
+    with pytest.raises(ValueError, match="runtime-controlled console key: out"):
+        ObservabilityRuntime(config)
+
+
+def test_fastapi_actor_resolver_accepts_builtin_string_modes() -> None:
+    """YAML 可按内置策略选择 actor resolver，而不必提供 Python callable。"""
+    config = observability.ObservabilityConfig.model_validate(
+        {
+            "service": {"name": "actor-resolver-selector"},
+            "logging": {"enabled": False},
+            "metrics": {"enabled": False},
+            "tracing": {"enabled": False},
+            "instrumentation": {
+                "fastapi": {"options": {"actor_resolver": "x-user-or-actor"}}
+            },
+        }
+    )
+    runtime = ObservabilityRuntime(config)
+    app = __import__("fastapi").FastAPI()
+    runtime.instrument_fastapi(app)
+    assert app.user_middleware
+
+
+def test_fastapi_actor_resolver_rejects_unknown_builtin_mode() -> None:
+    """未知 actor resolver 名称必须在启动前显式失败。"""
+    config = observability.ObservabilityConfig.model_validate(
+        {
+            "service": {"name": "actor-resolver-unknown"},
+            "logging": {"enabled": False},
+            "metrics": {"enabled": False},
+            "tracing": {"enabled": False},
+            "instrumentation": {
+                "fastapi": {"options": {"actor_resolver": "not-a-mode"}}
+            },
+        }
+    )
+    runtime = ObservabilityRuntime(config)
+    with pytest.raises(ValueError, match="unsupported actor resolver"):
+        runtime.instrument_fastapi(__import__("fastapi").FastAPI())
+
+
+@pytest.mark.parametrize(
+    ("exporter", "exporter_options"),
+    [
+        ("none", {}),
+        ("otlp_grpc", {"endpoint": "localhost:4317", "insecure": True}),
+    ],
+)
+def test_non_console_trace_exporters_keep_construction_contract(
+    exporter: str,
+    exporter_options: dict[str, object],
+) -> None:
+    """Console 本地可见性扩展不得破坏 none 或 OTLP 构造和关闭。"""
+    config = observability.ObservabilityConfig.model_validate(
+        {
+            "service": {"name": f"trace-{exporter}"},
+            "logging": {"enabled": False},
+            "metrics": {"enabled": False},
+            "tracing": {
+                "exporter": exporter,
+                "exporter_options": exporter_options,
+            },
+        }
+    )
+    runtime = ObservabilityRuntime(config)
+    assert runtime.tracing is not None
+    runtime.tracing.close()

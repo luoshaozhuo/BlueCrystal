@@ -16,10 +16,50 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from ..context import bind_observation_context, new_request_id
 
 if TYPE_CHECKING:
-    from ..manager import ObservabilityRuntime
+    from ..runtime import ObservabilityRuntime
 
 ActorResolver = Callable[[Request], str | None]
 CallNext = Callable[[Request], Awaitable[Response]]
+DEFAULT_ACTOR_RESOLVER = "x-actor"
+
+
+def x_actor_resolver(request: Request) -> str | None:
+    """默认策略：从请求头 ``x-actor`` 读取演示主体。"""
+    return request.headers.get("x-actor")
+
+
+def x_user_or_actor_resolver(request: Request) -> str | None:
+    """优先 ``x-user``，回退到 ``x-actor``。"""
+    return request.headers.get("x-user") or request.headers.get("x-actor")
+
+
+def x_forwarded_user_or_actor_resolver(request: Request) -> str | None:
+    """优先可信转发用户标识，再回退 ``x-user`` 和 ``x-actor``。"""
+    return (
+        request.headers.get("x-forwarded-user")
+        or request.headers.get("x-user")
+        or request.headers.get("x-actor")
+    )
+
+
+BUILTIN_ACTOR_RESOLVERS: dict[str, ActorResolver] = {
+    "x-actor": x_actor_resolver,
+    "x-user-or-actor": x_user_or_actor_resolver,
+    "x-forwarded-user-or-actor": x_forwarded_user_or_actor_resolver,
+}
+
+
+def resolve_actor_resolver(
+    value: str | ActorResolver | None,
+) -> ActorResolver:
+    """把配置字符串解析为 actor resolver callable，默认行为使用 ``x-actor``。"""
+    if callable(value):
+        return value
+    key = (value or DEFAULT_ACTOR_RESOLVER).strip().lower()
+    try:
+        return BUILTIN_ACTOR_RESOLVERS[key]
+    except KeyError as exc:
+        raise ValueError(f"unsupported actor resolver: {value!r}") from exc
 
 
 class FastAPIInstrumentation:
@@ -90,6 +130,8 @@ class FastAPIInstrumentation:
                 correlation_id = request.headers.get("x-correlation-id") or request_id
                 actor = self._actor_resolver(request) if self._actor_resolver else None
                 with bind_observation_context(
+                    service_name=runtime.config.service.name,
+                    service_instance_id=runtime.config.service.instance_id,
                     request_id=request_id,
                     correlation_id=correlation_id,
                     actor=actor,

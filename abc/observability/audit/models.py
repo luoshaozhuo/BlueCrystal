@@ -20,17 +20,27 @@ class AuditResult(StrEnum):
 class AuditRecord:
     """一条不可变审计记录，保存操作主体和关联链路。"""
 
+    # 审计记录的唯一标识符，通常为 UUID
     audit_id: str
+    # 记录生成时间戳
     timestamp: datetime
+    # 所属服务名称
     service_name: str | None
+    # 服务实例 ID
     service_instance_id: str | None
+    # 请求 ID
     request_id: str | None
+    # 操作主体
     actor: str | None
     source: str
     operation: str
+    # 操作类型，例如 "create", "update", "delete"
     target_type: str
+    # 操作目标的唯一标识符
     target_id: str | None
+    # 操作结果，SUCCESS or FAILURE
     result: AuditResult
+    # 操作详情，键值对形式
     detail: Mapping[str, object] = field(
         default_factory=lambda: MappingProxyType({})
     )
