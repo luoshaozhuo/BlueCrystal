@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
+from contextlib import closing
 
 from .models import AuditQuery, AuditRecord, AuditResult
 
@@ -48,7 +49,7 @@ class SQLiteAuditStore:
             record.error_type,
             record.error_message,
         )
-        with sqlite3.connect(self._path) as connection:
+        with closing(sqlite3.connect(self._path)) as connection:
             connection.execute(
                 "INSERT INTO audit_record VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 values,
@@ -85,13 +86,13 @@ class SQLiteAuditStore:
             "ORDER BY timestamp DESC LIMIT ?"
         )
 
-        with sqlite3.connect(self._path) as connection:
+        with closing(sqlite3.connect(self._path)) as connection:
             rows = connection.execute(statement, params).fetchall()
 
         return tuple(self._row_to_record(row) for row in rows)
 
     def _initialize(self) -> None:
-        with sqlite3.connect(self._path) as connection:
+        with closing(sqlite3.connect(self._path)) as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS audit_record (

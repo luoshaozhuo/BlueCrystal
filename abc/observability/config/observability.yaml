@@ -66,8 +66,9 @@ observability:
       # 是否插桩 FastAPI 请求生命周期和异常处理
       enabled: true
       options:
-        # 默认 actor resolver 使用请求头 x-actor；也可切成 x-user-or-actor
-        # 或 x-forwarded-user-or-actor
+        # 默认 actor resolver 使用请求头 x-actor；
+        # x-user-or-actor, 优先x-user，回退 x-actor
+        # x-forwarded-user-or-actor， 优先可信转发用户标识，再回退x-user 和 x-actor
         actor_resolver: x-actor
         # 排除不需要埋点的 URL，避免健康检查和指标接口被干扰
         excluded_urls: health,metrics,audit

@@ -129,10 +129,43 @@ def bind_execution_context(
     execution_id: str | None = None,
     attributes: Mapping[str, object] | None = None,
 ) -> AbstractContextManager[ObservationContext]:
-    """创建 scheduler 或 worker 执行边界的关联作用域。"""
+    """创建兼容既有调用的 Worker 执行边界关联作用域。"""
+    return bind_worker_context(
+        job_id=job_id,
+        execution_id=execution_id,
+        attributes=attributes,
+    )
+
+
+def bind_worker_context(
+    *,
+    job_id: str | None = None,
+    execution_id: str | None = None,
+    attributes: Mapping[str, object] | None = None,
+) -> AbstractContextManager[ObservationContext]:
+    """创建 Worker 执行边界的关联作用域。"""
     return bind_observation_context(
         job_id=job_id,
         execution_id=execution_id,
         source="worker",
         attributes=attributes or {},
+    )
+
+
+def bind_scheduler_context(
+    *,
+    operation: str,
+    target_type: str,
+    target_id: str | None,
+    attributes: Mapping[str, object] | None = None,
+) -> AbstractContextManager[ObservationContext]:
+    """创建 Scheduler 管理操作的关联作用域。"""
+    return bind_observation_context(
+        source="scheduler",
+        attributes={
+            "scheduler.operation": operation,
+            "scheduler.target.type": target_type,
+            "scheduler.target.id": target_id or "",
+            **dict(attributes or {}),
+        },
     )

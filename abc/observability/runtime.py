@@ -6,8 +6,6 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar, cast
 
-from prometheus_client import CollectorRegistry
-
 from .audit import AuditService, SQLiteAuditStore
 from .config import ObservabilityConfig, load_observability_config
 from .context import initialize_runtime_context
@@ -79,8 +77,6 @@ class ObservabilityRuntime:
     def instrument_fastapi(
         self,
         app: object,
-        *,
-        actor_resolver: Callable[..., str | None] | None = None,
     ) -> None:
         """按需安装 FastAPI adapter，并显式注入认证主体 resolver。
 
@@ -92,31 +88,13 @@ class ObservabilityRuntime:
         Raises:
             ValueError: YAML options 试图提供运行期 callable 时抛出。
         """
-        from .instrumentation.fastapi import (
-            FastAPIInstrumentation,
-            resolve_actor_resolver,
-        )
-
+        from .instrumentation.fastapi import FastAPIInstrumentation
+        
         options = self.config.instrumentation.get_options("fastapi")
-
-        configured = options.options.get("actor_resolver")
-        if configured is not None and not isinstance(configured, str):
-            raise ValueError(
-                "instrumentation.fastapi.options.actor_resolver must be a builtin "
-                "string selector or a Python runtime callable"
-            )
-
-        resolved_actor_resolver = actor_resolver
-        if resolved_actor_resolver is None:
-            resolved_actor_resolver = resolve_actor_resolver(configured)
-
         fastapi_options = dict(options.options)
-        fastapi_options.pop("actor_resolver", None)
-
-        adapter = cast(Any, FastAPIInstrumentation)(
+        adapter = FastAPIInstrumentation(
             app,
             enabled=True,
-            actor_resolver=resolved_actor_resolver,
             **fastapi_options,
         )
         self.install(adapter)

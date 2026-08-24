@@ -10,10 +10,10 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import FastAPI, Request, Response
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor as OTelFastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from ..context import bind_observation_context, new_request_id
+from ..context import bind_request_context, new_request_id
 
 if TYPE_CHECKING:
     from ..runtime import ObservabilityRuntime
@@ -76,7 +76,7 @@ class FastAPIInstrumentation:
         expose_metrics: bool = True,
         metrics_endpoint: str = "/metrics",
         request_id_header: str = "x-request-id",
-        actor_resolver: ActorResolver | None = None,
+        actor_resolver: str = "x-actor",
         otel_options: dict[str, object] | None = None,
         metrics_options: dict[str, object] | None = None,
     ) -> None:
@@ -89,10 +89,10 @@ class FastAPIInstrumentation:
         self._expose_metrics = expose_metrics
         self._metrics_endpoint = metrics_endpoint
         self._request_id_header = request_id_header
-        self._actor_resolver = actor_resolver
+        self._actor_resolver = resolve_actor_resolver(actor_resolver)
         self._otel_options = dict(otel_options or {})
         self._metrics_options = dict(metrics_options or {})
-        self._instrumentator: Instrumentator | None = None
+        self._prometheus_instrumentator: Instrumentator | None = None
         self._otel_installed = False
         self._installed = False
         self._owned_routes: list[object] = []
@@ -125,43 +125,38 @@ class FastAPIInstrumentation:
             async def correlation_middleware(
                 request: Request, call_next: CallNext
             ) -> Response:
-                """补充请求关联字段，不重复第三方 HTTP telemetry。"""
+                """填充http请求关联字段"""
                 request_id = request.headers.get(self._request_id_header) or new_request_id()
                 correlation_id = request.headers.get("x-correlation-id") or request_id
-                actor = self._actor_resolver(request) if self._actor_resolver else None
-                with bind_observation_context(
-                    service_name=runtime.config.service.name,
-                    service_instance_id=runtime.config.service.instance_id,
+                actor = self._actor_resolver(request)
+                with bind_request_context(
                     request_id=request_id,
                     correlation_id=correlation_id,
                     actor=actor,
-                    source="http",
                 ):
                     response = await call_next(request)
                 response.headers[self._request_id_header] = request_id
                 return response
 
             if runtime.metrics is not None:
-                instrumentator_factory = cast(Any, Instrumentator)
-                self._instrumentator = instrumentator_factory(
+                self._prometheus_instrumentator = Instrumentator(
                     registry=runtime.metrics.registry,
                     **self._metrics_options,
                 ).instrument(self._app)
                 if self._expose_metrics:
-                    self._instrumentator.expose(
+                    self._prometheus_instrumentator.expose(
                         self._app,
                         endpoint=self._metrics_endpoint,
                         include_in_schema=False,
                     )
+
             if runtime.tracing is not None:
-                instrument_app = cast(Any, FastAPIInstrumentor.instrument_app)
-                instrument_app(
+                OTelFastAPIInstrumentor.instrument_app(
                     self._app,
-                    tracer_provider=runtime.tracing.provider,
+                    tracer_provider=runtime.tracing.tracer_provider if runtime.tracing else None,
                     excluded_urls=self._excluded_urls,
                     **self._otel_options,
                 )
-                self._otel_installed = True
             self._installed = True
         finally:
             # 即使第三方安装中途失败，也记录本 adapter 已产生的对象供回滚。
@@ -177,7 +172,7 @@ class FastAPIInstrumentation:
     def uninstall(self) -> None:
         """卸载 OTel，并按对象身份移除本 adapter 创建的 route/middleware。"""
         if self._otel_installed:
-            FastAPIInstrumentor.uninstrument_app(self._app)
+            OTelFastAPIInstrumentor.uninstrument_app(self._app)
             self._otel_installed = False
         owned_route_ids = {id(route) for route in self._owned_routes}
         owned_middleware_ids = {id(item) for item in self._owned_middleware}

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 from opentelemetry.trace import Status, StatusCode
 
-from ..context import bind_observation_context
+from ..context import bind_scheduler_context
 
 if TYPE_CHECKING:
     from ..runtime import ObservabilityRuntime
@@ -47,11 +47,10 @@ def observe_scheduler_action(
             if runtime.tracing is not None
             else nullcontext(None)
         )
-        with bind_observation_context(
-            service_name=runtime.config.service.name,
-            service_instance_id=runtime.config.service.instance_id,
-            source="scheduler",
-            attributes=attributes,
+        with bind_scheduler_context(
+            operation=operation,
+            target_type=target_type,
+            target_id=target_id,
         ):
             with span_scope as span:
                 try:

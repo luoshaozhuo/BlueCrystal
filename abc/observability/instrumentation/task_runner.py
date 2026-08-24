@@ -15,7 +15,7 @@ from uuid import uuid4
 
 from opentelemetry.trace import Status, StatusCode
 
-from ..context import bind_observation_context
+from ..context import bind_worker_context
 
 if TYPE_CHECKING:
     from ..runtime import ObservabilityRuntime
@@ -44,7 +44,7 @@ def _identity(
     return job_id, execution_id, cast(Mapping[str, object], attributes)
 
 
-def _record_result(
+def _record_execution_metrics(
     runtime: ObservabilityRuntime,
     name: str,
     result: str,
@@ -102,16 +102,12 @@ def wrap_worker(
             if runtime.metrics is not None:
                 runtime.metrics.worker_in_flight.labels(operation=name).inc()
             span_attributes = {"worker.operation": name, **attributes}
-            context = bind_observation_context(
-                service_name=runtime.config.service.name,
-                service_instance_id=runtime.config.service.instance_id,
-                job_id=job_id,
-                execution_id=execution_id,
-                source="worker",
-                attributes=attributes,
-            )
             try:
-                with context:
+                with bind_worker_context(
+                    job_id=job_id,
+                    execution_id=execution_id,
+                    attributes=attributes,
+                ):
                     if runtime.tracing is None:
                         value = await async_runner(*args, **kwargs)
                     else:
@@ -127,14 +123,14 @@ def wrap_worker(
                                 span.set_status(Status(StatusCode.ERROR, str(exc)))
                                 raise
             except asyncio.CancelledError:
-                _record_result(runtime, name, "cancelled", perf_counter() - started)
+                _record_execution_metrics(runtime, name, "cancelled", perf_counter() - started)
                 raise
             except Exception:
                 # 外层只负责结果指标，绝不转换或吞掉业务异常。
-                _record_result(runtime, name, "failure", perf_counter() - started)
+                _record_execution_metrics(runtime, name, "failure", perf_counter() - started)
                 raise
             else:
-                _record_result(runtime, name, "success", perf_counter() - started)
+                _record_execution_metrics(runtime, name, "success", perf_counter() - started)
                 return value
             finally:
                 if runtime.metrics is not None:
@@ -152,12 +148,9 @@ def wrap_worker(
         if runtime.metrics is not None:
             runtime.metrics.worker_in_flight.labels(operation=name).inc()
         try:
-            with bind_observation_context(
-                service_name=runtime.config.service.name,
-                service_instance_id=runtime.config.service.instance_id,
+            with bind_worker_context(
                 job_id=job_id,
                 execution_id=execution_id,
-                source="worker",
                 attributes=attributes,
             ):
                 if runtime.tracing is None:
@@ -175,10 +168,10 @@ def wrap_worker(
                             raise
         except Exception:
             # 外层只负责结果指标，绝不转换或吞掉业务异常。
-            _record_result(runtime, name, "failure", perf_counter() - started)
+            _record_execution_metrics(runtime, name, "failure", perf_counter() - started)
             raise
         else:
-            _record_result(runtime, name, "success", perf_counter() - started)
+            _record_execution_metrics(runtime, name, "success", perf_counter() - started)
             return value
         finally:
             if runtime.metrics is not None:
