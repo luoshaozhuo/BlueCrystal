@@ -4,37 +4,28 @@
     "allow": [
       "Bash(git status *)",
       "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git log *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
       "Bash(git grep *)",
-      "Bash(find *)",
-      "Bash(ls *)",
       "Bash(python -m py_compile *)",
+      "Bash(python3 -m py_compile *)",
+      "Bash(python -m compileall *)",
+      "Bash(python3 -m compileall *)",
       "Bash(ruff check *)",
+      "Bash(python -m ruff check *)",
+      "Bash(python3 -m ruff check *)",
       "Bash(mypy *)",
+      "Bash(python -m mypy *)",
+      "Bash(python3 -m mypy *)",
       "Bash(pytest *)",
       "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
       "Bash(docker compose * config)",
       "Bash(docker compose * ps)",
       "Bash(docker compose * logs *)",
-      "Bash(command -v docker)",
-      "Bash(docker compose *)",
-      "Bash(echo \"dev=$?\")",
-      "Bash(echo \"prodlike=$?\")",
-      "Bash(echo \"p5=$?\")",
-      "Bash(echo \"whale-l5=$?\")",
-      "Bash(python -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
-      "Bash(PYTHONPATH=src python -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
-      "Bash(echo \"EXIT=$?\")",
-      "Bash(PYTHONPATH=src python3 -c \"from tests.support import ingest_prodlike_runtime as m; print\\(m.COMPOSE_FILE\\)\")",
-      "Bash(python3 -c ' *)",
-      "Bash(codex --version)",
-      "Bash(python -c \"from whale.shared.persistence.template import PROTOCOL_SAMPLE_SPECS, generate_all_sample_data, reset_sample_data\")",
-      "Bash(python -c \"from seahorse.infrastructure.repositories import WhaleMetadataRepository, WhaleMetadataToWritePlanMapper, WhaleMetadataMappingError\")",
-      "Bash(python -c \"from whale.ingest.framework.persistence.init_db import load_default_sample_data\")",
-      "Bash(python -c ' *)",
-      "Bash(WHALE_DB_URL='sqlite:////tmp/tools_smoke.db' python -c \"from tools.sqlalchemy_session import engine, session_scope, get_session, SessionLocal, DB_URL_ENV; assert DB_URL_ENV == 'WHALE_DB_URL'; print\\('url =', engine.url\\)\")",
-      "Bash(unset WHALE_DB_URL)",
-      "Bash(python -c \"import tools.sqlalchemy_session\")",
-      "Bash(python -c \"import whale.shared.persistence.session\")"
+      "Bash(command -v *)"
     ],
     "deny": [
       "Read(./.env)",
@@ -57,22 +48,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/block-dangerous-bash.py"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/no-source-lab-import-gate.sh"
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/block-git-write-ops.py"
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/docstring-cn-gate.py"
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/ai_shared/agent_config/hooks/block-dangerous-bash.py"
           }
         ]
       }

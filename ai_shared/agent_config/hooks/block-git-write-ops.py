@@ -8,34 +8,26 @@ import re
 import sys
 
 
-READ_ONLY_GIT_PATTERNS = (
-    r"^\s*git\s+status(?:\s|$)",
-    r"^\s*git\s+diff(?:\s|$)",
-    r"^\s*git\s+log(?:\s|$)",
-    r"^\s*git\s+show(?:\s|$)",
-    r"^\s*git\s+rev-parse(?:\s|$)",
-)
-
 DENIED_GIT_PATTERNS = (
-    r"^\s*git\s+commit(?:\s|$)",
-    r"^\s*git\s+push(?:\s|$)",
-    r"^\s*git\s+reset(?:\s|$)",
-    r"^\s*git\s+clean(?:\s|$)",
-    r"^\s*git\s+checkout\s+--(?:\s|$)",
-    r"^\s*git\s+restore(?:\s|$)",
-    r"^\s*git\s+switch(?:\s|$)",
-    r"^\s*git\s+merge(?:\s|$)",
-    r"^\s*git\s+rebase(?:\s|$)",
-    r"^\s*git\s+cherry-pick(?:\s|$)",
-    r"^\s*git\s+tag(?:\s|$)",
-    r"^\s*git\s+stash\s+(?:pop|drop|clear)(?:\s|$)",
-    r"^\s*git\s+remote\s+set-url(?:\s|$)",
+    r"\bgit\s+commit(?:\s|$)",
+    r"\bgit\s+push(?:\s|$)",
+    r"\bgit\s+reset(?:\s|$)",
+    r"\bgit\s+clean(?:\s|$)",
+    r"\bgit\s+checkout\s+--(?:\s|$)",
+    r"\bgit\s+restore(?:\s|$)",
+    r"\bgit\s+switch(?:\s|$)",
+    r"\bgit\s+merge(?:\s|$)",
+    r"\bgit\s+rebase(?:\s|$)",
+    r"\bgit\s+cherry-pick(?:\s|$)",
+    r"\bgit\s+tag(?:\s|$)",
+    r"\bgit\s+stash\s+(?:pop|drop|clear)(?:\s|$)",
+    r"\bgit\s+remote\s+set-url(?:\s|$)",
 )
 
 DENIED_GH_PATTERNS = (
-    r"^\s*gh\s+pr\s+(?:merge|close|edit|review)(?:\s|$)",
-    r"^\s*gh\s+repo\s+(?:rename|edit|delete|archive)(?:\s|$)",
-    r"^\s*gh\s+release\s+(?:create|delete|edit)(?:\s|$)",
+    r"\bgh\s+pr\s+(?:merge|close|edit|review)(?:\s|$)",
+    r"\bgh\s+repo\s+(?:rename|edit|delete|archive)(?:\s|$)",
+    r"\bgh\s+release\s+(?:create|delete|edit)(?:\s|$)",
 )
 
 
@@ -63,21 +55,13 @@ def deny(message: str) -> int:
             "permissionDecisionReason": message,
         }
     }, ensure_ascii=False))
-    return 2
-
-
-def is_read_only_git(command: str) -> bool:
-    """判断命令是否属于只读 Git 检查。"""
-    return any(re.search(pattern, command, flags=re.IGNORECASE) for pattern in READ_ONLY_GIT_PATTERNS)
+    return 0
 
 
 def main() -> int:
     """阻断默认不允许的 Git/GitHub 写操作。"""
     command = extract_command(sys.stdin.read()).strip()
     if not command:
-        return 0
-
-    if is_read_only_git(command):
         return 0
 
     for pattern in DENIED_GIT_PATTERNS:

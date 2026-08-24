@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""轻量检查 changed files 的文档注释、类型抑制和危险异常模式。"""
+"""按显式范围检查文档注释、类型抑制和危险异常模式。"""
 
 from __future__ import annotations
 
 import ast
+import argparse
 import re
 import subprocess
 import sys
@@ -20,10 +21,23 @@ SUPPRESSION_PATTERNS = (
 )
 
 
-def changed_files() -> list[Path]:
-    """返回当前工作区内发生变化且存在的文件。"""
+def staged_files() -> list[Path]:
+    """返回 Git index 中存在且当前工作区仍可读取的 staged 文件。"""
+    try:
+        out = subprocess.check_output(
+            ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMRT"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return []
+    return [Path(name) for name in sorted(out.splitlines()) if name and Path(name).is_file()]
+
+
+def all_files() -> list[Path]:
+    """返回当前工作区内已跟踪和 untracked 文件。"""
     names: set[str] = set()
-    for args in (["git", "diff", "--name-only"], ["git", "diff", "--cached", "--name-only"]):
+    for args in (["git", "ls-files"], ["git", "ls-files", "--others", "--exclude-standard"]):
         try:
             out = subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL)
         except Exception:
@@ -79,11 +93,18 @@ def check_text_patterns(path: Path, warnings: list[str]) -> None:
 
 
 def main() -> int:
-    """执行轻量 changed-file 质量检查。"""
+    """执行用户显式触发的注释与异常模式检查。"""
+    if len(sys.argv) == 1:
+        # 兼容当前会话已加载的旧自动调用；无显式范围时不执行检查。
+        return 0
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scope", choices=("staged", "all"), required=True)
+    args = parser.parse_args()
     failures: list[str] = []
     warnings: list[str] = []
 
-    for path in changed_files():
+    paths = staged_files() if args.scope == "staged" else all_files()
+    for path in paths:
         if path.suffix == ".py":
             check_python(path, failures, warnings)
         check_text_patterns(path, warnings)

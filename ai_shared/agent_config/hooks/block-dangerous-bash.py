@@ -46,7 +46,9 @@ def main() -> int:
                     "permissionDecisionReason": f"危险命令被拦截: {command}",
                 }
             }, ensure_ascii=False))
-            return 2
+            # Codex 与 Claude Code 都支持“退出 0 + 结构化 deny”。不要同时
+            # 返回 2；退出 2 时两端都只应通过 stderr 传递阻断原因。
+            return 0
     return 0
 
 

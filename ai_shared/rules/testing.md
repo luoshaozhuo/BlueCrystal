@@ -6,7 +6,7 @@
 
 1. 物理视图：测试代码如何组织；
 2. 逻辑视图：测试属于什么集合；
-3. 执行视图：一次改动后应选择哪些验证。
+3. 执行视图：用户显式触发检查阶段后应选择哪些测试。
 
 本规则不直接指定每次必须运行的具体命令；执行选择由 `validation-routing.md`、真实变更范围、环境条件和任务范围共同决定。
 
@@ -77,18 +77,25 @@ pytest -m "starfish and regression"
 
 ## 4. 执行视图
 
-### 4.1 执行优先级原则
+### 4.1 显式阶段与范围
 
-每次编码后不追求“能跑的都跑”，而是执行与变更风险匹配的最小必要验证。
+普通编码后不自动执行测试。用户显式触发后按以下范围执行：
+
+1. `/test`：以 Git index 为唯一范围基线，仅测试 staged diff 直接修改的代码。
+2. `/validate`：从 staged diff 的变更符号和契约扩大到真实引用方、依赖方和装配路径。
+3. `/test-all`：对当前整个工作区执行仓库定义的全部常规自动化测试，不按 diff 裁剪。
+4. unstaged 和 untracked 内容不是 `/test` 或 `/validate` 的范围起点。混合 staged/unstaged 文件必须标注 `MIXED_INDEX_FILE`。
+
+检查阶段内应执行与对应范围匹配的测试，不得自动扩大到下一阶段。
 
 默认原则：
 
 1. 先跑低成本、高信号验证。
 2. 只有当边界风险、历史缺陷或任务范围要求时，才扩大验证层级。
-3. `performance`、长稳、准生产依赖、完整部署演练、全量回归默认不属于每次编码后的必跑项。
+3. `performance`、长稳、准生产依赖和完整部署演练只在用户显式调用 `/test-all include-heavy` 或 `heavy-regression` 时执行。
 4. 高成本验证应由以下条件触发：
    - 用户明确要求；
-   - prompt / handoff 明确要求；
+   - 当前用户任务明确要求；
    - 发布前；
    - 高风险专项变更；
    - 历史问题追踪项要求。
@@ -200,9 +207,9 @@ tests/issue_trace.md
 5. 所属逻辑集合；
 6. 当前状态和边界说明。
 
-## 9. 代码变更后的测试同步
+## 9. `/test` 阶段的测试同步
 
-发生以下变化时，必须同步评估和更新测试、fixture、fake/mock/stub、测试索引及必要文档：
+用户显式调用 `/test` 且 staged diff 发生以下变化时，必须同步评估和更新测试、fixture、fake/mock/stub 及必要测试索引：
 
 1. 行为变化；
 2. public interface、port、Protocol、ABC、API、CLI 变化；
@@ -226,7 +233,7 @@ tests/issue_trace.md
 2. 不降低断言、删除失败测试、扩大 skip 或吞异常制造通过。
 3. 不把未执行、mock、fake、stub、health check、脚本存在、单文件通过写成真实闭环。
 4. 不把 `smoke`、`regression` 当作物理目录必须项。
-5. 不默认把 performance、长稳、准生产依赖验证当作每次编码后的必跑集合。
+5. performance、长稳、准生产依赖验证只在用户明确调用 `/test-all include-heavy` 或 `heavy-regression` 时执行。
 6. 不只跑局部测试却声称全量通过。
 7. 不新增无条件 skip 掩盖缺陷。
 8. 不把测试工具能力写成生产能力。

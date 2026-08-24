@@ -9,7 +9,7 @@
 #   - unit tests
 #   - integration tests (message_pipeline + speed_layer + storage)
 #   - e2e smoke
-#   汇总输出 PASS/FAIL/ENVIRONMENT_PENDING
+#   汇总输出 PASS/FAIL/NOT_RUN
 #
 # 测试阶段：构建期验证（语法/类型检查） + 开发期验证（lint/contract/单元测试） + 跨模块联调期验证（E2E smoke）
 # 环境依赖: CPython 3.13
@@ -191,11 +191,11 @@ main() {
                     ${PYTEST_ARGS:-} 2>&1 || $FAIL_FAST && return 1
         else
             log_pend "E2E smoke 测试文件不存在，跳过"
-            record_result "e2e_smoke" "SKIP" "file_not_found"
+            record_result "e2e_smoke" "NOT_RUN" "MISSING_DEPENDENCY:file_not_found"
         fi
     else
         log_pend "E2E smoke 跳过 (--skip-e2e)"
-        record_result "e2e_smoke" "SKIP" "user_requested"
+        record_result "e2e_smoke" "NOT_RUN" "USER_NOT_REQUESTED"
     fi
 
     # ---- Gate 7: 环境探针 ----
@@ -260,8 +260,8 @@ main() {
                 has_failure=true
                 all_passed=false
                 ;;
-            SKIP)
-                echo -e "  ${YELLOW}[SKIP]${NC}  $gate $detail"
+            NOT_RUN)
+                echo -e "  ${YELLOW}[NOT_RUN]${NC}  $gate $detail"
                 has_pending=true
                 ;;
             *)
@@ -299,11 +299,11 @@ main() {
         log_info "失败项需在部署前修复"
         exit 1
     elif $has_pending; then
-        echo -e "  总体结果: ${YELLOW}ENVIRONMENT_PENDING${NC}"
+        echo -e "  总体结果: ${YELLOW}NOT_RUN${NC}"
         echo "============================================================"
         echo ""
         log_info "存在 environment-pending 项，需现场环境就绪后补验证"
-        exit 0
+        exit 2
     else
         echo -e "  总体结果: ${GREEN}PASS${NC}"
         echo "============================================================"

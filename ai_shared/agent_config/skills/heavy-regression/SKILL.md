@@ -11,7 +11,7 @@ description: Use when the user explicitly requests heavy regression, long-runnin
 
 ## 2. 触发条件
 
-必须用户明确要求，或 handoff 明确指定。
+必须用户明确要求，并由当前主会话直接执行，不启动或委派独立 agent。
 
 禁止使用：
 - 普通小改动默认触发。

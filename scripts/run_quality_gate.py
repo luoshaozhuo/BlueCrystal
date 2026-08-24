@@ -2,10 +2,8 @@
 """
 CI/本地质量门禁聚合脚本。
 
-聚合 compileall、ruff、mypy（production+tools 和 test-typing-debt 分离）、
+聚合 compileall、ruff、mypy、
 关键 pytest、import boundary 检查，输出 JSON summary 和 human-readable summary。
-
-Tests mypy 历史债务单独归类为 test-typing-debt，不阻塞 production gate。
 """
 from __future__ import annotations
 
@@ -29,7 +27,7 @@ class GateItem:
     """单条门禁检查结果。"""
     name: str
     description: str
-    status: str  # passed / failed / skipped / debt
+    status: str  # passed / failed / not_run
     detail: str
     duration_sec: float = 0.0
 
@@ -40,8 +38,7 @@ class GateReport:
     items: list[GateItem] = field(default_factory=list)
     passed: int = 0
     failed: int = 0
-    skipped: int = 0
-    debt: int = 0
+    not_run: int = 0
 
     def add(self, item: GateItem) -> None:
         self.items.append(item)
@@ -49,24 +46,25 @@ class GateReport:
             self.passed += 1
         elif item.status == "failed":
             self.failed += 1
-        elif item.status == "skipped":
-            self.skipped += 1
-        elif item.status == "debt":
-            self.debt += 1
+        elif item.status == "not_run":
+            self.not_run += 1
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "total": self.passed + self.failed + self.skipped + self.debt,
+            "total": self.passed + self.failed + self.not_run,
             "passed": self.passed,
             "failed": self.failed,
-            "skipped": self.skipped,
-            "debt": self.debt,
-            "production_gate_passed": self.failed == 0,
+            "not_run": self.not_run,
+            "production_gate_passed": self.failed == 0 and self.not_run == 0,
             "items": [
                 {
                     "name": i.name,
                     "description": i.description,
-                    "status": i.status,
+                    "status": {
+                        "passed": "PASS",
+                        "failed": "FAIL",
+                        "not_run": "NOT_RUN",
+                    }[i.status],
                     "detail": i.detail,
                     "duration_sec": i.duration_sec,
                 }
@@ -186,8 +184,8 @@ def _run_mypy_production(report: GateReport) -> None:
         ))
 
 
-def _run_mypy_tests_debt(report: GateReport) -> None:
-    """执行 mypy tests 检查（归类为 test-typing-debt）。"""
+def _run_mypy_tests(report: GateReport) -> None:
+    """执行 tests 类型检查；真实失败按 FAIL 处理。"""
     import time
     start = time.time()
     ret, stdout, stderr = _run_cmd(
@@ -205,15 +203,14 @@ def _run_mypy_tests_debt(report: GateReport) -> None:
             duration_sec=elapsed,
         ))
     else:
-        # tests mypy 错误归类为 debt，不阻塞 production gate
         error_count = stdout.count("error:") if stdout else 0
-        detail = f"mypy tests 返回 {ret}，发现约 {error_count} 个错误（历史债务，不阻塞 production gate）"
+        detail = f"mypy tests 返回 {ret}，发现约 {error_count} 个错误"
         if stdout:
             detail += f"\n首行: {stdout.splitlines()[0] if stdout.splitlines() else ''}"
         report.add(GateItem(
             name="mypy-tests",
-            description="mypy tests 类型检查（test-typing-debt -- 不阻塞 production gate）",
-            status="debt",
+            description="mypy tests 类型检查",
+            status="failed",
             detail=detail,
             duration_sec=elapsed,
         ))
@@ -290,6 +287,7 @@ def _run_core_pytest(report: GateReport) -> None:
     ]
 
     all_passed = True
+    has_not_run = False
     total_passed = 0
     total_failed = 0
     detail_lines = []
@@ -297,7 +295,8 @@ def _run_core_pytest(report: GateReport) -> None:
     for tf in test_files:
         tf_path = os.path.join(REPO_ROOT, tf)
         if not os.path.isfile(tf_path):
-            detail_lines.append(f"  [skipped] {tf}: 文件不存在")
+            has_not_run = True
+            detail_lines.append(f"  [NOT_RUN] {tf}: 文件不存在")
             continue
 
         ret, stdout, stderr = _run_cmd(
@@ -317,7 +316,7 @@ def _run_core_pytest(report: GateReport) -> None:
     elapsed = time.time() - start
 
     detail = "\n".join(detail_lines)
-    if all_passed:
+    if all_passed and not has_not_run:
         report.add(GateItem(
             name="core-pytest",
             description=f"关键 pytest 检查 ({len(test_files)} files, {total_passed} passed)",
@@ -325,7 +324,7 @@ def _run_core_pytest(report: GateReport) -> None:
             detail=detail,
             duration_sec=elapsed,
         ))
-    else:
+    elif not all_passed:
         report.add(GateItem(
             name="core-pytest",
             description="关键 pytest 检查",
@@ -333,6 +332,42 @@ def _run_core_pytest(report: GateReport) -> None:
             detail=detail,
             duration_sec=elapsed,
         ))
+    else:
+        report.add(GateItem(
+            name="core-pytest",
+            description="关键 pytest 检查存在未执行项",
+            status="not_run",
+            detail=detail,
+            duration_sec=elapsed,
+        ))
+
+
+def _run_full_pytest(report: GateReport) -> None:
+    """执行当前工作区的全量常规 pytest。"""
+    import time
+
+    start = time.time()
+    ret, stdout, stderr = _run_cmd(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests",
+            "-q",
+            "-m",
+            "not performance and not load and not stress and not external and not prodlike and not l5 and not slow",
+        ],
+        timeout=1800,
+    )
+    elapsed = time.time() - start
+    detail = "\n".join(part for part in (stdout, stderr) if part)
+    report.add(GateItem(
+        name="full-pytest",
+        description="全量常规 pytest",
+        status="passed" if ret == 0 else "failed",
+        detail=detail or f"returncode={ret}",
+        duration_sec=elapsed,
+    ))
 
 
 def main() -> None:
@@ -349,12 +384,12 @@ def main() -> None:
     parser.add_argument(
         "--full-pytest",
         action="store_true",
-        help="运行全量 pytest（默认仅运行关键检查）",
+        help="运行全量常规 pytest，排除外部依赖、性能和长测（默认仅运行关键检查）",
     )
     parser.add_argument(
         "--skip-mypy-tests",
         action="store_true",
-        help="跳过 mypy tests（默认会检查但归类为 debt）",
+        help="跳过 mypy tests；结果记为 NOT_RUN 并阻断通过",
     )
     args = parser.parse_args()
 
@@ -376,15 +411,15 @@ def main() -> None:
     print("[3/6] mypy production+tools ...")
     _run_mypy_production(report)
 
-    # Gate 4: mypy tests (debt)
+    # Gate 4: mypy tests
     if not args.skip_mypy_tests:
-        print("[4/6] mypy tests (归类为 test-typing-debt) ...")
-        _run_mypy_tests_debt(report)
+        print("[4/6] mypy tests ...")
+        _run_mypy_tests(report)
     else:
         report.add(GateItem(
             name="mypy-tests",
             description="mypy tests (--skip-mypy-tests)",
-            status="skipped",
+            status="not_run",
             detail="使用 --skip-mypy-tests 跳过",
         ))
 
@@ -392,9 +427,13 @@ def main() -> None:
     print("[5/6] import boundary ...")
     _run_import_boundary(report)
 
-    # Gate 6: core pytest
-    print("[6/6] core pytest ...")
-    _run_core_pytest(report)
+    # Gate 6: pytest
+    if args.full_pytest:
+        print("[6/6] full pytest ...")
+        _run_full_pytest(report)
+    else:
+        print("[6/6] core pytest ...")
+        _run_core_pytest(report)
 
     # --------
     # 输出汇总
@@ -407,24 +446,23 @@ def main() -> None:
         icon = {
             "passed": "[PASS]",
             "failed": "[FAIL]",
-            "skipped": "[SKIP]",
-            "debt": "[DEBT]",
+            "not_run": "[NOT_RUN]",
         }.get(item.status, "[???]")
         print(f"  {icon} {item.name} ({item.duration_sec:.1f}s)")
-        if item.status in ("failed", "debt"):
+        if item.status in ("failed", "not_run"):
             # 截断输出保持可读
             detail_short = item.detail[:300].replace("\n", "\n    ")
             print(f"    {detail_short}")
 
     print("-" * 70)
-    print(f"  production gate: {'PASSED' if report.failed == 0 else 'FAILED'}")
-    print(f"  test-typing-debt: {report.debt} 项（不阻塞 production gate）")
-    print(f"  passed: {report.passed}, failed: {report.failed}, skipped: {report.skipped}, debt: {report.debt}")
+    gate_passed = report.failed == 0 and report.not_run == 0
+    print(f"  production gate: {'PASSED' if gate_passed else 'FAILED'}")
+    print(f"  passed: {report.passed}, failed: {report.failed}, not_run: {report.not_run}")
 
-    if report.failed > 0:
-        print(f"\n  警告: production gate 未通过！存在 {report.failed} 个失败项。")
+    if not gate_passed:
+        print("\n  警告: production gate 未通过；存在 FAIL 或 NOT_RUN。")
     else:
-        print("\n  production gate 通过（test-typing-debt 不计入阻塞）。")
+        print("\n  production gate 通过。")
 
     print("=" * 70)
 
@@ -435,7 +473,7 @@ def main() -> None:
             json.dump(summary, f, ensure_ascii=False, indent=2)
         print(f"\nJSON 汇总已输出到: {args.summary_json}")
 
-    sys.exit(0 if report.failed == 0 else 1)
+    sys.exit(0 if gate_passed else 1)
 
 
 if __name__ == "__main__":

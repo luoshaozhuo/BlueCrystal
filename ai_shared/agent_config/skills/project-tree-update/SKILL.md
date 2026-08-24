@@ -13,12 +13,13 @@ description: Use only when the user explicitly requests an incremental update of
 
 必须使用：
 - 用户明确要求增量更新 project_tree。
-- handoff 明确转述用户对增量更新 project_tree 的请求。
 
 禁止使用：
 - 仅因文件新增、删除、移动、重命名、职责变化或目录树不一致而自动检查或触发。
 - 单纯读取 project_tree。
 - 无变更时重写整棵树。
+
+由当前主会话直接执行，不启动或委派独立 agent。
 
 ## 3. 输入
 

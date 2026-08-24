@@ -1,72 +1,46 @@
 ---
 name: code-quality-gate
-description: Use when you need to decide the required comment, docstring, type, schema, test, and validation gates for the current changed files based on repository rules and actual impact.
+description: Select quality and test commands only inside an explicitly invoked test, validate, or test-all stage, based on the stage's real scope.
 ---
 
 # code-quality-gate
 
-## 1. 目的
+## 生效条件
 
-根据真实变更范围确认编码、注释/文档注释、类型、测试和验证门禁。
+仅在用户显式触发 `/test`、`/validate` 或 `/test-all` 时使用。普通编码阶段禁止使用本 skill。
 
-## 2. 触发条件
-
-必须使用：
-- code-implementer 修改前，用于制定质量计划。
-- test-validator 验证前，用于独立选择验证命令。
-
-禁止使用：
-- 替代真实 lint、type-check 或测试命令。
-- 只输出“已检查”但不列判断结果。
-
-## 3. 输入
+## 输入
 
 ```text
+validation stage: test | validate | test-all
 changed-files-gate 结果
-handoff 任务
-routing 指定规则
-相关源码、测试、配置、schema
-```
-
-## 4. 必读规则
-
-```text
-ai_shared/rules/coding.md
-ai_shared/rules/testing.md
-ai_shared/rules/validation-routing.md
 ai_shared/rules/quality-gate.md
-ai_shared/rules/python-docstring-cn.md
+相关源码、测试、配置、schema 和仓库工具链
 ```
 
-## 5. 必须判断
+## 范围
 
-```text
-## task_tier 行为
-- light: 不调用本 skill
-- standard: 只输出 §5.1 syntax / §5.5 受影响 unit / §5.4 测试最小集
-- full: 走完整 §5 全部 8 项
-```
+1. `test`：staged diff 直接修改代码的测试及必要最小语法检查。
+2. `validate`：staged 修改及其真实引用/依赖范围的 syntax、lint、type、测试和专项门禁。
+3. `test-all`：当前整个工作区的全仓常规工具链和测试；高成本项需要 `include-heavy`。
 
-1. 是否需要补充或修正文档注释。
-2. 是否需要补充普通注释说明原因、边界、假设或风险。
-3. 是否需要类型、schema、签名或契约修正。
-4. 是否需要新增或修改测试。
-5. 应执行哪些语法/编译、lint、type-check、pytest 或其他语言验证命令。
-6. 是否涉及生产路径与工具/实验路径隔离。
-7. 是否涉及安全、审计、权限、lease、fencing、事务、重试、回滚、子进程、socket 或外部系统调用。
-8. 是否需要 requirement-trace / rule-update，由 project-steward 后续处理；不自动检查 project-tree-update / project-tree-reset。
+## 必须判断
 
-## 6. 输出格式
+需要执行哪些语法/编译、lint、type-check、测试、契约/schema/配置、注释和生产路径边界检查，以及哪些项因范围、环境或成本应标记 `NOT_RUN`。
+
+## 输出
 
 ```text
 skill result:
 - skill: code-quality-gate
-- changed files:
-- comment/doc gate:
-- type/schema gate:
-- test gate:
-- validation commands:
-- docs/tree/requirement impact:
+- validation stage:
+- scope:
+- test changes allowed: yes/no
+- syntax/compile commands:
+- lint commands:
+- type-check commands:
+- test commands:
+- special gates:
+- not-run:
 - risk:
-- pending:
 ```

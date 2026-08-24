@@ -1,74 +1,42 @@
 # 质量门禁规则
 
-## 1. 变更范围门禁
+## 1. 生效边界
 
-每个 agent 开始工作前必须获取真实变更范围，不得只依赖上一个 agent 的口头说明。
+质量门禁不在普通编码阶段自动执行。只在用户显式调用 `/test`、`/validate` 或 `/test-all` 时，按对应范围选择命令。
 
-## 2. 通用门禁
+## 2. 阶段门禁
 
-修改代码时，必须优先执行或说明未执行原因：
+### `/test`
 
-```text
-1. 语法或编译检查；
-2. lint / static analysis；
-3. type-check（如果该语言或仓库启用）；
-4. affected tests；
-5. 与边界、安全、审计、配置、schema 相关的专项检查。
-```
+仅选择 staged diff 直接修改代码的必要测试；需要支持测试执行时，可对直接文件执行最小 syntax/compile 检查。
 
-## 3. 语言门禁参考
+### `/validate`
 
-实际命令以仓库配置为准：
+对 staged 修改及其真实引用/依赖范围选择：
 
 ```text
-Python: py_compile/compileall, ruff/pylint, mypy/pyright, pytest
-TypeScript/JavaScript: tsc --noEmit, eslint, npm/pnpm/yarn test
-Go: go test ./..., go vet ./..., golangci-lint
-Java/Kotlin: mvn/gradle test, checkstyle/spotbugs/PMD/detekt
-C/C++: cmake --build, ctest, clang-tidy/cppcheck, compiler warnings
-Rust: cargo check, cargo clippy, cargo test
-Shell: bash -n, shellcheck
-SQL/migration: migration dry-run, schema compatibility tests
+1. syntax/compile；
+2. lint/static analysis；
+3. type-check；
+4. 直接和受影响测试；
+5. 契约、配置、schema、安全、审计和生产路径边界专项检查。
 ```
 
-## 4. 文档门禁
+### `/test-all`
 
-`project-tree-update` 和 `project-tree-reset` 不属于例行质量门禁；仅在用户明确要求时手动执行，handoff 必须转述该请求，不因文件变化自动检查。
+对当前整个工作区执行仓库定义的全仓 syntax/compile、lint、type-check 和全部常规自动化测试。
 
-## 5. 结果分类
+## 3. 结果分类
 
-检查或测试结果使用：
+检查或测试结果只使用 `PASS`、`FAIL`、`NOT_RUN`。失败必须分类为本次变更引入、既有失败、环境失败、flaky、依赖缺失或验证命令错误。
 
-```text
-PASS
-FAIL
-NOT_RUN
-```
+## 4. 收口规则
 
-失败原因建议分类为：
+1. 存在本次变更引入的 `FAIL` 时不得写成通过。
+2. 必需项为 `NOT_RUN` 时不得写成通过，除非用户明确调整范围。
+3. 未执行项不得写成 `PASS`，局部验证不得写成全量验证。
+4. `project-tree-update` 和 `project-tree-reset` 不属于质量门禁。
 
-```text
-本次变更引入
-既有失败
-环境失败
-flaky
-依赖缺失
-验证命令错误
-```
+## 5. 禁止事项
 
-未执行项写为 NOT_RUN，并使用测试规则定义的原因。
-
-## 6. 收口规则
-
-1. 存在本次变更引入的 FAIL 时不得收口。
-2. 必需验证项为 NOT_RUN 时不得收口，除非任务范围明确排除。
-3. 未执行项不得写成 PASS。
-4. 局部验证不得写成全量验证。
-
-## 7. 禁止事项
-
-1. 不允许无说明的类型、lint 或静态分析抑制指令。
-2. 不允许裸 catch / except / rescue。
-3. 不允许静默吞异常。
-4. 不允许把未执行的工具写成通过。
-5. 不允许把 skipped、mock、fake、health check、脚本存在、局部通过写成真实闭环。
+不允许无说明的类型/lint 抑制、裸 catch/except/rescue、静默吞异常、fake OK，或把 skipped、mock、health check、脚本存在写成真实通过。

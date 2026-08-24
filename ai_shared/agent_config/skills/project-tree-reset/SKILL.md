@@ -11,7 +11,7 @@ description: Use when the user explicitly requests a full rebuild of ai_shared/m
 
 ## 2. 触发条件
 
-必须用户明确要求；如由子 agent 执行，handoff 必须转述该用户请求。不做例行一致性检查，不由任何自动流程推断触发。
+必须用户明确要求，并由当前主会话直接执行；不启动或委派独立 agent，不做例行一致性检查，不由任何自动流程推断触发。
 
 禁止使用：
 - 普通新增、删除、移动、重命名或职责变化文件。
