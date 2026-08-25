@@ -1,6 +1,6 @@
 """Opinionated observability integration runtime 的最小公共 API。
 
-根包不导入 FastAPI 或 APScheduler，未使用的框架依赖可以缺席。
+根包不导入 FastAPI 或 APScheduler。
 """
 
 from .audit import audit_action

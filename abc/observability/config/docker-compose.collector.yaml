@@ -1,12 +1,14 @@
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.107.0
+    image: otel/opentelemetry-collector-contrib:0.160.0-nightly.8b4ee5b-amd64
     container_name: observability-otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     restart: unless-stopped
+    # 默认与本地开发用户一致，使 bind mount 中的 trace 文件可直接读取和清理。
+    user: "${OTEL_COLLECTOR_UID:-1000}:${OTEL_COLLECTOR_GID:-1000}"
     environment:
-      # 非错误 trace 抽样比例（百分比）。
-      NORMAL_TRACE_SAMPLING_PERCENTAGE: "1"
+      # 示例需要稳定看到每条 trace，因此 Collector 不再二次抽掉正常 trace。
+      NORMAL_TRACE_SAMPLING_PERCENTAGE: "100"
       # 若启用 otlp/upstream exporter，请配置下方地址。
       UPSTREAM_OTLP_GRPC_ENDPOINT: "tempo:4317"
     ports:
@@ -14,5 +16,5 @@ services:
       - "64318:4318"   # OTLP/HTTP
       - "13133:13133" # Collector 健康检查
     volumes:
-      - ./collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
-      - ./collector-data:/var/lib/otelcol
+      - "${OTEL_COLLECTOR_CONFIG_PATH:?set OTEL_COLLECTOR_CONFIG_PATH}:/etc/otelcol-contrib/config.yaml:ro"
+      - "${OTEL_COLLECTOR_OUTPUT_PATH:?set OTEL_COLLECTOR_OUTPUT_PATH}:/var/lib/otelcol"

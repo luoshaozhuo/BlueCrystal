@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
-from dataclasses import replace
 from typing import Final, cast
 
 from .models import ObservationContext
@@ -30,8 +29,7 @@ def initialize_runtime_context(
     该函数用于 composition root；临时边界应使用
     ``bind_observation_context`` 以确保退出时恢复 token。
     """
-    observation = replace(
-        get_observation_context(),
+    observation = ObservationContext(
         service_name=service_name,
         service_instance_id=service_instance_id,
     )
@@ -42,6 +40,7 @@ def initialize_runtime_context(
 @contextmanager
 def bind_observation_context(
     *,
+    parent_context: ObservationContext | None = None,
     service_name: str | None | object = _UNSET,
     service_instance_id: str | None | object = _UNSET,
     request_id: str | None | object = _UNSET,
@@ -52,7 +51,20 @@ def bind_observation_context(
     execution_id: str | None | object = _UNSET,
     attributes: Mapping[str, object] | object = _UNSET,
 ) -> Generator[ObservationContext, None, None]:
-    """临时绑定关联字段，并在异常或取消时可靠恢复父上下文。"""
+    """在当前或显式父上下文上绑定字段，并可靠恢复 ContextVar token。
+    
+    普通的同步调用链或同一个 asyncio Task 中，get_observation_context() 确实足够，
+    能直接获得父 context。 增加 parent_context 是为了处理“执行载体发生切换”的情况：
+    - BackgroundScheduler → ThreadPoolExecutor：新线程拿不到提交线程的 ContextVar
+    - AsyncIOExecutor → run_in_executor()：工作线程也不能可靠继承调用方 context
+    - Scheduler 延迟执行：执行 Job 时，原来的 FastAPI 请求作用域通常早已退出
+    所以 Scheduler 注册 Job 时先保存当时的 context，Executor 执行时再显式恢复：
+    """
+    current = (
+        parent_context
+        if parent_context is not None
+        else get_observation_context()
+    )
     # _UNSET 的作用是“区分‘没传参数’和‘传了一个真实值’”。
     supplied = {
         "service_name": service_name,
@@ -74,11 +86,9 @@ def bind_observation_context(
         # >>> print(merged)
         # >>> {'tenant_id': 't1', 'region': 'us', 'order_id': 'O-99'}
         changes["attributes"] = {
-            **get_observation_context().attributes,
+            **current.attributes,
             **dict(cast(Mapping[str, object], attributes)),
         }
-    current = get_observation_context()
-
     # 下面的 cast 不是为了业务逻辑，而是为了“让静态类型检查器接受”这个值的来源。
     # changes.get(...) 的返回值来自字典，字典的值类型通常被推断为更宽泛的 object | None
     updated = ObservationContext(
@@ -110,12 +120,14 @@ def bind_observation_context(
 
 def bind_request_context(
     *,
+    runtime_context: ObservationContext,
     request_id: str | None = None,
     actor: str | None = None,
     correlation_id: str | None = None,
 ) -> AbstractContextManager[ObservationContext]:
     """创建 HTTP 或其他请求边界的关联作用域。"""
     return bind_observation_context(
+        parent_context=runtime_context,
         request_id=request_id,
         correlation_id=correlation_id,
         actor=actor,
@@ -123,44 +135,30 @@ def bind_request_context(
     )
 
 
-def bind_execution_context(
-    *,
-    job_id: str | None = None,
-    execution_id: str | None = None,
-    attributes: Mapping[str, object] | None = None,
-) -> AbstractContextManager[ObservationContext]:
-    """创建兼容既有调用的 Worker 执行边界关联作用域。"""
-    return bind_worker_context(
-        job_id=job_id,
-        execution_id=execution_id,
-        attributes=attributes,
-    )
-
-
 def bind_worker_context(
     *,
-    job_id: str | None = None,
-    execution_id: str | None = None,
-    attributes: Mapping[str, object] | None = None,
+    runtime_context: ObservationContext,
+    execution_id: str,
 ) -> AbstractContextManager[ObservationContext]:
-    """创建 Worker 执行边界的关联作用域。"""
+    """继承同一 Runtime 的当前上下文，并只补充 Worker 执行标识。"""
     return bind_observation_context(
-        job_id=job_id,
+        parent_context=resolve_parent_context(runtime_context),
         execution_id=execution_id,
         source="worker",
-        attributes=attributes or {},
     )
 
 
 def bind_scheduler_context(
     *,
+    runtime_context: ObservationContext,
     operation: str,
     target_type: str,
     target_id: str | None,
     attributes: Mapping[str, object] | None = None,
 ) -> AbstractContextManager[ObservationContext]:
-    """创建 Scheduler 管理操作的关联作用域。"""
+    """创建 Scheduler 管理操作的关联作用域，必要时补齐线程服务信息。"""
     return bind_observation_context(
+        parent_context=resolve_parent_context(runtime_context),
         source="scheduler",
         attributes={
             "scheduler.operation": operation,
@@ -169,3 +167,28 @@ def bind_scheduler_context(
             **dict(attributes or {}),
         },
     )
+
+
+def bind_scheduler_execution_context(
+    *,
+    parent_context: ObservationContext,
+    job_id: str,
+) -> AbstractContextManager[ObservationContext]:
+    """在 Executor 的真实执行边界恢复调度上下文并绑定 Job ID。"""
+    return bind_observation_context(
+        parent_context=parent_context,
+        source="scheduler",
+        job_id=job_id,
+        execution_id=None,
+    )
+
+
+def resolve_parent_context(runtime_context: ObservationContext) -> ObservationContext:
+    """选择属于同一 Runtime 的当前上下文，否则回退到服务级基线。"""
+    current = get_observation_context()
+    if (
+        current.service_name == runtime_context.service_name
+        and current.service_instance_id == runtime_context.service_instance_id
+    ):
+        return current
+    return runtime_context

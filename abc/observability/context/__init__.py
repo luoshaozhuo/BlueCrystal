@@ -3,10 +3,10 @@
 from uuid import uuid4
 
 from .manager import (
-    bind_execution_context,
     bind_observation_context,
     bind_request_context,
     bind_scheduler_context,
+    bind_scheduler_execution_context,
     bind_worker_context,
     get_observation_context,
     initialize_runtime_context,
@@ -21,10 +21,10 @@ def new_request_id() -> str:
 
 __all__ = [
     "ObservationContext",
-    "bind_execution_context",
     "bind_observation_context",
     "bind_request_context",
     "bind_scheduler_context",
+    "bind_scheduler_execution_context",
     "bind_worker_context",
     "get_observation_context",
     "initialize_runtime_context",

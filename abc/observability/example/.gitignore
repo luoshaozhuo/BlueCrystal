@@ -1,0 +1,5 @@
+# 示例运行过程中生成的 SQLite、应用日志与服务标准输出。
+output/*
+!output/collector/
+output/collector/*
+!output/collector/.gitkeep

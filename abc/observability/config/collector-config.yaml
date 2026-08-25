@@ -36,7 +36,7 @@ processors:
       - name: sample-non-error-traces
         type: probabilistic
         probabilistic:
-          sampling_percentage: ${NORMAL_TRACE_SAMPLING_PERCENTAGE:1}
+          sampling_percentage: ${env:NORMAL_TRACE_SAMPLING_PERCENTAGE}
 
   batch:
     timeout: 5s
@@ -57,7 +57,7 @@ exporters:
 
   # 如果需要转发到后端（Tempo/Jaeger/APM），启用下方 exporter 并加入 pipeline exporters。
   otlp/upstream:
-    endpoint: ${UPSTREAM_OTLP_GRPC_ENDPOINT:tempo:4317}
+    endpoint: ${env:UPSTREAM_OTLP_GRPC_ENDPOINT}
     tls:
       insecure: true
 
@@ -70,5 +70,5 @@ service:
       # 生产环境。
       # exporters: [otlp/upstream]
       # exporters: [file/local]
-      # 测试环境[debug] 或者 [debug, otlp/upstream]。
-      exporters: [debug]
+      # 本地示例统一写入宿主 example/output/collector/traces.jsonl。
+      exporters: [file/local]

@@ -48,6 +48,7 @@ def observe_scheduler_action(
             else nullcontext(None)
         )
         with bind_scheduler_context(
+            runtime_context=runtime.context,
             operation=operation,
             target_type=target_type,
             target_id=target_id,

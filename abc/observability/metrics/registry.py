@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
 from ..config import ServiceConfig, MetricsConfig
 
@@ -33,9 +33,11 @@ class MetricsBackend:
                 "metrics.provider_options conflicts with runtime-controlled keys: "
                 + ", ".join(sorted(conflict))
             )
+        self.registry = CollectorRegistry()
         common = {
             "namespace": service.name,
             "subsystem": config.subsystem,
+            "registry": self.registry,
         }
         # provider_options 是刻意保留的第三方动态边界；prometheus_client
         # 没有为可扩展 kwargs 暴露稳定 TypedDict。

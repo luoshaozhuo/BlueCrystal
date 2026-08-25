@@ -8,6 +8,7 @@ from .models import (
     MetricsConfig,
     ObservabilityConfig,
     ServiceConfig,
+    StatusConfig,
     TracingConfig,
 )
 
@@ -18,6 +19,7 @@ __all__ = [
     "MetricsConfig",
     "ObservabilityConfig",
     "ServiceConfig",
+    "StatusConfig",
     "TracingConfig",
     "load_observability_config",
 ]

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from .base import Instrumentation
+from ..status import InstrumentationStatus
+from ..status.models import immutable_details
 
 from typing import TYPE_CHECKING
 
@@ -136,6 +138,22 @@ class InstrumentationRegistry:
     def get_instrumentations(self) -> tuple[Instrumentation, ...]:
         """返回注册顺序稳定的 adapter 快照。"""
         return tuple(self._items)
+
+    def statuses(self) -> tuple[InstrumentationStatus, ...]:
+        """返回 adapter 安装、启动及可选低风险详情快照。"""
+        snapshots: list[InstrumentationStatus] = []
+        for item in self._items:
+            detail_provider = getattr(item, "status_details", None)
+            details = detail_provider() if callable(detail_provider) else {}
+            snapshots.append(
+                InstrumentationStatus(
+                    name=item.name,
+                    installed=item in self._installed,
+                    started=self._started and item in self._installed,
+                    details=immutable_details(details),
+                )
+            )
+        return tuple(snapshots)
 
 
 def _attach_cleanup_error(

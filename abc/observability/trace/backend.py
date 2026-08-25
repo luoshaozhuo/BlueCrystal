@@ -46,27 +46,36 @@ class TracingBackend:
         if service.environment:
             resource_attributes["deployment.environment.name"] = service.environment
         
-        self.provider = TracerProvider(
+        self.tracer_provider = TracerProvider(
             resource=Resource.create(resource_attributes),
+            sampler=TraceIdRatioBased(config.sample_rate),
             **config.provider_options,
         )
+        # ``provider`` 是既有属性；FastAPI adapter 使用语义更明确的公开名称。
+        self.provider = self.tracer_provider
 
         if config.exporter == "otlp_grpc":
             exporter: SpanExporter = cast(Any, OTLPSpanExporter)(**config.exporter_options)
+            if "span_exporter" in config.processor_options:
+                raise ValueError(
+                    "tracing.processor_options conflicts with: span_exporter"
+                )
             processor = BatchSpanProcessor(
                 exporter,
-                max_queue_size=2048,
-                schedule_delay_millis=5000,
-                max_export_batch_size=512,
+                **config.processor_options,
             )
         elif config.exporter == "console":
+            if config.processor_options:
+                raise ValueError(
+                    "tracing.processor_options is only supported by otlp_grpc"
+                )
             exporter: SpanExporter = cast(Any, ConsoleSpanExporter)(out=sys.stdout, **config.exporter_options)
             processor = SimpleSpanProcessor(exporter)
         else:
             raise ValueError(f"tracing.exporter: unsupported exporter {config.exporter!r}")
         
-        self.provider.add_span_processor(processor)
-        self.tracer: Tracer = self.provider.get_tracer("observability")
+        self.tracer_provider.add_span_processor(processor)
+        self.tracer: Tracer = self.tracer_provider.get_tracer("observability")
 
     def span(
         self,
@@ -86,7 +95,7 @@ class TracingBackend:
         """刷新并关闭 span processors。"""
         # 用了 BatchSpanProcessor（见 backend.py:53 一段），它会先入队再异步发。
         # 因此在关闭 provider 前，需要调用 shutdown 确保所有 span 都被导出。
-        self.provider.shutdown()
+        self.tracer_provider.shutdown()
 
 
 def _attribute_value(value: object) -> AttributeValue:

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
-from contextlib import closing
 
 from .models import AuditQuery, AuditRecord, AuditResult
 
@@ -18,8 +18,7 @@ class SQLiteAuditStore:
     def __init__(self, path: str | Path) -> None:
         """创建 SQLite store，并确保父目录及表结构存在。"""
         resolved = Path(path)
-        if resolved != Path(":memory:"):
-            resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.parent.mkdir(parents=True, exist_ok=True)
         self._path = str(resolved)
         self._initialize()
 

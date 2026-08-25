@@ -39,15 +39,19 @@ observability:
     enabled: true
     # 跟踪实现供应商，目前仅支持 OpenTelemetry
     provider: opentelemetry
+    # SDK 入口采样比例；示例设置为 1.0，生产环境应按容量覆盖。
+    sample_rate: ${OTEL_TRACE_SAMPLE_RATE:-0.001}
     # 数据导出器类型，例如 console 或 otlp_grpc
     exporter: otlp_grpc
     exporter_options:
-      # 下面的参数当 exporter==OTLP 类型时生效
+      # 下面的参数当 exporter == otlp_grpc 时传给 OTLPSpanExporter
       # endpoint 表示 OTLP 接收器的地址，格式为 host:port
+      endpoint: ${OTLP_ENDPOINT:-localhost:64317}
+    processor_options:
+      # 下面的参数传给 BatchSpanProcessor，而不是 exporter
       # max_queue_size 表示批处理队列的最大容量，超过该值的 span 会被丢弃。
       # schedule_delay_millis 表示调度延迟，单位为毫秒。
       # max_export_batch_size 表示每次导出的最大批量大小。
-      endpoint: ${OTLP_ENDPOINT:-localhost:64317}
       max_queue_size: 2048
       schedule_delay_millis: 5000
       max_export_batch_size: 512
@@ -55,11 +59,15 @@ observability:
   audit:
     # 是否开启审计日志
     enabled: true
-    # 审计存储后端
+    # 审计存储后端，目前仅支持 SQLite
     store: sqlite
     options:
       # 审计数据库位置；未配置时使用 /tmp 下的默认 SQLite 文件
       path: ${OBSERVABILITY_AUDIT_PATH:-/tmp/observability-example-audit.sqlite3}
+
+  status:
+    # 是否聚合 Runtime、backend、instrumentation 与 Worker 的只读状态快照
+    enabled: true
 
   instrumentation:
     fastapi:

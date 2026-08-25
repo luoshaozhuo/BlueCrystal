@@ -53,7 +53,7 @@ class MetricsConfig(_StrictModel):
 
 
 class TracingConfig(_StrictModel):
-    """OpenTelemetry provider 与 exporter 配置。"""
+    """OpenTelemetry provider、exporter 与 span processor 配置。"""
 
     enabled: bool = True
     provider: str = "opentelemetry"
@@ -61,6 +61,7 @@ class TracingConfig(_StrictModel):
     sample_rate: float = Field(default=0.001, ge=0, le=1)
     provider_options: dict[str, Any] = Field(default_factory=dict)
     exporter_options: dict[str, Any] = Field(default_factory=dict)
+    processor_options: dict[str, Any] = Field(default_factory=dict)
 
 
 class AuditConfig(_StrictModel):
@@ -69,6 +70,12 @@ class AuditConfig(_StrictModel):
     enabled: bool = False
     store: str = "sqlite"
     options: dict[str, Any] = Field(default_factory=dict)
+
+
+class StatusConfig(_StrictModel):
+    """运行状态快照能力配置。"""
+
+    enabled: bool = True
 
 
 class InstrumentationOptions(_StrictModel):
@@ -94,6 +101,7 @@ class ObservabilityConfig(_StrictModel):
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     tracing: TracingConfig = Field(default_factory=TracingConfig)
     audit: AuditConfig = Field(default_factory=AuditConfig)
+    status: StatusConfig = Field(default_factory=StatusConfig)
     instrumentation: InstrumentationConfig = Field(
         default_factory=lambda: InstrumentationConfig(root={})
     )

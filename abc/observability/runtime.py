@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Any, ParamSpec, TypeVar, cast
 
 from .audit import AuditService, SQLiteAuditStore
@@ -14,6 +16,12 @@ from .instrumentation.registry import InstrumentationRegistry
 from .logs import configure_logging, get_logger
 from .metrics import MetricsBackend
 from .trace.backend import TracingBackend
+from .status import (
+    BackendStatus,
+    RuntimeLifecycle,
+    RuntimeStatus,
+    WorkerStatusTracker,
+)
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -42,9 +50,12 @@ class ObservabilityRuntime:
         )
         self.audit = self._create_audit(config)
         self._instrumentations = InstrumentationRegistry(self)
-        self._started = False
-        self._closed = False
-        initialize_runtime_context(
+        self._worker_status_tracker = (
+            WorkerStatusTracker() if config.status.enabled else None
+        )
+        self._lifecycle_lock = Lock()
+        self._lifecycle = RuntimeLifecycle.CREATED
+        self.context = initialize_runtime_context(
             service_name=config.service.name,
             service_instance_id=config.service.instance_id,
         )
@@ -69,8 +80,10 @@ class ObservabilityRuntime:
 
     def install(self, instrumentation: Instrumentation) -> Instrumentation:
         """注册可扩展 instrumentation，并返回原实例便于调用方持有。"""
-        if self._closed:
-            raise RuntimeError("observability runtime is closed")
+        if self._current_lifecycle() is not RuntimeLifecycle.CREATED:
+            raise RuntimeError(
+                "instrumentation must be installed while runtime is created"
+            )
         self._instrumentations.register(instrumentation)
         return instrumentation
 
@@ -117,7 +130,6 @@ class ObservabilityRuntime:
         name: str,
         runner: Callable[P, R],
         *,
-        resolver: Callable[..., Mapping[str, object]] | None = None,
         options: Mapping[str, object] | None = None,
     ) -> Callable[P, R]:
         """包装同步或异步业务 Worker，同时保留其参数和返回契约。
@@ -130,9 +142,6 @@ class ObservabilityRuntime:
                 例子: "sync_orders", "daily_report", "ingest_event".
             runner: 要包装的原始业务函数。函数可以是同步或异步 callable，并保留
                 其原有参数列表和返回值签名。
-            resolver: 可选 callables，用于从 worker 调用上下文中解析附加业务元数据。
-                例如可从函数参数、消息体或任务载荷中提取 tenant_id、order_id 等。
-                该 resolver 不应依赖任意 HTTP header；而应明确从已知调用上下文中读取。
             options: 可覆盖或追加的 worker 配置项。它会和 YAML 中配置合并，options
                 优先级更高，最终以显式调用参数覆盖配置文件。
                 例子: {"timeout": 30, "retries": 2, "queue": "orders"}.
@@ -158,42 +167,123 @@ class ObservabilityRuntime:
         wrapper_factory = cast(Any, wrap_worker)
         return cast(
             Callable[P, R],
-            wrapper_factory(name, runner, runtime=self, resolver=resolver, **merged),
+            wrapper_factory(
+                name,
+                runner,
+                runtime=self,
+                status_tracker=self._worker_status_tracker,
+                **merged,
+            ),
         )
 
     async def start(self) -> None:
         """幂等启动已注册 adapter；失败时 registry 会逆序回滚。"""
-        if self._closed:
-            raise RuntimeError("observability runtime is closed")
-        if self._started:
+        if not self._begin_start():
             return
         try:
             await self._instrumentations.start()
         except Exception:
             # instrumentation 已回滚结构；同时释放 backend，Runtime 不可复用。
-            if self.tracing is not None:
-                self.tracing.close()
-            self._closed = True
+            try:
+                if self.tracing is not None:
+                    self.tracing.close()
+            finally:
+                self._set_lifecycle(RuntimeLifecycle.CLOSED)
             raise
-        self._started = True
+        self._set_lifecycle(RuntimeLifecycle.STARTED)
 
     async def close(self) -> None:
         """逆序卸载 adapter 并关闭 backend；重复关闭安全。"""
-        if self._closed:
+        if not self._begin_close():
             return
         try:
             await self._instrumentations.shutdown()
         finally:
             if self.tracing is not None:
                 self.tracing.close()
-            self._started = False
-            self._closed = True
+            self._set_lifecycle(RuntimeLifecycle.CLOSED)
 
     shutdown = close
 
     def get_logger(self, name: str | None = None) -> object:
         """返回业务 Logger；基座不替业务代码定义日志事件。"""
         return get_logger(name)
+
+    def status(self) -> RuntimeStatus:
+        """返回可配置的 Runtime、backend、adapter 与 Worker 只读状态快照。"""
+        enabled = self.config.status.enabled
+        lifecycle = self._current_lifecycle()
+        workers = (
+            self._worker_status_tracker.worker_statuses()
+            if self._worker_status_tracker
+            else ()
+        )
+        return RuntimeStatus(
+            enabled=enabled,
+            lifecycle=lifecycle,
+            backends=self._backend_statuses(lifecycle),
+            instrumentations=self._instrumentations.statuses() if enabled else (),
+            workers=workers,
+            observed_at=datetime.now(timezone.utc),
+        )
+
+    def _backend_statuses(
+        self,
+        lifecycle: RuntimeLifecycle,
+    ) -> tuple[BackendStatus, ...]:
+        """汇总 backend 是否启用及其当前 Runtime 就绪状态。"""
+        values = (
+            ("logging", self.config.logging.enabled),
+            ("metrics", self.metrics is not None),
+            ("tracing", self.tracing is not None),
+            ("audit", self.audit is not None),
+        )
+        def state(enabled: bool) -> str:
+            """把 backend 启用状态与同一份 Runtime 生命周期快照合并。"""
+            if not enabled:
+                return "disabled"
+            if lifecycle in {RuntimeLifecycle.CLOSING, RuntimeLifecycle.CLOSED}:
+                return lifecycle.value
+            return "ready"
+
+        return tuple(BackendStatus(name, enabled, state(enabled)) for name, enabled in values)
+
+    def _set_lifecycle(self, lifecycle: RuntimeLifecycle) -> None:
+        """在线程安全边界内更新 Runtime 生命周期。"""
+        with self._lifecycle_lock:
+            self._lifecycle = lifecycle
+
+    def _begin_start(self) -> bool:
+        """原子进入启动阶段；已启动时返回 false，非法阶段拒绝重入。"""
+        with self._lifecycle_lock:
+            if self._lifecycle is RuntimeLifecycle.STARTED:
+                return False
+            if self._lifecycle is RuntimeLifecycle.CLOSED:
+                raise RuntimeError("observability runtime is closed")
+            if self._lifecycle is not RuntimeLifecycle.CREATED:
+                raise RuntimeError(
+                    f"observability runtime cannot start while {self._lifecycle.value}"
+                )
+            self._lifecycle = RuntimeLifecycle.STARTING
+            return True
+
+    def _begin_close(self) -> bool:
+        """原子进入关闭阶段；已关闭或正在关闭时保持幂等。"""
+        with self._lifecycle_lock:
+            if self._lifecycle in {
+                RuntimeLifecycle.CLOSED,
+                RuntimeLifecycle.CLOSING,
+            }:
+                return False
+            if self._lifecycle is RuntimeLifecycle.STARTING:
+                raise RuntimeError("observability runtime is starting")
+            self._lifecycle = RuntimeLifecycle.CLOSING
+            return True
+
+    def _current_lifecycle(self) -> RuntimeLifecycle:
+        """在线程安全边界内读取 Runtime 生命周期。"""
+        with self._lifecycle_lock:
+            return self._lifecycle
 
 
 def create_observability(
@@ -236,10 +326,16 @@ def install_observability(
     runtime = create_observability(config)
 
     if app is not None:
+        state = getattr(app, "state", None)
+        if state is None:
+            raise TypeError("observability app target must expose state")
         if runtime.config.instrumentation.get_options("fastapi").enabled:
             runtime.instrument_fastapi(app)
-            state = getattr(app, "state", None)
-            setattr(state, "observability", runtime)
+        if runtime.config.status.enabled:
+            from .status.fastapi import install_status_route
+
+            install_status_route(app, runtime)
+        setattr(state, "observability", runtime)
 
     if scheduler is not None:
         if runtime.config.instrumentation.get_options("apscheduler").enabled:

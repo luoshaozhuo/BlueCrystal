@@ -130,6 +130,7 @@ class FastAPIInstrumentation:
                 correlation_id = request.headers.get("x-correlation-id") or request_id
                 actor = self._actor_resolver(request)
                 with bind_request_context(
+                    runtime_context=runtime.context,
                     request_id=request_id,
                     correlation_id=correlation_id,
                     actor=actor,
@@ -157,6 +158,7 @@ class FastAPIInstrumentation:
                     excluded_urls=self._excluded_urls,
                     **self._otel_options,
                 )
+                self._otel_installed = True
             self._installed = True
         finally:
             # 即使第三方安装中途失败，也记录本 adapter 已产生的对象供回滚。
@@ -194,3 +196,12 @@ class FastAPIInstrumentation:
 
     def stop(self) -> None:
         """FastAPI adapter 无独立运行期资源。"""
+
+    def status_details(self) -> dict[str, object]:
+        """返回不含请求数据的 FastAPI instrumentation 状态。"""
+        return {
+            "enabled": self._enabled,
+            "otel_installed": self._otel_installed,
+            "metrics_exposed": self._prometheus_instrumentator is not None
+            and self._expose_metrics,
+        }
