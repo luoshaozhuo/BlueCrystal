@@ -45,7 +45,11 @@ class ManagedService(Protocol):
         """返回用于本地注册和静态配置匹配的稳定服务标识。"""
 
     async def start(self) -> None:
-        """启动真实运行体，使服务最终报告为可运行但默认未激活。"""
+        """启动真实运行体并等待稳定初始状态。
+
+        成功返回时，``snapshot`` 必须已报告 ``RUNNING`` 与 ``INACTIVE``。底层运行体
+        若异步完成启动，实现方必须在此方法内等待，不得将该等待责任泄漏给 Deploy Runtime。
+        """
 
     async def activate(self, ownership: Ownership | None = None) -> None:
         """允许服务发起 Active 业务；托管模式会传入已确认的 Ownership。"""

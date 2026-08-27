@@ -1,13 +1,15 @@
-"""ClusterRuntime 生命周期与三大一级模块的编排实现。
+"""ClusterRuntime 生命周期与一级模块的编排实现。
 
-本模块只编排 Coordination、ManagedService Management 和 Reconciliation Control 的确定
-启动/关闭顺序；不直接调用具体运行框架，也不实现真实分布式 Failover、Failback 或多活。
-启动失败会保留 FAILED 事实，调用方仍可通过 ``stop`` 进入统一资源清理路径。
+本模块只编排 Coordination、ManagedService Management、Coordination Maintenance 和
+Reconciliation Control 的确定启动/关闭顺序；不直接调用具体运行框架，也不实现真实分布式
+Failover、Failback 或多活。启动失败会保留 FAILED 事实，调用方仍可通过 ``stop`` 进入统一
+资源清理路径。
 """
 
 from __future__ import annotations
 
 from .core.cluster_coordination import ClusterCoordination
+from .core.coordination_maintenance import CoordinationMaintenance
 from .core.managed_service_management import ManagedServiceManagement
 from .core.reconciler import ActualFacts, DesiredState, Reconciler
 from .core.reconciliation import ReconciliationControl
@@ -21,8 +23,9 @@ class ClusterRuntime:
     """当前节点 Deploy Runtime 的单次生命周期编排器。
 
     Runtime 从 CREATED 只能进入一次启动路径；到达 STOPPED 后不可重启。ManagedService
-    应在 ``start`` 前注册，启动顺序固定为 Coordination、Service Management、READY、
-    Reconciliation；关闭则先停止控制器，再停用服务、释放 Ownership、停止服务并离开集群。
+    应在 ``start`` 前注册，启动顺序固定为 Coordination、Coordination Maintenance、Service
+    Management、READY、Reconciliation；关闭则先停止 Reconciliation，再停用服务、释放
+    Ownership、停止服务、离开集群并停止 Coordination Maintenance。
     """
 
     def __init__(
@@ -32,20 +35,26 @@ class ClusterRuntime:
         *,
         reconciler: Reconciler | None = None,
         reconciliation_interval_seconds: float = 1.0,
+        coordination_maintenance_interval_seconds: float = 1.0,
     ) -> None:
-        """构造未启动的 Runtime，并装配三个一级模块。
+        """构造未启动的 Runtime，并装配 Coordination 与两个长期控制单元。
 
         Args:
             cluster: 已完成基础校验的静态 Cluster 模型。
             coordination_port: 提供 Membership 与 Ownership 事实的适配器。
             reconciler: 可替换的纯决策器；默认使用第一阶段空计划实现。
             reconciliation_interval_seconds: 控制循环最长等待间隔。
+            coordination_maintenance_interval_seconds: Coordination Maintenance 循环最长等待间隔。
         """
         self._cluster = cluster
         self._state = ClusterRuntimeLifecycleState.CREATED
         self._failure: Exception | None = None
         self._service_management = ManagedServiceManagement()
         self._coordination = ClusterCoordination(cluster.local_node_id, coordination_port)
+        self._coordination_maintenance = CoordinationMaintenance(
+            self._maintain_coordination_once,
+            interval_seconds=coordination_maintenance_interval_seconds,
+        )
         self._reconciler = reconciler or Reconciler()
         self._reconciliation = ReconciliationControl(
             self._reconcile_once,
@@ -85,7 +94,7 @@ class ClusterRuntime:
         self._service_management.register(service)
 
     async def start(self) -> None:
-        """按确定顺序启动协调、服务与 Reconciliation Control。
+        """按确定顺序启动协调、维护、服务与 Reconciliation Control。
 
         Raises:
             RuntimeError: 当前实例不是可启动的 CREATED 状态。
@@ -97,6 +106,7 @@ class ClusterRuntime:
         self._state = ClusterRuntimeLifecycleState.STARTING
         try:
             await self._coordination.start()
+            await self._coordination_maintenance.start()
             await self._service_management.start_all()
             await self._coordination.mark_ready()
             await self._reconciliation.start()
@@ -127,6 +137,7 @@ class ClusterRuntime:
             self._coordination.release_local_ownerships,
             self._service_management.stop_all,
             self._coordination.leave,
+            self._coordination_maintenance.stop,
         ):
             try:
                 await cleanup()
@@ -150,6 +161,14 @@ class ClusterRuntime:
             services=self._service_management.snapshots(),
         )
         self._reconciler.reconcile(DesiredState(self._cluster), actual)
+
+    async def _maintain_coordination_once(self) -> None:
+        """读取 Coordination 的权威事实，为后续维护算法保留安全生命周期入口。
+
+        第一阶段不续租、不改变 Membership、不操作 Ownership，也不影响 ManagedService 的
+        Activation；读取快照仅验证长期维护 Task 可以在 Runtime 生命周期内安全运行。
+        """
+        await self._coordination.snapshot()
 
     def _validate_registration(self) -> None:
         """确保静态模型与本节点已注册对象一一对应，避免启动半配置 Runtime。"""

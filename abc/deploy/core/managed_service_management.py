@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from ..managed import ManagedService, ManagedServiceSnapshot
 from ..model.ownership import Ownership
-from ..model.state import ManagedServiceActivationState
+from ..model.state import ManagedServiceActivationState, ManagedServiceLifecycleState
 from .managed_service_registry import ManagedServiceRegistry
 
 
@@ -29,9 +29,29 @@ class ManagedServiceManagement:
         self._registry.add(service)
 
     async def start_all(self) -> None:
-        """按注册顺序启动所有服务；任一失败立即传播供 Runtime 进入 FAILED。"""
+        """按注册顺序启动并确认所有服务的实际初始状态。
+
+        ``ManagedService.start`` 成功返回只表示实现方已完成其底层启动等待；本门面仍
+        必须从权威 snapshot 确认服务确已 RUNNING 且保持 INACTIVE，才允许 Runtime
+        将节点发布为 READY。
+
+        Raises:
+            RuntimeError: 服务快照的标识或生命周期状态不符合启动后的稳定契约。
+        """
         for service in self._registry.list():
             await service.start()
+            snapshot = service.snapshot()
+            if (
+                snapshot.service_id != service.service_id
+                or snapshot.lifecycle_state is not ManagedServiceLifecycleState.RUNNING
+                or snapshot.activation_state is not ManagedServiceActivationState.INACTIVE
+            ):
+                raise RuntimeError(
+                    "ManagedService 启动后的实际状态不符合稳定契约: "
+                    f"service_id={service.service_id}, "
+                    f"lifecycle_state={snapshot.lifecycle_state}, "
+                    f"activation_state={snapshot.activation_state}"
+                )
 
     async def stop_all(self) -> None:
         """按逆注册顺序停止服务，降低依赖服务先被销毁的风险。"""
