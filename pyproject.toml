@@ -111,7 +111,10 @@ no_implicit_optional = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests"]
+testpaths = [
+    "tests",
+    "abc/deploy/test",
+]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

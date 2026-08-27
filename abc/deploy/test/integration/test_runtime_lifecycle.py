@@ -27,10 +27,24 @@ from deploy.runtime import ClusterRuntime
 class FakeCoordinationPort:
     """记录 Membership 调用顺序的本地 CoordinationPort 替身。"""
 
+<<<<<<< HEAD
     def __init__(self, events: list[str], before_leaving: Callable[[], None]) -> None:
         """创建空成员事实；回调用于从公开 Runtime 状态记录控制器已停止。"""
         self._events = events
         self._before_leaving = before_leaving
+=======
+    def __init__(
+        self,
+        events: list[str],
+        before_leaving: Callable[[], None],
+        *,
+        before_mark_ready: Callable[[], None] | None = None,
+    ) -> None:
+        """创建空成员事实；回调用于观察 READY 前和 LEAVING 前的公开 Runtime 状态。"""
+        self._events = events
+        self._before_leaving = before_leaving
+        self._before_mark_ready = before_mark_ready
+>>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
         self._node_states: dict[str, NodeState] = {}
 
     async def join(self, node_id: str) -> None:
@@ -40,6 +54,11 @@ class FakeCoordinationPort:
 
     async def mark_ready(self, node_id: str) -> None:
         """记录 READY 发布。"""
+<<<<<<< HEAD
+=======
+        if self._before_mark_ready is not None:
+            self._before_mark_ready()
+>>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
         self._events.append("coordination.mark_ready")
         self._node_states[node_id] = NodeState.READY
 
@@ -165,7 +184,19 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
         assert runtime.reconciliation_running is False
         events.append("reconciliation.stop")
 
+<<<<<<< HEAD
     coordination = FakeCoordinationPort(events, record_reconciliation_stopped)
+=======
+    def assert_reconciliation_not_started() -> None:
+        """确认节点发布 READY 时 Reconciliation Control 尚未启动。"""
+        assert runtime.reconciliation_running is False
+
+    coordination = FakeCoordinationPort(
+        events,
+        record_reconciliation_stopped,
+        before_mark_ready=assert_reconciliation_not_started,
+    )
+>>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
     runtime = ClusterRuntime(make_cluster("service-a", "service-b"), coordination)
     service_a = FakeManagedService("service-a", events, on_start=record_maintenance_before_service_start)
     service_b = FakeManagedService("service-b", events, on_start=record_maintenance_before_service_start)
@@ -173,7 +204,10 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
     runtime.register(service_b)
 
     await runtime.start()
+<<<<<<< HEAD
     events.append("reconciliation.start")
+=======
+>>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
     assert runtime.state is ClusterRuntimeLifecycleState.RUNNING
     assert runtime.coordination_maintenance_running is True
     assert runtime.reconciliation_running is True
@@ -192,7 +226,10 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
     assert events.index("coordination_maintenance.start") < events.index("service-a.start")
     assert events.index("service-b.start") < events.index("service-b.snapshot")
     assert events.index("service-b.snapshot") < events.index("coordination.mark_ready")
+<<<<<<< HEAD
     assert events.index("coordination.mark_ready") < events.index("reconciliation.start")
+=======
+>>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
     assert events.index("reconciliation.stop") < events.index("coordination.begin_leaving")
     assert events.index("coordination.begin_leaving") < service_b_shutdown_snapshot
     assert service_b_shutdown_snapshot < events.index("service-b.deactivate")
