@@ -33,11 +33,13 @@ class FakeCoordinationPort:
         before_leaving: Callable[[], None],
         *,
         before_mark_ready: Callable[[], None] | None = None,
+        before_leave: Callable[[], None] | None = None,
     ) -> None:
-        """创建空成员事实；回调用于观察 READY 前和 LEAVING 前的公开 Runtime 状态。"""
+        """创建空成员事实；回调用于观察 READY、LEAVING 和 leave 前的公开 Runtime 状态。"""
         self._events = events
         self._before_leaving = before_leaving
         self._before_mark_ready = before_mark_ready
+        self._before_leave = before_leave
         self._node_states: dict[str, NodeState] = {}
         self._ownerships: dict[tuple[str, int], Ownership] = {}
 
@@ -65,6 +67,8 @@ class FakeCoordinationPort:
 
     async def leave(self, node_id: str) -> None:
         """记录节点离开；维护循环仍应在该阶段之后才停止。"""
+        if self._before_leave is not None:
+            self._before_leave()
         self._events.append("coordination.leave")
         self._node_states.pop(node_id, None)
 
@@ -190,10 +194,15 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
         """确认节点发布 READY 时 Reconciliation Control 尚未启动。"""
         assert runtime.reconciliation_running is False
 
+    def assert_maintenance_still_running_before_leave() -> None:
+        """确认真实 leave 调用发生时 Coordination Maintenance 尚未停止。"""
+        assert runtime.coordination_maintenance_running is True
+
     coordination = FakeCoordinationPort(
         events,
         record_reconciliation_stopped,
         before_mark_ready=assert_reconciliation_not_started,
+        before_leave=assert_maintenance_still_running_before_leave,
     )
     runtime = ClusterRuntime(make_cluster("service-a", "service-b"), coordination)
     service_a = FakeManagedService("service-a", events, on_start=record_maintenance_before_service_start)
@@ -219,7 +228,6 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
         )
     )
     await runtime.stop()
-    events.append("coordination_maintenance.stop")
 
     assert runtime.state is ClusterRuntimeLifecycleState.STOPPED
     assert runtime.coordination_maintenance_running is False
@@ -239,7 +247,6 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
     assert events.index("coordination.release_local_ownership") < events.index("service-b.stop")
     assert events.index("service-b.stop") < events.index("service-a.stop")
     assert events.index("service-a.stop") < events.index("coordination.leave")
-    assert events.index("coordination.leave") < events.index("coordination_maintenance.stop")
 
 
 @pytest.mark.asyncio
