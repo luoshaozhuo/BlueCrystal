@@ -39,7 +39,7 @@ class ManagedServiceLifecycleState(StrEnum):
 
 
 class ManagedServiceActivationState(StrEnum):
-    """ManagedService 是否允许执行 Active 业务的正交状态。""
+    """ManagedService 是否允许执行 Active 业务的正交状态。"""
 
     INACTIVE = "INACTIVE"
     ACTIVATING = "ACTIVATING"

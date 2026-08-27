@@ -55,10 +55,19 @@ class ManagedService(Protocol):
         """允许服务发起 Active 业务；托管模式会传入已确认的 Ownership。"""
 
     async def deactivate(self) -> None:
-        """停止发起新的 Active 业务，但不等同于停止真实运行体。"""
+        """停止发起新的 Active 业务，并保证对未激活状态幂等。
+
+        已经 ``INACTIVE``、尚未启动或尚未进入 ``ACTIVE`` 的服务调用本方法必须安全返回；
+        正常返回后，``snapshot`` 必须稳定报告 ``INACTIVE``。本方法不等同于停止真实运行体。
+        """
 
     async def stop(self) -> None:
-        """有序停止真实运行体，并释放实现方持有的本地资源。"""
+        """有序停止真实运行体，并保证 cleanup 对任意本地生命周期阶段幂等。
+
+        尚未启动或已经 ``STOPPED`` 的服务调用本方法必须安全返回，重复调用不得重复破坏底层
+        资源。正常返回后，``snapshot`` 必须稳定报告 ``STOPPED``；Runtime 因而无需镜像记录
+        哪些服务曾成功启动。
+        """
 
     async def wait(self) -> None:
         """等待真实运行体正常结束或异常退出；退出事实必须可由 snapshot 观察。"""

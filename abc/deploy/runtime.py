@@ -76,6 +76,16 @@ class ClusterRuntime:
         """暴露服务管理门面供宿主读取受管服务快照。"""
         return self._service_management
 
+    @property
+    def coordination_maintenance_running(self) -> bool:
+        """返回 Coordination Maintenance 后台任务是否仍在运行，不暴露其控制接口。"""
+        return self._coordination_maintenance.is_running
+
+    @property
+    def reconciliation_running(self) -> bool:
+        """返回 Reconciliation 后台任务是否仍在运行，不暴露其控制接口。"""
+        return self._reconciliation.is_running
+
     def register(self, service: ManagedService) -> None:
         """在启动前注册一个本节点 ManagedService。
 
