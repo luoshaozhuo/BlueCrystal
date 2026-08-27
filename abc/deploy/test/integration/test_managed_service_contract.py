@@ -10,10 +10,7 @@ from __future__ import annotations
 import pytest
 
 from deploy.managed import ManagedServiceSnapshot
-<<<<<<< HEAD
-=======
 from deploy.model.ownership import Ownership
->>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
 from deploy.model.state import ManagedServiceActivationState, ManagedServiceLifecycleState
 
 
@@ -36,14 +33,9 @@ class FakeManagedService:
         self._lifecycle_state = ManagedServiceLifecycleState.RUNNING
         self._activation_state = ManagedServiceActivationState.INACTIVE
 
-<<<<<<< HEAD
-    async def activate(self) -> None:
-        """仅为完整 Protocol 提供最小激活行为；本测试不验证重复激活语义。"""
-=======
     async def activate(self, ownership: Ownership | None = None) -> None:
         """仅为完整 Protocol 提供最小激活行为；本测试不验证重复激活语义。"""
         del ownership
->>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
         self._activation_state = ManagedServiceActivationState.ACTIVE
 
     async def deactivate(self) -> None:

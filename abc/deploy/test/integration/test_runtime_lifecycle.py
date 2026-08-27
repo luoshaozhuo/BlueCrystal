@@ -14,7 +14,7 @@ import pytest
 from deploy.adapters.coordination.local import LocalCoordination
 from deploy.managed import ManagedServiceSnapshot
 from deploy.model.cluster import ClusterModel, ManagedServiceSpec, NodeSpec
-from deploy.model.ownership import CoordinationSnapshot, Ownership
+from deploy.model.ownership import CoordinationSnapshot, Lease, Ownership
 from deploy.model.state import (
     ClusterRuntimeLifecycleState,
     ManagedServiceActivationState,
@@ -27,12 +27,6 @@ from deploy.runtime import ClusterRuntime
 class FakeCoordinationPort:
     """记录 Membership 调用顺序的本地 CoordinationPort 替身。"""
 
-<<<<<<< HEAD
-    def __init__(self, events: list[str], before_leaving: Callable[[], None]) -> None:
-        """创建空成员事实；回调用于从公开 Runtime 状态记录控制器已停止。"""
-        self._events = events
-        self._before_leaving = before_leaving
-=======
     def __init__(
         self,
         events: list[str],
@@ -44,8 +38,12 @@ class FakeCoordinationPort:
         self._events = events
         self._before_leaving = before_leaving
         self._before_mark_ready = before_mark_ready
->>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
         self._node_states: dict[str, NodeState] = {}
+        self._ownerships: dict[tuple[str, int], Ownership] = {}
+
+    def seed_local_ownership(self, ownership: Ownership) -> None:
+        """写入供 shutdown 测试释放的本地 Ownership；不属于正式 CoordinationPort。"""
+        self._ownerships[(ownership.service_id, ownership.replica_slot)] = ownership
 
     async def join(self, node_id: str) -> None:
         """记录加入并发布 JOINING 状态。"""
@@ -54,11 +52,8 @@ class FakeCoordinationPort:
 
     async def mark_ready(self, node_id: str) -> None:
         """记录 READY 发布。"""
-<<<<<<< HEAD
-=======
         if self._before_mark_ready is not None:
             self._before_mark_ready()
->>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
         self._events.append("coordination.mark_ready")
         self._node_states[node_id] = NodeState.READY
 
@@ -74,10 +69,12 @@ class FakeCoordinationPort:
         self._node_states.pop(node_id, None)
 
     async def snapshot(self) -> CoordinationSnapshot:
-        """返回本地成员事实；本替身不提供 Ownership。"""
-        if self._node_states.get("node-a") is NodeState.LEAVING:
-            self._events.append("coordination.release_local_ownerships")
-        return CoordinationSnapshot(dict(self._node_states), (), True)
+        """返回本地成员与 Ownership 事实，不在读取路径产生控制事件。"""
+        return CoordinationSnapshot(
+            node_states=dict(self._node_states),
+            ownerships=tuple(self._ownerships.values()),
+            coordination_available=True,
+        )
 
     async def try_acquire(self, service_id: str, replica_slot: int, node_id: str) -> Ownership | None:
         """第一阶段测试不执行 Ownership 获取，因此固定返回 None。"""
@@ -88,9 +85,13 @@ class FakeCoordinationPort:
         return None
 
     async def release(self, ownership: Ownership) -> bool:
-        """记录本地释放阶段；本替身没有 Ownership 可释放。"""
-        self._events.append("coordination.release_local_ownerships")
-        return False
+        """仅在持有精确匹配的 Ownership 时记录并执行真实的测试释放。"""
+        key = (ownership.service_id, ownership.replica_slot)
+        if self._ownerships.get(key) != ownership:
+            return False
+        self._events.append("coordination.release_local_ownership")
+        del self._ownerships[key]
+        return True
 
 
 class FakeManagedService:
@@ -131,6 +132,7 @@ class FakeManagedService:
 
     async def activate(self, ownership: Ownership | None = None) -> None:
         """记录测试中的显式 Active 状态，以验证关闭阶段会执行 deactivate。"""
+        del ownership
         self._events.append(f"{self.service_id}.activate")
         self._activation_state = ManagedServiceActivationState.ACTIVE
 
@@ -184,9 +186,6 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
         assert runtime.reconciliation_running is False
         events.append("reconciliation.stop")
 
-<<<<<<< HEAD
-    coordination = FakeCoordinationPort(events, record_reconciliation_stopped)
-=======
     def assert_reconciliation_not_started() -> None:
         """确认节点发布 READY 时 Reconciliation Control 尚未启动。"""
         assert runtime.reconciliation_running is False
@@ -196,7 +195,6 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
         record_reconciliation_stopped,
         before_mark_ready=assert_reconciliation_not_started,
     )
->>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
     runtime = ClusterRuntime(make_cluster("service-a", "service-b"), coordination)
     service_a = FakeManagedService("service-a", events, on_start=record_maintenance_before_service_start)
     service_b = FakeManagedService("service-b", events, on_start=record_maintenance_before_service_start)
@@ -204,16 +202,22 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
     runtime.register(service_b)
 
     await runtime.start()
-<<<<<<< HEAD
-    events.append("reconciliation.start")
-=======
->>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
     assert runtime.state is ClusterRuntimeLifecycleState.RUNNING
     assert runtime.coordination_maintenance_running is True
     assert runtime.reconciliation_running is True
 
     await service_a.activate()
     await service_b.activate()
+    coordination.seed_local_ownership(
+        Ownership(
+            service_id="service-a",
+            replica_slot=0,
+            owner_node_id="node-a",
+            lease=Lease("lease-a", "node-a", float("inf")),
+            epoch=1,
+            fencing_token=1,
+        )
+    )
     await runtime.stop()
     events.append("coordination_maintenance.stop")
 
@@ -226,17 +230,13 @@ async def test_cluster_runtime_start_and_stop_follows_lifecycle_order() -> None:
     assert events.index("coordination_maintenance.start") < events.index("service-a.start")
     assert events.index("service-b.start") < events.index("service-b.snapshot")
     assert events.index("service-b.snapshot") < events.index("coordination.mark_ready")
-<<<<<<< HEAD
-    assert events.index("coordination.mark_ready") < events.index("reconciliation.start")
-=======
->>>>>>> acc39ee (test(deploy): 覆盖第一阶段生命周期与 cleanup 契约)
     assert events.index("reconciliation.stop") < events.index("coordination.begin_leaving")
     assert events.index("coordination.begin_leaving") < service_b_shutdown_snapshot
     assert service_b_shutdown_snapshot < events.index("service-b.deactivate")
     assert events.index("service-b.deactivate") < service_a_shutdown_snapshot
     assert service_a_shutdown_snapshot < events.index("service-a.deactivate")
-    assert events.index("service-a.deactivate") < events.index("coordination.release_local_ownerships")
-    assert events.index("coordination.release_local_ownerships") < events.index("service-b.stop")
+    assert events.index("service-a.deactivate") < events.index("coordination.release_local_ownership")
+    assert events.index("coordination.release_local_ownership") < events.index("service-b.stop")
     assert events.index("service-b.stop") < events.index("service-a.stop")
     assert events.index("service-a.stop") < events.index("coordination.leave")
     assert events.index("coordination.leave") < events.index("coordination_maintenance.stop")
